@@ -1,0 +1,21 @@
+<div class="import-page">
+  <header class="import-header">
+    <h1 class="app-title">ALCHEMY<sup>5</sup></h1>
+    <p>Import a Uticor/Modbus XML file. Preload elements are skipped on import and rebuilt on export.</p>
+  </header>
+
+  <%= form_with url: documents_path, method: :post, local: true, multipart: true, class: "import-form", data: { controller: "file-field" } do |f| %>
+    <div class="field">
+      <label for="xml_file">XML file</label>
+      <div class="file-input-wrap">
+        <label for="xml_file" class="file-input-btn">Choose file</label>
+        <%= file_field_tag :xml_file, accept: ".xml,application/xml,text/xml", required: true, class: "file-input", id: "xml_file", data: { file_field_target: "input", action: "change->file-field#showName" } %>
+        <span class="file-input-status" data-file-field-target="status">No file selected</span>
+      </div>
+    </div>
+    <div class="form-actions">
+      <%= submit_tag "Import", class: "btn btn-primary" %>
+      <%= link_to "Cancel", root_path, class: "btn btn-secondary" %>
+    </div>
+  <% end %>
+</div>

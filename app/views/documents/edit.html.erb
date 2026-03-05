@@ -1,0 +1,123 @@
+<%
+  columns = [
+    ["Tag Group", "tag_group", :text],
+    ["Tag Name", "tag_name", :text],
+    ["Data Type", "data_type", :data_type],
+    ["Address Start", "address_start", :text],
+    ["Data Length", "data_length", :text],
+    ["Scaling", "scaling", :text],
+    ["Read/Write", "read_write", :read_write],
+    ["Verify", "verify", :text]
+  ]
+  data_type_options = ["BOOL", "INT", "UINT", "INT (Scaled)", "UINT (Scaled)", "DINT", "DINT (w/Byte Swap)", "DINT (Scaled)", "DINT (Scaled, w/Byte Swap)", "UDINT", "UDINT (w/Byte Swap)", "UDINT (Scaled)", "UDINT (Scaled, w/Byte Swap)", "REAL", "REAL (w/Byte Swap)", "Unknown"]
+  read_write_options = ["Read Only", "Read+Write"]
+  recs = @sorted_records || @document.records_with_string_keys
+  sort_column = @sort_column
+  sort_direction = @sort_direction
+%>
+
+<div class="workspace">
+  <%= form_with model: @document, url: document_path(@document), method: :patch, class: "workspace-form", data: { controller: "autosave workspace-lock tag-table" } do |f| %>
+    <header class="workspace-header">
+      <div class="header-top">
+        <div class="header-title-block">
+          <%= text_field_tag :metadata_filename, @document.metadata_filename.presence || "Document ##{@document.id}", class: "workspace-title-input", placeholder: "Document name", data: { workspace_lock_target: "headerEditable" }, disabled: true %>
+          <div class="connection-line">
+            <%= select_tag :metadata_protocol, options_for_select([["TCP", "TCP"], ["RTU", "RTU"]], @document.metadata_protocol), class: "connection-inline connection-select", data: { workspace_lock_target: "headerEditable" }, disabled: true %>
+            <%= text_field_tag :metadata_ip, @document.metadata_ip, class: "connection-inline", placeholder: "0.0.0.0", size: 14, data: { workspace_lock_target: "headerEditable" }, disabled: true %>
+          </div>
+        </div>
+        <div class="header-actions">
+          <div class="header-actions-lock-group">
+            <button type="button" class="btn btn-toolbar btn-toolbar-icon btn-add-row" data-tag-table-target="addBtn" title="Add row">+</button>
+            <button type="button" class="btn btn-toolbar btn-toolbar-icon btn-select-mode" data-workspace-lock-target="selectModeBtn" data-action="click->workspace-lock#toggleSelectMode" title="Select Rows" aria-label="Select rows">☑</button>
+            <button type="button" class="btn btn-toolbar btn-toolbar-icon btn-lock" data-workspace-lock-target="toggle" data-action="click->workspace-lock#toggle" title="Lock/unlock editing and column sort">
+              <span data-workspace-lock-target="lockIcon" aria-hidden="true">🔒</span>
+            </button>
+            <%= link_to "🏠", root_path, class: "btn btn-toolbar btn-toolbar-icon", title: "Home", data: { action: "click->tag-table#maybeConfirmLeave" } %>
+          </div>
+          <%= link_to "Export XML", export_document_path(@document), class: "btn btn-toolbar btn-export", data: { turbo: false, action: "click->tag-table#saveThenExport" } %>
+        </div>
+      </div>
+      <p class="loaded-status">
+        <span data-tag-table-target="statusMessage"><%= flash[:edit_status].presence || "" %></span>
+        <span class="loaded-status-count" data-tag-table-target="statusCount"><%= recs.size %> tag<%= "s" if recs.size != 1 %></span>
+      </p>
+    </header>
+
+    <div class="table-container" data-workspace-lock-target="tableContainer">
+      <table class="tag-table">
+        <thead>
+          <tr>
+            <% columns.each do |col_name, _key, _type|
+              type_or_addr = (col_name == "Data Type" || col_name == "Address Start")
+              active = type_or_addr ? (sort_column == "Data Type") : (sort_column == col_name)
+              sort_url = active ? edit_document_path(@document) : edit_document_path(@document, sort: (type_or_addr ? "Data Type" : col_name), direction: "asc")
+            %>
+              <th class="<%= 'sort-asc' if active && sort_direction.present? %>">
+                <%= link_to sort_url, data: { workspace_lock_target: "sortLink", action: "click->workspace-lock#preventSortWhenLocked" } do %>
+                  <%= col_name %>
+                <% end %>
+              </th>
+            <% end %>
+          </tr>
+        </thead>
+        <tbody data-tag-table-target="tbody">
+          <% recs.each_with_index do |row, idx| %>
+            <tr class="tag-data-row" data-tag-table-target="dataRow" data-row-index="<%= idx %>">
+              <% columns.each do |col_name, _key, type|
+                param_key = "records[#{idx}][#{col_name}]"
+                val = row[col_name].to_s
+              %>
+                <td>
+                  <% case type %>
+                  <% when :data_type %>
+                    <%= select_tag param_key, options_for_select(data_type_options, val), name: param_key, class: "cell", data: { workspace_lock_target: "editable" }, disabled: true %>
+                  <% when :read_write %>
+                    <%= select_tag param_key, options_for_select(read_write_options, val), name: param_key, class: "cell", data: { workspace_lock_target: "editable" }, disabled: true %>
+                  <% else %>
+                    <%= text_field_tag param_key, val, name: param_key, class: "cell", size: [12, val.length + 2].max.clamp(6, 36), data: { workspace_lock_target: "editable" }, disabled: true %>
+                  <% end %>
+                </td>
+              <% end %>
+            </tr>
+          <% end %>
+          <tr id="tag-row-template" class="tag-row-template tag-data-row" aria-hidden="true" style="display: none;" data-tag-table-target="templateRow">
+            <% columns.each do |col_name, _key, type|
+              name_pattern = "records[__INDEX__][#{col_name}]"
+              val = case col_name
+              when "Data Type" then "INT"
+              when "Data Length" then "1"
+              when "Read/Write" then "Read Only"
+              when "Verify" then "7 (Changed)"
+              else ""
+              end
+            %>
+              <td>
+                <% case type %>
+                <% when :data_type %>
+                  <%= select_tag "", options_for_select(data_type_options, val), class: "cell", data: { workspace_lock_target: "editable", name_pattern: name_pattern }, disabled: true %>
+                <% when :read_write %>
+                  <%= select_tag "", options_for_select(read_write_options, val), class: "cell", data: { workspace_lock_target: "editable", name_pattern: name_pattern }, disabled: true %>
+                <% else %>
+                  <%= text_field_tag "", val, class: "cell", size: 12, data: { workspace_lock_target: "editable", name_pattern: name_pattern }, disabled: true %>
+                <% end %>
+              </td>
+            <% end %>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="leave-dialog-overlay" data-tag-table-target="leaveDialog" aria-hidden="true" role="dialog" aria-labelledby="leave-dialog-title">
+      <div class="leave-dialog">
+        <p id="leave-dialog-title" class="leave-dialog-title">You have unsaved changes. Save before leaving?</p>
+        <div class="leave-dialog-actions">
+          <button type="button" class="btn btn-toolbar" data-action="click->tag-table#leaveDialogSave">Save and go home</button>
+          <button type="button" class="btn btn-toolbar" data-action="click->tag-table#leaveDialogDiscard">Discard and go home</button>
+          <button type="button" class="btn btn-toolbar" data-action="click->tag-table#leaveDialogCancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+  <% end %>
+</div>

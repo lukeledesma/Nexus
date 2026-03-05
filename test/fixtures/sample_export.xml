@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GLOBAL>
+  <XML>
+    <Preload_Words_0_99 type="STRING">
+      <TYPE type="STRING">"TCP"</TYPE>
+      <FUNCCODE type="STRING">"03"</FUNCCODE>
+      <ADDRSTART type="STRING">"0"</ADDRSTART>
+      <DATALENGTH type="STRING">"100"</DATALENGTH>
+      <NODEID type="STRING">"Preload"</NODEID>
+    </Preload_Words_0_99>
+    <MyTag type="STRING">
+      <TYPE type="STRING">"TCP"</TYPE>
+      <DEVICEID type="STRING">"1"</DEVICEID>
+      <FUNCCODE type="STRING">"03"</FUNCCODE>
+      <ADDRSTART type="STRING">"10"</ADDRSTART>
+      <DATALENGTH type="STRING">"1"</DATALENGTH>
+      <ALIAS type="STRING">"none"</ALIAS>
+      <NODEID type="STRING">"Default"</NODEID>
+      <IP type="STRING">"192.168.1.1"</IP>
+      <PORT type="STRING">"502"</PORT>
+      <DATATYPE type="STRING">"4"</DATATYPE>
+      <ENCODE type="STRING">"255"</ENCODE>
+      <EXPR type="STRING">"1.0"</EXPR>
+      <SUBSCRIBE type="STRING">"off"</SUBSCRIBE>
+    </MyTag>
+  </XML>
+</GLOBAL>

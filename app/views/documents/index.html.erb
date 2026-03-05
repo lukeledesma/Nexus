@@ -1,0 +1,32 @@
+<div class="home">
+  <header class="home-header">
+    <h1 class="app-title">ALCHEMY<sup>5</sup></h1>
+    <p class="tagline">Modbus TCP tag editor — import XML, edit tags, export with preloads rebuilt.</p>
+  </header>
+
+  <div class="home-actions">
+    <%= form_with url: documents_path, method: :post, local: true, multipart: true, class: "home-import-form", data: { controller: "import-form" } do |f| %>
+      <%= file_field_tag :xml_file, accept: ".xml,application/xml,text/xml", class: "file-input-hidden", id: "home_xml_file", data: { action: "change->import-form#submit" } %>
+      <button type="button" class="btn btn-primary" data-action="click->import-form#chooseFile">Import</button>
+    <% end %>
+    <%= button_to "New", documents_path, method: :post, params: { blank: "1" }, class: "btn btn-secondary" %>
+  </div>
+
+  <% if @documents.any? %>
+    <section class="recent-docs" data-controller="recent-docs">
+      <h2>Recent</h2>
+      <ul>
+        <% @documents.each do |doc| %>
+          <li class="doc-row" tabindex="0" data-recent-docs-target="doc" data-delete-url="<%= document_path(doc) %>">
+            <%= link_to document_path(doc), class: "doc-link" do %>
+              <span class="doc-name"><%= doc.metadata_filename.presence || "Document ##{doc.id}" %></span>
+              <span class="doc-count"><%= doc.records.size %> tag(s)</span>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    </section>
+  <% else %>
+    <p class="empty-state">No documents yet. Use <strong>Import</strong> or <strong>New</strong> to get started.</p>
+  <% end %>
+</div>
