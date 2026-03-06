@@ -7,20 +7,20 @@ export default class extends Controller {
   connect() {
     this.reorderMode = false
     this.selectMode = false
-    const fromSortNav = sessionStorage.getItem("nexus_workspace_sort_nav") === "1"
+    const fromSortNav = sessionStorage.getItem("alchemy_workspace_sort_nav") === "1"
     this.locked = !fromSortNav && !this.initialUnlockedValue
     if (this.initialUnlockedValue && !this.locked) {
-      sessionStorage.setItem("nexus_workspace_unlocked", "1")
-      sessionStorage.setItem("nexus_workspace_path", window.location.pathname)
+      sessionStorage.setItem("alchemy_workspace_unlocked", "1")
+      sessionStorage.setItem("alchemy_workspace_path", window.location.pathname)
     }
     if (fromSortNav) {
       clearTimeout(this._sortNavClearTimeout)
       this._sortNavClearTimeout = setTimeout(() => {
-        sessionStorage.removeItem("nexus_workspace_sort_nav")
+        sessionStorage.removeItem("alchemy_workspace_sort_nav")
         this._sortNavClearTimeout = null
       }, 500)
     } else {
-      sessionStorage.removeItem("nexus_workspace_sort_nav")
+      sessionStorage.removeItem("alchemy_workspace_sort_nav")
     }
     this.boundPreventSort = this.preventSortWhenLocked.bind(this)
     this._sortLinks = this.hasSortLinkTarget ? [...this.sortLinkTargets] : []
@@ -43,12 +43,12 @@ export default class extends Controller {
       this.reorderMode = false
       this.selectMode = false
       this.clearRowSelections()
-      sessionStorage.removeItem("nexus_workspace_unlocked")
-      sessionStorage.removeItem("nexus_workspace_path")
-      sessionStorage.removeItem("nexus_workspace_sort_nav")
+      sessionStorage.removeItem("alchemy_workspace_unlocked")
+      sessionStorage.removeItem("alchemy_workspace_path")
+      sessionStorage.removeItem("alchemy_workspace_sort_nav")
     } else {
-      sessionStorage.setItem("nexus_workspace_unlocked", "1")
-      sessionStorage.setItem("nexus_workspace_path", window.location.pathname)
+      sessionStorage.setItem("alchemy_workspace_unlocked", "1")
+      sessionStorage.setItem("alchemy_workspace_path", window.location.pathname)
     }
     this.updateUi()
   }
@@ -70,7 +70,7 @@ export default class extends Controller {
       e.preventDefault()
       e.stopPropagation()
     } else {
-      sessionStorage.setItem("nexus_workspace_sort_nav", "1")
+      sessionStorage.setItem("alchemy_workspace_sort_nav", "1")
     }
   }
 
