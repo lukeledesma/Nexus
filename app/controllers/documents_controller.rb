@@ -3,14 +3,14 @@
 require Rails.root.join("app/services/tag_xml.rb").to_s
 
 class DocumentsController < ApplicationController
-  RECORD_KEYS = ["Tag Group", "Tag Name", "Data Type", "Address Start", "Data Length", "Scaling", "Read/Write", "Verify"].freeze
+  RECORD_KEYS = ["Tag Group", "Tag Name", "Data Type", "Address Start", "Data Length", "Scaling", "Read/Write"].freeze
 
   # Canonical order for Data Type (register / type precedence)
   DATA_TYPE_ORDER = [
-    "BOOL", "INT", "UINT", "INT (Scaled)", "UINT (Scaled)",
+    "BOOL", "BOOL (Bit of INT)", "INT", "UINT", "INT (Scaled)", "UINT (Scaled)",
     "DINT", "DINT (w/Byte Swap)", "DINT (Scaled)", "DINT (Scaled, w/Byte Swap)",
     "UDINT", "UDINT (w/Byte Swap)", "UDINT (Scaled)", "UDINT (Scaled, w/Byte Swap)",
-    "REAL", "REAL (w/Byte Swap)", "Unknown"
+    "REAL", "REAL (w/Byte Swap)", "Unique"
   ].freeze
 
   before_action :set_document, only: %i[show edit update export destroy]
@@ -64,20 +64,25 @@ class DocumentsController < ApplicationController
       return redirect_to root_path
     end
 
-    records = TagXml::Parser.parse_records(file.tempfile.path)
-    meta = extract_metadata_from_file(file)
+    xml_path, display_filename = resolve_import_path(file)
+    unless xml_path
+      flash[:alert] = "Could not find XML inside the selected file."
+      return redirect_to root_path
+    end
+
+    records = TagXml::Parser.parse_records(xml_path)
+    meta = extract_metadata_from_path(xml_path, display_filename)
 
     @document = Document.new(
       records: records,
       metadata_ip: meta[:ip],
       metadata_protocol: meta[:protocol],
-      metadata_filename: meta[:filename] || file.original_filename
+      metadata_filename: meta[:filename] || display_filename
     )
 
     if @document.save
-      n = records.size
-      flash[:edit_status] = "#{n} tag#{'s' if n != 1} imported"
-      redirect_to @document
+      flash[:just_imported] = true
+      redirect_to root_path
     else
       flash[:alert] = "Failed to parse XML."
       redirect_to root_path
@@ -160,11 +165,10 @@ class DocumentsController < ApplicationController
       numeric_keys = raw.keys.select { |k| k.to_s.match?(/\A\d+\z/) }.sort_by { |k| k.to_s.to_i }
       numeric_pairs = numeric_keys.map { |k| [k, raw[k]] }
       existing = @document.records_with_string_keys
-      records = numeric_pairs.map do |_, h|
+      records = numeric_pairs.each_with_index.map do |(_, h), idx|
         next {} unless h.respond_to?(:permit)
-        permitted = h.permit(RECORD_KEYS).to_h.transform_keys(&:to_s)
-        key = [permitted["Tag Name"], permitted["Address Start"], permitted["Data Type"]]
-        old = existing.find { |r| [r["Tag Name"], r["Address Start"], r["Data Type"]] == key }
+        permitted = h.permit(RECORD_KEYS + RAW_PRESERVE_KEYS).to_h.transform_keys(&:to_s)
+        old = existing[idx]
         (old || {}).slice(*RAW_PRESERVE_KEYS).merge(permitted)
       end.reject { |r| r.except(*RAW_PRESERVE_KEYS).values.all?(&:blank?) }
       @document.records = records
@@ -221,8 +225,35 @@ class DocumentsController < ApplicationController
     @document = Document.find(params[:id])
   end
 
-  def extract_metadata_from_file(file)
-    root = TagXml::Parser.load_root(file.tempfile.path)
+  def resolve_import_path(file)
+    path = file.tempfile.path
+    name = file.original_filename.to_s
+    if name.end_with?(".tar", ".xml.tar")
+      Dir.mktmpdir("alchemy_tar") do |dir|
+        success = system("tar", "-xf", path, "-C", dir, out: File::NULL, err: File::NULL)
+        unless success
+          return [nil, name]
+        end
+        xml_path = Dir.glob(File.join(dir, "**", "*.xml")).first
+        xml_path ||= Dir.glob(File.join(dir, "**", "*")).find { |f| File.file?(f) }
+        next [nil, name] unless xml_path
+        display = name.sub(/\.tar\z/i, "")
+        display = File.basename(xml_path) if display.blank?
+        # Copy to a temp file so we can use it after the tar dir is removed
+        tmp = Tempfile.new(["alchemy_xml", ".xml"])
+        tmp.binmode
+        tmp.write(File.binread(xml_path))
+        tmp.rewind
+        @_import_tempfile = tmp
+        [tmp.path, display.presence || name]
+      end
+    else
+      [path, name]
+    end
+  end
+
+  def extract_metadata_from_path(xml_path, original_filename)
+    root = TagXml::Parser.load_root(xml_path)
     xml_node = root.elements["XML"] || root
     ip = Document::DEFAULT_IP
     protocol = Document::DEFAULT_PROTOCOL
@@ -232,8 +263,8 @@ class DocumentsController < ApplicationController
       protocol = TagXml::Parser.get_child_text(child, "TYPE").strip.delete('"').presence || Document::DEFAULT_PROTOCOL
       break
     end
-    { ip: ip, protocol: protocol, filename: file.original_filename }
+    { ip: ip, protocol: protocol, filename: original_filename }
   rescue StandardError
-    { ip: Document::DEFAULT_IP, protocol: Document::DEFAULT_PROTOCOL, filename: file.original_filename }
+    { ip: Document::DEFAULT_IP, protocol: Document::DEFAULT_PROTOCOL, filename: original_filename }
   end
 end

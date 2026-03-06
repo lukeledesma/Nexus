@@ -25,8 +25,10 @@ export default class extends Controller {
     const headers = { "X-CSRF-Token": csrf?.content || "", "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" }
     fetch(url, { method: "DELETE", headers, credentials: "same-origin" }).then((res) => {
       if (res.ok) {
+        row.classList.remove("doc-row--just-imported")
         row.classList.add("doc-row--deleting")
-        const onDone = () => {
+        const onDone = (e) => {
+          if (e.animationName !== "doc-row-delete-poof") return
           row.removeEventListener("animationend", onDone)
           row.remove()
           if (this.element.querySelectorAll("[data-recent-docs-target='doc']").length === 0) {

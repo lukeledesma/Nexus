@@ -6,7 +6,7 @@
 
   <div class="home-actions">
     <%= form_with url: documents_path, method: :post, local: true, multipart: true, class: "home-import-form", data: { controller: "import-form" } do |f| %>
-      <%= file_field_tag :xml_file, accept: ".xml,application/xml,text/xml", class: "file-input-hidden", id: "home_xml_file", data: { action: "change->import-form#submit" } %>
+      <%= file_field_tag :xml_file, accept: ".xml,.xml.tar,application/xml,text/xml,application/x-tar", class: "file-input-hidden", id: "home_xml_file", data: { action: "change->import-form#submit" } %>
       <button type="button" class="btn btn-primary" data-action="click->import-form#chooseFile">Import</button>
     <% end %>
     <%= button_to "New", documents_path, method: :post, params: { blank: "1" }, class: "btn btn-secondary" %>
@@ -14,10 +14,10 @@
 
   <% if @documents.any? %>
     <section class="recent-docs" data-controller="recent-docs">
-      <h2>Recent</h2>
+      <h2>Files</h2>
       <ul>
-        <% @documents.each do |doc| %>
-          <li class="doc-row<%= ' doc-row--zero-tags' if doc.records.size.zero? %>" tabindex="0" data-recent-docs-target="doc" data-delete-url="<%= document_path(doc) %>">
+        <% @documents.each_with_index do |doc, idx| %>
+          <li class="doc-row<%= ' doc-row--zero-tags' if doc.records.size.zero? %><%= ' doc-row--just-imported' if idx == 0 && flash[:just_imported] %>" tabindex="0" data-recent-docs-target="doc" data-delete-url="<%= document_path(doc) %>">
             <%= link_to document_path(doc), class: "doc-link" do %>
               <span class="doc-title-block">
                 <% untitled = doc.metadata_filename.blank? || doc.metadata_filename == "Untitled ##{doc.id}" %>

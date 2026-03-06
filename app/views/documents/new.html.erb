@@ -9,7 +9,7 @@
       <label for="xml_file">XML file</label>
       <div class="file-input-wrap">
         <label for="xml_file" class="file-input-btn">Choose file</label>
-        <%= file_field_tag :xml_file, accept: ".xml,application/xml,text/xml", required: true, class: "file-input", id: "xml_file", data: { file_field_target: "input", action: "change->file-field#showName" } %>
+        <%= file_field_tag :xml_file, accept: ".xml,.xml.tar,application/xml,text/xml,application/x-tar", required: true, class: "file-input", id: "xml_file", data: { file_field_target: "input", action: "change->file-field#showName" } %>
         <span class="file-input-status" data-file-field-target="status">No file selected</span>
       </div>
     </div>

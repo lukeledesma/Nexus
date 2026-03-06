@@ -8,7 +8,7 @@ module TagXml
   module DataTypeMapper
     TYPE_MAP = {
       ["107", "255"] => "BOOL",
-      ["107", "107"] => "BOOL",
+      ["107", "107"] => "BOOL (Bit of INT)",
       ["0", "255"] => "INT",
       ["1", "255"] => "UINT",
       ["0", "102"] => "INT (Scaled)",
@@ -28,6 +28,7 @@ module TagXml
 
     EXPORT_CODES = {
       "BOOL" => ["107", "255"],
+      "BOOL (Bit of INT)" => ["107", "255"],
       "INT" => ["0", "255"],
       "UINT" => ["1", "255"],
       "INT (Scaled)" => ["0", "102"],
@@ -44,13 +45,41 @@ module TagXml
       "REAL (w/Byte Swap)" => ["0035", "32"]
     }.freeze
 
+    # Uticor code → human-readable label (for datatype and encode fields)
+    UTICOR_CODE_LABELS = {
+      "0" => "Signed",
+      "1" => "Unsigned",
+      "4" => "32 Bit signed, Big-endian (AB CD)",
+      "5" => "32 Bit signed, Little-endian (DC BA)",
+      "6" => "32 Bit signed, Big-endian byte swap (BA DC)",
+      "7" => "32 Bit signed, Little-endian byte swap (CD AB)",
+      "8" => "32 Bit Unsigned, Big-endian (AB CD)",
+      "9" => "32 Bit Unsigned, Little-endian (DC BA)",
+      "16" => "32 Bit Unsigned, Big-endian byte swap (BA DC)",
+      "17" => "32 Bit Unsigned, Little-endian byte swap (CD AB)",
+      "32" => "32 Bit Float, Big-endian (AB CD)",
+      "33" => "32 Bit Float, Little-endian (DC BA)",
+      "34" => "32 Bit Float, Big-endian byte swap (BA DC)",
+      "35" => "32 Bit Float, Little-endian byte swap (CD AB)",
+      "100" => "Raw",
+      "101" => "Integer",
+      "102" => "Float SP (AB CD) (Legacy)",
+      "103" => "Dummy",
+      "104" => "Float (CD AB) (Legacy)",
+      "105" => "String",
+      "106" => "HEX",
+      "107" => "Boolean",
+      "114" => "Double",
+      "255" => "Ignore",
+      "0032" => "32 Bit Float, Big-endian (AB CD)",
+      "0035" => "32 Bit Float, Little-endian byte swap (CD AB)"
+    }.freeze
+
     module_function
 
-    def map_datatype(datatype, encode, funccode)
+    def map_datatype(datatype, encode, _funccode)
       dt = (datatype || "").to_s.strip.delete('"')
       enc = (encode || "").to_s.strip.delete('"')
-      fc = (funccode || "").to_s.strip.delete('"')
-      return "BOOL" if fc == "01"
       key = [dt, enc]
       return TYPE_MAP[key] if TYPE_MAP.key?(key)
       return "REAL (w/Byte Swap)" if ["0032", "35"].include?(dt) && enc != "255"
@@ -61,7 +90,13 @@ module TagXml
       return "UDINT (w/Byte Swap)" if dt == "17"
       return "INT" if dt == "0"
       return "UINT" if dt == "1"
-      "Unknown"
+      "Unique"
+    end
+
+    def uticor_label(code)
+      return "" if code.blank?
+      c = code.to_s.strip.delete('"')
+      UTICOR_CODE_LABELS[c] || "Code #{c}"
     end
 
     def get_export_codes(dtype)
@@ -71,6 +106,46 @@ module TagXml
 
     def get_function_code(dtype)
       dtype.to_s.strip == "BOOL" ? '"01"' : '"03"'
+    end
+
+    # Options for the data type popup: label, datatype, encode, and Uticor labels for tooltip
+    def data_type_popup_options
+      [
+        ["BOOL", "107", "255"],
+        ["BOOL (Bit of INT)", "107", "255"],
+        ["INT", "0", "255"],
+        ["UINT", "1", "255"],
+        ["INT (Scaled)", "0", "102"],
+        ["UINT (Scaled)", "1", "102"],
+        ["DINT (Scaled)", "4", "32"],
+        ["DINT (Scaled, w/Byte Swap)", "7", "32"],
+        ["UDINT (Scaled)", "8", "32"],
+        ["UDINT (Scaled, w/Byte Swap)", "17", "32"],
+        ["DINT", "4", "255"],
+        ["DINT (w/Byte Swap)", "7", "4"],
+        ["UDINT", "8", "255"],
+        ["UDINT (w/Byte Swap)", "17", "8"],
+        ["REAL", "0032", "255"],
+        ["REAL (w/Byte Swap)", "0035", "32"]
+      ].map do |label, dt, enc|
+        { label: label, datatype: dt, encode: enc, datatype_label: uticor_label(dt), encode_label: uticor_label(enc) }
+      end
+    end
+
+    # Normalize code: strip leading zeros, keep "0" as "0"
+    def normalize_code(code)
+      s = code.to_s.strip.sub(/\A0+/, "")
+      s.empty? ? "0" : s
+    end
+
+    # For Datatype/Encode dropdowns: [[display_label, value], ...] for options_for_select (label first, value second)
+    def uticor_code_options
+      seen = {}
+      UTICOR_CODE_LABELS.each do |code, label|
+        norm = normalize_code(code)
+        seen[norm] ||= ["#{norm}: #{label}", norm]
+      end
+      seen.values.sort_by { |_, value| (value.to_i rescue 0) }
     end
   end
 
@@ -245,12 +320,15 @@ module TagXml
         }
         words_sections = PreloadCalculator.calculate_sections(records, "03")
         bits_sections = PreloadCalculator.calculate_sections(records, "01")
+        # Preload names use address start and datalength (same as ADDRSTART/DATALENGTH in the block)
         find_section = lambda do |addr, func_code|
           sections = func_code == "03" ? words_sections : bits_sections
           prefix = func_code == "03" ? "Preload_Words" : "Preload_Bits"
           sections.each do |start, len|
             end_addr = start + len - 1
-            return "#{prefix}_#{start}_#{end_addr}" if addr >= start && addr <= end_addr
+            next unless addr >= start && addr <= end_addr
+            dlength = (func_code == "03") ? (start + len) : (start + len - 1)
+            return "#{prefix}_#{start}_#{dlength}"
           end
           ""
         end
@@ -260,10 +338,12 @@ module TagXml
         out << "<GLOBAL>\n  <XML>\n"
 
         words_sections.each do |start, length|
-          out << block_xml("Preload_Words_#{start}_#{start + length - 1}", preload_fields("Preload_Words", start, length, meta))
+          name = "Preload_Words_#{start}_#{start + length}"
+          out << block_xml(name, preload_fields("Preload_Words", start, length, meta))
         end
         bits_sections.each do |start, length|
-          out << block_xml("Preload_Bits_#{start}_#{start + length - 1}", preload_fields("Preload_Bits", start, length, meta))
+          name = "Preload_Bits_#{start}_#{start + length - 1}"
+          out << block_xml(name, preload_fields("Preload_Bits", start, length, meta))
         end
 
         records.each do |record|
@@ -300,7 +380,11 @@ module TagXml
         enc_code = record["_raw_encode"].to_s.strip.presence
         dt_code, enc_code = DataTypeMapper.get_export_codes(dtype) unless dt_code && enc_code
         verify_code = record["_raw_verify"].to_s.strip.presence || "7"
-        funccode = DataTypeMapper.get_function_code(dtype)
+        funccode = if dtype == "Unique" && record["_raw_datatype"].to_s.strip == "107"
+          '"01"'
+        else
+          DataTypeMapper.get_function_code(dtype)
+        end
         addr = (record["Address Start"] || "").to_s.strip.delete('"').presence || "0"
         dlength = (record["Data Length"] || DEFAULT_DATA_LENGTH).to_s.strip.delete('"')
         dlength = DEFAULT_DATA_LENGTH unless dlength.match?(/\A\d+\z/)
@@ -320,9 +404,12 @@ module TagXml
 
       def preload_fields(tag_prefix, start, length, meta)
         func_code = tag_prefix == "Preload_Words" ? '"03"' : '"01"'
+        # Bits: DATALENGTH = end index (tight). Words (holding registers): DATALENGTH = end + 1 for PLCs that use 2 for all tags
+        end_index = start + length - 1
+        dlength = (tag_prefix == "Preload_Words") ? (end_index + 1) : end_index
         [
           ["TYPE", "\"#{meta[:protocol] || 'TCP'}\""], ["DEVICEID", '"1"'], ["FUNCCODE", func_code],
-          ["ADDRSTART", "\"#{start}\""], ["DATALENGTH", "\"#{length}\""], ["ALIAS", '"none"'],
+          ["ADDRSTART", "\"#{start}\""], ["DATALENGTH", "\"#{dlength}\""], ["ALIAS", '"none"'],
           ["NODEID", '"Preload"'], ["SERIAL", '"remote"'], ["IP", "\"#{meta[:ip] || '0.0.0.0'}\""],
           ["PORT", '"502"'], ["OID", '"none"'], ["CMMSTR_R", '"public"'], ["CMMSTR_W", '"public"'],
           ["TRIGGER", '"none"'], ["PRELOAD", '"none"'], ["VERIFY", '"254"'], ["THRESHOLD", '"0"'],

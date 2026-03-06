@@ -37,6 +37,18 @@ export default class extends Controller {
     this.boundValidateTable = this.validateTable.bind(this)
     this.element.addEventListener("input", this.boundValidateTable)
     this.element.addEventListener("change", this.boundValidateTable)
+    this.boundCellChanged = (e) => {
+      if (e.detail?.message && e.detail?.row) this.setStatus(e.detail.message, [e.detail.row])
+      this.validateTable()
+      this.saveForm()
+    }
+    this.element.addEventListener("tag-table:cell-changed", this.boundCellChanged)
+    this.boundFocusIn = this.handleCellFocusIn.bind(this)
+    this.boundFocusOut = this.handleCellFocusOut.bind(this)
+    this.boundCellSelectChange = this.handleCellSelectChange.bind(this)
+    this.element.addEventListener("focusin", this.boundFocusIn, true)
+    this.element.addEventListener("focusout", this.boundFocusOut, true)
+    this.element.addEventListener("change", this.boundCellSelectChange, true)
     this.boundResizeInputs = this.resizeHeaderInputs.bind(this)
     this.element.querySelectorAll(".workspace-title-input, input.connection-inline").forEach(el => {
       el.addEventListener("input", this.boundResizeInputs)
@@ -66,6 +78,10 @@ export default class extends Controller {
     this.element.removeEventListener("change", this.boundFormChange)
     this.element.removeEventListener("input", this.boundValidateTable)
     this.element.removeEventListener("change", this.boundValidateTable)
+    this.element.removeEventListener("tag-table:cell-changed", this.boundCellChanged)
+    this.element.removeEventListener("focusin", this.boundFocusIn, true)
+    this.element.removeEventListener("focusout", this.boundFocusOut, true)
+    this.element.removeEventListener("change", this.boundCellSelectChange, true)
     this.element.querySelectorAll(".workspace-title-input, input.connection-inline").forEach(el => {
       el.removeEventListener("input", this.boundResizeInputs)
       el.removeEventListener("change", this.boundResizeInputs)
@@ -126,6 +142,9 @@ export default class extends Controller {
     if (!e.target) return
     if (e.target.classList.contains("cell") || e.target.classList.contains("workspace-title-input") || e.target.classList.contains("connection-inline")) {
       if (e.target.classList.contains("cell") && e.target.name) {
+        if (e.target.closest("tr.tag-data-row") && (e.type === "input" || e.type === "change")) {
+          return
+        }
         const m = e.target.name.match(/records\[\d+\]\[([^\]]+)\]/)
         if (m) {
           const row = e.target.closest("tr.tag-data-row")
@@ -199,14 +218,65 @@ export default class extends Controller {
   }
 
   handleKeydown(e) {
-    if (e.key !== "Enter") return
     const el = e.target
     if (!el || !this.element.contains(el)) return
-    if ((el.tagName === "INPUT" || el.tagName === "SELECT") && !el.matches('button, [type="submit"]')) {
+    const isCell = (el.tagName === "INPUT" || el.tagName === "SELECT") && el.classList.contains("cell") && !el.matches('button, [type="submit"]')
+    if (e.key === "Enter" && isCell) {
       e.preventDefault()
-      el.blur()
+      this._committedOnEnter = true
+      const m = el.name && el.name.match(/records\[\d+\]\[([^\]]+)\]/)
+      const row = el.closest("tr.tag-data-row")
+      const validRow = row && !row.classList.contains("tag-row-template")
+      if (m) {
+        if (m[1] === "Address Start" && /[^0-9]/.test((el.value || "").trim())) {
+          this.setStatus("An invalid address was entered", validRow ? [row] : null)
+        } else {
+          this.setStatus(m[1] + " updated", validRow ? [row] : null)
+        }
+      }
       this.saveForm()
+      el.blur()
+    } else if (e.key === "Escape" && isCell) {
+      e.preventDefault()
+      if (this._editingCell) {
+        this._editingCell.value = this._editingCellOriginalValue
+        this._editingCell = null
+      }
+      el.blur()
     }
+  }
+
+  handleCellFocusIn(e) {
+    const el = e.target
+    if ((el.tagName === "INPUT" || el.tagName === "SELECT") && el.classList.contains("cell") && el.closest("tr.tag-data-row")) {
+      this._editingCell = el
+      this._editingCellOriginalValue = el.value
+      this._committedOnEnter = false
+    }
+  }
+
+  handleCellFocusOut(e) {
+    if (!this._editingCell || e.target !== this._editingCell) return
+    if (!this._committedOnEnter) {
+      this._editingCell.value = this._editingCellOriginalValue
+    }
+    this._editingCell = null
+    this._committedOnEnter = false
+  }
+
+  handleCellSelectChange(e) {
+    const el = e.target
+    if (el.tagName !== "SELECT" || !el.classList.contains("cell") || !el.closest("tr.tag-data-row")) return
+    const name = el.getAttribute("name") || ""
+    if (!name.includes("[Data Length]") && !name.includes("[Scaling]") && !name.includes("[Read/Write]")) return
+    this._committedOnEnter = true
+    const m = name.match(/records\[\d+\]\[([^\]]+)\]/)
+    if (m) {
+      const row = el.closest("tr.tag-data-row")
+      this.setStatus(m[1] + " updated", row ? [row] : null)
+    }
+    this.saveForm()
+    el.blur()
   }
 
   // Save document via PATCH without leaving the page. Returns fetch promise.
@@ -248,7 +318,8 @@ export default class extends Controller {
     if (!inWorkspace) return
     const isSelectMode = this.element.classList.contains("workspace-select-mode")
     const isMod = e.metaKey || e.ctrlKey
-    if (isMod && e.key === "c") {
+    const key = (e.key || "").toLowerCase()
+    if (isMod && key === "c") {
       if (isSelectMode) {
         const selected = this.getSelectedRows()
         if (selected.length > 0) {
@@ -257,7 +328,7 @@ export default class extends Controller {
           this.copySelected()
         }
       }
-    } else if (isMod && e.key === "x") {
+    } else if (isMod && key === "x") {
       if (isSelectMode) {
         const selected = this.getSelectedRows()
         if (selected.length > 0) {
@@ -266,11 +337,15 @@ export default class extends Controller {
           this.cutSelected()
         }
       }
-    } else if (isMod && e.key === "v") {
-      if (isSelectMode && this.clipboard && this.clipboard.length > 0) {
+    } else if (isMod && key === "v") {
+      if (isSelectMode) {
         e.preventDefault()
         e.stopPropagation()
-        this.paste()
+        if (this.clipboard && this.clipboard.length > 0) {
+          this.paste()
+        } else {
+          this.pasteFromSystemClipboard()
+        }
       }
     } else if (e.key === "Delete" || e.key === "Backspace") {
       const target = e.target
@@ -378,13 +453,59 @@ export default class extends Controller {
     const selected = this.getSelectedRows()
     if (selected.length === 0) return
     this.clipboard = selected.map(tr => this.getRowValues(tr))
+    const headers = Array.from(this.element.querySelectorAll(".tag-table thead th")).map(th => th.textContent.replace(/\s*↑\s*$/, "").trim())
+    const rows = this.clipboard
+    const flatten = (v) => (typeof v === "object" && v && "label" in v ? v.label : v)
+    const tsv = [headers.join("\t"), ...rows.map(vals => vals.map(flatten).join("\t"))].join("\n")
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(tsv).catch(() => this.fallbackCopyToClipboard(tsv))
+    } else {
+      this.fallbackCopyToClipboard(tsv)
+    }
     this.setStatus(selected.length === 1 ? "1 row copied" : `${selected.length} rows copied`)
+  }
+
+  fallbackCopyToClipboard(text) {
+    const ta = document.createElement("textarea")
+    ta.value = text
+    ta.style.position = "fixed"
+    ta.style.left = "-9999px"
+    ta.setAttribute("readonly", "")
+    document.body.appendChild(ta)
+    ta.select()
+    try {
+      document.execCommand("copy")
+    } catch (err) {}
+    document.body.removeChild(ta)
   }
 
   paste(e) {
     if (e) e.preventDefault()
+    if (this.clipboard && this.clipboard.length > 0) this.pasteWithValues(this.clipboard)
+  }
+
+  pasteFromSystemClipboard() {
     if (this.element.classList.contains("workspace-locked")) return
-    if (!this.clipboard || this.clipboard.length === 0) return
+    if (!navigator.clipboard || !navigator.clipboard.readText) return
+    navigator.clipboard.readText().then((text) => {
+      const rows = this.parseTsvToRowValues(text)
+      if (rows && rows.length > 0) this.pasteWithValues(rows)
+    }).catch(() => {})
+  }
+
+  parseTsvToRowValues(text) {
+    if (!text || typeof text !== "string") return null
+    const lines = text.trim().split(/\r?\n/)
+    if (lines.length < 2) return null
+    const rows = lines.slice(1).map((line) => line.split("\t"))
+    const colCount = this.element.querySelectorAll(".tag-table thead th").length
+    if (colCount === 0) return null
+    return rows.filter((row) => row.length >= colCount).map((row) => row.slice(0, colCount))
+  }
+
+  pasteWithValues(values) {
+    if (this.element.classList.contains("workspace-locked")) return
+    if (!values || values.length === 0) return
     const selected = this.getSelectedRows()
     const dataRows = this.dataRows
     const insertBeforeRow = selected.length > 0
@@ -395,8 +516,8 @@ export default class extends Controller {
       : null
     this.dataRows.forEach(r => r.classList.remove("row-selected"))
     const newRows = []
-    this.clipboard.forEach(values => {
-      const newRow = this.addRowWithValues(values, insertBeforeRow)
+    values.forEach((rowValues) => {
+      const newRow = this.addRowWithValues(rowValues, insertBeforeRow)
       if (newRow) newRows.push(newRow)
     })
     this.reindexRows()
@@ -406,18 +527,51 @@ export default class extends Controller {
     this.updateStatusCount()
     this.validateTable()
     this.saveForm()
-    }
+  }
 
   getRowValues(tr) {
     const cells = tr.querySelectorAll("td input.cell, td select.cell")
-    return Array.from(cells).map(el => el.tagName === "SELECT" ? el.value : el.value)
+    const vals = Array.from(cells).map(el => (el.tagName === "SELECT" ? el.value : el.value))
+    const dataTypeTd = tr.querySelector("td:nth-child(3)")
+    if (dataTypeTd) {
+      const rawDt = dataTypeTd.querySelector("input[name*='_raw_datatype']")?.value
+      const rawEnc = dataTypeTd.querySelector("input[name*='_raw_encode']")?.value
+      if (rawDt !== undefined || rawEnc !== undefined) {
+        vals[2] = { label: vals[2], rawDt: rawDt ?? "0", rawEnc: rawEnc ?? "255" }
+      }
+    }
+    return vals
   }
 
   setRowValues(tr, values) {
     const cells = tr.querySelectorAll("td input.cell, td select.cell")
+    const dataTypeTd = tr.querySelector("td:nth-child(3)")
     cells.forEach((el, i) => {
-      if (values[i] !== undefined) el.value = values[i]
+      if (values[i] === undefined) return
+      if (i === 2 && typeof values[i] === "object" && values[i] && "label" in values[i]) {
+        const { label, rawDt, rawEnc } = values[i]
+        el.value = label ?? ""
+        if (dataTypeTd) {
+          const rawDtInput = dataTypeTd.querySelector("input[name*='_raw_datatype']")
+          const rawEncInput = dataTypeTd.querySelector("input[name*='_raw_encode']")
+          const btn = dataTypeTd.querySelector(".data-type-trigger")
+          if (rawDtInput) rawDtInput.value = rawDt ?? "0"
+          if (rawEncInput) rawEncInput.value = rawEnc ?? "255"
+          if (btn) {
+            btn.textContent = label || "—"
+            btn.dataset.value = label
+            btn.dataset.rawDatatype = rawDt ?? "0"
+            btn.dataset.rawEncode = rawEnc ?? "255"
+          }
+        }
+      } else {
+        el.value = values[i]
+      }
     })
+    if (dataTypeTd && typeof values[2] === "string") {
+      const btn = dataTypeTd.querySelector(".data-type-trigger")
+      if (btn) btn.textContent = values[2] || "—"
+    }
   }
 
   addRow(e) {
