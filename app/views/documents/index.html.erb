@@ -1,7 +1,7 @@
 <div class="home">
   <header class="home-header">
     <h1 class="app-title">ALCHEMY<sup>5</sup></h1>
-    <p class="tagline">Modbus TCP tag editor — import XML, edit tags, export with preloads rebuilt.</p>
+    <p class="tagline">Modbus tag editor — import XML, edit tags, export with preloads rebuilt.</p>
   </header>
 
   <div class="home-actions">
@@ -17,9 +17,16 @@
       <h2>Recent</h2>
       <ul>
         <% @documents.each do |doc| %>
-          <li class="doc-row" tabindex="0" data-recent-docs-target="doc" data-delete-url="<%= document_path(doc) %>">
+          <li class="doc-row<%= ' doc-row--zero-tags' if doc.records.size.zero? %>" tabindex="0" data-recent-docs-target="doc" data-delete-url="<%= document_path(doc) %>">
             <%= link_to document_path(doc), class: "doc-link" do %>
-              <span class="doc-name"><%= doc.metadata_filename.presence || "Document ##{doc.id}" %></span>
+              <span class="doc-title-block">
+                <% untitled = doc.metadata_filename.blank? || doc.metadata_filename == "Untitled ##{doc.id}" %>
+                <% if untitled %>
+                  <span class="doc-name">Untitled</span>
+                <% else %>
+                  <span class="doc-name"><%= doc.metadata_filename %></span><% if @doc_disambiguator[doc.id] %><span class="doc-disambiguator"> #<%= @doc_disambiguator[doc.id] %></span><% end %>
+                <% end %>
+              </span>
               <span class="doc-count"><%= doc.records.size %> tag(s)</span>
             <% end %>
           </li>

@@ -102,9 +102,14 @@ a:hover { text-decoration: underline; }
 .recent-docs li:last-child { border-bottom: none; }
 .recent-docs li.doc-row { outline: none; }
 .recent-docs li.doc-row:focus { background: var(--surface-raised); }
+.recent-docs li.doc-row--zero-tags .doc-link,
+.recent-docs li.doc-row--zero-tags .doc-link:hover { color: var(--danger, #c53030); }
+.recent-docs li.doc-row--zero-tags .doc-count { color: var(--danger, #c53030); }
 .doc-link { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; color: var(--text); }
 .doc-link:hover { background: var(--surface-raised); text-decoration: none; color: var(--text); }
+.doc-title-block { display: inline-flex; align-items: baseline; gap: 0.2rem; }
 .doc-name { font-weight: 500; }
+.doc-disambiguator { font-size: 0.85rem; color: var(--muted); }
 .doc-count { font-size: 0.85rem; color: var(--muted); }
 .empty-state { color: var(--muted); font-size: 0.95rem; }
 
@@ -184,14 +189,16 @@ a:hover { text-decoration: underline; }
   font-weight: 600;
   letter-spacing: -0.02em;
   margin: 0;
-  padding: 0.15rem 0.25rem;
+  padding: 0.15rem 0.12rem 0.15rem 0.25rem;
   border: 1px solid transparent;
   border-radius: 4px;
   background: transparent;
   color: var(--text);
-  width: 100%;
+  width: auto;
+  min-width: 10ch;
   max-width: 32rem;
   font-family: inherit;
+  box-sizing: content-box;
 }
 .workspace-title-input:focus { outline: none; border-color: var(--accent); background: var(--surface-raised); }
 .workspace-title-input::placeholder { color: var(--muted); }
@@ -213,6 +220,11 @@ a:hover { text-decoration: underline; }
   font-size: 0.8125rem;
   background: transparent;
   color: var(--text);
+  box-sizing: content-box;
+}
+input.connection-inline {
+  width: auto;
+  min-width: 12ch;
 }
 .connection-inline:focus { outline: none; border-color: var(--accent); background: var(--surface-raised); }
 .connection-inline.connection-select { cursor: pointer; }
@@ -288,35 +300,7 @@ a:hover { text-decoration: underline; }
 .tag-table .cell { width: 100%; min-width: 3rem; padding: 0.3rem 0.5rem; border: 1px solid transparent; border-radius: 4px; font: inherit; font-size: 0.875rem; background: transparent; color: var(--text); }
 .tag-table .cell:focus { outline: none; border-color: var(--accent); background: var(--surface-raised); }
 .tag-table select.cell { cursor: pointer; }
+.tag-table .cell.cell-invalid,
+.tag-table .cell.cell-duplicate { color: #f87171; border-color: rgba(248, 113, 113, 0.4); }
+.workspace-title-input.cell-invalid { color: #f87171; border-color: rgba(248, 113, 113, 0.6); }
 
-/* Leave-dialog: unsaved changes when clicking Home */
-.leave-dialog-overlay {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 1000;
-  align-items: center;
-  justify-content: center;
-}
-.leave-dialog-overlay.is-open {
-  display: flex;
-}
-.leave-dialog {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 1.25rem 1.5rem;
-  min-width: 18rem;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-}
-.leave-dialog-title {
-  margin: 0 0 1rem 0;
-  font-size: 0.9375rem;
-  color: var(--text);
-}
-.leave-dialog-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}

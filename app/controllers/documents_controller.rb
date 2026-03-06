@@ -17,6 +17,15 @@ class DocumentsController < ApplicationController
 
   def index
     @documents = Document.order(created_at: :desc).limit(50)
+    by_title = @documents.group_by { |d| d.metadata_filename.presence || "Untitled ##{d.id}" }
+    @doc_disambiguator = {}
+    by_title.each do |_title, docs|
+      if docs.size > 1
+        docs.each_with_index { |d, i| @doc_disambiguator[d.id] = i + 1 }
+      else
+        @doc_disambiguator[docs[0].id] = nil
+      end
+    end
   end
 
   def new
@@ -25,9 +34,21 @@ class DocumentsController < ApplicationController
 
   def create
     if params[:blank].present?
+      # If any untitled doc with 0 tags exists, open that instead of creating another
+      existing = Document.order(updated_at: :desc).limit(50).find do |d|
+        (d.metadata_filename.blank? || d.metadata_filename == "Untitled ##{d.id}") && d.records.size == 0
+      end
+      if existing
+        flash[:edit_status] = "Opened existing untitled document"
+        flash[:new_document] = true
+        redirect_to edit_document_path(existing)
+        return
+      end
       @document = Document.new(records: [], metadata_ip: Document::DEFAULT_IP, metadata_protocol: Document::DEFAULT_PROTOCOL, metadata_filename: "")
       if @document.save
+        @document.update_column(:metadata_filename, "Untitled ##{@document.id}")
         flash[:edit_status] = "New document created"
+        flash[:new_document] = true
         redirect_to edit_document_path(@document)
       else
         redirect_to root_path, alert: "Could not create document."
@@ -52,8 +73,9 @@ class DocumentsController < ApplicationController
     )
 
     if @document.save
-      flash[:edit_status] = "Imported"
-      redirect_to @document, notice: "Imported #{records.size} tag(s)."
+      n = records.size
+      flash[:edit_status] = "#{n} tag#{'s' if n != 1} imported"
+      redirect_to @document
     else
       flash[:alert] = "Failed to parse XML."
       redirect_to root_path
@@ -71,8 +93,7 @@ class DocumentsController < ApplicationController
   def edit
     recs = @document.records_with_string_keys
     raw_sort = params[:sort].to_s.presence
-    # Data Type and Address Start share one sort: type then address (low to high)
-    @sort_column = (raw_sort == "Address Start") ? "Data Type" : raw_sort
+    @sort_column = raw_sort
     @sort_direction = (params[:direction].to_s == "asc") ? "asc" : nil
 
     if @sort_column.present? && @sort_direction == "asc"
@@ -82,11 +103,22 @@ class DocumentsController < ApplicationController
 
         cmp = case @sort_column
         when "Data Type"
-          # Group by Data Type (canonical order), then by Address Start low to high: BOOL 1, BOOL 2, BOOL 3, INT 1, INT 2
+          # Group by Data Type (canonical order), then by Address Start low to high
           ia = DATA_TYPE_ORDER.index(va) || DATA_TYPE_ORDER.size
           ib = DATA_TYPE_ORDER.index(vb) || DATA_TYPE_ORDER.size
           if ia != ib
             ia <=> ib
+          else
+            addr_a = (a["Address Start"].to_s.strip =~ /\A\d+\z/) ? a["Address Start"].to_s.strip.to_i : -1
+            addr_b = (b["Address Start"].to_s.strip =~ /\A\d+\z/) ? b["Address Start"].to_s.strip.to_i : -1
+            addr_a <=> addr_b
+          end
+        when "Address Start"
+          # Coils (BOOL) first, then holding registers (INT, UINT, REAL, etc.) mixed; within each group sort by address
+          coil_a = (a["Data Type"].to_s.strip == "BOOL") ? 0 : 1
+          coil_b = (b["Data Type"].to_s.strip == "BOOL") ? 0 : 1
+          if coil_a != coil_b
+            coil_a <=> coil_b
           else
             addr_a = (a["Address Start"].to_s.strip =~ /\A\d+\z/) ? a["Address Start"].to_s.strip.to_i : -1
             addr_b = (b["Address Start"].to_s.strip =~ /\A\d+\z/) ? b["Address Start"].to_s.strip.to_i : -1
@@ -134,12 +166,15 @@ class DocumentsController < ApplicationController
         (old || {}).slice(*RAW_PRESERVE_KEYS).merge(permitted)
       end.reject { |r| r.except(*RAW_PRESERVE_KEYS).values.all?(&:blank?) }
       @document.records = records
+    else
+      # Form had no rows (e.g. all tags deleted) — persist empty document
+      @document.records = []
     end
 
     if params[:metadata_ip].present?
       @document.metadata_ip = params[:metadata_ip]
       @document.metadata_protocol = params[:metadata_protocol] if params[:metadata_protocol].present?
-      @document.metadata_filename = params[:metadata_filename] if params[:metadata_filename].present?
+      @document.metadata_filename = params[:metadata_filename].present? ? params[:metadata_filename] : "Untitled ##{@document.id}"
     end
 
     if @document.save
@@ -168,6 +203,9 @@ class DocumentsController < ApplicationController
 
   def destroy
     @document.destroy
+    if Document.count.zero?
+      ActiveRecord::Base.connection.execute("ALTER SEQUENCE documents_id_seq RESTART WITH 1")
+    end
     redirect_to root_path, notice: "Document deleted."
   end
 

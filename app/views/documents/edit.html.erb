@@ -17,11 +17,15 @@
 %>
 
 <div class="workspace">
-  <%= form_with model: @document, url: document_path(@document), method: :patch, class: "workspace-form", data: { controller: "autosave workspace-lock tag-table" } do |f| %>
+  <%= form_with model: @document, url: document_path(@document), method: :patch, class: "workspace-form", data: { controller: "autosave workspace-lock tag-table", workspace_lock_initial_unlocked_value: flash[:new_document].present? } do |f| %>
     <header class="workspace-header">
       <div class="header-top">
         <div class="header-title-block">
-          <%= text_field_tag :metadata_filename, @document.metadata_filename.presence || "Document ##{@document.id}", class: "workspace-title-input", placeholder: "Document name", data: { workspace_lock_target: "headerEditable" }, disabled: true %>
+          <%
+            title_value = @document.metadata_filename
+            title_value = nil if title_value.blank? || title_value == "Untitled ##{@document.id}"
+          %>
+          <%= text_field_tag :metadata_filename, title_value, class: "workspace-title-input", placeholder: "Untitled", data: { workspace_lock_target: "headerEditable", tag_table_target: "titleInput" }, disabled: true %>
           <div class="connection-line">
             <%= select_tag :metadata_protocol, options_for_select([["TCP", "TCP"], ["RTU", "RTU"]], @document.metadata_protocol), class: "connection-inline connection-select", data: { workspace_lock_target: "headerEditable" }, disabled: true %>
             <%= text_field_tag :metadata_ip, @document.metadata_ip, class: "connection-inline", placeholder: "0.0.0.0", size: 14, data: { workspace_lock_target: "headerEditable" }, disabled: true %>
@@ -31,10 +35,10 @@
           <div class="header-actions-lock-group">
             <button type="button" class="btn btn-toolbar btn-toolbar-icon btn-add-row" data-tag-table-target="addBtn" title="Add row">+</button>
             <button type="button" class="btn btn-toolbar btn-toolbar-icon btn-select-mode" data-workspace-lock-target="selectModeBtn" data-action="click->workspace-lock#toggleSelectMode" title="Select Rows" aria-label="Select rows">☑</button>
-            <button type="button" class="btn btn-toolbar btn-toolbar-icon btn-lock" data-workspace-lock-target="toggle" data-action="click->workspace-lock#toggle" title="Lock/unlock editing and column sort">
+            <button type="button" class="btn btn-toolbar btn-toolbar-icon btn-lock" data-workspace-lock-target="toggle" data-action="click->workspace-lock#toggle" title="Lock/Unlock">
               <span data-workspace-lock-target="lockIcon" aria-hidden="true">🔒</span>
             </button>
-            <%= link_to "🏠", root_path, class: "btn btn-toolbar btn-toolbar-icon", title: "Home", data: { action: "click->tag-table#maybeConfirmLeave" } %>
+            <%= link_to "🏠", root_path, class: "btn btn-toolbar btn-toolbar-icon", title: "Home", data: { action: "click->tag-table#requireTitleBeforeHome" } %>
           </div>
           <%= link_to "Export XML", export_document_path(@document), class: "btn btn-toolbar btn-export", data: { turbo: false, action: "click->tag-table#saveThenExport" } %>
         </div>
@@ -50,9 +54,8 @@
         <thead>
           <tr>
             <% columns.each do |col_name, _key, _type|
-              type_or_addr = (col_name == "Data Type" || col_name == "Address Start")
-              active = type_or_addr ? (sort_column == "Data Type") : (sort_column == col_name)
-              sort_url = active ? edit_document_path(@document) : edit_document_path(@document, sort: (type_or_addr ? "Data Type" : col_name), direction: "asc")
+              active = (sort_column == col_name)
+              sort_url = active ? edit_document_path(@document) : edit_document_path(@document, sort: col_name, direction: "asc")
             %>
               <th class="<%= 'sort-asc' if active && sort_direction.present? %>">
                 <%= link_to sort_url, data: { workspace_lock_target: "sortLink", action: "click->workspace-lock#preventSortWhenLocked" } do %>
@@ -107,17 +110,6 @@
           </tr>
         </tbody>
       </table>
-    </div>
-
-    <div class="leave-dialog-overlay" data-tag-table-target="leaveDialog" aria-hidden="true" role="dialog" aria-labelledby="leave-dialog-title">
-      <div class="leave-dialog">
-        <p id="leave-dialog-title" class="leave-dialog-title">You have unsaved changes. Save before leaving?</p>
-        <div class="leave-dialog-actions">
-          <button type="button" class="btn btn-toolbar" data-action="click->tag-table#leaveDialogSave">Save and go home</button>
-          <button type="button" class="btn btn-toolbar" data-action="click->tag-table#leaveDialogDiscard">Discard and go home</button>
-          <button type="button" class="btn btn-toolbar" data-action="click->tag-table#leaveDialogCancel">Cancel</button>
-        </div>
-      </div>
     </div>
   <% end %>
 </div>

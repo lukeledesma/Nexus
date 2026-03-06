@@ -3,18 +3,14 @@ import { Controller } from "@hotwired/stimulus"
 const PLACEHOLDER = "__INDEX__"
 
 export default class extends Controller {
-  static targets = ["tbody", "templateRow", "addBtn", "leaveDialog", "statusCount", "statusMessage"]
+  static targets = ["tbody", "templateRow", "addBtn", "statusCount", "statusMessage", "titleInput"]
 
   connect() {
     this.clipboard = []
     this.anchorRow = null
-    this.unsavedEdits = false
-    this.homeUrl = ""
     this.boundKeydown = this.handleKeydown.bind(this)
     this.boundFormChange = this.markUnsaved.bind(this)
-    this.boundBeforeUnload = this.beforeUnloadSave.bind(this)
     this.element.addEventListener("keydown", this.boundKeydown, true)
-    window.addEventListener("beforeunload", this.boundBeforeUnload)
     if (this.hasAddBtnTarget) this.addBtnTarget.addEventListener("click", this.addRow.bind(this))
     if (this.hasTbodyTarget) {
       this.boundTbodyClick = this.handleTbodyClick.bind(this)
@@ -28,10 +24,19 @@ export default class extends Controller {
     document.addEventListener("keydown", this.boundGlobalKeydown, true)
     this.element.addEventListener("input", this.boundFormChange)
     this.element.addEventListener("change", this.boundFormChange)
+    this.boundValidateTable = this.validateTable.bind(this)
+    this.element.addEventListener("input", this.boundValidateTable)
+    this.element.addEventListener("change", this.boundValidateTable)
+    this.boundResizeInputs = this.resizeHeaderInputs.bind(this)
+    this.element.querySelectorAll(".workspace-title-input, input.connection-inline").forEach(el => {
+      el.addEventListener("input", this.boundResizeInputs)
+      el.addEventListener("change", this.boundResizeInputs)
+    })
+    this.resizeHeaderInputs()
+    this.validateTable()
   }
 
   disconnect() {
-    window.removeEventListener("beforeunload", this.boundBeforeUnload)
     this.element.removeEventListener("keydown", this.boundKeydown, true)
     if (this.hasAddBtnTarget) this.addBtnTarget.removeEventListener("click", this.addRow.bind(this))
     if (this.hasTbodyTarget) {
@@ -44,16 +49,72 @@ export default class extends Controller {
     document.removeEventListener("keydown", this.boundGlobalKeydown, true)
     this.element.removeEventListener("input", this.boundFormChange)
     this.element.removeEventListener("change", this.boundFormChange)
+    this.element.removeEventListener("input", this.boundValidateTable)
+    this.element.removeEventListener("change", this.boundValidateTable)
+    this.element.querySelectorAll(".workspace-title-input, input.connection-inline").forEach(el => {
+      el.removeEventListener("input", this.boundResizeInputs)
+      el.removeEventListener("change", this.boundResizeInputs)
+    })
+  }
+
+  resizeHeaderInputs() {
+    this.element.querySelectorAll(".workspace-title-input, input.connection-inline").forEach(el => {
+      const minLen = el.classList.contains("workspace-title-input") ? 8 : 10
+      const len = Math.max(el.value.length, (el.placeholder || "").length, minLen)
+      const extra = el.classList.contains("workspace-title-input") ? 0.5 : 1
+      el.style.width = `${len + extra}ch`
+    })
+  }
+
+  validateTable() {
+    if (!this.hasTbodyTarget) return
+    const rows = this.dataRows
+    const numericOnly = /^\d*$/
+    rows.forEach(tr => {
+      const cells = tr.querySelectorAll("td input.cell, td select.cell")
+      cells.forEach(el => {
+        el.classList.remove("cell-invalid", "cell-duplicate")
+        const name = el.getAttribute("name") || ""
+        const val = (el.value || "").trim()
+        if (name.includes("[Address Start]")) {
+          if (!numericOnly.test(val)) el.classList.add("cell-invalid")
+        } else if (name.includes("[Data Length]")) {
+          if (!numericOnly.test(val)) el.classList.add("cell-invalid")
+        } else if (name.includes("[Scaling]")) {
+          if (val !== "" && !/^-?\d+(\.\d+)?$/.test(val)) el.classList.add("cell-invalid")
+        }
+      })
+    })
+
+    const keyCount = new Map()
+    rows.forEach(tr => {
+      const dataTypeEl = tr.querySelector("select[name*='[Data Type]']")
+      const addrEl = tr.querySelector("input[name*='[Address Start]']")
+      if (!dataTypeEl || !addrEl) return
+      const kind = (dataTypeEl.value || "").trim() === "BOOL" ? "coil" : "holding"
+      const addr = (addrEl.value || "").trim()
+      const key = `${kind}:${addr}`
+      keyCount.set(key, (keyCount.get(key) || 0) + 1)
+    })
+    rows.forEach(tr => {
+      const dataTypeEl = tr.querySelector("select[name*='[Data Type]']")
+      const addrEl = tr.querySelector("input[name*='[Address Start]']")
+      if (!dataTypeEl || !addrEl) return
+      const kind = (dataTypeEl.value || "").trim() === "BOOL" ? "coil" : "holding"
+      const addr = (addrEl.value || "").trim()
+      const key = `${kind}:${addr}`
+      if (addr !== "" && (keyCount.get(key) || 0) > 1) addrEl.classList.add("cell-duplicate")
+    })
   }
 
   markUnsaved(e) {
     if (!e.target) return
     if (e.target.classList.contains("cell") || e.target.classList.contains("workspace-title-input") || e.target.classList.contains("connection-inline")) {
-      this.unsavedEdits = true
       if (e.target.classList.contains("cell") && e.target.name) {
         const m = e.target.name.match(/records\[\d+\]\[([^\]]+)\]/)
         if (m) this.setStatus(m[1] + " updated")
       } else if (e.target.classList.contains("workspace-title-input")) {
+        e.target.classList.remove("cell-invalid")
         this.setStatus("Document name updated")
       } else if (e.target.classList.contains("connection-inline")) {
         this.setStatus("Connection updated")
@@ -63,57 +124,30 @@ export default class extends Controller {
 
   setStatus(message) {
     if (!this.hasStatusMessageTarget) return
-    this.statusTimeout && clearTimeout(this.statusTimeout)
     this.statusMessageTarget.textContent = message
-    this.statusTimeout = setTimeout(() => {
-      this.statusMessageTarget.textContent = ""
-      this.statusTimeout = null
-    }, 4000)
+  }
+
+  requireTitleBeforeHome(e) {
+    if (!this.hasTitleInputTarget) return
+    const title = (this.titleInputTarget.value || "").trim()
+    if (title === "") {
+      e.preventDefault()
+      this.titleInputTarget.classList.add("cell-invalid")
+      this.setStatus("Enter a title")
+      this.titleInputTarget.focus()
+      return
+    }
+    e.preventDefault()
+    const homeUrl = e.currentTarget && e.currentTarget.href
+    this.saveForm().then((res) => {
+      if (homeUrl) window.location.href = homeUrl
+    })
   }
 
   updateStatusCount() {
     if (!this.hasStatusCountTarget) return
     const n = this.dataRows.length
     this.statusCountTarget.textContent = n + " tag" + (n !== 1 ? "s" : "")
-  }
-
-  maybeConfirmLeave(e) {
-    if (!this.unsavedEdits) return
-    e.preventDefault()
-    this.homeUrl = e.currentTarget.href
-    this.showLeaveDialog()
-  }
-
-  showLeaveDialog() {
-    if (!this.hasLeaveDialogTarget) return
-    this.leaveDialogTarget.classList.add("is-open")
-    this.leaveDialogTarget.setAttribute("aria-hidden", "false")
-  }
-
-  hideLeaveDialog() {
-    if (!this.hasLeaveDialogTarget) return
-    this.leaveDialogTarget.classList.remove("is-open")
-    this.leaveDialogTarget.setAttribute("aria-hidden", "true")
-  }
-
-  leaveDialogSave() {
-    this.saveForm().then((res) => {
-      if (res && (res.status === 204 || res.status === 200)) {
-        this.unsavedEdits = false
-        this.hideLeaveDialog()
-        window.location = this.homeUrl
-      }
-    })
-  }
-
-  leaveDialogDiscard() {
-    this.unsavedEdits = false
-    this.hideLeaveDialog()
-    window.location = this.homeUrl
-  }
-
-  leaveDialogCancel() {
-    this.hideLeaveDialog()
   }
 
   handleKeydown(e) {
@@ -123,9 +157,7 @@ export default class extends Controller {
     if ((el.tagName === "INPUT" || el.tagName === "SELECT") && !el.matches('button, [type="submit"]')) {
       e.preventDefault()
       el.blur()
-      this.saveForm().then((res) => {
-        if (res && (res.status === 204 || res.status === 200)) this.unsavedEdits = false
-      })
+      this.saveForm()
     }
   }
 
@@ -152,16 +184,6 @@ export default class extends Controller {
     const headers = { "X-Requested-With": "XMLHttpRequest", "Accept": "text/html" }
     if (csrf && csrf.getAttribute("content")) headers["X-CSRF-Token"] = csrf.getAttribute("content")
     return fetch(action, { method: method === "GET" ? "GET" : "POST", body: body, headers }).catch(() => {})
-  }
-
-  beforeUnloadSave() {
-    const form = this.element
-    if (!form || !form.action || form.tagName !== "FORM") return
-    const body = new FormData(form)
-    if (!body.has("_method")) body.set("_method", "patch")
-    const csrf = document.querySelector('meta[name="csrf-token"]')
-    if (csrf && csrf.getAttribute("content") && !body.has("authenticity_token")) body.set("authenticity_token", csrf.getAttribute("content"))
-    navigator.sendBeacon(form.action, body)
   }
 
   saveThenExport(e) {
@@ -265,11 +287,10 @@ export default class extends Controller {
     if (selected.length === 0) return
     selected.forEach(tr => tr.remove())
     this.reindexRows()
-    this.setStatus(selected.length === 1 ? "Row deleted" : "Rows deleted")
+    this.setStatus(selected.length === 1 ? "1 row deleted" : `${selected.length} rows deleted`)
     this.updateStatusCount()
-    this.saveForm().then((res) => {
-      if (res && (res.status === 204 || res.status === 200)) this.unsavedEdits = false
-    })
+    this.validateTable()
+    this.saveForm()
   }
 
   cutSelected() {
@@ -277,7 +298,7 @@ export default class extends Controller {
     if (selected.length === 0) return
     this.copySelected()
     this.removeSelected()
-    this.setStatus("Cut")
+    this.setStatus(selected.length === 1 ? "1 row cut" : `${selected.length} rows cut`)
     this.updateStatusCount()
   }
 
@@ -299,16 +320,17 @@ export default class extends Controller {
     this.reindexRows()
     newRows.forEach(tr => tr.classList.add("row-selected"))
     if (newRows.length) newRows[0].scrollIntoView({ block: "nearest", behavior: "smooth" })
-    this.setStatus("Duplicated")
+    this.setStatus(newRows.length === 1 ? "1 row duplicated" : `${newRows.length} rows duplicated`)
     this.updateStatusCount()
-    this.unsavedEdits = true
+    this.validateTable()
+    this.saveForm()
   }
 
   copySelected() {
     const selected = this.getSelectedRows()
     if (selected.length === 0) return
     this.clipboard = selected.map(tr => this.getRowValues(tr))
-    this.setStatus("Copied")
+    this.setStatus(selected.length === 1 ? "1 row copied" : `${selected.length} rows copied`)
   }
 
   paste(e) {
@@ -332,9 +354,10 @@ export default class extends Controller {
     this.reindexRows()
     newRows.forEach(tr => tr.classList.add("row-selected"))
     if (newRows.length) newRows[0].scrollIntoView({ block: "nearest", behavior: "smooth" })
-    this.setStatus("Pasted")
+    this.setStatus(newRows.length === 1 ? "1 row pasted" : `${newRows.length} rows pasted`)
     this.updateStatusCount()
-    this.unsavedEdits = true
+    this.validateTable()
+    this.saveForm()
   }
 
   getRowValues(tr) {
@@ -353,8 +376,10 @@ export default class extends Controller {
     if (e) e.preventDefault()
     if (!this.hasTemplateRowTarget) return
     this.addRowWithValues(null)
-    this.setStatus("Row added")
+    this.setStatus("1 row added")
     this.updateStatusCount()
+    this.validateTable()
+    this.saveForm()
   }
 
   addRowWithValues(values, insertBeforeRow) {
@@ -378,7 +403,7 @@ export default class extends Controller {
     })
     if (values && values.length) this.setRowValues(clone, values)
     this.tbodyTarget.insertBefore(clone, ref)
-    this.unsavedEdits = true
+    this.validateTable()
     return clone
   }
 
@@ -455,9 +480,26 @@ export default class extends Controller {
     moving.forEach(r => tbody.insertBefore(r, ref))
     this.reindexRows()
     this.dataRows.forEach(r => r.classList.remove("drop-before", "drop-after"))
-    this.setStatus("Reordered")
-    this.saveForm().then((res) => {
-      if (res && (res.status === 204 || res.status === 200)) this.unsavedEdits = false
+    this.setStatus(moving.length === 1 ? "1 row moved" : `${moving.length} rows moved`)
+    this.clearSortIndicator()
+    this.validateTable()
+    this.saveForm()
+  }
+
+  clearSortIndicator() {
+    const table = this.tbodyTarget && this.tbodyTarget.closest("table")
+    if (!table) return
+    table.querySelectorAll("th.sort-asc").forEach(th => th.classList.remove("sort-asc"))
+    const url = new URL(window.location.href)
+    if (url.searchParams.has("sort") || url.searchParams.has("direction")) {
+      url.searchParams.delete("sort")
+      url.searchParams.delete("direction")
+      history.replaceState({}, "", url.toString())
+    }
+    const base = window.location.pathname
+    table.querySelectorAll("thead th a[href]").forEach(a => {
+      const col = a.textContent.trim()
+      if (col) a.href = `${base}?sort=${encodeURIComponent(col)}&direction=asc`
     })
   }
 

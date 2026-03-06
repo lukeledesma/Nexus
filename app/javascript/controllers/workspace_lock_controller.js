@@ -2,13 +2,39 @@ import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
   static targets = ["toggle", "lockIcon", "tableContainer", "sortLink", "editable", "headerEditable", "selectModeBtn"]
+  static values = { initialUnlocked: Boolean }
 
   connect() {
     this.reorderMode = false
     this.selectMode = false
-    sessionStorage.removeItem("nexus_workspace_unlocked")
-    this.locked = true
+    const fromSortNav = sessionStorage.getItem("nexus_workspace_sort_nav") === "1"
+    this.locked = !fromSortNav && !this.initialUnlockedValue
+    if (this.initialUnlockedValue && !this.locked) {
+      sessionStorage.setItem("nexus_workspace_unlocked", "1")
+      sessionStorage.setItem("nexus_workspace_path", window.location.pathname)
+    }
+    if (fromSortNav) {
+      clearTimeout(this._sortNavClearTimeout)
+      this._sortNavClearTimeout = setTimeout(() => {
+        sessionStorage.removeItem("nexus_workspace_sort_nav")
+        this._sortNavClearTimeout = null
+      }, 500)
+    } else {
+      sessionStorage.removeItem("nexus_workspace_sort_nav")
+    }
+    this.boundPreventSort = this.preventSortWhenLocked.bind(this)
+    this._sortLinks = this.hasSortLinkTarget ? [...this.sortLinkTargets] : []
+    this._sortLinks.forEach(link => {
+      link.addEventListener("click", this.boundPreventSort, true)
+    })
     this.updateUi()
+  }
+
+  disconnect() {
+    clearTimeout(this._sortNavClearTimeout)
+    this._sortLinks && this._sortLinks.forEach(link => {
+      link.removeEventListener("click", this.boundPreventSort, true)
+    })
   }
 
   toggle() {
@@ -18,8 +44,11 @@ export default class extends Controller {
       this.selectMode = false
       this.clearRowSelections()
       sessionStorage.removeItem("nexus_workspace_unlocked")
+      sessionStorage.removeItem("nexus_workspace_path")
+      sessionStorage.removeItem("nexus_workspace_sort_nav")
     } else {
       sessionStorage.setItem("nexus_workspace_unlocked", "1")
+      sessionStorage.setItem("nexus_workspace_path", window.location.pathname)
     }
     this.updateUi()
   }
@@ -37,7 +66,12 @@ export default class extends Controller {
   }
 
   preventSortWhenLocked(e) {
-    if (this.locked) e.preventDefault()
+    if (this.locked) {
+      e.preventDefault()
+      e.stopPropagation()
+    } else {
+      sessionStorage.setItem("nexus_workspace_sort_nav", "1")
+    }
   }
 
   updateUi() {
