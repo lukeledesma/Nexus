@@ -37,6 +37,11 @@ Rails.application.configure do
   # Make template changes take effect immediately.
   config.action_mailer.perform_caching = false
 
+  # Allow access from other devices on the same WiFi (e.g. 192.168.x.x, 10.x.x.x).
+  config.hosts << IPAddr.new("192.168.0.0/16")
+  config.hosts << IPAddr.new("10.0.0.0/8")
+  config.hosts << IPAddr.new("172.16.0.0/12")
+
   # Set localhost to be used by links generated in mailer templates.
   config.action_mailer.default_url_options = { host: "localhost", port: 3000 }
 
