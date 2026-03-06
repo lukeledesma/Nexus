@@ -7,42 +7,42 @@ require "rexml/document"
 module TagXml
   module DataTypeMapper
     TYPE_MAP = {
-      ["107", "255"] => "BOOL",
-      ["107", "107"] => "BOOL (Bit of INT)",
-      ["0", "255"] => "INT",
-      ["1", "255"] => "UINT",
-      ["0", "102"] => "INT (Scaled)",
-      ["1", "102"] => "UINT (Scaled)",
-      ["4", "32"] => "DINT (Scaled)",
-      ["7", "32"] => "DINT (Scaled, w/Byte Swap)",
-      ["8", "32"] => "UDINT (Scaled)",
-      ["17", "32"] => "UDINT (Scaled, w/Byte Swap)",
-      ["4", "255"] => "DINT",
-      ["7", "4"] => "DINT (w/Byte Swap)",
-      ["8", "255"] => "UDINT",
-      ["17", "8"] => "UDINT (w/Byte Swap)",
-      ["104", "32"] => "REAL",
-      ["0032", "255"] => "REAL",
-      ["0035", "32"] => "REAL (w/Byte Swap)"
+      [ "107", "255" ] => "BOOL",
+      [ "107", "107" ] => "BOOL (Bit of INT)",
+      [ "0", "255" ] => "INT",
+      [ "1", "255" ] => "UINT",
+      [ "0", "102" ] => "INT (Scaled)",
+      [ "1", "102" ] => "UINT (Scaled)",
+      [ "4", "32" ] => "DINT (Scaled)",
+      [ "7", "32" ] => "DINT (Scaled, w/Byte Swap)",
+      [ "8", "32" ] => "UDINT (Scaled)",
+      [ "17", "32" ] => "UDINT (Scaled, w/Byte Swap)",
+      [ "4", "255" ] => "DINT",
+      [ "7", "4" ] => "DINT (w/Byte Swap)",
+      [ "8", "255" ] => "UDINT",
+      [ "17", "8" ] => "UDINT (w/Byte Swap)",
+      [ "104", "32" ] => "REAL",
+      [ "0032", "255" ] => "REAL",
+      [ "0035", "32" ] => "REAL (w/Byte Swap)"
     }.freeze
 
     EXPORT_CODES = {
-      "BOOL" => ["107", "255"],
-      "BOOL (Bit of INT)" => ["107", "255"],
-      "INT" => ["0", "255"],
-      "UINT" => ["1", "255"],
-      "INT (Scaled)" => ["0", "102"],
-      "UINT (Scaled)" => ["1", "102"],
-      "DINT" => ["4", "255"],
-      "DINT (w/Byte Swap)" => ["7", "4"],
-      "DINT (Scaled)" => ["4", "32"],
-      "DINT (Scaled, w/Byte Swap)" => ["7", "32"],
-      "UDINT" => ["8", "255"],
-      "UDINT (w/Byte Swap)" => ["17", "8"],
-      "UDINT (Scaled)" => ["8", "32"],
-      "UDINT (Scaled, w/Byte Swap)" => ["17", "32"],
-      "REAL" => ["0032", "255"],
-      "REAL (w/Byte Swap)" => ["0035", "32"]
+      "BOOL" => [ "107", "255" ],
+      "BOOL (Bit of INT)" => [ "107", "255" ],
+      "INT" => [ "0", "255" ],
+      "UINT" => [ "1", "255" ],
+      "INT (Scaled)" => [ "0", "102" ],
+      "UINT (Scaled)" => [ "1", "102" ],
+      "DINT" => [ "4", "255" ],
+      "DINT (w/Byte Swap)" => [ "7", "4" ],
+      "DINT (Scaled)" => [ "4", "32" ],
+      "DINT (Scaled, w/Byte Swap)" => [ "7", "32" ],
+      "UDINT" => [ "8", "255" ],
+      "UDINT (w/Byte Swap)" => [ "17", "8" ],
+      "UDINT (Scaled)" => [ "8", "32" ],
+      "UDINT (Scaled, w/Byte Swap)" => [ "17", "32" ],
+      "REAL" => [ "0032", "255" ],
+      "REAL (w/Byte Swap)" => [ "0035", "32" ]
     }.freeze
 
     # Uticor code → human-readable label (for datatype and encode fields)
@@ -80,11 +80,11 @@ module TagXml
     def map_datatype(datatype, encode, _funccode)
       dt = (datatype || "").to_s.strip.delete('"')
       enc = (encode || "").to_s.strip.delete('"')
-      key = [dt, enc]
+      key = [ dt, enc ]
       return TYPE_MAP[key] if TYPE_MAP.key?(key)
-      return "REAL (w/Byte Swap)" if ["0032", "35"].include?(dt) && enc != "255"
-      return "REAL" if ["0032", "35"].include?(dt)
-      return "DINT (w/Byte Swap)" if dt == "7" && !["255", "4"].include?(enc)
+      return "REAL (w/Byte Swap)" if [ "0032", "35" ].include?(dt) && enc != "255"
+      return "REAL" if [ "0032", "35" ].include?(dt)
+      return "DINT (w/Byte Swap)" if dt == "7" && ![ "255", "4" ].include?(enc)
       return "DINT" if dt == "7"
       return "UDINT" if dt == "8"
       return "UDINT (w/Byte Swap)" if dt == "17"
@@ -101,7 +101,7 @@ module TagXml
 
     def get_export_codes(dtype)
       normalized = dtype.to_s.strip
-      EXPORT_CODES[normalized] || ["0", "255"]
+      EXPORT_CODES[normalized] || [ "0", "255" ]
     end
 
     def get_function_code(dtype)
@@ -111,22 +111,22 @@ module TagXml
     # Options for the data type popup: label, datatype, encode, and Uticor labels for tooltip
     def data_type_popup_options
       [
-        ["BOOL", "107", "255"],
-        ["BOOL (Bit of INT)", "107", "255"],
-        ["INT", "0", "255"],
-        ["UINT", "1", "255"],
-        ["INT (Scaled)", "0", "102"],
-        ["UINT (Scaled)", "1", "102"],
-        ["DINT (Scaled)", "4", "32"],
-        ["DINT (Scaled, w/Byte Swap)", "7", "32"],
-        ["UDINT (Scaled)", "8", "32"],
-        ["UDINT (Scaled, w/Byte Swap)", "17", "32"],
-        ["DINT", "4", "255"],
-        ["DINT (w/Byte Swap)", "7", "4"],
-        ["UDINT", "8", "255"],
-        ["UDINT (w/Byte Swap)", "17", "8"],
-        ["REAL", "0032", "255"],
-        ["REAL (w/Byte Swap)", "0035", "32"]
+        [ "BOOL", "107", "255" ],
+        [ "BOOL (Bit of INT)", "107", "255" ],
+        [ "INT", "0", "255" ],
+        [ "UINT", "1", "255" ],
+        [ "INT (Scaled)", "0", "102" ],
+        [ "UINT (Scaled)", "1", "102" ],
+        [ "DINT (Scaled)", "4", "32" ],
+        [ "DINT (Scaled, w/Byte Swap)", "7", "32" ],
+        [ "UDINT (Scaled)", "8", "32" ],
+        [ "UDINT (Scaled, w/Byte Swap)", "17", "32" ],
+        [ "DINT", "4", "255" ],
+        [ "DINT (w/Byte Swap)", "7", "4" ],
+        [ "UDINT", "8", "255" ],
+        [ "UDINT (w/Byte Swap)", "17", "8" ],
+        [ "REAL", "0032", "255" ],
+        [ "REAL (w/Byte Swap)", "0035", "32" ]
       ].map do |label, dt, enc|
         { label: label, datatype: dt, encode: enc, datatype_label: uticor_label(dt), encode_label: uticor_label(enc) }
       end
@@ -143,7 +143,7 @@ module TagXml
       seen = {}
       UTICOR_CODE_LABELS.each do |code, label|
         norm = normalize_code(code)
-        seen[norm] ||= ["#{norm}: #{label}", norm]
+        seen[norm] ||= [ "#{norm}: #{label}", norm ]
       end
       seen.values.sort_by { |_, value| (value.to_i rescue 0) }
     end
@@ -218,11 +218,11 @@ module TagXml
           if addr <= cluster_end + 1
             cluster_end = addr
           else
-            clusters << [cluster_start, cluster_end + pad]
+            clusters << [ cluster_start, cluster_end + pad ]
             cluster_start = cluster_end = addr
           end
         end
-        clusters << [cluster_start, cluster_end + pad]
+        clusters << [ cluster_start, cluster_end + pad ]
         chunk_end = {}
         clusters.each do |c_start, c_end|
           c_end = c_start if c_end < c_start
@@ -235,7 +235,7 @@ module TagXml
             chunk += 100
           end
         end
-        chunk_end.keys.sort.map { |chunk| [chunk, chunk_end[chunk] - chunk + 1] }
+        chunk_end.keys.sort.map { |chunk| [ chunk, chunk_end[chunk] - chunk + 1 ] }
       end
     end
   end
@@ -359,7 +359,7 @@ module TagXml
           rescue ArgumentError
             # keep preload_name ""
           end
-          fields = fields.map { |n, v| n == "PRELOAD" ? [n, "\"#{preload_name}\""] : [n, v] }
+          fields = fields.map { |n, v| n == "PRELOAD" ? [ n, "\"#{preload_name}\"" ] : [ n, v ] }
           out << block_xml(tag_name, fields)
         end
 
@@ -392,13 +392,13 @@ module TagXml
         expr = ScalingMapper.ui_to_expr(record["Scaling"] || DEFAULT_SCALING)
         subscribe = ReadWriteMapper.ui_to_subscribe(record["Read/Write"] || DEFAULT_READ_WRITE)
         [
-          ["TYPE", "\"#{meta[:protocol] || 'TCP'}\""], ["DEVICEID", '"1"'], ["FUNCCODE", funccode],
-          ["ADDRSTART", "\"#{addr}\""], ["DATALENGTH", "\"#{dlength}\""], ["ALIAS", '"none"'],
-          ["NODEID", "\"#{nodeid}\""], ["SERIAL", '"remote"'], ["IP", "\"#{meta[:ip] || '0.0.0.0'}\""],
-          ["PORT", '"502"'], ["OID", '"none"'], ["CMMSTR_R", '"public"'], ["CMMSTR_W", '"public"'],
-          ["TRIGGER", '"none"'], ["PRELOAD", '""'], ["VERIFY", "\"#{verify_code}\""], ["THRESHOLD", '"0"'],
-          ["DATATYPE", "\"#{dt_code}\""], ["ENCODE", "\"#{enc_code}\""], ["EXPR", expr],
-          ["SUBSCRIBE", subscribe], ["POLL", '"on"']
+          [ "TYPE", "\"#{meta[:protocol] || 'TCP'}\"" ], [ "DEVICEID", '"1"' ], [ "FUNCCODE", funccode ],
+          [ "ADDRSTART", "\"#{addr}\"" ], [ "DATALENGTH", "\"#{dlength}\"" ], [ "ALIAS", '"none"' ],
+          [ "NODEID", "\"#{nodeid}\"" ], [ "SERIAL", '"remote"' ], [ "IP", "\"#{meta[:ip] || '0.0.0.0'}\"" ],
+          [ "PORT", '"502"' ], [ "OID", '"none"' ], [ "CMMSTR_R", '"public"' ], [ "CMMSTR_W", '"public"' ],
+          [ "TRIGGER", '"none"' ], [ "PRELOAD", '""' ], [ "VERIFY", "\"#{verify_code}\"" ], [ "THRESHOLD", '"0"' ],
+          [ "DATATYPE", "\"#{dt_code}\"" ], [ "ENCODE", "\"#{enc_code}\"" ], [ "EXPR", expr ],
+          [ "SUBSCRIBE", subscribe ], [ "POLL", '"on"' ]
         ]
       end
 
@@ -408,12 +408,12 @@ module TagXml
         end_index = start + length - 1
         dlength = (tag_prefix == "Preload_Words") ? (end_index + 1) : end_index
         [
-          ["TYPE", "\"#{meta[:protocol] || 'TCP'}\""], ["DEVICEID", '"1"'], ["FUNCCODE", func_code],
-          ["ADDRSTART", "\"#{start}\""], ["DATALENGTH", "\"#{dlength}\""], ["ALIAS", '"none"'],
-          ["NODEID", '"Preload"'], ["SERIAL", '"remote"'], ["IP", "\"#{meta[:ip] || '0.0.0.0'}\""],
-          ["PORT", '"502"'], ["OID", '"none"'], ["CMMSTR_R", '"public"'], ["CMMSTR_W", '"public"'],
-          ["TRIGGER", '"none"'], ["PRELOAD", '"none"'], ["VERIFY", '"254"'], ["THRESHOLD", '"0"'],
-          ["DATATYPE", '"103"'], ["ENCODE", '"255"'], ["EXPR", '"1.0"'], ["SUBSCRIBE", '"off"'], ["POLL", '"on"']
+          [ "TYPE", "\"#{meta[:protocol] || 'TCP'}\"" ], [ "DEVICEID", '"1"' ], [ "FUNCCODE", func_code ],
+          [ "ADDRSTART", "\"#{start}\"" ], [ "DATALENGTH", "\"#{dlength}\"" ], [ "ALIAS", '"none"' ],
+          [ "NODEID", '"Preload"' ], [ "SERIAL", '"remote"' ], [ "IP", "\"#{meta[:ip] || '0.0.0.0'}\"" ],
+          [ "PORT", '"502"' ], [ "OID", '"none"' ], [ "CMMSTR_R", '"public"' ], [ "CMMSTR_W", '"public"' ],
+          [ "TRIGGER", '"none"' ], [ "PRELOAD", '"none"' ], [ "VERIFY", '"254"' ], [ "THRESHOLD", '"0"' ],
+          [ "DATATYPE", '"103"' ], [ "ENCODE", '"255"' ], [ "EXPR", '"1.0"' ], [ "SUBSCRIBE", '"off"' ], [ "POLL", '"on"' ]
         ]
       end
 

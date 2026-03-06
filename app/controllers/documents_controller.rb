@@ -3,7 +3,7 @@
 require Rails.root.join("app/services/tag_xml.rb").to_s
 
 class DocumentsController < ApplicationController
-  RECORD_KEYS = ["Tag Group", "Tag Name", "Data Type", "Address Start", "Data Length", "Scaling", "Read/Write"].freeze
+  RECORD_KEYS = [ "Tag Group", "Tag Name", "Data Type", "Address Start", "Data Length", "Scaling", "Read/Write" ].freeze
 
   # Canonical order for Data Type (register / type precedence)
   DATA_TYPE_ORDER = [
@@ -163,7 +163,7 @@ class DocumentsController < ApplicationController
 
     if hash_like
       numeric_keys = raw.keys.select { |k| k.to_s.match?(/\A\d+\z/) }.sort_by { |k| k.to_s.to_i }
-      numeric_pairs = numeric_keys.map { |k| [k, raw[k]] }
+      numeric_pairs = numeric_keys.map { |k| [ k, raw[k] ] }
       existing = @document.records_with_string_keys
       records = numeric_pairs.each_with_index.map do |(_, h), idx|
         next {} unless h.respond_to?(:permit)
@@ -232,23 +232,23 @@ class DocumentsController < ApplicationController
       Dir.mktmpdir("alchemy_tar") do |dir|
         success = system("tar", "-xf", path, "-C", dir, out: File::NULL, err: File::NULL)
         unless success
-          return [nil, name]
+          return [ nil, name ]
         end
         xml_path = Dir.glob(File.join(dir, "**", "*.xml")).first
         xml_path ||= Dir.glob(File.join(dir, "**", "*")).find { |f| File.file?(f) }
-        next [nil, name] unless xml_path
+        next [ nil, name ] unless xml_path
         display = name.sub(/\.tar\z/i, "")
         display = File.basename(xml_path) if display.blank?
         # Copy to a temp file so we can use it after the tar dir is removed
-        tmp = Tempfile.new(["alchemy_xml", ".xml"])
+        tmp = Tempfile.new([ "alchemy_xml", ".xml" ])
         tmp.binmode
         tmp.write(File.binread(xml_path))
         tmp.rewind
         @_import_tempfile = tmp
-        [tmp.path, display.presence || name]
+        [ tmp.path, display.presence || name ]
       end
     else
-      [path, name]
+      [ path, name ]
     end
   end
 
