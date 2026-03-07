@@ -179,10 +179,12 @@ export default class extends Controller {
   }
 
   // UI rendering helpers.
-  buildTooltip(datatypeLabel, encodeLabel) {
+  buildTooltip(datatypeLabel, encodeLabel, datatypeCode, encodeCode) {
     const dt = (datatypeLabel || "").trim() || "Unknown"
     const enc = (encodeLabel || "").trim() || "Unknown"
-    return `Data Type: ${dt}\nEncode: ${enc}`
+    const dtCode = this.normalizeCode(datatypeCode)
+    const encCode = this.normalizeCode(encodeCode)
+    return `Datatype - ${dtCode}: ${dt}\nEncode - ${encCode}: ${enc}`
   }
 
   codeLabelFromSelect(selectEl, code) {
@@ -190,6 +192,25 @@ export default class extends Controller {
     const option = Array.from(selectEl.options).find((opt) => this.normalizeCode(opt.value) === normalized)
     if (option) return option.textContent.trim()
     return `Code ${normalized}`
+  }
+
+  codeSummary(datatypeCode, encodeCode, datatypeLabel, encodeLabel) {
+    const dtCode = this.normalizeCode(datatypeCode)
+    const encCode = this.normalizeCode(encodeCode)
+    const dtText = this.stripLeadingCode(datatypeLabel) || "Unknown"
+    const encText = this.stripLeadingCode(encodeLabel) || "Unknown"
+    return `Datatype - ${dtCode}:${dtText} & Encode - ${encCode}:${encText}`
+  }
+
+  stripLeadingCode(label) {
+    return String(label || "").trim().replace(/^\d+\s*:\s*/, "")
+  }
+
+  statusValueForKind(kind, formatLabel, datatypeCode, encodeCode, datatypeLabel, encodeLabel) {
+    if (kind === "Unique") {
+      return this.codeSummary(datatypeCode, encodeCode, datatypeLabel, encodeLabel)
+    }
+    return (formatLabel || "").trim() || "(blank)"
   }
 
   updateUniqueHighlight() {
@@ -210,6 +231,8 @@ export default class extends Controller {
     const hiddenRawDt = td.querySelector("input[name*='_raw_datatype']")
     const hiddenRawEnc = td.querySelector("input[name*='_raw_encode']")
     const beforeLabel = this.currentTrigger.dataset.value || hiddenValue?.value || ""
+    const beforeDatatype = this.normalizeCode(this.currentTrigger.dataset.rawDatatype || hiddenRawDt?.value || "0")
+    const beforeEncode = this.normalizeCode(this.currentTrigger.dataset.rawEncode || hiddenRawEnc?.value || "255")
     if (hiddenValue) hiddenValue.value = label
     if (hiddenRawDt) hiddenRawDt.value = datatype
     if (hiddenRawEnc) hiddenRawEnc.value = encode
@@ -222,7 +245,18 @@ export default class extends Controller {
     const opt = this.typeOptions.find((o) => o.label === label)
     const dtLabel = opt ? opt.datatype_label : this.codeLabelFromSelect(this.datatypeSelectTarget, datatype)
     const encLabel = opt ? opt.encode_label : this.codeLabelFromSelect(this.encodeSelectTarget, encode)
-    this.currentTrigger.title = this.buildTooltip(dtLabel, encLabel)
+    this.currentTrigger.title = this.buildTooltip(dtLabel, encLabel, datatype, encode)
+    const beforeKind = beforeLabel === "Unique" ? "Unique" : "Formatted"
+    const beforeKey = `${beforeDatatype}_${beforeEncode}`
+    const beforeMappedLabel = this.reverseMap[beforeKey] || "Unique"
+    const beforeOpt = this.typeOptions.find((o) => o.label === beforeMappedLabel)
+    const beforeDtLabel = beforeOpt ? beforeOpt.datatype_label : this.codeLabelFromSelect(this.datatypeSelectTarget, beforeDatatype)
+    const beforeEncLabel = beforeOpt ? beforeOpt.encode_label : this.codeLabelFromSelect(this.encodeSelectTarget, beforeEncode)
+    const beforeStatusValue = this.statusValueForKind(beforeKind, beforeLabel, beforeDatatype, beforeEncode, beforeDtLabel, beforeEncLabel)
+    const afterKind = label === "Unique" ? "Unique" : "Formatted"
+    const afterStatusValue = this.statusValueForKind(afterKind, label, datatype, encode, dtLabel, encLabel)
+    const statusKind = beforeKind !== afterKind ? "data-type-unique-transition" : "data-type-change"
+    const transition = `${beforeKind.toLowerCase()}-to-${afterKind.toLowerCase()}`
     const form = this.element.closest("form")
     const row = this.currentTrigger.closest("tr.tag-data-row")
     const rowIndexMatch = hiddenValue && hiddenValue.name ? hiddenValue.name.match(/records\[(\d+)\]/) : null
@@ -238,7 +272,8 @@ export default class extends Controller {
     }
     const status = {
       simple: "Data Type updated",
-      detailed: `Data Type ${beforeLabel || "(blank)"} > Data Type ${label || "(blank)"}`
+      detailed: `${beforeStatusValue} > ${afterStatusValue} (${beforeKind} > ${afterKind})`,
+      meta: { kind: statusKind, transition }
     }
     if (form && form.dataset.controller && form.dataset.controller.includes("tag-table")) {
       form.dispatchEvent(new CustomEvent("tag-table:cell-changed", { bubbles: true, detail: { message: "Data Type updated", status, row, delta } }))

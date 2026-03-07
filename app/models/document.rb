@@ -27,6 +27,10 @@ class Document < ApplicationRecord
     records.map { |r| r.transform_keys(&:to_s) }
   end
 
+  def new_untitled_placeholder?
+    !!self[:new_untitled_placeholder]
+  end
+
   private
 
   def set_default_metadata

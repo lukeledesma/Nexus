@@ -21,7 +21,7 @@
 <script type="application/json" id="data-type-picker-type-options"><%= raw data_type_popup_options.to_json %></script>
 
 <div class="workspace">
-  <%= form_with model: @document, url: document_path(@document), method: :patch, class: "workspace-form", data: { controller: "workspace-lock tag-table data-type-picker", workspace_lock_initial_unlocked_value: flash[:new_document].present? } do |f| %>
+  <%= form_with model: @document, url: document_path(@document), method: :patch, class: "workspace-form", data: { controller: "workspace-lock tag-table data-type-picker", workspace_lock_initial_unlocked_value: @document.new_untitled_placeholder? } do |f| %>
     <header class="workspace-header">
       <div class="header-top">
         <div class="header-title-block">
@@ -83,7 +83,9 @@
                     <% raw_enc = row["_raw_encode"].to_s.strip %>
                     <% dt_tip = TagXml::DataTypeMapper.uticor_label(raw_dt).presence || "Unknown" %>
                     <% enc_tip = TagXml::DataTypeMapper.uticor_label(raw_enc).presence || "Unknown" %>
-                    <% uticor_tip = "Data Type: #{dt_tip}\nEncode: #{enc_tip}" %>
+                    <% dt_code_tip = raw_dt.presence || "0" %>
+                    <% enc_code_tip = raw_enc.presence || "255" %>
+                    <% uticor_tip = "Datatype - #{dt_code_tip}: #{dt_tip}\nEncode - #{enc_code_tip}: #{enc_tip}" %>
                     <%= hidden_field_tag "records[#{idx}][Data Type]", val, class: "cell", data: { workspace_lock_target: "editable" }, disabled: true %>
                     <%= hidden_field_tag "records[#{idx}][_raw_datatype]", raw_dt.presence || "0", id: nil %>
                     <%= hidden_field_tag "records[#{idx}][_raw_encode]", raw_enc.presence || "255", id: nil %>

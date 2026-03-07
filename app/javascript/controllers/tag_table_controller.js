@@ -202,8 +202,106 @@ export default class extends Controller {
     this.clearStatusHighlight()
     this.clearHeaderStatusHighlight()
     this.clearDeletedGhostRows()
+    this.clearMovedGhostRows()
     this.renderStatusMessage()
     this._lastStatusRows = rows && rows.length ? Array.from(rows) : null
+    this.flashStatusTargets(this._lastStatus, this._lastStatusRows)
+  }
+
+  statusTone(status) {
+    const kind = status?.meta?.kind
+    const transition = status?.meta?.transition
+    if (kind === "invalid-address" || kind === "invalid-ip" || kind === "duplicate-address" || kind === "duplicate-tag-name") {
+      return "red"
+    }
+    if (kind === "data-type-unique-transition" && transition === "formatted-to-unique") return "yellow"
+    return "green"
+  }
+
+  applyFlashClass(el, className) {
+    if (!el || !className) return
+    el.classList.remove(className)
+    void el.offsetWidth
+    el.classList.add(className)
+    el.addEventListener("animationend", () => el.classList.remove(className), { once: true })
+  }
+
+  flashRows(rows, tone) {
+    if (!Array.isArray(rows) || rows.length === 0) return
+    const className = `row-change-flash-${tone}`
+    rows.filter((r) => r && r.isConnected).forEach((r) => this.applyFlashClass(r, className))
+  }
+
+  flashField(el, tone) {
+    if (!el) return
+    this.applyFlashClass(el, `field-change-flash-${tone}`)
+  }
+
+  flashInvalidAddressFields(rows, tone) {
+    if (!Array.isArray(rows) || rows.length === 0) return
+    rows.forEach((row) => {
+      const el = row?.querySelector("input[name*='[Address Start]']")
+      if (el) this.flashField(el, tone)
+    })
+  }
+
+  flashDuplicateAddressFields(meta, tone) {
+    const address = String(meta?.address || "").trim()
+    const registerKind = String(meta?.registerKind || "")
+    if (!address || !registerKind) return
+    this.dataRows.forEach((row) => {
+      const dt = row.querySelector("input[name*='[Data Type]'], select[name*='[Data Type]']")
+      const addrEl = row.querySelector("input[name*='[Address Start]']")
+      if (!dt || !addrEl) return
+      const rowKind = (dt.value || "").trim() === "BOOL" ? "coil" : "holding"
+      if (rowKind !== registerKind) return
+      if ((addrEl.value || "").trim() !== address) return
+      this.flashField(addrEl, tone)
+    })
+  }
+
+  flashDuplicateTagNameFields(meta, tone) {
+    const tagName = String(meta?.tagName || "").trim()
+    if (!tagName) return
+    this.dataRows.forEach((row) => {
+      const tagNameEl = row.querySelector("input[name*='[Tag Name]']")
+      if (!tagNameEl) return
+      if ((tagNameEl.value || "").trim() !== tagName) return
+      this.flashField(tagNameEl, tone)
+    })
+  }
+
+  flashHeaderFields(meta, tone) {
+    const names = Array.isArray(meta?.headerFieldNames) ? meta.headerFieldNames : []
+    names.forEach((fieldName) => {
+      const el = this.element.querySelector(`[name='${fieldName}']`)
+      if (el) this.flashField(el, tone)
+    })
+  }
+
+  flashStatusTargets(status, rows) {
+    const tone = this.statusTone(status)
+    this.flashRows(rows, tone)
+    const kind = status?.meta?.kind
+    if (kind === "header-field-change") {
+      this.flashHeaderFields(status.meta, tone)
+      return
+    }
+    if (kind === "invalid-ip") {
+      this.flashHeaderFields(status.meta, tone)
+      return
+    }
+    if (kind === "invalid-address") {
+      this.flashInvalidAddressFields(rows, tone)
+      return
+    }
+    if (kind === "duplicate-address") {
+      this.flashDuplicateAddressFields(status.meta, tone)
+      return
+    }
+    if (kind === "duplicate-tag-name") {
+      this.flashDuplicateTagNameFields(status.meta, tone)
+    }
   }
 
   normalizeStatus(status) {
@@ -223,14 +321,27 @@ export default class extends Controller {
       this.statusMessageTarget.textContent = ""
       this.statusMessageTarget.classList.remove("status-detailed")
       this.statusMessageTarget.classList.remove("status-detailed-deleted")
+      this.statusMessageTarget.classList.remove("status-detailed-unique")
       return
     }
     const text = this._statusDetailedMode ? this._lastStatus.detailed : this._lastStatus.simple
     this.statusMessageTarget.textContent = text
     this.statusMessageTarget.classList.toggle("status-detailed", !!this._statusDetailedMode)
     const detailKind = this._lastStatus?.meta?.kind
-    const isErrorDetail = !!(this._statusDetailedMode && (detailKind === "rows-deleted" || detailKind === "invalid-address" || detailKind === "invalid-ip"))
+    const isErrorDetail = !!(
+      this._statusDetailedMode && (
+        detailKind === "rows-deleted" ||
+        detailKind === "invalid-address" ||
+        detailKind === "invalid-ip" ||
+        detailKind === "duplicate-address" ||
+        detailKind === "duplicate-tag-name"
+      )
+    )
+    const transition = this._lastStatus?.meta?.transition
+    const isFormattedToUnique = transition === "formatted-to-unique"
+    const isUniqueTransitionDetail = !!(this._statusDetailedMode && detailKind === "data-type-unique-transition" && isFormattedToUnique)
     this.statusMessageTarget.classList.toggle("status-detailed-deleted", isErrorDetail)
+    this.statusMessageTarget.classList.toggle("status-detailed-unique", isUniqueTransitionDetail)
   }
 
   flashStatusRestored() {
@@ -308,9 +419,79 @@ export default class extends Controller {
     }
   }
 
+  buildDuplicateAddressStatus(beforeValue, afterValue, registerKind) {
+    const beforeText = this.statusValueText(beforeValue)
+    const afterText = this.statusValueText(afterValue)
+    return {
+      simple: "A duplicate address was entered",
+      detailed: `Address Start ${beforeText} > Address Start ${afterText} (duplicate)`,
+      meta: { kind: "duplicate-address", address: String(afterValue || "").trim(), registerKind: String(registerKind || "") }
+    }
+  }
+
+  buildDuplicateTagNameStatus(beforeValue, afterValue) {
+    const beforeText = this.statusValueText(beforeValue)
+    const afterText = this.statusValueText(afterValue)
+    return {
+      simple: "A duplicate tag name was entered",
+      detailed: `Tag Name ${beforeText} > Tag Name ${afterText} (duplicate)`,
+      meta: { kind: "duplicate-tag-name", tagName: String(afterValue || "").trim() }
+    }
+  }
+
+  isDuplicateAddressValue(row, value) {
+    const address = String(value || "").trim()
+    if (address === "") return false
+    const dataTypeEl = row?.querySelector("input[name*='[Data Type]'], select[name*='[Data Type]']")
+    const kind = (dataTypeEl?.value || "").trim() === "BOOL" ? "coil" : "holding"
+    let count = 0
+    this.dataRows.forEach((tr) => {
+      const dt = tr.querySelector("input[name*='[Data Type]'], select[name*='[Data Type]']")
+      const addrEl = tr.querySelector("input[name*='[Address Start]']")
+      if (!dt || !addrEl) return
+      const trKind = (dt.value || "").trim() === "BOOL" ? "coil" : "holding"
+      const trAddr = (addrEl.value || "").trim()
+      if (trKind === kind && trAddr === address) count += 1
+    })
+    return count > 1
+  }
+
+  isDuplicateTagNameValue(value) {
+    const tagName = String(value || "").trim()
+    if (tagName === "") return false
+    let count = 0
+    this.dataRows.forEach((tr) => {
+      const tagNameEl = tr.querySelector("input[name*='[Tag Name]']")
+      if (!tagNameEl) return
+      if ((tagNameEl.value || "").trim() === tagName) count += 1
+    })
+    return count > 1
+  }
+
+  buildRecordStatusForChange(fieldName, beforeValue, afterValue, row) {
+    if (fieldName === "Address Start") {
+      if (/[^0-9]/.test((afterValue || "").trim())) return this.buildInvalidAddressStatus(beforeValue, afterValue)
+      if (row && this.isDuplicateAddressValue(row, afterValue)) {
+        const dt = row.querySelector("input[name*='[Data Type]'], select[name*='[Data Type]']")
+        const registerKind = (dt?.value || "").trim() === "BOOL" ? "coil" : "holding"
+        return this.buildDuplicateAddressStatus(beforeValue, afterValue, registerKind)
+      }
+    }
+    if (fieldName === "Tag Name" && this.isDuplicateTagNameValue(afterValue)) {
+      return this.buildDuplicateTagNameStatus(beforeValue, afterValue)
+    }
+    return this.buildFieldChangeStatus(fieldName, beforeValue, afterValue)
+  }
+
   statusHighlightClass() {
     const kind = this._lastStatus?.meta?.kind
-    if (kind === "invalid-address") return "row-status-highlight-deleted"
+    const transition = this._lastStatus?.meta?.transition
+    if (kind === "data-type-unique-transition" && transition === "formatted-to-unique") {
+      return "row-status-highlight-unique"
+    }
+    if (kind === "invalid-address" || kind === "duplicate-address" || kind === "duplicate-tag-name") {
+      return "row-status-highlight-deleted"
+    }
     return "row-status-highlight"
   }
 
@@ -318,7 +499,7 @@ export default class extends Controller {
     if (!this._statusHighlightedRows) return
     this._statusHighlightedRows.forEach(r => {
       if (!r || !r.isConnected) return
-      r.classList.remove("row-status-highlight", "row-status-highlight-deleted")
+      r.classList.remove("row-status-highlight", "row-status-highlight-deleted", "row-status-highlight-unique")
     })
     this._statusHighlightedRows = null
   }
@@ -343,8 +524,16 @@ export default class extends Controller {
     this.element.querySelectorAll("tr.row-deleted-ghost").forEach((tr) => tr.remove())
   }
 
+  clearMovedGhostRows() {
+    this.element.querySelectorAll("tr.row-moved-ghost").forEach((tr) => tr.remove())
+  }
+
   hasDeletedGhostPreviewActive() {
     return !!(this._statusDetailedMode && this._lastStatus?.meta?.kind === "rows-deleted")
+  }
+
+  hasMovedGhostPreviewActive() {
+    return !!(this._statusDetailedMode && this._lastStatus?.meta?.kind === "rows-moved")
   }
 
   showDeletedGhostRows(entries) {
@@ -385,12 +574,68 @@ export default class extends Controller {
     })
   }
 
+  showMovedGhostRows(entries) {
+    if (!this.hasTbodyTarget || !Array.isArray(entries) || entries.length === 0) return
+    this.clearMovedGhostRows()
+    const tbody = this.tbodyTarget
+    const tableBodyRows = () => Array.from(tbody.querySelectorAll("tr:not(.tag-row-template):not(.row-deleted-ghost):not(.row-moved-ghost)"))
+    const sorted = entries
+      .map((entry) => ({ fromIndex: Number(entry.fromIndex), values: Array.isArray(entry.values) ? entry.values : [] }))
+      .filter((entry) => Number.isInteger(entry.fromIndex) && entry.fromIndex >= 0)
+      .sort((a, b) => a.fromIndex - b.fromIndex)
+    if (sorted.length === 0) return
+    const colCount = Math.max(1, this.element.querySelectorAll(".tag-table thead th").length)
+
+    let inserted = 0
+    sorted.forEach((entry) => {
+      const rows = tableBodyRows()
+      const targetIndex = entry.fromIndex - inserted
+      const referenceRow = targetIndex >= rows.length ? this.templateRowTarget : rows[targetIndex]
+      const ghost = document.createElement("tr")
+      ghost.className = "row-moved-ghost row-status-highlight-deleted"
+      ghost.setAttribute("aria-hidden", "true")
+      for (let i = 0; i < colCount; i += 1) {
+        const cell = document.createElement("td")
+        const value = entry.values[i]
+        const shell = document.createElement("div")
+        shell.className = "cell ghost-cell"
+        if (value && typeof value === "object" && "label" in value) {
+          shell.textContent = value.label || ""
+        } else {
+          shell.textContent = value == null ? "" : String(value)
+        }
+        cell.appendChild(shell)
+        ghost.appendChild(cell)
+      }
+      tbody.insertBefore(ghost, referenceRow)
+      inserted += 1
+    })
+  }
+
   buildDeletedRowsStatus(count, deletedEntries) {
     const noun = count === 1 ? "row" : "rows"
     return {
       simple: `${count} ${noun} deleted`,
       detailed: `${count} ${noun} deleted (original positions shown)`,
       meta: { kind: "rows-deleted", entries: deletedEntries }
+    }
+  }
+
+  buildMovedRowsStatus(count, movedEntries) {
+    const noun = count === 1 ? "row" : "rows"
+    return {
+      simple: `${count} ${noun} moved`,
+      detailed: `${count} ${noun} moved (original positions shown)`,
+      meta: { kind: "rows-moved", entries: movedEntries }
+    }
+  }
+
+  buildMovedBackStatus(count, movedEntries) {
+    const noun = count === 1 ? "row" : "rows"
+    return {
+      simple: `${count} ${noun} moved back`,
+      detailed: `${count} ${noun} moved back (previous positions shown)`,
+      meta: { kind: "rows-moved", entries: movedEntries }
     }
   }
 
@@ -422,7 +667,43 @@ export default class extends Controller {
     })
     const restoredLabel = restoredRows.length === 1 ? "Row restored" : "Rows restored"
     this.setStatus({ simple: restoredLabel, detailed: restoredLabel, meta: { kind: "rows-restored" } }, restoredRows)
-    this.flashStatusRestored()
+    return true
+  }
+
+  restoreMovedRowsFromStatus() {
+    const entries = this._lastStatus?.meta?.entries
+    if (!Array.isArray(entries) || entries.length === 0) return false
+    this.clearMovedGhostRows()
+    const sorted = entries
+      .map((entry) => ({ row: entry.row, fromIndex: Number(entry.fromIndex) }))
+      .filter((entry) => entry.row && entry.row.isConnected && Number.isInteger(entry.fromIndex) && entry.fromIndex >= 0)
+      .sort((a, b) => a.fromIndex - b.fromIndex)
+    if (sorted.length === 0) return false
+
+    const preRestoreRows = this.dataRows
+    const reverseEntries = sorted
+      .map((entry) => ({ row: entry.row, fromIndex: preRestoreRows.indexOf(entry.row), values: this.getRowValues(entry.row) }))
+      .filter((entry) => entry.fromIndex >= 0)
+      .sort((a, b) => a.fromIndex - b.fromIndex)
+
+    const tbody = this.tbodyTarget
+    sorted.forEach((entry) => entry.row.remove())
+    sorted.forEach((entry) => {
+      const rows = this.dataRows
+      const ref = entry.fromIndex >= rows.length ? this.templateRowTarget : rows[entry.fromIndex]
+      tbody.insertBefore(entry.row, ref)
+    })
+    this.reindexRows()
+    this.clearHoverState()
+    this.updateStatusCount()
+    this.validateTable()
+    this.saveForm({ clearSortIndicator: true })
+    const restoredRows = sorted.map((entry) => entry.row)
+    restoredRows.forEach((row) => {
+      row.classList.add("row-restored-flash")
+      row.addEventListener("animationend", () => row.classList.remove("row-restored-flash"), { once: true })
+    })
+    this.setStatus(this.buildMovedBackStatus(restoredRows.length, reverseEntries), restoredRows)
     return true
   }
 
@@ -432,8 +713,11 @@ export default class extends Controller {
     if (!this._lastStatusRows?.length) {
       this._statusDetailedMode = !this._statusDetailedMode
       const deletedMeta = this._lastStatus.meta && this._lastStatus.meta.kind === "rows-deleted" ? this._lastStatus.meta : null
+      const movedMeta = this._lastStatus.meta && this._lastStatus.meta.kind === "rows-moved" ? this._lastStatus.meta : null
       if (deletedMeta && this._statusDetailedMode) this.showDeletedGhostRows(deletedMeta.entries)
       else this.clearDeletedGhostRows()
+      if (movedMeta && this._statusDetailedMode) this.showMovedGhostRows(movedMeta.entries)
+      else this.clearMovedGhostRows()
       const headerMeta = this._lastStatus?.meta
       const headerNames = (headerMeta?.kind === "header-field-change" || headerMeta?.kind === "invalid-ip") ? headerMeta.headerFieldNames : null
       const headerClass = headerMeta?.kind === "invalid-ip" ? "header-status-highlight-error" : "header-status-highlight"
@@ -449,16 +733,21 @@ export default class extends Controller {
       this.clearStatusHighlight()
       this.clearHeaderStatusHighlight()
       this.clearDeletedGhostRows()
+      this.clearMovedGhostRows()
       this._statusDetailedMode = false
       this.renderStatusMessage()
       return
     }
     this.clearStatusHighlight()
     this.clearHeaderStatusHighlight()
+    this.clearDeletedGhostRows()
     this._statusHighlightedRows = this._lastStatusRows.filter(r => r && r.isConnected)
     const highlightClass = this.statusHighlightClass()
     this._statusHighlightedRows.forEach(r => r.classList.add(highlightClass))
     this._statusDetailedMode = true
+    const movedMeta = this._lastStatus?.meta?.kind === "rows-moved" ? this._lastStatus.meta : null
+    if (movedMeta) this.showMovedGhostRows(movedMeta.entries)
+    else this.clearMovedGhostRows()
     this.renderStatusMessage()
   }
 
@@ -494,11 +783,7 @@ export default class extends Controller {
         const row = el.closest("tr.tag-data-row")
         const validRow = row && !row.classList.contains("tag-row-template")
         if (m) {
-          if (m[1] === "Address Start" && /[^0-9]/.test((el.value || "").trim())) {
-            this.setStatus(this.buildInvalidAddressStatus(originalValue, el.value), validRow ? [row] : null)
-          } else {
-            this.setStatus(this.buildFieldChangeStatus(m[1], originalValue, el.value), validRow ? [row] : null)
-          }
+          this.setStatus(this.buildRecordStatusForChange(m[1], originalValue, el.value, row), validRow ? [row] : null)
         }
         this.saveForm({ delta: this.buildRecordFieldDelta(el), clearSortIndicator: true })
       }
@@ -604,6 +889,12 @@ export default class extends Controller {
           if (el && el.isConnected) el.focus()
         })
       }
+    } else if (this.hasMovedGhostPreviewActive() && (el.tagName === "INPUT" || el.tagName === "SELECT" || el.tagName === "TEXTAREA")) {
+      if (this.restoreMovedRowsFromStatus()) {
+        requestAnimationFrame(() => {
+          if (el && el.isConnected) el.focus()
+        })
+      }
     }
     if ((el.tagName === "INPUT" || el.tagName === "SELECT") && el.classList.contains("cell") && el.closest("tr.tag-data-row")) {
       this._editingCell = el
@@ -638,11 +929,7 @@ export default class extends Controller {
         const row = el.closest("tr.tag-data-row")
         const validRow = row && !row.classList.contains("tag-row-template")
         if (m) {
-          if (m[1] === "Address Start" && /[^0-9]/.test((el.value || "").trim())) {
-            this.setStatus(this.buildInvalidAddressStatus(originalValue, el.value), validRow ? [row] : null)
-          } else {
-            this.setStatus(this.buildFieldChangeStatus(m[1], originalValue, el.value), validRow ? [row] : null)
-          }
+          this.setStatus(this.buildRecordStatusForChange(m[1], originalValue, el.value, row), validRow ? [row] : null)
           this.saveForm({ delta: this.buildRecordFieldDelta(el), clearSortIndicator: true })
         }
       }
@@ -865,6 +1152,15 @@ export default class extends Controller {
         return
       }
     }
+    if (this.hasMovedGhostPreviewActive()) {
+      const ghostRow = e.target.closest("tr.row-moved-ghost")
+      if (ghostRow) {
+        e.preventDefault()
+        e.stopPropagation()
+        this.restoreMovedRowsFromStatus()
+        return
+      }
+    }
     if (!this.element.classList.contains("workspace-select-mode")) return
     const row = e.target.closest("tr.tag-data-row")
     if (!row || row.classList.contains("tag-row-template")) return
@@ -1080,6 +1376,8 @@ export default class extends Controller {
             btn.dataset.value = label
             btn.dataset.rawDatatype = rawDt ?? "0"
             btn.dataset.rawEncode = rawEnc ?? "255"
+            if (label === "Unique") btn.classList.add("data-type-unique")
+            else btn.classList.remove("data-type-unique")
           }
         }
       } else {
@@ -1088,7 +1386,13 @@ export default class extends Controller {
     })
     if (dataTypeTd && typeof values[2] === "string") {
       const btn = dataTypeTd.querySelector(".data-type-trigger")
-      if (btn) btn.textContent = values[2] || "—"
+      if (btn) {
+        const label = values[2] || ""
+        btn.textContent = label || "—"
+        btn.dataset.value = label
+        if (label === "Unique") btn.classList.add("data-type-unique")
+        else btn.classList.remove("data-type-unique")
+      }
     }
   }
 
@@ -1187,9 +1491,16 @@ export default class extends Controller {
     const moving = this.movingRows || []
     if (row === this.draggedRow) return
     if (moving.length && moving.includes(row)) {
-      // dropping on another row in the selection: treat as before/after the whole block
-      const first = moving[0]
-      const last = moving[moving.length - 1]
+      // Dropping on a selected row should anchor around that local selected segment,
+      // not the global first/last selected row.
+      const rows = this.dataRows
+      const index = rows.indexOf(row)
+      let start = index
+      while (start > 0 && moving.includes(rows[start - 1])) start -= 1
+      let end = index
+      while (end < rows.length - 1 && moving.includes(rows[end + 1])) end += 1
+      const first = rows[start]
+      const last = rows[end]
       const rect = row.getBoundingClientRect()
       const mid = rect.top + rect.height / 2
       const before = e.clientY < mid
@@ -1210,28 +1521,56 @@ export default class extends Controller {
     const dropTarget = e.target.closest("tr.tag-data-row")
     if (!dropTarget || !this.draggedRow || dropTarget.classList.contains("tag-row-template")) return
     const moving = this.movingRows || [this.draggedRow]
+    const preDropRows = this.dataRows
+    const movedEntries = moving
+      .map((r) => ({ row: r, fromIndex: preDropRows.indexOf(r), values: this.getRowValues(r) }))
+      .filter((entry) => entry.fromIndex >= 0)
+      .sort((a, b) => a.fromIndex - b.fromIndex)
     const rect = dropTarget.getBoundingClientRect()
     const mid = rect.top + rect.height / 2
     const before = e.clientY < mid
     const tbody = this.tbodyTarget
     let ref
     if (moving.length && moving.includes(dropTarget)) {
-      ref = before ? moving[0].previousElementSibling : moving[moving.length - 1].nextElementSibling
+      const rows = this.dataRows
+      const index = rows.indexOf(dropTarget)
+      let start = index
+      while (start > 0 && moving.includes(rows[start - 1])) start -= 1
+      let end = index
+      while (end < rows.length - 1 && moving.includes(rows[end + 1])) end += 1
+      // before => insert ahead of the local segment; after => insert after it.
+      ref = before ? rows[start] : rows[end].nextElementSibling
     } else {
       ref = before ? dropTarget : dropTarget.nextElementSibling
     }
     // ref must not be one of the rows we're removing (would be detached and break insertBefore)
     while (ref && moving.includes(ref)) ref = ref.nextElementSibling
+
+    const baseRows = preDropRows.filter((r) => !moving.includes(r))
+    const insertAtRaw = ref ? baseRows.indexOf(ref) : baseRows.length
+    const insertAt = insertAtRaw < 0 ? baseRows.length : insertAtRaw
+    const nextOrder = [
+      ...baseRows.slice(0, insertAt),
+      ...moving,
+      ...baseRows.slice(insertAt)
+    ]
+    const isNoOpDrop = nextOrder.length === preDropRows.length && nextOrder.every((r, i) => r === preDropRows[i])
+    if (isNoOpDrop) {
+      this.clearHoverState()
+      this.dataRows.forEach(r => r.classList.remove("drop-before", "drop-after"))
+      this.dataRows.forEach(r => r.classList.remove("row-selected"))
+      this.anchorRow = null
+      return
+    }
+
     moving.forEach(r => r.remove())
     moving.forEach(r => tbody.insertBefore(r, ref))
     this.reindexRows()
     this.clearHoverState()
     this.dataRows.forEach(r => r.classList.remove("drop-before", "drop-after"))
-    if (moving.length === 1 && this.draggedRowWasUnselected) {
-      this.dataRows.forEach(r => r.classList.remove("row-selected"))
-      moving[0].classList.add("row-selected")
-    }
-    this.setStatus(moving.length === 1 ? "1 row moved" : `${moving.length} rows moved`, moving)
+    this.dataRows.forEach(r => r.classList.remove("row-selected"))
+    this.anchorRow = null
+    this.setStatus(this.buildMovedRowsStatus(moving.length, movedEntries), moving)
     this.validateTable()
     this.saveForm({ clearSortIndicator: true })
   }

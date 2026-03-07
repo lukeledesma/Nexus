@@ -42,11 +42,9 @@ class DocumentsController < ApplicationController
   # --- Import / Create ------------------------------------------------------
   def create
     if params[:blank].present?
-      # Keep only one untitled-empty placeholder document.
-      # If it is already top-most, flash it. Otherwise, replace it with a fresh new row at top.
-      existing = Document.order(updated_at: :desc).limit(50).find do |d|
-        (d.metadata_filename.blank? || d.metadata_filename == "Untitled ##{d.id}") && d.records.size == 0
-      end
+      # Keep only one dedicated new-untitled placeholder document.
+      # Existing docs that later become untitled/empty are not treated as placeholders.
+      existing = Document.where(new_untitled_placeholder: true).order(updated_at: :desc).first
       if existing
         top_doc_id = Document.order(created_at: :desc).limit(1).pick(:id)
         if top_doc_id == existing.id
@@ -60,7 +58,13 @@ class DocumentsController < ApplicationController
         flash[:replaced_untitled_old_index] = old_index if old_index
         existing.destroy
       end
-      @document = Document.new(records: [], metadata_ip: Document::DEFAULT_IP, metadata_protocol: Document::DEFAULT_PROTOCOL, metadata_filename: "")
+      @document = Document.new(
+        records: [],
+        metadata_ip: Document::DEFAULT_IP,
+        metadata_protocol: Document::DEFAULT_PROTOCOL,
+        metadata_filename: "",
+        new_untitled_placeholder: true
+      )
       if @document.save
         @document.update_column(:metadata_filename, "Untitled ##{@document.id}")
         flash[:just_imported] = true
@@ -198,6 +202,10 @@ class DocumentsController < ApplicationController
       @document.metadata_filename = params[:metadata_filename].present? ? params[:metadata_filename] : "Untitled ##{@document.id}"
     end
 
+    # Once actually edited, this is no longer the special new placeholder row.
+    placeholder_edited = @document.new_untitled_placeholder? && @document.changed?
+    @document.new_untitled_placeholder = false if placeholder_edited
+
     if save_document_with_quiet_sql
       response.headers["X-Records-Saved"] = records.size.to_s
       head :no_content
@@ -286,6 +294,10 @@ class DocumentsController < ApplicationController
     else
       return render_delta_error("Invalid delta update kind")
     end
+
+    # Any actual delta change graduates the placeholder into a normal document.
+    delta_changed = Array(@pending_change_logs).any? { |entry| entry[:before].to_s != entry[:after].to_s }
+    @document.new_untitled_placeholder = false if @document.new_untitled_placeholder? && delta_changed
 
     if save_document_with_quiet_sql
       log_pending_changes

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_06_051805) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_07_000100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -21,6 +21,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_06_051805) do
     t.string "metadata_filename"
     t.string "metadata_ip"
     t.string "metadata_protocol"
+    t.boolean "new_untitled_placeholder", default: false, null: false
     t.integer "parent_id"
     t.json "records"
     t.datetime "updated_at", null: false
