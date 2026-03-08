@@ -10,9 +10,17 @@ Rails.application.routes.draw do
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
 
   root "documents#index"
+  post "/documents/create_root_folder", to: "documents#create_root_folder"
   resources :documents do
+    collection do
+      get :organizer_fragment
+    end
+
     member do
+      post :create_file
+      patch :rename
       get :export
+      get :file_list
     end
   end
 end

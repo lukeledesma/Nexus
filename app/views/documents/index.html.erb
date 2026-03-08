@@ -1,70 +1,16 @@
-<div class="home">
+<div class="home" data-controller="folders">
   <header class="home-header">
     <h1 class="app-title">ALCHEMY<sup>5</sup></h1>
     <p class="tagline">Modbus tag editor — import XML, edit tags, export with preloads rebuilt.</p>
   </header>
 
-  <div class="home-actions">
-    <%= form_with url: documents_path, method: :post, local: true, multipart: true, class: "home-import-form", data: { controller: "import-form" } do |f| %>
-      <%= file_field_tag :xml_file, accept: ".xml,.xml.tar,application/xml,text/xml,application/x-tar", class: "file-input-hidden", id: "home_xml_file", data: { action: "change->import-form#submit" } %>
-      <button type="button" class="btn btn-primary" data-action="click->import-form#chooseFile">Import</button>
-    <% end %>
-    <%= button_to "New", documents_path, method: :post, params: { blank: "1" }, class: "btn btn-secondary" %>
+  <div class="organizer-header mb-3">
+    <button class="btn btn-primary" data-action="click->folders#createRootFolder">New Folder</button>
   </div>
 
-  <% if @documents.any? %>
-    <section class="recent-docs" data-controller="recent-docs">
-      <h2>Files</h2>
-      <ul>
-        <% ghost_insert_index = flash[:replaced_untitled_old_index].to_i + 1 if flash[:replaced_untitled_old_index].present? %>
-        <% ghost_inserted = false %>
-        <% @documents.each_with_index do |doc, idx| %>
-          <% delayed_top_insert = idx == 0 && flash[:just_imported] && flash[:replaced_untitled_old_index].present? %>
-          <% if ghost_insert_index && !ghost_inserted && idx == ghost_insert_index %>
-            <li class="doc-row doc-row--new-untitled doc-row--replaced-ghost" aria-hidden="true">
-              <div class="doc-link">
-                <span class="doc-title-block">
-                  <span class="doc-name">Untitled</span>
-                </span>
-                <span class="doc-count">0 tag(s)</span>
-              </div>
-            </li>
-            <% ghost_inserted = true %>
-          <% end %>
-          <% top_existing_reused = idx == 0 && flash[:reused_existing_was_top] && flash[:reused_existing_doc_id].to_i == doc.id %>
-          <% row_classes = ["doc-row"] %>
-          <% row_classes << "doc-row--new-untitled" if doc.new_untitled_placeholder? %>
-          <% row_classes << "doc-row--empty" if doc.records.size.zero? && !doc.new_untitled_placeholder? %>
-          <% row_classes << "doc-row--just-imported" if idx == 0 && flash[:just_imported] %>
-          <% row_classes << "doc-row--just-imported-delayed" if delayed_top_insert %>
-          <% row_classes << "doc-row--existing-top-flash" if top_existing_reused %>
-          <li class="<%= row_classes.join(' ') %>" tabindex="0" data-recent-docs-target="doc" data-delete-url="<%= document_path(doc) %>">
-            <%= link_to document_path(doc), class: "doc-link" do %>
-              <span class="doc-title-block">
-                <% untitled = doc.metadata_filename.blank? || doc.metadata_filename == "Untitled ##{doc.id}" %>
-                <% if untitled %>
-                  <span class="doc-name">Untitled</span>
-                <% else %>
-                  <span class="doc-name"><%= doc.metadata_filename %></span><% if @doc_disambiguator[doc.id] %><span class="doc-disambiguator"> #<%= @doc_disambiguator[doc.id] %></span><% end %>
-                <% end %>
-              </span>
-              <span class="doc-count"><%= doc.records.size %> tag(s)</span>
-            <% end %>
-          </li>
-        <% end %>
-        <% if ghost_insert_index && !ghost_inserted %>
-          <li class="doc-row doc-row--new-untitled doc-row--replaced-ghost" aria-hidden="true">
-            <div class="doc-link">
-              <span class="doc-title-block">
-                <span class="doc-name">Untitled</span>
-              </span>
-              <span class="doc-count">0 tag(s)</span>
-            </div>
-          </li>
-        <% end %>
-      </ul>
-    </section>
-  <% else %>
-    <p class="empty-state">No documents yet. Use <strong>Import</strong> or <strong>New</strong> to get started.</p>
-  <% end %>
+  <div id="organizer-wrapper" data-controller="recent-docs">
+    <div id="organizer-content">
+      <%= render "organizer" %>
+    </div>
+  </div>
 </div>

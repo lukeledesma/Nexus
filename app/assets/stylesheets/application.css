@@ -76,7 +76,7 @@ a:hover { text-decoration: underline; }
 .btn-save { background: var(--accent); color: #fff; border: none; padding: 0.4rem 0.9rem; border-radius: 6px; font: inherit; cursor: pointer; }
 
 /* Home */
-.home { max-width: 42rem; margin: 0 auto; padding: 2rem 1.5rem; text-align: center; }
+.home { max-width: 56rem; margin: 0 auto; padding: 2rem 1.5rem; text-align: center; }
 .home-header { margin-bottom: 2rem; }
 .home-header .app-title { margin: 0 0 0.35rem 0; }
 .home-header .tagline { margin: 0; }
@@ -118,7 +118,12 @@ a:hover { text-decoration: underline; }
 .app-title sup { font-size: 0.5em; top: -0.4em; font-weight: 600; opacity: 0.9; }
 .tagline { color: var(--muted); font-size: 0.95rem; }
 .home-actions { display: flex; justify-content: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 2rem; }
-.home-actions .file-input-hidden { position: absolute; width: 0.1px; height: 0.1px; opacity: 0; overflow: hidden; z-index: -1; }
+.organizer-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.file-input-hidden { position: absolute; width: 0.1px; height: 0.1px; opacity: 0; overflow: hidden; z-index: -1; }
 .home-import-form { display: inline-block; }
 .recent-docs { text-align: left; }
 .recent-docs__content.recent-docs__content--fade-out { animation: recent-docs-fade-out 0.3s ease-out forwards; }
@@ -130,12 +135,186 @@ a:hover { text-decoration: underline; }
   from { opacity: 0; }
   to { opacity: 1; }
 }
-.recent-docs h2 { font-size: 1rem; font-weight: 600; margin: 0 0 0.75rem 0; color: var(--muted); }
+.recent-docs h2 { font-size: 0.95rem; font-weight: 600; margin: 0 0 0.75rem 0; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
 .recent-docs ul { list-style: none; padding: 0; margin: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); overflow: hidden; }
 .recent-docs li { border-bottom: 1px solid var(--border); }
 .recent-docs li:last-child { border-bottom: none; }
 .recent-docs li.doc-row { outline: none; }
 .recent-docs li.doc-row:focus { background: var(--surface-raised); }
+.recent-docs li.folder-item:focus { background: transparent; }
+.organizer .organizer-list { overflow: visible; }
+.folder-item { overflow: hidden; }
+.folder-toggle {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  display: flex;
+  padding: 0.54rem 0;
+  text-align: left;
+  cursor: pointer;
+}
+.folder-row,
+.plc-header-row {
+  font-size: 15px;
+  font-weight: 500;
+}
+.file-row {
+  font-size: 13.5px;
+  font-weight: 400;
+}
+.folder-toggle .doc-name {
+  line-height: 1.25;
+  font-size: inherit;
+  font-weight: inherit;
+}
+.organizer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+.organizer-row-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.organizer-row-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+.folder-row-actions {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+.folder-toggle:not(.folder-row--expanded) .folder-row-actions {
+  display: none;
+}
+.folder-toggle.folder-collapsed {
+  background: transparent;
+}
+.folder-toggle.folder-expanded {
+  background: var(--surface-raised);
+}
+.folder-toggle:hover {
+  background: var(--surface-raised);
+}
+.folder-dropdown {
+  max-height: 0px;
+  opacity: 0;
+  transition: max-height 280ms ease, opacity 180ms ease;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.12);
+  padding-left: 0;
+}
+.folder-dropdown.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+.plc-header-row {
+  padding: 0.45rem 0;
+}
+.plc-header-row .row-left,
+.plc-header-row .row-right {
+  flex: 0 0 auto;
+}
+.plc-header-row .row-left {
+  gap: 8px !important;
+}
+.plc-header-label {
+  font-size: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  font-weight: inherit;
+}
+.plc-header-row .inline-action-form,
+.plc-header-row .home-import-form {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+}
+.plc-header-row .row-right {
+  margin-left: auto !important;
+}
+.folder-toolbar-hint { font-size: 0.78rem; color: var(--text-muted); }
+.plc-file-list {
+  margin: 0;
+  padding: 0;
+}
+
+.no-tag-lists {
+  font-size: 14px;
+  line-height: normal;
+  display: flex;
+  align-items: center;
+  color: inherit;
+}
+
+.plc-file-list > .organizer-row {
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.plc-file-list > .organizer-row:last-child {
+  border-bottom: none;
+}
+
+.plc-empty-row {
+  color: var(--muted);
+  background: transparent;
+  pointer-events: none;
+}
+
+.plc-empty-row:hover {
+  background: transparent;
+}
+.file-row-actions-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.file-row .row-buttons svg {
+  transform: translateY(1px);
+}
+
+.btn-tiny {
+  margin-right: 0;
+  padding: 0.18rem 0.45rem;
+  font-size: 0.72rem;
+}
+.doc-row--file-inline .doc-link--static {
+  width: 100%;
+}
+.file-row--empty .row-left { color: var(--muted); }
+.file-link { color: var(--text); }
+.file-link:hover { color: var(--text); text-decoration: underline; }
+.unfiled-header .doc-link {
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.folder-row--created { animation: organizer-row-in 320ms ease-out; }
+.file-row--created { animation: organizer-file-in 260ms ease-out; }
+.file-row--deleting { animation: organizer-file-out 220ms ease-out forwards; }
+@keyframes organizer-row-in {
+  0% { opacity: 0; transform: translateY(-8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes organizer-file-in {
+  0% { opacity: 0; transform: translateY(-5px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes organizer-file-out {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
 .recent-docs li.doc-row--new-untitled .doc-link,
 .recent-docs li.doc-row--new-untitled .doc-link:hover { color: var(--danger, #c53030); }
 .recent-docs li.doc-row--new-untitled .doc-count { color: var(--danger, #c53030); }
@@ -169,7 +348,7 @@ a:hover { text-decoration: underline; }
   45% { background: rgba(185, 28, 28, 0.30); }
   100% { background: transparent; }
 }
-.doc-link { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; color: var(--text); }
+.doc-link { display: flex; justify-content: space-between; align-items: center; padding: 0.62rem 0.95rem; color: var(--text); }
 .doc-link:hover { background: var(--surface-raised); text-decoration: none; color: var(--text); }
 .doc-title-block { display: inline-flex; align-items: baseline; gap: 0.2rem; }
 .doc-name { font-weight: 500; }
@@ -506,4 +685,79 @@ input.connection-inline {
 .data-type-popup-hint { margin: 0.5rem 0 0; font-size: 0.75rem; color: var(--muted); }
 .tag-table .cell.data-type-unique,
 .tag-table .data-type-trigger.data-type-unique { color: #eab308; border-color: rgba(234, 179, 8, 0.4); }
+
+/* Organizer row hard overrides */
+.organizer-row {
+  display: flex !important;
+  align-items: center !important;
+  width: 100% !important;
+  justify-content: space-between !important;
+  min-width: 0 !important;
+  white-space: nowrap !important;
+  transition: all 150ms ease;
+}
+
+.organizer-row.collapsing {
+  height: 0 !important;
+  opacity: 0;
+  margin: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  transition: all 150ms ease;
+}
+
+.organizer-row .row-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex: 0 1 auto !important;
+  padding-left: 12px !important;
+  margin-left: 0 !important;
+  min-width: 0 !important;
+  white-space: nowrap !important;
+}
+
+.organizer-row .row-right {
+  margin-left: auto !important;
+  padding-right: 12px !important;
+  text-align: right !important;
+  flex: 0 0 auto !important;
+  white-space: nowrap !important;
+}
+
+.folder-row.folder-collapsed .row-left .action {
+  display: none !important;
+}
+
+.folder-row.folder-expanded .row-left .action {
+  display: inline-flex !important;
+}
+
+.file-row .row-left .action,
+.doc-row--file-inline .row-left .action {
+  display: inline-flex !important;
+}
+
+.inline-rename-hidden {
+  display: none !important;
+}
+
+.inline-rename-input {
+  min-width: 10ch;
+  max-width: 28ch;
+  width: auto;
+  padding: 0.16rem 0.38rem;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--surface-raised);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.86rem;
+  line-height: 1.2;
+}
+
+.inline-rename-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
 

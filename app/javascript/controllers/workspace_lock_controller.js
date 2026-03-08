@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static targets = ["toggle", "lockIcon", "tableContainer", "sortLink", "editable", "headerEditable", "selectModeBtn"]
+  static targets = ["toggle", "lockIconLocked", "lockIconUnlocked", "tableContainer", "sortLink", "editable", "headerEditable", "selectModeBtn"]
   static values = { initialUnlocked: Boolean }
 
   connect() {
@@ -75,9 +75,8 @@ export default class extends Controller {
   }
 
   updateUi() {
-    if (this.hasLockIconTarget) {
-      this.lockIconTarget.textContent = this.locked ? "🔒" : "🔓"
-    }
+    if (this.hasLockIconLockedTarget) this.lockIconLockedTarget.hidden = !this.locked
+    if (this.hasLockIconUnlockedTarget) this.lockIconUnlockedTarget.hidden = this.locked
 
     this.element.classList.toggle("workspace-locked", this.locked)
     this.element.classList.toggle("workspace-reorder-mode", this.reorderMode)

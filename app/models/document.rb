@@ -5,8 +5,16 @@ class Document < ApplicationRecord
   DEFAULT_PROTOCOL = "TCP"
   DEFAULT_FILENAME = "export.xml"
 
+  belongs_to :parent, class_name: "Document", optional: true
+  has_many :children, class_name: "Document", foreign_key: :parent_id, dependent: :destroy
+
+  scope :folders, -> { where(is_folder: true) }
+  scope :files, -> { where(is_folder: false) }
+
   validate :records_must_be_array
+  validate :folder_parent_must_be_blank
   before_validation :set_default_metadata, on: :create
+  before_validation :normalize_folder_defaults
 
   def metadata
     {
@@ -27,6 +35,14 @@ class Document < ApplicationRecord
     records.map { |r| r.transform_keys(&:to_s) }
   end
 
+  def folder?
+    !!self[:is_folder]
+  end
+
+  def file?
+    !folder?
+  end
+
   def new_untitled_placeholder?
     !!self[:new_untitled_placeholder]
   end
@@ -34,13 +50,34 @@ class Document < ApplicationRecord
   private
 
   def set_default_metadata
+    return if folder?
+
     self.metadata_ip ||= DEFAULT_IP
     self.metadata_protocol ||= DEFAULT_PROTOCOL
-    self.metadata_filename ||= DEFAULT_FILENAME
+    self.metadata_filename ||= "Untitled"
+  end
+
+  def normalize_folder_defaults
+    if folder?
+      self.records = [] unless records.is_a?(Array)
+      self.metadata_filename = (metadata_filename.presence || "New Folder").to_s.strip
+      self.storage_path = (storage_path.presence || metadata_filename).to_s.strip
+      self.metadata_ip = nil
+      self.metadata_protocol = nil
+      self.new_untitled_placeholder = false if has_attribute?(:new_untitled_placeholder)
+    else
+      self.metadata_filename = (metadata_filename.presence || "Untitled").to_s.strip
+    end
   end
 
   def records_must_be_array
     return if records.is_a?(Array)
     errors.add(:records, "must be an array")
+  end
+
+  def folder_parent_must_be_blank
+    return unless folder? && parent_id.present?
+
+    errors.add(:parent_id, "must be blank for folders")
   end
 end

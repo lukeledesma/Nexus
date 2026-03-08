@@ -21,13 +21,12 @@
 <script type="application/json" id="data-type-picker-type-options"><%= raw data_type_popup_options.to_json %></script>
 
 <div class="workspace">
-  <%= form_with model: @document, url: document_path(@document), method: :patch, class: "workspace-form", data: { controller: "workspace-lock tag-table data-type-picker", workspace_lock_initial_unlocked_value: @document.new_untitled_placeholder? } do |f| %>
+  <%= form_with model: @document, url: document_path(@document), method: :patch, class: "workspace-form", data: { controller: "workspace-lock tag-table data-type-picker", workspace_lock_initial_unlocked_value: @document.records_with_string_keys.empty? } do |f| %>
     <header class="workspace-header">
       <div class="header-top">
         <div class="header-title-block">
           <%
-            title_value = @document.metadata_filename
-            title_value = nil if title_value.blank? || title_value == "Untitled ##{@document.id}"
+            title_value = @document.metadata_filename.presence || "Untitled"
           %>
           <%= text_field_tag :metadata_filename, title_value, class: "workspace-title-input", placeholder: "Untitled", data: { workspace_lock_target: "headerEditable", tag_table_target: "titleInput" }, disabled: true %>
           <div class="connection-line">

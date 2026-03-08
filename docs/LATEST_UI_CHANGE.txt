@@ -1,0 +1,46 @@
+Latest Change: Empty-State File-Size Typography + Strict Locked Action Visibility
+Date: 2026-03-08
+
+Summary
+Applied two organizer fixes: empty-folder message now matches file-row sizing, and lock mode now strictly suppresses Rename/Delete visibility unless explicitly unlocked.
+
+What Was Changed
+1) Empty-state text now matches file-row size
+- Updated app/assets/stylesheets/application.css:
+  - `.no-tag-lists` font size changed to `14px` (file-row scale).
+  - Retained `line-height: normal`, `display: flex`, and `align-items: center` to preserve row height and vertical centering.
+- Confirmed consistent usage in:
+  - `app/views/documents/_folder_file_list.html.erb`
+  - JS-generated empty states in `app/javascript/controllers/recent_docs_controller.js`
+
+2) Locked mode now strictly hides Rename/Delete controls
+- Updated app/assets/stylesheets/application.css:
+  - Locked default hardened to:
+    - `.row-actions .rename, .row-actions .delete { display: none !important; }`
+  - Unlocked state kept explicit with override:
+    - `.organizer-unlocked .row-actions .rename, .organizer-unlocked .row-actions .delete { display: inline-flex !important; }`
+  - PLC header exceptions retained:
+    - `.plc-header-row .import-button, .plc-header-row .new-button { display: inline-flex !important; }`
+
+3) Structure verification for lock scoping
+- Verified all organizer Rename/Delete buttons are inside `.row-actions` wrappers.
+- Verified `.plc-header-row` is only used on the PLC TAG LISTS header row.
+
+Files Touched
+- app/assets/stylesheets/application.css
+
+Behavioral Result
+- Empty-folder text now matches file-row scale and remains vertically centered without row-height changes.
+- Rename/Delete controls never appear in locked mode.
+- Import/New in PLC TAG LISTS remain visible in both lock states.
+- Sorting, highlight, and toggle behavior remain unchanged.
+
+How We Will Maintain This Document
+- This file is the canonical latest-change note.
+- On each future request, content should be replaced entirely with the newest change summary (not appended).
+
+Timestamp: 2026-03-08 04:10:30 MDT
+
+------------------------------------------------------------
+NOTES BELOW (USER-OWNED)
+------------------------------------------------------------

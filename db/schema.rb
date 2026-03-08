@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_07_000100) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_07_001000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -18,13 +18,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_07_000100) do
     t.datetime "created_at", null: false
     t.text "edit_note"
     t.string "edited_by"
+    t.boolean "is_folder", default: false, null: false
     t.string "metadata_filename"
     t.string "metadata_ip"
     t.string "metadata_protocol"
     t.boolean "new_untitled_placeholder", default: false, null: false
     t.integer "parent_id"
     t.json "records"
+    t.string "storage_path"
     t.datetime "updated_at", null: false
+    t.index ["is_folder"], name: "index_documents_on_is_folder"
     t.index ["parent_id"], name: "index_documents_on_parent_id"
   end
 end

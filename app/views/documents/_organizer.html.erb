@@ -1,0 +1,80 @@
+<% if @has_organizer_content %>
+  <section class="recent-docs organizer" data-controller="rename">
+    <h2>File Organizer</h2>
+
+    <ul class="organizer-list">
+      <% @browser_folders.each do |folder_entry| %>
+        <% folder = folder_entry[:folder] %>
+        <% files = folder_entry[:files] %>
+        <% open_folder = flash[:created_file_id].present? && files.any? { |f| f.id == flash[:created_file_id].to_i } %>
+        <% row_classes = ["doc-row", "folder-item"] %>
+        <% row_classes << "folder-row--created" if flash[:created_folder_id].to_i == folder&.id || flash[:created_folder_name] == folder_entry[:name] %>
+
+        <li class="<%= row_classes.join(' ') %>" tabindex="0" data-recent-docs-target="doc" data-doc-kind="folder" data-folder-row="true" data-folder-id="<%= folder&.id %>" data-delete-url="<%= folder ? document_path(folder) : '' %>" data-expanded="<%= open_folder ? 'true' : 'false' %>">
+          <% toggle_classes = ["organizer-row", "folder-toggle", "folder-row"] %>
+          <% toggle_classes << "folder-row--expanded" if open_folder %>
+          <% toggle_classes << (open_folder ? "folder-expanded" : "folder-collapsed") %>
+          <div class="<%= toggle_classes.join(' ') %>" data-folder-name="<%= folder_entry[:title] %>" data-folder-toggle-row="true" data-type="folder" data-action="click->recent-docs#toggleFolder">
+            <div class="row-left">
+              <span class="doc-name" data-rename-target="label"><%= folder_entry[:title] %></span>
+              <% if folder %>
+                <span class="folder-row-actions row-actions">
+                  <button type="button" class="btn btn-secondary btn-tiny action rename" data-action="click->rename#startInline" data-rename-url="<%= rename_document_path(folder) %>" data-current-name="<%= folder.metadata_filename %>" data-doc-kind="folder">Rename</button>
+                  <button type="button" class="btn btn-secondary btn-tiny action delete" data-action="click->recent-docs#deleteByButton" data-delete-url="<%= document_path(folder) %>" data-doc-kind="folder">Delete</button>
+                </span>
+              <% end %>
+            </div>
+            <div class="row-right">
+              <span class="doc-count"><%= files.size %> tag list<%= "s" if files.size != 1 %></span>
+            </div>
+          </div>
+
+          <div class="folder-dropdown <%= open_folder ? 'is-open' : '' %>" data-recent-docs-target="folderDropdown">
+            <div class="plc-header-row organizer-row" data-type="file-list" data-no-toggle="true">
+              <div class="row-left">
+                <span class="plc-header-label">PLC Tag Lists</span>
+                <% if folder %>
+                  <%= form_with url: documents_path, method: :post, local: true, multipart: true, class: "home-import-form inline-action-form", data: { controller: "import-form", action: "submit->import-form#submit" } do |f| %>
+                    <%= hidden_field_tag :parent_id, folder.id %>
+                    <%= file_field_tag :xml_file, accept: ".xml,.xml.tar,application/xml,text/xml,application/x-tar", class: "file-input-hidden", id: "folder_xml_file_#{folder.id}", data: { action: "change->import-form#submit" } %>
+                    <button type="button" class="btn btn-secondary btn-tiny action import-button" data-action="click->import-form#chooseFile">Import</button>
+                  <% end %>
+                  <%= button_to "New", create_file_document_path(folder), method: :post, class: "btn btn-secondary btn-tiny action new-button", form_class: "inline-action-form" %>
+                <% else %>
+                  <span class="folder-toolbar-hint">Read-only folder from disk</span>
+                <% end %>
+              </div>
+              <div class="row-right"></div>
+            </div>
+
+            <%= render "folder_file_list", files: files %>
+          </div>
+        </li>
+      <% end %>
+
+      <% if @root_files.any? %>
+        <li class="doc-row unfiled-header" aria-hidden="true">
+          <div class="doc-link"><span class="doc-name">Unfiled Tag Lists</span></div>
+        </li>
+        <% @root_files.each do |doc| %>
+          <li class="doc-row doc-row--file-inline" tabindex="0" data-recent-docs-target="doc" data-doc-kind="file" data-delete-url="<%= document_path(doc) %>">
+            <div class="doc-link doc-link--static organizer-row file-row">
+              <span class="row-left">
+                <%= link_to(doc.metadata_filename.presence || "Untitled", document_path(doc), class: "file-link", data: { rename_target: "label" }) %>
+                <span class="file-row-actions-inline row-actions row-buttons">
+                  <button type="button" class="btn btn-secondary btn-tiny action rename" data-action="click->rename#startInline" data-rename-url="<%= rename_document_path(doc) %>" data-current-name="<%= doc.metadata_filename %>" data-doc-kind="file">Rename</button>
+                  <button type="button" class="btn btn-secondary btn-tiny action delete" data-action="click->recent-docs#deleteByButton" data-delete-url="<%= document_path(doc) %>" data-doc-kind="file">Delete</button>
+                </span>
+              </span>
+              <span class="row-right">
+                <span class="doc-count"><%= doc.records.size %> tag(s)</span>
+              </span>
+            </div>
+          </li>
+        <% end %>
+      <% end %>
+    </ul>
+  </section>
+<% else %>
+  <p class="empty-state">No folders or files yet. Use <strong>Import</strong> or <strong>New</strong> to get started.</p>
+<% end %>

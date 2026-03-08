@@ -1,0 +1,25 @@
+<div class="plc-file-list">
+  <% if files.any? %>
+    <% files.each do |file_doc| %>
+      <% file_row_classes = ["organizer-row", "file-row", "plc-file-row"] %>
+      <% file_row_classes << "file-row--created" if flash[:created_file_id].to_i == file_doc.id %>
+      <div class="<%= file_row_classes.join(' ') %>" tabindex="0" data-recent-docs-target="doc" data-doc-kind="file" data-file-name="<%= file_doc.metadata_filename %>" data-delete-url="<%= document_path(file_doc) %>">
+        <div class="row-left">
+          <%= link_to(file_doc.metadata_filename.presence || "Untitled", document_path(file_doc), class: "file-link", data: { rename_target: "label" }) %>
+          <span class="file-row-actions-inline row-actions row-buttons">
+            <button type="button" class="btn btn-secondary btn-tiny action rename" data-action="click->rename#startInline" data-rename-url="<%= rename_document_path(file_doc) %>" data-current-name="<%= file_doc.metadata_filename %>" data-doc-kind="file">Rename</button>
+            <button type="button" class="btn btn-secondary btn-tiny action delete" data-action="click->recent-docs#deleteByButton" data-delete-url="<%= document_path(file_doc) %>" data-doc-kind="file">Delete</button>
+          </span>
+        </div>
+        <div class="row-right">
+          <span class="doc-count"><%= file_doc.records.size %> tag(s)</span>
+        </div>
+      </div>
+    <% end %>
+  <% else %>
+    <div class="organizer-row plc-empty-row" aria-hidden="true">
+      <div class="row-left"><div class="no-tag-lists">No Tag Lists in this folder</div></div>
+      <div class="row-right"></div>
+    </div>
+  <% end %>
+</div>
