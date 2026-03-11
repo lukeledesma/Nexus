@@ -121,6 +121,13 @@ a:hover { text-decoration: underline; }
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 720px) {
+  .organizer-header {
+    margin-bottom: 0.79rem;
+  }
 }
 .file-input-hidden { position: absolute; width: 0.1px; height: 0.1px; opacity: 0; overflow: hidden; z-index: -1; }
 .home-import-form { display: inline-block; }
@@ -715,6 +722,87 @@ input.connection-inline {
   margin-left: 0 !important;
   min-width: 0 !important;
   white-space: nowrap !important;
+}
+
+.row-pencil {
+  opacity: 0;
+  pointer-events: none;
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--text);
+  border-radius: 6px;
+  font-size: 0.82rem;
+  line-height: 1;
+  padding: 0.18rem 0.35rem;
+  margin-right: 0.35rem;
+  transition: opacity 120ms ease;
+}
+
+.organizer-row:hover .row-pencil,
+.organizer-row:focus-within .row-pencil {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.rename-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+}
+
+.rename-modal-backdrop.hidden {
+  display: none;
+}
+
+.rename-modal {
+  width: min(92vw, 28rem);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  padding: 1rem;
+}
+
+.rename-modal-title {
+  margin: 0 0 0.75rem 0;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.rename-modal-input {
+  width: 100%;
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 0.5rem 0.65rem;
+  font: inherit;
+}
+
+.rename-modal-input.cell-invalid {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.6);
+}
+
+.rename-modal-actions {
+  margin-top: 0.85rem;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.btn-danger {
+  background: #b91c1c;
+  color: #fff;
+  border-color: #b91c1c;
+}
+
+.btn-danger:hover {
+  background: #991b1b;
+  color: #fff;
 }
 
 .organizer-row .row-right {

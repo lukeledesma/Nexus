@@ -107,6 +107,8 @@ module DocumentStorageSync
   def rename_document!(document, raw_name)
     name = raw_name.to_s.strip
     raise ArgumentError, "Name cannot be blank" if name.blank?
+    raise ArgumentError, "Name cannot start with a period" if name.start_with?(".")
+    name = ensure_xml_extension(name) unless document.folder?
 
     if document.folder?
       rename_folder!(document, name)
@@ -119,13 +121,19 @@ module DocumentStorageSync
     old_name = folder_name(folder)
     old_dir = STORAGE_ROOT.join(old_name)
     new_dir = STORAGE_ROOT.join(new_name)
-    if old_name != new_name && Dir.exist?(new_dir)
+    if folder_name_conflict?(folder, old_name, new_name)
+      raise NameConflictError, "A folder/file with this name already exists."
+    end
+
+    if old_name != new_name && Dir.exist?(new_dir) && !same_path_case_only?(old_dir, new_dir)
       raise NameConflictError, "A folder/file with this name already exists."
     end
 
     if old_name != new_name
       if Dir.exist?(old_dir)
-        FileUtils.mv(old_dir, new_dir)
+        unless same_path_case_only?(old_dir, new_dir)
+          FileUtils.mv(old_dir, new_dir)
+        end
       else
         FileUtils.mkdir_p(new_dir)
       end
@@ -148,16 +156,26 @@ module DocumentStorageSync
   def rename_file!(file_doc, new_name)
     old_rel = file_doc.storage_path.to_s
     target_rel = join_folder_and_name(folder_for_file(file_doc), new_name)
-    if old_rel != target_rel && File.exist?(STORAGE_ROOT.join(target_rel))
+    if file_name_conflict?(file_doc, old_rel, new_name)
+      raise NameConflictError, "A folder/file with this name already exists."
+    end
+
+    old_abs = STORAGE_ROOT.join(old_rel)
+    target_abs = STORAGE_ROOT.join(target_rel)
+    if old_rel != target_rel && File.exist?(target_abs) && !same_path_case_only?(old_abs, target_abs)
       raise NameConflictError, "A folder/file with this name already exists."
     end
 
     if old_rel.present? && old_rel != target_rel
-      old_abs = STORAGE_ROOT.join(old_rel)
-      new_abs = STORAGE_ROOT.join(target_rel)
+      new_abs = target_abs
       if File.exist?(old_abs)
         FileUtils.mkdir_p(new_abs.dirname)
-        FileUtils.mv(old_abs, new_abs)
+        if same_path_case_only?(old_abs, new_abs)
+          # Case-only rename on case-insensitive filesystems maps to same inode/path.
+          # Persist metadata/storage path casing without forcing a failing move.
+        else
+          FileUtils.mv(old_abs, new_abs)
+        end
       end
     end
 
@@ -180,6 +198,14 @@ module DocumentStorageSync
     base = "import" if base.blank?
     used = existing_filenames(folder_name)
     next_available_filename(used, base, ext)
+  end
+
+  def ensure_xml_extension(name)
+    value = name.to_s.strip
+    return "untitled.xml" if value.blank?
+    return value if value.downcase.end_with?(".xml")
+
+    "#{value}.xml"
   end
 
   # Matches Finder-style naming by filling the lowest missing numeric suffix.
@@ -238,6 +264,39 @@ module DocumentStorageSync
     return [] unless Dir.exist?(dir)
 
     Dir.children(dir).select { |name| File.file?(dir.join(name)) }
+  end
+
+  def folder_name_conflict?(folder, old_name, new_name)
+    candidate = new_name.to_s.strip.downcase
+    return false if candidate.blank?
+
+    conflicts = Document.folders
+      .where.not(id: folder.id)
+      .where("LOWER(COALESCE(storage_path, metadata_filename)) = ?", candidate)
+      .to_a
+
+    conflicts.any? do |other|
+      other_name = folder_name(other)
+      !same_path_case_only?(other_name, old_name)
+    end
+  end
+
+  def file_name_conflict?(file_doc, old_rel, new_name)
+    candidate = new_name.to_s.strip.downcase
+    return false if candidate.blank?
+
+    scope = Document.files.where.not(id: file_doc.id)
+    scope = file_doc.parent_id.present? ? scope.where(parent_id: file_doc.parent_id) : scope.where(parent_id: nil)
+
+    conflicts = scope.where("LOWER(metadata_filename) = ?", candidate).to_a
+    conflicts.any? do |other|
+      other_rel = other.storage_path.to_s
+      !same_path_case_only?(other_rel, old_rel)
+    end
+  end
+
+  def same_path_case_only?(left, right)
+    left.to_s.casecmp(right.to_s).zero?
   end
 
   def prune_empty_directories(start_dir)

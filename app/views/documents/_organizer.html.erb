@@ -6,7 +6,7 @@
       <% @browser_folders.each do |folder_entry| %>
         <% folder = folder_entry[:folder] %>
         <% files = folder_entry[:files] %>
-        <% open_folder = flash[:created_file_id].present? && files.any? { |f| f.id == flash[:created_file_id].to_i } %>
+        <% open_folder = flash[:created_file_id].present? && files.any? { |f| f[:document]&.id == flash[:created_file_id].to_i } %>
         <% row_classes = ["doc-row", "folder-item"] %>
         <% row_classes << "folder-row--created" if flash[:created_folder_id].to_i == folder&.id || flash[:created_folder_name] == folder_entry[:name] %>
 
@@ -17,15 +17,21 @@
           <div class="<%= toggle_classes.join(' ') %>" data-folder-name="<%= folder_entry[:title] %>" data-folder-toggle-row="true" data-type="folder" data-action="click->recent-docs#toggleFolder">
             <div class="row-left">
               <span class="doc-name" data-rename-target="label"><%= folder_entry[:title] %></span>
-              <% if folder %>
-                <span class="folder-row-actions row-actions">
-                  <button type="button" class="btn btn-secondary btn-tiny action rename" data-action="click->rename#startInline" data-rename-url="<%= rename_document_path(folder) %>" data-current-name="<%= folder.metadata_filename %>" data-doc-kind="folder">Rename</button>
-                  <button type="button" class="btn btn-secondary btn-tiny action delete" data-action="click->recent-docs#deleteByButton" data-delete-url="<%= document_path(folder) %>" data-doc-kind="folder">Delete</button>
-                </span>
-              <% end %>
             </div>
             <div class="row-right">
-              <span class="doc-count"><%= files.size %> tag list<%= "s" if files.size != 1 %></span>
+              <% if folder %>
+                <button
+                  type="button"
+                  class="row-pencil"
+                  aria-label="Edit folder"
+                  data-action="click->rename#openModal"
+                  data-rename-url="<%= rename_document_path(folder) %>"
+                  data-delete-url="<%= document_path(folder) %>"
+                  data-current-name="<%= folder.metadata_filename %>"
+                  data-doc-kind="folder"
+                >✎</button>
+              <% end %>
+              <span class="doc-count"><%= files.size %> file<%= "s" if files.size != 1 %></span>
             </div>
           </div>
 
@@ -39,7 +45,7 @@
                     <%= file_field_tag :xml_file, accept: ".xml,.xml.tar,.xml.tar.gz,application/xml,text/xml,application/x-tar,application/gzip", class: "file-input-hidden", id: "folder_xml_file_#{folder.id}", data: { action: "change->import-form#submit" } %>
                     <button type="button" class="btn btn-secondary btn-tiny action import-button" data-action="click->import-form#chooseFile">Import</button>
                   <% end %>
-                  <%= button_to "New", create_file_document_path(folder), method: :post, class: "btn btn-secondary btn-tiny action new-button", form_class: "inline-action-form" %>
+                  <%= button_to "New", create_file_document_path(folder), method: :post, class: "btn btn-secondary btn-tiny action new-button", form_class: "inline-action-form", data: { action: "click->recent-docs#createFile" } %>
                 <% else %>
                   <span class="folder-toolbar-hint">Read-only folder from disk</span>
                 <% end %>
@@ -57,16 +63,23 @@
           <div class="doc-link"><span class="doc-name">Unfiled Tag Lists</span></div>
         </li>
         <% @root_files.each do |doc| %>
+          <% display_name = (doc.metadata_filename.presence || "Untitled").to_s.sub(/\.xml\z/i, "") %>
           <li class="doc-row doc-row--file-inline" tabindex="0" data-recent-docs-target="doc" data-doc-kind="file" data-delete-url="<%= document_path(doc) %>">
             <div class="doc-link doc-link--static organizer-row file-row">
               <span class="row-left">
-                <%= link_to(doc.metadata_filename.presence || "Untitled", document_path(doc), class: "file-link", data: { rename_target: "label" }) %>
-                <span class="file-row-actions-inline row-actions row-buttons">
-                  <button type="button" class="btn btn-secondary btn-tiny action rename" data-action="click->rename#startInline" data-rename-url="<%= rename_document_path(doc) %>" data-current-name="<%= doc.metadata_filename %>" data-doc-kind="file">Rename</button>
-                  <button type="button" class="btn btn-secondary btn-tiny action delete" data-action="click->recent-docs#deleteByButton" data-delete-url="<%= document_path(doc) %>" data-doc-kind="file">Delete</button>
-                </span>
+                <%= link_to(display_name.presence || "Untitled", document_path(doc), class: "file-link", data: { rename_target: "label" }) %>
               </span>
               <span class="row-right">
+                <button
+                  type="button"
+                  class="row-pencil"
+                  aria-label="Edit file"
+                  data-action="click->rename#openModal"
+                  data-rename-url="<%= rename_document_path(doc) %>"
+                  data-delete-url="<%= document_path(doc) %>"
+                  data-current-name="<%= display_name %>"
+                  data-doc-kind="file"
+                >✎</button>
                 <span class="doc-count"><%= doc.records.size %> tag(s)</span>
               </span>
             </div>
@@ -74,6 +87,18 @@
         <% end %>
       <% end %>
     </ul>
+
+    <div class="rename-modal-backdrop hidden" data-rename-target="modalBackdrop" data-action="click->rename#clickBackdrop" aria-hidden="true">
+      <div class="rename-modal" data-rename-target="modal" role="dialog" aria-modal="true" aria-labelledby="rename-modal-title">
+        <h3 id="rename-modal-title" class="rename-modal-title" data-rename-target="modalTitle">Edit Item</h3>
+        <input type="text" class="rename-modal-input" data-rename-target="modalInput" aria-label="Name">
+        <div class="rename-modal-actions">
+          <button type="button" class="btn btn-primary" data-rename-target="modalSave" data-action="click->rename#save">Save</button>
+          <button type="button" class="btn btn-danger" data-rename-target="modalDelete" data-action="click->rename#remove">Delete</button>
+          <button type="button" class="btn btn-secondary" data-action="click->rename#closeModal">Cancel</button>
+        </div>
+      </div>
+    </div>
   </section>
 <% else %>
   <p class="empty-state">No folders or files yet. Use <strong>Import</strong> or <strong>New</strong> to get started.</p>

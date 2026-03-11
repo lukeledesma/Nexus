@@ -171,6 +171,11 @@ export default class extends Controller {
       const ipValue = (ipEl.value || "").trim()
       if (ipValue !== "" && !this.isValidIpv4(ipValue)) ipEl.classList.add("cell-invalid")
     }
+
+    const titleEl = this.element.querySelector("input.workspace-title-input[name='metadata_filename']")
+    if (titleEl) {
+      titleEl.classList.toggle("cell-invalid", this.isInvalidFilename(titleEl.value))
+    }
   }
 
   markUnsaved(e) {
@@ -189,7 +194,7 @@ export default class extends Controller {
           if (e.target.tagName === "SELECT") e.target.blur()
         }
       } else if (e.target.classList.contains("workspace-title-input")) {
-        e.target.classList.remove("cell-invalid")
+        e.target.classList.toggle("cell-invalid", this.isInvalidFilename(e.target.value))
       }
     }
   }
@@ -211,7 +216,7 @@ export default class extends Controller {
   statusTone(status) {
     const kind = status?.meta?.kind
     const transition = status?.meta?.transition
-    if (kind === "invalid-address" || kind === "invalid-ip" || kind === "duplicate-address" || kind === "duplicate-tag-name") {
+    if (kind === "invalid-address" || kind === "invalid-ip" || kind === "invalid-filename" || kind === "duplicate-address" || kind === "duplicate-tag-name") {
       return "red"
     }
     if (kind === "data-type-unique-transition" && transition === "formatted-to-unique") return "yellow"
@@ -333,6 +338,7 @@ export default class extends Controller {
         detailKind === "rows-deleted" ||
         detailKind === "invalid-address" ||
         detailKind === "invalid-ip" ||
+        detailKind === "invalid-filename" ||
         detailKind === "duplicate-address" ||
         detailKind === "duplicate-tag-name"
       )
@@ -396,6 +402,20 @@ export default class extends Controller {
       detailed: `IP ${beforeText} > IP ${afterText} (invalid)`,
       meta: { kind: "invalid-ip", headerFieldNames: ["metadata_ip"] }
     }
+  }
+
+  buildInvalidFilenameStatus(beforeValue, afterValue) {
+    const beforeText = this.statusValueText(beforeValue)
+    const afterText = this.statusValueText(afterValue)
+    return {
+      simple: "Names cannot start with a period",
+      detailed: `Document name ${beforeText} > Document name ${afterText} (invalid)`,
+      meta: { kind: "invalid-filename", headerFieldNames: ["metadata_filename"] }
+    }
+  }
+
+  isInvalidFilename(value) {
+    return String(value || "").trim().startsWith(".")
   }
 
   isValidIpv4(value) {
@@ -803,10 +823,15 @@ export default class extends Controller {
       this._headerFieldCommitted = true
       if (hasChanged) {
         const isIpField = (el.getAttribute("name") || "") === "metadata_ip"
+        const isFilenameField = (el.getAttribute("name") || "") === "metadata_filename"
         const isInvalidIp = isIpField && (el.value || "").trim() !== "" && !this.isValidIpv4(el.value)
+        const isInvalidFilename = isFilenameField && this.isInvalidFilename(el.value)
         if (isInvalidIp) this.setStatus(this.buildInvalidIpStatus(originalValue, el.value))
-        else this.setStatus(this.buildHeaderFieldChangeStatus(el, originalValue, el.value))
-        this.saveForm({ delta: this.buildHeaderFieldDelta(el) })
+        else if (isInvalidFilename) this.setStatus(this.buildInvalidFilenameStatus(originalValue, el.value))
+        else {
+          this.setStatus(this.buildHeaderFieldChangeStatus(el, originalValue, el.value))
+          this.saveForm({ delta: this.buildHeaderFieldDelta(el) })
+        }
       }
       this.validateTable()
       el.blur()
@@ -949,10 +974,15 @@ export default class extends Controller {
       const hasChanged = String(el.value ?? "") !== String(originalValue ?? "")
       if (hasChanged) {
         const isIpField = (el.getAttribute("name") || "") === "metadata_ip"
+        const isFilenameField = (el.getAttribute("name") || "") === "metadata_filename"
         const isInvalidIp = isIpField && (el.value || "").trim() !== "" && !this.isValidIpv4(el.value)
+        const isInvalidFilename = isFilenameField && this.isInvalidFilename(el.value)
         if (isInvalidIp) this.setStatus(this.buildInvalidIpStatus(originalValue, el.value))
-        else this.setStatus(this.buildHeaderFieldChangeStatus(el, originalValue, el.value))
-        this.saveForm({ delta: this.buildHeaderFieldDelta(el) })
+        else if (isInvalidFilename) this.setStatus(this.buildInvalidFilenameStatus(originalValue, el.value))
+        else {
+          this.setStatus(this.buildHeaderFieldChangeStatus(el, originalValue, el.value))
+          this.saveForm({ delta: this.buildHeaderFieldDelta(el) })
+        }
       }
       this.validateTable()
     }
@@ -967,10 +997,15 @@ export default class extends Controller {
       this._headerFieldCommitted = true
       if (hasChanged) {
         const isIpField = (el.getAttribute("name") || "") === "metadata_ip"
+        const isFilenameField = (el.getAttribute("name") || "") === "metadata_filename"
         const isInvalidIp = isIpField && (el.value || "").trim() !== "" && !this.isValidIpv4(el.value)
+        const isInvalidFilename = isFilenameField && this.isInvalidFilename(el.value)
         if (isInvalidIp) this.setStatus(this.buildInvalidIpStatus(originalValue, el.value))
-        else this.setStatus(this.buildHeaderFieldChangeStatus(el, originalValue, el.value))
-        this.saveForm({ delta: this.buildHeaderFieldDelta(el) })
+        else if (isInvalidFilename) this.setStatus(this.buildInvalidFilenameStatus(originalValue, el.value))
+        else {
+          this.setStatus(this.buildHeaderFieldChangeStatus(el, originalValue, el.value))
+          this.saveForm({ delta: this.buildHeaderFieldDelta(el) })
+        }
       }
       this.validateTable()
       el.blur()
@@ -1059,6 +1094,12 @@ export default class extends Controller {
     const clearSortIndicator = !!(options && options.clearSortIndicator)
     const form = this.element
     if (!form || !form.action || form.tagName !== "FORM") return Promise.resolve()
+    const titleEl = form.querySelector("input.workspace-title-input[name='metadata_filename']")
+    if (titleEl && this.isInvalidFilename(titleEl.value)) {
+      titleEl.classList.add("cell-invalid")
+      this.setStatus(this.buildInvalidFilenameStatus(this._editingHeaderFieldOriginalValue, titleEl.value))
+      return Promise.resolve()
+    }
     if (clearSortIndicator) this.clearSortIndicator()
     const method = (form.getAttribute("method") || "get").toUpperCase()
     const action = form.action

@@ -59,6 +59,48 @@ export default class extends Controller {
     this.requestDelete(row, url, kind)
   }
 
+  async createFile(e) {
+    e.preventDefault()
+    e.stopPropagation()
+
+    const button = e.currentTarget
+    const form = button.closest("form")
+    const row = button.closest("[data-folder-row='true']")
+    const folderId = row?.dataset?.folderId
+    if (!form || !row || !folderId) return
+
+    button.disabled = true
+    const csrf = document.querySelector("meta[name='csrf-token']")
+    const headers = {
+      "X-CSRF-Token": csrf?.content || "",
+      "Accept": "application/json",
+      "X-Requested-With": "XMLHttpRequest"
+    }
+
+    try {
+      const res = await fetch(form.action, {
+        method: "POST",
+        headers,
+        credentials: "same-origin",
+        body: new FormData(form)
+      })
+      if (!res.ok) throw new Error("Create failed")
+
+      const listRes = await fetch(`/documents/${folderId}/file_list`, {
+        headers: { "Accept": "text/html", "X-Requested-With": "XMLHttpRequest" },
+        credentials: "same-origin"
+      })
+      if (!listRes.ok) throw new Error("Refresh failed")
+
+      const html = await listRes.text()
+      this.updateFileList(folderId, html)
+    } catch (_error) {
+      window.location.reload()
+    } finally {
+      button.disabled = false
+    }
+  }
+
   requestDelete(row, url, kind) {
     const isFolder = kind === "folder"
     const message = isFolder ? "Delete this folder and all contained tag lists? This cannot be undone." : "Delete this PLC tag list? This cannot be undone."
@@ -365,10 +407,6 @@ export default class extends Controller {
     const oldList = row?.querySelector(".plc-file-list")
     if (!row || !oldList) return false
 
-    const existingKeys = new Set(
-      Array.from(oldList.querySelectorAll(".plc-file-row[data-doc-kind='file']")).map((fileRow) => this.fileRowKey(fileRow)).filter(Boolean)
-    )
-
     const template = document.createElement("template")
     template.innerHTML = html.trim()
     const newList = template.content.firstElementChild
@@ -376,7 +414,6 @@ export default class extends Controller {
 
     oldList.replaceWith(newList)
     this.syncFolderEmptyState(newList)
-    if (!options.suppressAppear) this.animateNewFileRows(newList, existingKeys)
     this.resetFileListObservers()
     this.setFolderExpanded(row, true, false)
     return { ok: true, fileList: newList }
@@ -451,6 +488,23 @@ export default class extends Controller {
 
     this.collapseOtherFolders(match)
     this.setFolderExpanded(match, true, false)
+    return true
+  }
+
+  revealFolderByName(name) {
+    const normalized = String(name || "").trim().toLowerCase()
+    if (!normalized) return false
+
+    const rows = this.element.querySelectorAll("[data-folder-row='true']")
+    const match = Array.from(rows).find((row) => {
+      const label = row.querySelector(".folder-toggle .doc-name")
+      return (label?.textContent || "").trim().toLowerCase() === normalized
+    })
+    if (!match) return false
+
+    if (typeof match.scrollIntoView === "function") {
+      match.scrollIntoView({ behavior: "smooth", block: "nearest" })
+    }
     return true
   }
 

@@ -13,6 +13,7 @@ class Document < ApplicationRecord
 
   validate :records_must_be_array
   validate :folder_parent_must_be_blank
+  validate :metadata_filename_cannot_start_with_dot
   before_validation :set_default_metadata, on: :create
   before_validation :normalize_folder_defaults
 
@@ -79,5 +80,13 @@ class Document < ApplicationRecord
     return unless folder? && parent_id.present?
 
     errors.add(:parent_id, "must be blank for folders")
+  end
+
+  def metadata_filename_cannot_start_with_dot
+    value = metadata_filename.to_s.strip
+    return if value.blank?
+    return unless value.start_with?(".")
+
+    errors.add(:metadata_filename, "cannot start with a period")
   end
 end

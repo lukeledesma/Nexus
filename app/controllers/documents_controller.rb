@@ -5,7 +5,6 @@ require Rails.root.join("app/services/tag_xml.rb").to_s
 
 class DocumentsController < ApplicationController
   # --- Constants / Rules ----------------------------------------------------
-  IMPORTED_FOLDER_NAME = "Imported"
   RECORD_KEYS = [ "Tag Group", "Tag Name", "Data Type", "Address Start", "Data Length", "Scaling", "Read/Write" ].freeze
   RAW_PRESERVE_KEYS = %w[_raw_datatype _raw_encode _raw_verify].freeze
   RECORD_UPDATE_KEYS = (RECORD_KEYS + RAW_PRESERVE_KEYS).freeze
@@ -254,7 +253,7 @@ class DocumentsController < ApplicationController
     if params[:metadata_ip].present?
       @document.metadata_ip = params[:metadata_ip]
       @document.metadata_protocol = params[:metadata_protocol] if params[:metadata_protocol].present?
-      @document.metadata_filename = params[:metadata_filename].present? ? params[:metadata_filename] : "Untitled"
+      @document.metadata_filename = normalize_metadata_filename(@document, params[:metadata_filename])
     end
 
     # Once actually edited, this is no longer the special new placeholder row.
@@ -306,9 +305,17 @@ class DocumentsController < ApplicationController
 
     if file_doc.save
       DocumentStorageSync.write_scaffold!(file_doc)
+      if request.xhr? || request.format.json?
+        render json: { ok: true, folder_id: @document.id, file_id: file_doc.id }
+        return
+      end
       flash[:created_file_id] = file_doc.id
       redirect_to root_path
     else
+      if request.xhr? || request.format.json?
+        render json: { error: "Could not create PLC tag list." }, status: :unprocessable_entity
+        return
+      end
       redirect_to root_path, alert: "Could not create PLC tag list."
     end
   end
@@ -350,6 +357,7 @@ class DocumentsController < ApplicationController
 
     delta = raw_delta.permit(:kind, :row_index, :key, :value, fields: {})
     kind = delta[:kind].to_s
+    handled_directly = false
 
     case kind
     when "record_field"
@@ -384,18 +392,53 @@ class DocumentsController < ApplicationController
     when "metadata_field"
       key = delta[:key].to_s
       return render_delta_error("Invalid metadata key") unless METADATA_UPDATE_KEYS.include?(key)
+      if key == "metadata_filename" && delta[:value].to_s.strip.start_with?(".")
+        return render_delta_error("Name cannot start with a period")
+      end
 
-      before_value = @document.public_send(key)
-      apply_metadata_field(key, delta[:value].to_s)
-      after_value = @document.public_send(key)
-      @pending_change_logs = [ { row_index: nil, field: key, before: before_value, after: after_value } ]
+      if key == "metadata_filename"
+        before_value = @document.metadata_filename
+        requested_name = delta[:value].to_s
+        next_name = normalize_metadata_filename(@document, requested_name)
+        if before_value.to_s != next_name.to_s
+          begin
+            DocumentStorageSync.rename_document!(@document, next_name)
+          rescue DocumentStorageSync::NameConflictError, ArgumentError => e
+            return render_delta_error(e.message)
+          end
+        else
+          @document.metadata_filename = next_name
+        end
+        after_value = @document.metadata_filename
+        @pending_change_logs = [ { row_index: nil, field: key, before: before_value, after: after_value } ]
+        handled_directly = true
+      end
+
+      unless handled_directly
+        before_value = @document.public_send(key)
+        apply_metadata_field(key, delta[:value].to_s)
+        after_value = @document.public_send(key)
+        @pending_change_logs = [ { row_index: nil, field: key, before: before_value, after: after_value } ]
+      end
     else
       return render_delta_error("Invalid delta update kind")
     end
 
     # Any actual delta change graduates the placeholder into a normal document.
     delta_changed = Array(@pending_change_logs).any? { |entry| entry[:before].to_s != entry[:after].to_s }
-    @document.new_untitled_placeholder = false if @document.new_untitled_placeholder? && delta_changed
+    if @document.new_untitled_placeholder? && delta_changed
+      if handled_directly
+        @document.update_column(:new_untitled_placeholder, false)
+      else
+        @document.new_untitled_placeholder = false
+      end
+    end
+
+    if handled_directly
+      log_pending_changes
+      head :no_content
+      return true
+    end
 
     if save_document_with_quiet_sql
       sync_storage_for(@document)
@@ -414,7 +457,7 @@ class DocumentsController < ApplicationController
   def apply_metadata_field(key, value)
     case key
     when "metadata_filename"
-      @document.metadata_filename = value.present? ? value : "Untitled"
+      @document.metadata_filename = normalize_metadata_filename(@document, value)
     when "metadata_ip"
       @document.metadata_ip = value
     when "metadata_protocol"
@@ -482,6 +525,21 @@ class DocumentsController < ApplicationController
     folder.storage_path.to_s.presence || folder.metadata_filename.to_s
   end
 
+  def normalize_metadata_filename(document, raw_value)
+    value = raw_value.to_s.strip
+    value = document.folder? ? "New Folder" : "Untitled" if value.blank?
+    return value if document.folder?
+
+    DocumentStorageSync.ensure_xml_extension(value)
+  end
+
+  def display_name_for_organizer(name, xml: false)
+    value = name.to_s
+    return value unless xml
+
+    value.sub(/\.xml\z/i, "")
+  end
+
   def storage_root
     DocumentStorageSync::STORAGE_ROOT
   end
@@ -529,6 +587,8 @@ class DocumentsController < ApplicationController
   end
 
   def load_organizer_data
+    reconcile_storage_with_database!
+
     scan = scan_filesystem_entries
     folders = finder_natural_sort(scan[:folders])
     files = scan[:files]
@@ -538,16 +598,23 @@ class DocumentsController < ApplicationController
     Rails.logger.info("[OrganizerScan] files=#{files.inspect}")
 
     folder_docs_by_name = Document.folders.index_by { |folder| folder_name_for(folder) }
-    folders = folders.reject { |name| name == IMPORTED_FOLDER_NAME && !folder_docs_by_name.key?(name) }
+    folders = folders.select { |name| folder_docs_by_name.key?(name) }
     file_docs_by_path = Document.files.where.not(storage_path: [ nil, "" ]).index_by(&:storage_path)
 
     @browser_folders = folders.map do |folder_name|
       folder_doc = folder_docs_by_name[folder_name]
       folder_files = files
         .select { |rel| File.dirname(rel) == folder_name }
-        .map { |rel| file_docs_by_path[rel] }
-        .compact
-      folder_files = sort_documents_by_name(folder_files)
+        .map do |rel|
+          doc = file_docs_by_path[rel]
+          {
+            rel_path: rel,
+            name: display_name_for_organizer(doc&.metadata_filename.presence || File.basename(rel), xml: rel.downcase.end_with?(".xml")),
+            document: doc,
+            xml: rel.downcase.end_with?(".xml")
+          }
+        end
+      folder_files = folder_files.sort_by { |entry| [ entry[:name].to_s.downcase, entry[:name].to_s ] }
 
       {
         name: folder_name,
@@ -574,12 +641,18 @@ class DocumentsController < ApplicationController
     files = []
 
     Dir.children(root).each do |entry|
+      next if entry.start_with?(".")
+
       abs = root.join(entry)
       if File.directory?(abs)
         folders << entry
         Dir.children(abs).each do |child|
+          next if child.start_with?(".")
+
           child_abs = abs.join(child)
-          files << File.join(entry, child) if File.file?(child_abs)
+          next unless File.file?(child_abs)
+
+          files << File.join(entry, child)
         end
       elsif File.file?(abs)
         files << entry
@@ -652,6 +725,75 @@ class DocumentsController < ApplicationController
       end
     else
       [ path, name ]
+    end
+  end
+
+  def reconcile_storage_with_database!
+    scan = scan_filesystem_entries
+    folder_names = scan[:folders]
+    file_paths = scan[:files]
+
+    folder_docs = Document.folders.to_a
+    folder_by_name = folder_docs.index_by { |folder| folder_name_for(folder) }
+
+    folder_names.each do |name|
+      folder = folder_by_name[name]
+      next if folder
+
+      folder = Document.create!(
+        is_folder: true,
+        metadata_filename: name,
+        storage_path: name,
+        records: []
+      )
+      folder_by_name[name] = folder
+    end
+
+    Document.files.where.not(storage_path: [ nil, "" ]).find_each do |doc|
+      rel = doc.storage_path.to_s
+      next if file_paths.include?(rel)
+
+      doc.destroy
+    end
+
+    Document.folders.find_each do |folder|
+      name = folder_name_for(folder)
+      next if name.blank?
+      next if folder_names.include?(name)
+
+      folder.destroy
+    end
+
+    existing_file_by_path = Document.files.where.not(storage_path: [ nil, "" ]).index_by(&:storage_path)
+
+    file_paths.each do |rel|
+      next unless rel.downcase.end_with?(".xml")
+
+      doc = existing_file_by_path[rel]
+      next if doc
+
+      abs = storage_root.join(rel)
+      begin
+        records = TagXml::Parser.parse_records(abs)
+        meta = extract_metadata_from_path(abs, File.basename(rel))
+      rescue StandardError
+        next
+      end
+
+      parent_name = File.dirname(rel)
+      parent = parent_name == "." ? nil : folder_by_name[parent_name]
+
+      created = Document.create!(
+        is_folder: false,
+        parent: parent,
+        records: records,
+        metadata_ip: meta[:ip],
+        metadata_protocol: meta[:protocol],
+        metadata_filename: File.basename(rel),
+        storage_path: rel,
+        new_untitled_placeholder: false
+      )
+      existing_file_by_path[rel] = created
     end
   end
 

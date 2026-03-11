@@ -27,6 +27,7 @@
         <div class="header-title-block">
           <%
             title_value = @document.metadata_filename.presence || "Untitled"
+            title_value = title_value.to_s.sub(/\.xml\z/i, "") if @document.file?
           %>
           <%= text_field_tag :metadata_filename, title_value, class: "workspace-title-input", placeholder: "Untitled", data: { workspace_lock_target: "headerEditable", tag_table_target: "titleInput" }, disabled: true %>
           <div class="connection-line">
