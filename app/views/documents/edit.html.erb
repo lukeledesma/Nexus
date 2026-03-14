@@ -1,159 +1,137 @@
-<%
-  columns = [
-    ["Tag Group", "tag_group", :text],
-    ["Tag Name", "tag_name", :text],
-    ["Data Type", "data_type", :data_type],
-    ["Address Start", "address_start", :text],
-    ["Data Length", "data_length", :data_length],
-    ["Scaling", "scaling", :scaling],
-    ["Read/Write", "read_write", :read_write]
-  ]
-  read_write_options = ["Read Only", "Read+Write"]
-  scaling_options = [["x1", "1"], ["x10", "10"], ["x100", "100"]]
-  data_length_options = [["1", "1"], ["2", "2"]]
-  recs = @sorted_records || @document.records_with_string_keys
-  sort_column = @sort_column
-  sort_direction = @sort_direction
-  data_type_popup_options = TagXml::DataTypeMapper.data_type_popup_options
-  uticor_code_options = TagXml::DataTypeMapper.uticor_code_options
-  data_type_labels = data_type_popup_options.map { |o| o[:label] } + ["Unique"]
-%>
-<script type="application/json" id="data-type-picker-type-options"><%= raw data_type_popup_options.to_json %></script>
-
-<div class="workspace">
-  <%= form_with model: @document, url: document_path(@document), method: :patch, class: "workspace-form", data: { controller: "workspace-lock tag-table data-type-picker", workspace_lock_initial_unlocked_value: @document.records_with_string_keys.empty? } do |f| %>
-    <header class="workspace-header">
-      <div class="header-top">
-        <div class="header-title-block">
-          <%
-            title_value = @document.metadata_filename.presence || "Untitled"
-            title_value = title_value.to_s.sub(/\.xml\z/i, "") if @document.file?
-          %>
-          <%= text_field_tag :metadata_filename, title_value, class: "workspace-title-input", placeholder: "Untitled", data: { workspace_lock_target: "headerEditable", tag_table_target: "titleInput" }, disabled: true %>
-          <div class="connection-line">
-            <%= select_tag :metadata_protocol, options_for_select([["TCP", "TCP"], ["RTU", "RTU"]], @document.metadata_protocol), class: "connection-inline connection-select", data: { workspace_lock_target: "headerEditable" }, disabled: true %>
-            <%= text_field_tag :metadata_ip, @document.metadata_ip, class: "connection-inline", placeholder: "0.0.0.0", size: 14, data: { workspace_lock_target: "headerEditable" }, disabled: true %>
+<div class="workspace note-workspace">
+  <% if @document.content_type == "task_list" %>
+    <%= form_with model: @document,
+                  url: document_path(@document),
+                  method: :patch,
+                  class: "workspace-form task-list-form",
+                  data: { controller: "task-list", task_list_debounce_value: 300 } do |f| %>
+      <header class="workspace-header note-header">
+        <div class="header-top">
+          <div class="header-title-block">
+            <%= f.text_field :title,
+                             class: "workspace-title-input note-title-input",
+                             placeholder: "Untitled Task List",
+                             autocomplete: "off",
+                             data: { task_list_target: "title", action: "input->task-list#queueSave" } %>
+          </div>
+          <div class="header-actions">
+            <button type="button" class="btn btn-toolbar btn-toolbar-icon" data-action="click->task-list#toggleResetSettings" aria-label="Toggle reset settings">⏲</button>
+            <button type="button" class="btn btn-toolbar btn-toolbar-icon" data-action="click->task-list#addTask" aria-label="Add row">+</button>
+            <%= link_to "Back", root_path, class: "btn btn-toolbar" %>
           </div>
         </div>
-        <div class="header-actions">
-          <div class="header-actions-lock-group">
-            <button type="button" class="btn btn-toolbar btn-toolbar-icon btn-add-row" data-tag-table-target="addBtn" title="Add row">+</button>
-            <button type="button" class="btn btn-toolbar btn-toolbar-icon btn-select-mode" data-workspace-lock-target="selectModeBtn" data-action="click->workspace-lock#toggleSelectMode" title="Select Rows" aria-label="Select rows">☑</button>
-            <button type="button" class="btn btn-toolbar btn-toolbar-icon btn-lock" data-workspace-lock-target="toggle" data-action="click->workspace-lock#toggle" title="Lock/Unlock">
-              <span data-workspace-lock-target="lockIcon" aria-hidden="true">🔒</span>
-            </button>
-            <%= link_to "🏠", root_path, class: "btn btn-toolbar btn-toolbar-icon", title: "Home", data: { action: "click->tag-table#requireTitleBeforeHome" } %>
-          </div>
-          <%= link_to "Export XML", export_document_path(@document), class: "btn btn-toolbar btn-export", data: { turbo: false, action: "click->tag-table#saveThenExport" } %>
-        </div>
-      </div>
-      <p class="loaded-status">
-        <span data-tag-table-target="statusMessage"><%= flash[:edit_status].presence || "" %></span>
-        <span class="loaded-status-count" data-tag-table-target="statusCount"><%= recs.size %> tag<%= "s" if recs.size != 1 %></span>
-      </p>
-    </header>
+        <p class="loaded-status" data-controller="clock">
+          <span data-task-list-target="status">Saved</span>
+          <span class="workspace-clock workspace-clock--toggle"
+                data-clock-target="display"
+                data-action="click->task-list#toggleResetSettings"
+                role="button"
+                tabindex="0"
+                title="Toggle reset days"></span>
+        </p>
+      </header>
 
-    <div class="table-container" data-workspace-lock-target="tableContainer">
-      <table class="tag-table">
-        <thead>
-          <tr>
-            <% columns.each do |col_name, _key, _type|
-              active = (sort_column == col_name)
-              sort_url = active ? edit_document_path(@document) : edit_document_path(@document, sort: col_name, direction: "asc")
-            %>
-              <th class="<%= 'sort-asc' if active && sort_direction.present? %>">
-                <%= link_to sort_url, data: { workspace_lock_target: "sortLink", action: "click->workspace-lock#preventSortWhenLocked" } do %>
-                  <%= col_name %>
-                <% end %>
-              </th>
-            <% end %>
-          </tr>
-        </thead>
-        <tbody data-tag-table-target="tbody">
-          <% recs.each_with_index do |row, idx| %>
-            <tr class="tag-data-row" data-tag-table-target="dataRow" data-row-index="<%= idx %>">
-              <% columns.each do |col_name, _key, type|
-                param_key = "records[#{idx}][#{col_name}]"
-                val = row[col_name].to_s
-              %>
-                <td>
-                  <% case type %>
-                  <% when :data_type %>
-                    <% raw_dt = row["_raw_datatype"].to_s.strip %>
-                    <% raw_enc = row["_raw_encode"].to_s.strip %>
-                    <% dt_code_tip = TagXml::DataTypeMapper.normalize_code(raw_dt.presence || "0") %>
-                    <% enc_code_tip = TagXml::DataTypeMapper.normalize_code(raw_enc.presence || "255") %>
-                    <% dt_tip = TagXml::DataTypeMapper.uticor_label(dt_code_tip).presence || "Unknown" %>
-                    <% enc_tip = TagXml::DataTypeMapper.uticor_label(enc_code_tip).presence || "Unknown" %>
-                    <% uticor_tip = "Datatype - #{dt_code_tip}: #{dt_tip}\nEncode - #{enc_code_tip}: #{enc_tip}" %>
-                    <%= hidden_field_tag "records[#{idx}][Data Type]", val, class: "cell", data: { workspace_lock_target: "editable" }, disabled: true %>
-                    <%= hidden_field_tag "records[#{idx}][_raw_datatype]", raw_dt.presence || "0", id: nil %>
-                    <%= hidden_field_tag "records[#{idx}][_raw_encode]", raw_enc.presence || "255", id: nil %>
-                    <button type="button" class="data-type-trigger<%= ' data-type-unique' if val == 'Unique' %>" data-data-type-picker-target="trigger" data-action="click->data-type-picker#open" data-raw-datatype="<%= raw_dt %>" data-raw-encode="<%= raw_enc %>" data-value="<%= val %>" title="<%= uticor_tip %>" data-workspace-lock-target="editable" disabled><%= val.presence || "—" %></button>
-                  <% when :scaling %>
-                    <%= select_tag param_key, options_for_select(scaling_options, val), name: param_key, class: "cell", data: { workspace_lock_target: "editable" }, disabled: true %>
-                  <% when :data_length %>
-                    <%= select_tag param_key, options_for_select(data_length_options + (val.present? && !%w[1 2].include?(val) ? [[val, val]] : []), val), name: param_key, class: "cell", data: { workspace_lock_target: "editable" }, disabled: true %>
-                  <% when :read_write %>
-                    <%= select_tag param_key, options_for_select(read_write_options, val), name: param_key, class: "cell", data: { workspace_lock_target: "editable" }, disabled: true %>
-                  <% else %>
-                    <%= text_field_tag param_key, val, name: param_key, class: "cell", size: [12, val.length + 2].max.clamp(6, 36), data: { workspace_lock_target: "editable" }, disabled: true %>
-                  <% end %>
-                </td>
-              <% end %>
-            </tr>
+      <div class="task-reset-panel hidden" data-task-list-target="resetPanel">
+        <p class="folder-toolbar-hint">Reset completed tasks at 7:00 AM on selected days.</p>
+        <div class="reset-days-grid">
+          <% %w[Sun Mon Tue Wed Thu Fri Sat].each_with_index do |label, index| %>
+            <button type="button"
+                    class="btn btn-secondary reset-day-button"
+                    data-day-index="<%= index %>"
+                    data-action="click->task-list#toggleResetDay"><%= label %></button>
           <% end %>
-          <tr id="tag-row-template" class="tag-row-template tag-data-row" aria-hidden="true" style="display: none;" data-tag-table-target="templateRow">
-            <% columns.each do |col_name, _key, type|
-              name_pattern = "records[__INDEX__][#{col_name}]"
-              val = case col_name
-              when "Data Type" then "INT"
-              when "Data Length" then "1"
-              when "Scaling" then "1"
-              when "Read/Write" then "Read Only"
-              else ""
-              end
-              raw_pattern_dt = "records[__INDEX__][_raw_datatype]"
-              raw_pattern_enc = "records[__INDEX__][_raw_encode]"
-            %>
-              <td>
-                <% case type %>
-                <% when :data_type %>
-                  <%= hidden_field_tag "", val, class: "cell", data: { workspace_lock_target: "editable", name_pattern: name_pattern }, disabled: true %>
-                  <input type="hidden" value="0" data-name-pattern="<%= raw_pattern_dt %>">
-                  <input type="hidden" value="255" data-name-pattern="<%= raw_pattern_enc %>">
-                  <button type="button" class="data-type-trigger" data-data-type-picker-target="trigger" data-action="click->data-type-picker#open" data-raw-datatype="0" data-raw-encode="255" data-value="<%= val %>" data-workspace-lock-target="editable" disabled>INT</button>
-                <% when :scaling %>
-                  <%= select_tag "", options_for_select(scaling_options, val), class: "cell", data: { workspace_lock_target: "editable", name_pattern: name_pattern }, disabled: true %>
-                <% when :data_length %>
-                  <%= select_tag "", options_for_select(data_length_options, val), class: "cell", data: { workspace_lock_target: "editable", name_pattern: name_pattern }, disabled: true %>
-                <% when :read_write %>
-                  <%= select_tag "", options_for_select(read_write_options, val), class: "cell", data: { workspace_lock_target: "editable", name_pattern: name_pattern }, disabled: true %>
-                <% else %>
-                  <%= text_field_tag "", val, class: "cell", size: 12, data: { workspace_lock_target: "editable", name_pattern: name_pattern }, disabled: true %>
-                <% end %>
-              </td>
-            <% end %>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="data-type-popup hidden" data-data-type-picker-target="popup" aria-hidden="true">
-      <div class="data-type-popup-inner">
-        <div class="data-type-popup-row">
-          <label class="data-type-popup-label">Format</label>
-          <%= select_tag "popup_type", options_for_select(data_type_labels, "INT"), class: "data-type-popup-select", data: { data_type_picker_target: "typeSelect", action: "change->data-type-picker#fromType" } %>
         </div>
-        <div class="data-type-popup-row">
-          <label class="data-type-popup-label">Data Type</label>
-          <%= select_tag "popup_datatype", options_for_select(uticor_code_options, "0"), class: "data-type-popup-select", data: { data_type_picker_target: "datatypeSelect", action: "change->data-type-picker#fromCodes" } %>
-        </div>
-        <div class="data-type-popup-row">
-          <label class="data-type-popup-label">Encode</label>
-          <%= select_tag "popup_encode", options_for_select(uticor_code_options, "255"), class: "data-type-popup-select", data: { data_type_picker_target: "encodeSelect", action: "change->data-type-picker#fromCodes" } %>
-        </div>
-        <p class="data-type-popup-hint">Press Enter to apply, Escape or click outside to cancel</p>
       </div>
-    </div>
+
+      <%= hidden_field_tag "document[tasks_payload]", @document.tasks.to_json, data: { task_list_target: "tasksPayload" } %>
+      <%= hidden_field_tag "document[last_reset_at]", @document.last_reset_at&.iso8601, data: { task_list_target: "lastResetAt" } %>
+      <% Array(@document.reset_days).each do |day| %>
+        <%= hidden_field_tag "document[reset_days][]", day, data: { task_list_target: "resetDay" } %>
+      <% end %>
+
+      <div class="task-list-shell">
+        <div class="task-list-rows" data-task-list-target="rows">
+          <% Array(@document.tasks).each_with_index do |task, main_index| %>
+            <% text = task.is_a?(Hash) ? task["text"].to_s : "" %>
+            <% checked = task.is_a?(Hash) ? !!task["checked"] : false %>
+            <% subtasks = task.is_a?(Hash) ? Array(task["subtasks"]) : [] %>
+            <div class="organizer-row task-item-row task-item-row--main <%= 'task-item-group--head' if subtasks.any? %> <%= 'task-item-row--checked' if checked %>"
+                 data-task-list-target="row"
+                 data-main-index="<%= main_index %>"
+                 data-action="click->task-list#toggleRow">
+              <div class="row-left">
+                <span class="task-item-text"><%= text.presence || "Untitled Task" %></span>
+              </div>
+              <div class="row-right">
+                <button type="button" class="row-plus" data-action="click->task-list#addSubtask">+</button>
+                <button type="button" class="row-pencil" data-action="click->task-list#editRow">✎</button>
+              </div>
+            </div>
+
+            <% subtasks.each_with_index do |subtask, sub_index| %>
+              <% subtask_text = subtask.is_a?(Hash) ? subtask["text"].to_s : "" %>
+              <% subtask_checked = subtask.is_a?(Hash) ? !!subtask["checked"] : false %>
+              <div class="organizer-row task-item-row task-item-row--subtask task-item-group--child <%= 'task-item-group--tail' if sub_index == subtasks.length - 1 %> <%= 'task-item-row--checked' if subtask_checked %>"
+                   data-task-list-target="row"
+                   data-main-index="<%= main_index %>"
+                   data-sub-index="<%= sub_index %>"
+                   data-action="click->task-list#toggleRow">
+                <div class="row-left">
+                  <span class="task-item-text task-item-text--subtask"><%= subtask_text.presence || "Untitled Subtask" %></span>
+                </div>
+                <div class="row-right">
+                  <button type="button" class="row-pencil" data-action="click->task-list#editRow">✎</button>
+                </div>
+              </div>
+            <% end %>
+          <% end %>
+        </div>
+      </div>
+
+      <div class="rename-modal-backdrop hidden" data-task-list-target="editModalBackdrop" data-action="click->task-list#clickEditModalBackdrop" aria-hidden="true">
+        <div class="rename-modal task-edit-modal" role="dialog" aria-modal="true" aria-labelledby="task-edit-title">
+          <h3 id="task-edit-title" class="rename-modal-title">Edit Task</h3>
+          <input type="text" class="rename-modal-input" data-task-list-target="editInput" data-action="keydown.enter->task-list#saveTaskEdit" autocomplete="off">
+          <div class="rename-modal-actions">
+            <button type="button" class="btn btn-primary" data-action="click->task-list#saveTaskEdit">Save</button>
+            <button type="button" class="btn btn-danger" data-action="click->task-list#deleteTask">Delete</button>
+            <button type="button" class="btn btn-secondary" data-action="click->task-list#closeTaskEdit">Cancel</button>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  <% else %>
+    <%= form_with model: @document, url: document_path(@document), method: :patch, class: "workspace-form note-form", data: { controller: "note-editor", note_editor_debounce_value: 400 } do |f| %>
+      <header class="workspace-header note-header">
+        <div class="header-top">
+          <div class="header-title-block">
+            <%= f.text_field :title,
+                             class: "workspace-title-input note-title-input",
+                             placeholder: "Untitled",
+                             autocomplete: "off",
+                             data: { note_editor_target: "title", action: "input->note-editor#onTitleInput blur->note-editor#flush" } %>
+          </div>
+          <div class="header-actions">
+            <%= link_to "Back", root_path, class: "btn btn-toolbar" %>
+          </div>
+        </div>
+        <p class="loaded-status" data-controller="clock">
+          <span data-note-editor-target="status">Saved</span>
+          <span class="workspace-clock" data-clock-target="display"></span>
+        </p>
+      </header>
+
+      <%= f.hidden_field :content, data: { note_editor_target: "content" } %>
+      <div class="note-editor-shell">
+        <div class="note-editor"
+             contenteditable="true"
+             spellcheck="true"
+             data-note-editor-target="editor"
+              data-action="input->note-editor#onEditorInput blur->note-editor#flush paste->note-editor#onPaste"
+             role="textbox"
+             aria-multiline="true"
+             aria-label="Note content"></div>
+      </div>
+    <% end %>
   <% end %>
 </div>

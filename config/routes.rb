@@ -19,7 +19,6 @@ Rails.application.routes.draw do
     member do
       post :create_file
       patch :rename
-      get :export
       get :file_list
     end
   end

@@ -1,9 +1,10 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static targets = ["doc", "folderDropdown"]
+  static targets = ["doc", "folderDropdown", "itemCreatorBackdrop"]
 
   connect() {
+    this.itemCreatorContext = null
     this.boundKeydown = this.handleKeydown.bind(this)
     this.element.addEventListener("keydown", this.boundKeydown, true)
     this.syncExpandedFolders()
@@ -35,6 +36,12 @@ export default class extends Controller {
   }
 
   handleKeydown(e) {
+    if (e.key === "Escape" && this.hasItemCreatorBackdropTarget && !this.itemCreatorBackdropTarget.classList.contains("hidden")) {
+      e.preventDefault()
+      this.closeItemCreator()
+      return
+    }
+
     if (e.key !== "Delete" && e.key !== "Backspace") return
     const tag = (e.target?.tagName || "").toLowerCase()
     if (["input", "textarea", "select", "button"].includes(tag)) return
@@ -46,6 +53,86 @@ export default class extends Controller {
     e.preventDefault()
     const kind = row.dataset.docKind || (row.dataset.folderRow === "true" ? "folder" : "file")
     this.requestDelete(row, url, kind)
+  }
+
+  openItemCreator(e) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!this.hasItemCreatorBackdropTarget) return
+
+    const button = e.currentTarget
+    this.itemCreatorContext = {
+      createUrl: button.dataset.createUrl,
+      folderId: button.dataset.folderId
+    }
+
+    if (!this.itemCreatorContext.createUrl || !this.itemCreatorContext.folderId) return
+    this.itemCreatorBackdropTarget.classList.remove("hidden")
+    this.itemCreatorBackdropTarget.setAttribute("aria-hidden", "false")
+  }
+
+  closeItemCreator() {
+    if (!this.hasItemCreatorBackdropTarget) return
+    this.itemCreatorContext = null
+    this.itemCreatorBackdropTarget.classList.add("hidden")
+    this.itemCreatorBackdropTarget.setAttribute("aria-hidden", "true")
+  }
+
+  clickItemCreatorBackdrop(e) {
+    if (!this.hasItemCreatorBackdropTarget) return
+    if (e.target !== this.itemCreatorBackdropTarget) return
+    this.closeItemCreator()
+  }
+
+  createNoteItem(e) {
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    this.createItemFromModal("note")
+  }
+
+  createTaskListItem(e) {
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    this.createItemFromModal("task_list")
+  }
+
+  async createItemFromModal(contentType) {
+    const context = this.itemCreatorContext
+    if (!context?.createUrl || !context?.folderId) return
+
+    const csrf = document.querySelector("meta[name='csrf-token']")
+    const body = new FormData()
+    body.append("content_type", contentType)
+
+    try {
+      const createRes = await fetch(context.createUrl, {
+        method: "POST",
+        headers: {
+          "X-CSRF-Token": csrf?.content || "",
+          "Accept": "application/json",
+          "X-Requested-With": "XMLHttpRequest"
+        },
+        credentials: "same-origin",
+        body
+      })
+      if (!createRes.ok) throw new Error("Create failed")
+
+      const listRes = await fetch(`/documents/${context.folderId}/file_list`, {
+        headers: { "Accept": "text/html", "X-Requested-With": "XMLHttpRequest" },
+        credentials: "same-origin"
+      })
+      if (!listRes.ok) throw new Error("Refresh failed")
+
+      const html = await listRes.text()
+      this.updateFileList(context.folderId, html)
+      this.closeItemCreator()
+    } catch (_error) {
+      window.location.reload()
+    }
   }
 
   deleteByButton(e) {
@@ -103,7 +190,7 @@ export default class extends Controller {
 
   requestDelete(row, url, kind) {
     const isFolder = kind === "folder"
-    const message = isFolder ? "Delete this folder and all contained tag lists? This cannot be undone." : "Delete this PLC tag list? This cannot be undone."
+    const message = isFolder ? "Delete this folder and all contained items? This cannot be undone." : "Delete this item? This cannot be undone."
     if (!window.confirm(message)) return
     const csrf = document.querySelector("meta[name='csrf-token']")
     const headers = { "X-CSRF-Token": csrf?.content || "", "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" }
@@ -159,7 +246,7 @@ export default class extends Controller {
           const parent = this.element.parentNode
           const p = document.createElement("p")
           p.className = "empty-state empty-state--fade-in"
-          p.innerHTML = "No folders or files yet. Use <strong>Import</strong> or <strong>New</strong> to get started."
+          p.innerHTML = "No folders or items yet. Create a folder to get started."
           parent.replaceChild(p, this.element)
         }
         wrapper.addEventListener("animationend", showEmpty, { once: true })
@@ -274,7 +361,7 @@ export default class extends Controller {
       const parent = this.element.parentNode
       const p = document.createElement("p")
       p.className = "empty-state empty-state--fade-in"
-      p.innerHTML = "No folders or files yet. Use <strong>Import</strong> or <strong>New</strong> to get started."
+      p.innerHTML = "No folders or items yet. Create a folder to get started."
       parent.replaceChild(p, this.element)
     }
     wrapper.addEventListener("animationend", showEmpty, { once: true })
@@ -567,7 +654,7 @@ export default class extends Controller {
     left.className = "row-left"
     const text = document.createElement("div")
     text.className = "no-tag-lists"
-    text.textContent = "No Tag Lists in this folder"
+    text.textContent = "No items in this folder"
     left.appendChild(text)
 
     const right = document.createElement("div")
@@ -622,7 +709,7 @@ export default class extends Controller {
       left.className = "row-left"
       const text = document.createElement("div")
       text.className = "no-tag-lists"
-      text.textContent = "No Tag Lists in this folder"
+      text.textContent = "No items in this folder"
       left.appendChild(text)
 
       const right = document.createElement("div")

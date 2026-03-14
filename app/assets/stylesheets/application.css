@@ -124,6 +124,18 @@ a:hover { text-decoration: underline; }
   margin-bottom: 1rem;
 }
 
+.home .organizer-header {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.home .organizer-header .btn {
+  margin-right: 0;
+}
+
 @media (max-width: 720px) {
   .organizer-header {
     margin-bottom: 0.79rem;
@@ -265,6 +277,10 @@ a:hover { text-decoration: underline; }
 .plc-file-list > .organizer-row {
   padding: 0.45rem 0;
   border-bottom: 1px solid var(--border);
+}
+
+.plc-file-list.plc-file-list--has-items > .organizer-row:first-child {
+  border-top: 1px solid var(--border);
 }
 
 .plc-file-list > .organizer-row:last-child {
@@ -413,6 +429,240 @@ a:hover { text-decoration: underline; }
 .workspace { padding: 0.25rem var(--page-padding) var(--page-padding); max-width: 1400px; margin: 0 auto; }
 .workspace-form { display: flex; flex-direction: column; gap: var(--space-md); }
 
+.note-editor-shell {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-height: 60vh;
+  padding: 1rem;
+}
+
+.note-editor {
+  min-height: 56vh;
+  outline: none;
+  line-height: 1.7;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+.note-editor:empty::before {
+  content: "Start writing your note...";
+  color: var(--text-muted);
+}
+
+.workspace-clock {
+  min-width: 5.6rem;
+  text-align: right;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.workspace-clock--toggle {
+  cursor: pointer;
+}
+
+.workspace-clock--toggle:hover {
+  color: var(--text);
+}
+
+.item-create-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 10, 13, 0.6);
+}
+
+.item-create-modal-backdrop.hidden {
+  display: none;
+}
+
+.item-create-modal {
+  width: min(30rem, 92vw);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+.task-list-shell {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-height: 0;
+  padding: 1rem;
+}
+
+.task-list-shell.task-list-shell--empty {
+  display: none;
+}
+
+.task-list-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0 !important;
+  margin-bottom: 0;
+}
+
+.task-item-row {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.7rem;
+  margin: 0 !important;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.task-item-row--main {
+  margin-top: 0.55rem !important;
+  --completion: 0;
+  background-image: linear-gradient(
+    to right,
+    rgba(34, 197, 94, 0.18),
+    rgba(34, 197, 94, 0.18)
+  );
+  background-repeat: no-repeat;
+  background-size: calc(var(--completion) * 100%) 100%;
+  background-position: left top;
+  transition: background-size 220ms ease;
+}
+
+.task-item-row--main:first-child {
+  margin-top: 0 !important;
+}
+
+.task-item-row .row-left {
+  gap: 0.55rem !important;
+}
+
+.task-item-row .row-left,
+.task-item-row--subtask .row-left {
+  padding-left: 0.55rem !important;
+}
+
+.task-item-row--main .task-item-text {
+  font-weight: 500;
+}
+
+.task-item-row--subtask {
+  margin-left: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  border-style: solid;
+  border-color: var(--border);
+}
+
+.task-item-row--main + .task-item-row--subtask {
+  margin-top: 0 !important;
+}
+
+.task-item-row--subtask + .task-item-row--main {
+  margin-top: 0.55rem !important;
+}
+
+.task-item-row--main + .task-item-row--main {
+  margin-top: 0.55rem !important;
+}
+
+.task-item-row--subtask .row-left {
+  padding-left: 0.55rem !important;
+}
+
+.task-item-text,
+.task-item-text--subtask {
+  margin-left: 0 !important;
+}
+
+.task-item-text--subtask {
+  font-size: 0.93rem;
+  color: var(--muted);
+}
+
+.task-item-group--head {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.task-item-group--child {
+  border-top: none;
+  border-top-width: 0 !important;
+  border-radius: 0;
+}
+
+.task-item-group--tail {
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+
+.row-plus {
+  opacity: 0;
+  pointer-events: none;
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--text);
+  border-radius: 6px;
+  font-size: 0.82rem;
+  line-height: 1;
+  padding: 0.18rem 0.35rem;
+  margin-right: 0.35rem;
+  transition: opacity 120ms ease;
+}
+
+.organizer-row:hover .row-plus,
+.organizer-row:focus-within .row-plus {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.task-item-row:hover {
+  background: var(--surface-raised);
+}
+
+.task-item-row--checked {
+  background: rgba(34, 197, 94, 0.18) !important;
+  border-color: var(--border) !important;
+}
+
+.task-item-row--checked .task-item-text {
+  opacity: 0.75;
+}
+
+.task-item-text {
+  user-select: none;
+}
+
+.task-list-rows .organizer-row {
+  padding-left: 0 !important;
+}
+
+.task-list-rows .organizer-row .row-left {
+  padding-left: 0.55rem !important;
+}
+
+.task-reset-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+.task-reset-panel.hidden {
+  display: none;
+}
+
+.reset-days-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.reset-day-button {
+  margin-right: 0;
+  padding: 0.3rem 0.45rem;
+}
+
 .workspace-header {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -497,8 +747,12 @@ input.connection-inline {
 .workspace-header .header-actions {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: 0.4rem;
   flex-shrink: 0;
+}
+
+.workspace-header .header-actions .btn {
+  margin-right: 0;
 }
 .workspace-header .header-actions-lock-group {
   display: flex;
@@ -512,7 +766,8 @@ input.connection-inline {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 1rem;
+  font-size: 1.08rem;
+  font-weight: 600;
   line-height: 1;
 }
 .workspace-form.workspace-locked .btn-add-row,
@@ -764,6 +1019,31 @@ input.connection-inline {
   border-radius: 12px;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
   padding: 1rem;
+}
+
+.task-edit-modal {
+  width: min(92vw, 38rem);
+  padding: 1rem;
+}
+
+.task-edit-modal .rename-modal-title {
+  margin-bottom: 0.75rem;
+}
+
+.task-edit-modal .rename-modal-input {
+  font-size: 1rem;
+}
+
+.task-edit-modal .rename-modal-actions {
+  margin-top: 0.85rem;
+  gap: 0.5rem;
+}
+
+.task-edit-modal .btn {
+  min-width: 0;
+  font-size: 0.9rem;
+  border-radius: 6px;
+  padding: 0.4rem 0.9rem;
 }
 
 .rename-modal-title {

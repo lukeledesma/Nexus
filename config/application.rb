@@ -26,5 +26,11 @@ module Alchemy
 
     # Load services (e.g. TagXml)
     config.autoload_paths << Rails.root.join("app/services")
+
+    config.after_initialize do
+      next if ENV["SKIP_DOCUMENT_DISK_SYNC"] == "1"
+
+      DocumentDiskLoader.sync!
+    end
   end
 end

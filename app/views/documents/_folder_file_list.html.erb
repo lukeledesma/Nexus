@@ -1,4 +1,4 @@
-<div class="plc-file-list">
+<div class="plc-file-list <%= 'plc-file-list--has-items' if files.any? %>">
   <% if files.any? %>
     <% files.each do |file_entry| %>
       <% file_doc = file_entry[:document] %>
@@ -20,7 +20,6 @@
               data-current-name="<%= file_entry[:name] %>"
               data-doc-kind="file"
             >✎</button>
-            <span class="doc-count"><%= file_doc.records.size %> tag(s)</span>
           </div>
         </div>
       <% else %>
@@ -29,14 +28,14 @@
             <span class="doc-name"><%= file_entry[:name] %></span>
           </div>
           <div class="row-right">
-            <span class="folder-toolbar-hint">Read-only (non-XML)</span>
+            <span class="folder-toolbar-hint">Read-only</span>
           </div>
         </div>
       <% end %>
     <% end %>
   <% else %>
     <div class="organizer-row plc-empty-row" aria-hidden="true">
-      <div class="row-left"><div class="no-tag-lists">No Tag Lists in this folder</div></div>
+      <div class="row-left"><div class="no-tag-lists">No items in this folder</div></div>
       <div class="row-right"></div>
     </div>
   <% end %>

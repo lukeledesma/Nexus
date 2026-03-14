@@ -1,6 +1,6 @@
 <% if @has_organizer_content %>
-  <section class="recent-docs organizer" data-controller="rename">
-    <h2>File Organizer</h2>
+  <section class="recent-docs organizer" data-controller="rename item-creator">
+    <h2>Organizer</h2>
 
     <ul class="organizer-list">
       <% @browser_folders.each do |folder_entry| %>
@@ -27,7 +27,7 @@
                   data-action="click->rename#openModal"
                   data-rename-url="<%= rename_document_path(folder) %>"
                   data-delete-url="<%= document_path(folder) %>"
-                  data-current-name="<%= folder.metadata_filename %>"
+                  data-current-name="<%= folder.title %>"
                   data-doc-kind="folder"
                 >✎</button>
               <% end %>
@@ -38,16 +38,17 @@
           <div class="folder-dropdown <%= open_folder ? 'is-open' : '' %>" data-recent-docs-target="folderDropdown">
             <div class="plc-header-row organizer-row" data-type="file-list" data-no-toggle="true">
               <div class="row-left">
-                <span class="plc-header-label">PLC Tag Lists</span>
+                <span class="plc-header-label">Items</span>
                 <% if folder %>
-                  <%= form_with url: documents_path, method: :post, local: true, multipart: true, class: "home-import-form inline-action-form", data: { controller: "import-form", action: "submit->import-form#submit" } do |f| %>
-                    <%= hidden_field_tag :parent_id, folder.id %>
-                    <%= file_field_tag :xml_file, accept: ".xml,.xml.tar,.xml.tar.gz,application/xml,text/xml,application/x-tar,application/gzip", class: "file-input-hidden", id: "folder_xml_file_#{folder.id}", data: { action: "change->import-form#submit" } %>
-                    <button type="button" class="btn btn-secondary btn-tiny action import-button" data-action="click->import-form#chooseFile">Import</button>
-                  <% end %>
-                  <%= button_to "New", create_file_document_path(folder), method: :post, class: "btn btn-secondary btn-tiny action new-button", form_class: "inline-action-form", data: { action: "click->recent-docs#createFile" } %>
+                    <button type="button"
+                      class="btn btn-secondary btn-tiny action new-button"
+                      data-action="click->recent-docs#openItemCreator"
+                      data-folder-id="<%= folder.id %>"
+                      data-create-url="<%= create_file_document_path(folder) %>">
+                    New Item
+                  </button>
                 <% else %>
-                  <span class="folder-toolbar-hint">Read-only folder from disk</span>
+                  <span class="folder-toolbar-hint">Read-only folder</span>
                 <% end %>
               </div>
               <div class="row-right"></div>
@@ -60,10 +61,10 @@
 
       <% if @root_files.any? %>
         <li class="doc-row unfiled-header" aria-hidden="true">
-          <div class="doc-link"><span class="doc-name">Unfiled Tag Lists</span></div>
+          <div class="doc-link"><span class="doc-name">Unfiled Items</span></div>
         </li>
         <% @root_files.each do |doc| %>
-          <% display_name = (doc.metadata_filename.presence || "Untitled").to_s.sub(/\.xml\z/i, "") %>
+          <% display_name = doc.title.presence || "Untitled" %>
           <li class="doc-row doc-row--file-inline" tabindex="0" data-recent-docs-target="doc" data-doc-kind="file" data-delete-url="<%= document_path(doc) %>">
             <div class="doc-link doc-link--static organizer-row file-row">
               <span class="row-left">
@@ -80,7 +81,6 @@
                   data-current-name="<%= display_name %>"
                   data-doc-kind="file"
                 >✎</button>
-                <span class="doc-count"><%= doc.records.size %> tag(s)</span>
               </span>
             </div>
           </li>
@@ -99,7 +99,19 @@
         </div>
       </div>
     </div>
+
+    <div class="item-create-modal-backdrop hidden" data-recent-docs-target="itemCreatorBackdrop" data-action="click->recent-docs#clickItemCreatorBackdrop" aria-hidden="true">
+      <div class="item-create-modal" role="dialog" aria-modal="true" aria-labelledby="item-create-title">
+        <h3 id="item-create-title" class="rename-modal-title">What would you like to create?</h3>
+        <p class="folder-toolbar-hint">Choose a content type for this folder item.</p>
+        <div class="rename-modal-actions">
+          <button type="button" class="btn btn-primary" data-action="click->recent-docs#createNoteItem">Create Note</button>
+          <button type="button" class="btn btn-secondary" data-action="click->recent-docs#createTaskListItem">Create Task List</button>
+          <button type="button" class="btn btn-secondary" data-action="click->recent-docs#closeItemCreator">Cancel</button>
+        </div>
+      </div>
+    </div>
   </section>
 <% else %>
-  <p class="empty-state">No folders or files yet. Use <strong>Import</strong> or <strong>New</strong> to get started.</p>
+  <p class="empty-state">No folders or items yet. Create a folder to get started.</p>
 <% end %>

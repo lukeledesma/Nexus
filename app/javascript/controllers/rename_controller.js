@@ -31,7 +31,7 @@ export default class extends Controller {
     if (!renameUrl || !deleteUrl) return
 
     this.activeContext = { name, renameUrl, deleteUrl, docKind, folderId }
-    this.modalTitleTarget.textContent = docKind === "folder" ? "Edit Folder" : "Edit PLC Tag List"
+    this.modalTitleTarget.textContent = docKind === "folder" ? "Edit Folder" : "Edit Note"
     this.modalInputTarget.value = name
     this.updateNameValidity()
     this.open()
