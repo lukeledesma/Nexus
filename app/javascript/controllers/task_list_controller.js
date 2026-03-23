@@ -10,9 +10,11 @@ export default class extends Controller {
     this.completionFrameIds = new Map()
     this.expandedMainIndices = new Set()
     this.boundKeydown = this.handleKeydown.bind(this)
+    this.boundRowClick = this.toggleRow.bind(this)
     this.tasks = this.readTasksFromDom()
     this.resetDays = this.readResetDays()
     this.syncResetButtons()
+    this.setupRowClickListener()
     this.renderTasks()
     window.addEventListener("keydown", this.boundKeydown)
   }
@@ -22,6 +24,15 @@ export default class extends Controller {
     this.completionFrameIds.forEach((frameId) => cancelAnimationFrame(frameId))
     this.completionFrameIds.clear()
     window.removeEventListener("keydown", this.boundKeydown)
+    if (this.hasRowsTarget) {
+      this.rowsTarget.removeEventListener("click", this.boundRowClick)
+    }
+  }
+
+  setupRowClickListener() {
+    if (this.hasRowsTarget) {
+      this.rowsTarget.addEventListener("click", this.boundRowClick)
+    }
   }
 
   scheduleCompletionUpdate(row, ratio) {
@@ -51,7 +62,8 @@ export default class extends Controller {
   }
 
   toggleRow(event) {
-    const row = event.currentTarget
+    const row = event.target.closest("[data-clickable]")
+    if (!row) return
     if (event.target.closest(".row-pencil") || event.target.closest(".row-plus")) return
 
     const mainIndex = Number(row.dataset.mainIndex)
@@ -353,11 +365,12 @@ export default class extends Controller {
 
   buildMainRow(task, mainIndex, isExpanded = false) {
     const hasSubtasks = task.subtasks.length > 0
+    const shouldHaveTail = !hasSubtasks || !isExpanded
     const row = document.createElement("div")
-    row.className = `organizer-row task-item-row task-item-row--main ${hasSubtasks && isExpanded ? "task-item-group--head" : ""} ${task.checked ? "task-item-row--checked" : ""}`
+    row.className = `organizer-row task-item-row task-item-row--main ${hasSubtasks && isExpanded ? "task-item-group--head" : ""} ${shouldHaveTail ? "task-item-group--tail" : ""} ${task.checked ? "task-item-row--checked" : ""}`
     row.dataset.taskListTarget = "row"
     row.dataset.mainIndex = String(mainIndex)
-    row.dataset.action = "click->task-list#toggleRow"
+    row.dataset.clickable = "true"
 
     const ratio = this.computeCompletionRatio(task)
     if (ratio !== null) {
@@ -410,7 +423,7 @@ export default class extends Controller {
     row.dataset.taskListTarget = "row"
     row.dataset.mainIndex = String(mainIndex)
     row.dataset.subIndex = String(subIndex)
-    row.dataset.action = "click->task-list#toggleRow"
+    row.dataset.clickable = "true"
 
     const left = document.createElement("div")
     left.className = "row-left"
