@@ -303,7 +303,7 @@ export default class extends Controller {
       const startHeight = dropdown.scrollHeight
       dropdown.style.maxHeight = `${startHeight}px`
       dropdown.style.overflow = "hidden"
-      dropdown.style.transition = "max-height 150ms ease, opacity 150ms ease"
+      dropdown.style.transition = "max-height 150ms ease, opacity 150ms ease, transform 150ms ease"
       dropdown.getBoundingClientRect()
       dropdown.classList.remove("is-open")
       dropdown.style.maxHeight = "0px"

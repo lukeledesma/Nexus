@@ -46,6 +46,7 @@ export default class extends Controller {
       const subtasks = this.#subtasksFor(row)
       if (subtasks.length > 0) {
         this.#toggleCollapsed(row)
+        this.#refreshAll()
         return
       }
     }
@@ -97,12 +98,8 @@ export default class extends Controller {
       mainRow.insertAdjacentElement("afterend", subtaskRow)
     }
 
-    // If first subtask, set collapsed state and add group head class
-    const isFirstSubtask = this.#subtasksFor(mainRow).length === 0
-    if (isFirstSubtask) {
-      mainRow.dataset.collapsed = "true"
-      mainRow.classList.add("task-item-group--head")
-    }
+    // Always expand parent when adding a subtask so the new row is visible.
+    mainRow.dataset.collapsed = "false"
 
 
     this.#startEditRow(subtaskRow)
@@ -319,6 +316,8 @@ export default class extends Controller {
       const subtasks = this.#subtasksFor(mainRow)
       const subtaskCount = subtasks.length
       const checkedSubtasks = subtasks.filter((row) => row.classList.contains("task-item-row--checked")).length
+      if (subtaskCount === 0) mainRow.dataset.collapsed = "false"
+      const isCollapsed = mainRow.dataset.collapsed === "true"
       mainRow.dataset.hasSubtasks = subtaskCount > 0 ? "true" : "false"
 
       if (subtaskCount > 0) {
@@ -355,8 +354,11 @@ export default class extends Controller {
         label.textContent = subtaskCount > 0 ? `${checkedSubtasks}/${subtaskCount}` : ""
       }
 
-      mainRow.classList.toggle("task-item-group--head", subtaskCount > 0)
+      mainRow.classList.toggle("task-item-group--head", subtaskCount > 0 && !isCollapsed)
+      mainRow.classList.toggle("task-item-group--tail", subtaskCount === 0 || isCollapsed)
       subtasks.forEach((subtask, index) => {
+        subtask.classList.toggle("is-collapsed", isCollapsed)
+        subtask.setAttribute("aria-hidden", isCollapsed ? "true" : "false")
         subtask.classList.add("task-item-group--child")
         subtask.classList.toggle("task-item-group--tail", index === subtaskCount - 1)
 

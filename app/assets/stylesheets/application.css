@@ -384,13 +384,17 @@ a:hover { text-decoration: underline; }
 .folder-dropdown {
   max-height: 0px;
   opacity: 0;
-  transition: max-height 280ms ease, opacity 180ms ease;
+  transform: translateY(-8px);
+  transition: max-height 280ms ease, opacity 180ms ease, transform 220ms ease;
+  overflow: hidden;
+  will-change: max-height, opacity, transform;
   pointer-events: none;
   background: rgba(0, 0, 0, 0.12);
   padding-left: 0;
 }
 .folder-dropdown.is-open {
   opacity: 1;
+  transform: translateY(0);
   pointer-events: auto;
 }
 .plc-header-row {
@@ -705,6 +709,22 @@ a:hover { text-decoration: underline; }
   margin-bottom: 0 !important;
   border-style: solid;
   border-color: var(--border);
+  max-height: 3.4rem;
+  opacity: 1;
+  transform: translateY(0);
+  overflow: hidden;
+  transition: max-height 220ms ease, opacity 180ms ease, transform 220ms ease, padding 220ms ease, border-width 220ms ease;
+}
+
+.task-item-row--subtask.is-collapsed {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-6px);
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  border-top-width: 0 !important;
+  border-bottom-width: 0 !important;
+  pointer-events: none;
 }
 
 .task-item-row--main + .task-item-row--subtask {
@@ -803,11 +823,6 @@ a:hover { text-decoration: underline; }
 
 .task-item-row--checked .task-toggle {
   color: #22c55e;
-}
-
-/* Hide subtasks when main task is collapsed */
-.task-item-row--main[data-collapsed="true"] ~ .task-item-row--subtask {
-  display: none !important;
 }
 
 .task-item-row .organizer-row-right {
@@ -1701,10 +1716,26 @@ input.connection-inline {
   gap: 0;
   margin: 0;
   padding: 0;
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-6px);
+  overflow: hidden;
+  pointer-events: none;
+  will-change: max-height, opacity, transform;
+  transition: max-height 240ms ease, opacity 180ms ease, transform 220ms ease;
 }
 
 .folder-item-panel.hidden {
-  display: none;
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none;
+}
+
+.folder-item-panel.is-open {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
 }
 
 .finder-item-child {

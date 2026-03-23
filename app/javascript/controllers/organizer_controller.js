@@ -10,6 +10,16 @@ export default class extends Controller {
   connect() {
     this.pendingFolderId = null
     this.draftRow = null
+
+    this.element.querySelectorAll(".folder-item-panel").forEach((panel) => {
+      if (panel.classList.contains("hidden")) {
+        panel.classList.remove("is-open")
+        panel.style.maxHeight = "0px"
+      } else {
+        panel.classList.add("is-open")
+        panel.style.maxHeight = "none"
+      }
+    })
   }
 
   toggleFolder(event) {
@@ -19,17 +29,18 @@ export default class extends Controller {
     const panel = this.element.querySelector(`[data-folder-panel-id="${folderId}"]`)
     if (!panel) return
 
-    const willOpen = panel.classList.contains("hidden")
+    const willOpen = !panel.classList.contains("is-open")
 
     this.element.querySelectorAll(".folder-item-panel").forEach((itemPanel) => {
-      itemPanel.classList.add("hidden")
+      if (itemPanel === panel && willOpen) return
+      this.#animateClosePanel(itemPanel)
     })
     this.element.querySelectorAll(".finder-item[data-folder-id]").forEach((folderButton) => {
       folderButton.classList.remove("is-folder-selected")
     })
 
     if (willOpen) {
-      panel.classList.remove("hidden")
+      this.#animateOpenPanel(panel)
       button.classList.add("is-folder-selected")
     }
   }
@@ -440,15 +451,52 @@ export default class extends Controller {
     if (!panel || !folderButton) return null
 
     this.element.querySelectorAll(".folder-item-panel").forEach((itemPanel) => {
-      itemPanel.classList.add("hidden")
+      if (itemPanel === panel) return
+      this.#animateClosePanel(itemPanel)
     })
     this.element.querySelectorAll(".finder-item[data-folder-id]").forEach((row) => {
       row.classList.remove("is-folder-selected")
     })
 
-    panel.classList.remove("hidden")
+    this.#animateOpenPanel(panel)
     folderButton.classList.add("is-folder-selected")
     return panel
+  }
+
+  #animateOpenPanel(panel) {
+    panel.classList.remove("hidden")
+    panel.classList.add("is-open")
+    panel.style.overflow = "hidden"
+    panel.style.maxHeight = "0px"
+
+    requestAnimationFrame(() => {
+      panel.style.maxHeight = `${panel.scrollHeight}px`
+    })
+
+    const onDone = () => {
+      panel.style.maxHeight = "none"
+      panel.style.overflow = ""
+      panel.removeEventListener("transitionend", onDone)
+    }
+    panel.addEventListener("transitionend", onDone)
+  }
+
+  #animateClosePanel(panel) {
+    if (!panel.classList.contains("is-open") && panel.classList.contains("hidden")) return
+
+    const startHeight = panel.scrollHeight
+    panel.style.overflow = "hidden"
+    panel.style.maxHeight = `${startHeight}px`
+    panel.getBoundingClientRect()
+    panel.classList.remove("is-open")
+    panel.classList.add("hidden")
+    panel.style.maxHeight = "0px"
+
+    const onDone = () => {
+      panel.style.overflow = ""
+      panel.removeEventListener("transitionend", onDone)
+    }
+    panel.addEventListener("transitionend", onDone)
   }
 
   #removeDraftRow() {
