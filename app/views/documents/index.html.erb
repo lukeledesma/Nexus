@@ -1,16 +1,6 @@
-<div class="home" data-controller="folders">
-  <header class="home-header">
-    <h1 class="app-title">NEXUS</h1>
-    <p class="tagline">A focused workspace for notes and task lists with folders, fast organization, and live saving.</p>
-  </header>
-
-  <div class="organizer-header mb-3">
-    <button class="btn btn-primary" data-action="click->folders#createRootFolder">New Folder</button>
+<section class="finder-shell">
+  <div data-finder-target="window" class="finder-window collapsed"></div>
+  <div class="finder-main-pane hidden opacity-0" data-finder-target="mainPane">
+    <turbo-frame id="app-pane" class="finder-app-frame"></turbo-frame>
   </div>
-
-  <div id="organizer-wrapper" data-controller="recent-docs">
-    <div id="organizer-content">
-      <%= render "organizer" %>
-    </div>
-  </div>
-</div>
+</section>

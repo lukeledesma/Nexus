@@ -1,0 +1,21 @@
+<turbo-frame id="app-pane">
+  <section class="app-surface">
+    <header class="app-surface-header">
+      <h2>All Notes</h2>
+      <p><%= @notes.size %> note<%= "s" if @notes.size != 1 %> across all folders</p>
+    </header>
+
+    <% if @notes.any? %>
+      <ul class="app-list">
+        <% @notes.each do |note| %>
+          <li>
+            <%= link_to note.name, apps_note_path(note), data: { turbo_frame: "app-pane" }, class: "app-list-link" %>
+            <span class="app-list-badge"><%= note.folder.name %></span>
+          </li>
+        <% end %>
+      </ul>
+    <% else %>
+      <p class="app-empty">No notes yet. Create a folder and add a note.</p>
+    <% end %>
+  </section>
+</turbo-frame>

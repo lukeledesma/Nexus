@@ -1,4 +1,20 @@
 Rails.application.routes.draw do
+  get "/login", to: "sessions#new"
+  post "/login", to: "sessions#create"
+  delete "/logout", to: "sessions#destroy"
+
+  namespace :apps do
+    resources :folders, only: %i[show create update destroy]
+    resources :notes, only: %i[show create update destroy]
+    resources :task_lists, only: %i[show create update destroy]
+    get "calculator", to: "calculator#show"
+    get "settings", to: "settings#show"
+    get "all_notes",  to: "notes#index"
+    get "all_tasks",  to: "task_lists#index"
+  end
+
+  resources :folders, only: %i[create update destroy], controller: "apps/folders"
+
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.

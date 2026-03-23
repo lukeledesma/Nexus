@@ -1,0 +1,21 @@
+<turbo-frame id="app-pane">
+  <section class="app-surface">
+    <header class="app-surface-header">
+      <h2>All Task Lists</h2>
+      <p><%= @task_lists.size %> task list<%= "s" if @task_lists.size != 1 %> across all folders</p>
+    </header>
+
+    <% if @task_lists.any? %>
+      <ul class="app-list">
+        <% @task_lists.each do |task_list| %>
+          <li>
+            <%= link_to task_list.name, apps_task_list_path(task_list), data: { turbo_frame: "app-pane" }, class: "app-list-link" %>
+            <span class="app-list-badge"><%= task_list.folder.name %></span>
+          </li>
+        <% end %>
+      </ul>
+    <% else %>
+      <p class="app-empty">No task lists yet. Create a folder and add a task list.</p>
+    <% end %>
+  </section>
+</turbo-frame>

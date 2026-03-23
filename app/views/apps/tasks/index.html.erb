@@ -1,0 +1,18 @@
+<section class="app-surface">
+  <header class="app-surface-header">
+    <h2>Task Lists</h2>
+    <p>All task list documents.</p>
+  </header>
+
+  <% if @task_lists.any? %>
+    <ul class="app-list">
+      <% @task_lists.each do |task_list| %>
+        <li>
+          <%= link_to task_list.title, apps_note_path(task_list), data: { turbo_frame: "app-pane" }, class: "app-list-link" %>
+        </li>
+      <% end %>
+    </ul>
+  <% else %>
+    <p class="app-empty">No task lists available.</p>
+  <% end %>
+</section>

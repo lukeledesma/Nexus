@@ -1,0 +1,19 @@
+<%= render "shared/modal", modal_id: "new-task-list-modal" do %>
+  <h2 class="modal-title">Create Task List</h2>
+
+  <%= form_with url: apps_task_lists_path, method: :post,
+        data: { action: "submit->organizer#submitNewTaskList", turbo: "false" },
+        html: { class: "modal-form" } do |f| %>
+    <label class="modal-label">Folder</label>
+    <%= f.collection_select :folder_id, folders, :id, :name, {},
+          { name: "item[folder_id]", class: "modal-select", required: true } %>
+
+    <label class="modal-label">Title</label>
+    <%= f.text_field :name, name: "item[name]", class: "modal-input", value: "Untitled Task List", required: true %>
+
+    <div class="modal-actions">
+      <button type="button" data-action="click->modal#close" class="modal-cancel-btn">Cancel</button>
+      <button type="submit" class="modal-submit-btn">Create</button>
+    </div>
+  <% end %>
+<% end %>

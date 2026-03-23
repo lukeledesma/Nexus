@@ -1,0 +1,11 @@
+<div
+  class="modal-backdrop fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden"
+  data-modal-id="<%= modal_id %>"
+  data-modal-target="backdrop"
+  data-action="click->modal#backdropClose"
+>
+  <div class="modal-window bg-neutral-900 rounded-lg p-6 w-[400px] shadow-xl"
+       data-modal-target="window">
+    <%= yield %>
+  </div>
+</div>

@@ -1,0 +1,12 @@
+<section class="app-surface">
+  <header class="app-surface-header">
+    <h2>Calculator</h2>
+    <p>Quick arithmetic scratchpad.</p>
+  </header>
+
+  <div class="calculator-shell" data-controller="calculator-lite">
+    <input type="text" class="form-input" placeholder="Example: 12 * (4 + 3)" data-calculator-lite-target="expression">
+    <button type="button" class="btn btn-primary" data-action="click->calculator-lite#evaluate">Evaluate</button>
+    <p class="calculator-result" data-calculator-lite-target="result">Result: —</p>
+  </div>
+</section>

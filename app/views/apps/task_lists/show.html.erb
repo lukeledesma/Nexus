@@ -1,0 +1,68 @@
+<turbo-frame id="app-pane">
+  <section class="app-surface" data-controller="title-editor task-list-editor">
+    <header class="app-surface-header">
+      <h2 class="app-inline-title" data-action="click->title-editor#startEdit" title="Click to rename">
+        <span data-title-editor-target="display"><%= @task_list.name %></span>
+      </h2>
+    </header>
+
+    <%= form_with model: @task_list, url: apps_task_list_path(@task_list), method: :patch,
+          data: {
+        turbo_frame: "app-pane",
+        controller: "autosave",
+        autosave_item_id_value: @task_list.id,
+        autosave_item_type_value: "task_list"
+          }, class: "task-list-form" do |f| %>
+      <%= f.hidden_field :name, value: @task_list.name, name: "item[name]", data: { title_editor_target: "input" } %>
+      <input type="hidden" name="item[tasks_payload]" value="" data-task-list-editor-target="payload">
+
+      <ul class="task-list-rows" data-task-list-editor-target="list" data-action="click->task-list-editor#handleListClick keydown->task-list-editor#handleListKeydown">
+        <% @tasks_for_view.each do |task| %>
+          <% subtasks = Array(task["subtasks"]) %>
+          <% total_subtasks = subtasks.length %>
+          <% completed_subtasks = subtasks.count { |sub| sub["checked"] } %>
+          <% completion = total_subtasks.positive? ? (completed_subtasks.to_f / total_subtasks.to_f) : (task["checked"] ? 1.0 : 0.0) %>
+          <% main_classes = ["task-item-row", "task-item-row--main", "organizer-row"] %>
+          <% main_classes << "task-item-row--checked" if total_subtasks.positive? && completion >= 1.0 %>
+          <% main_classes << "task-item-group--head" if total_subtasks.positive? %>
+
+          <li class="<%= main_classes.join(" ") %>" style="--completion: <%= completion %>;" data-role="main-task" data-main-checked="<%= task["checked"] ? "true" : "false" %>" data-collapsed="<%= total_subtasks.positive? ? "true" : "false" %>" data-has-subtasks="<%= total_subtasks.positive? ? "true" : "false" %>">
+            <div class="organizer-row-left row-left">
+              <span class="task-toggle" role="button" tabindex="0" aria-label="Toggle task completion"><%= task["checked"] ? "✓" : "○" %></span>
+              <span class="task-item-text" data-role="task-text"><%= task["text"] %></span>
+            </div>
+            <div class="organizer-row-right">
+              <span class="task-progress-bar" aria-hidden="true"><span class="task-progress-bar-fill" style="width: <%= (completion * 100).round %>%;"></span></span>
+              <% if total_subtasks.positive? %>
+                <span class="task-progress-label"><%= completed_subtasks %>/<%= total_subtasks %></span>
+              <% end %>
+              <span class="row-plus" title="Add subtask">+</span>
+              <span class="item-action-btn" title="Rename">&#9998;</span>
+              <span class="item-action-btn item-action-delete" title="Delete">&times;</span>
+            </div>
+          </li>
+
+          <% subtasks.each_with_index do |subtask, index| %>
+            <% sub_classes = ["task-item-row", "task-item-row--subtask", "organizer-row", "task-item-group--child"] %>
+            <% sub_classes << "task-item-row--checked" if subtask["checked"] %>
+            <% sub_classes << "task-item-group--tail" if index == total_subtasks - 1 %>
+            <li class="<%= sub_classes.join(" ") %>" data-role="subtask">
+              <div class="organizer-row-left row-left">
+                <span class="task-toggle" role="button" tabindex="0" aria-label="Toggle subtask completion"><%= subtask["checked"] ? "✓" : "○" %></span>
+                <span class="task-item-text task-item-text--subtask" data-role="task-text"><%= subtask["text"] %></span>
+              </div>
+              <div class="organizer-row-right">
+                <span class="item-action-btn" title="Rename">&#9998;</span>
+                <span class="item-action-btn item-action-delete" title="Delete">&times;</span>
+              </div>
+            </li>
+          <% end %>
+        <% end %>
+      </ul>
+
+      <div class="task-list-add-row">
+        <button type="button" class="btn-add-task" data-action="click->task-list-editor#addTask">+ Add Task</button>
+      </div>
+    <% end %>
+  </section>
+</turbo-frame>

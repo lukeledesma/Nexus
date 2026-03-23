@@ -214,6 +214,9 @@ class DocumentsController < ApplicationController
 
     @root_files = Document.files.where(parent_id: nil).order(Arel.sql("LOWER(title) ASC"))
     @has_organizer_content = @browser_folders.any? || @root_files.any?
+    @sidebar_notes = Item.notes.ordered
+    @sidebar_task_lists = Item.task_lists.ordered
+    @folders = Folder.includes(:items).ordered
   end
 
   def next_folder_name

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_11_200000) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_22_063645) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -21,7 +21,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_11_200000) do
     t.boolean "is_folder", default: false, null: false
     t.datetime "last_reset_at"
     t.integer "parent_id"
-    t.integer "reset_days", null: false, array: true
+    t.integer "reset_days", default: [], null: false, array: true
     t.string "reset_mode", default: "none", null: false
     t.string "storage_path"
     t.jsonb "tasks", default: [], null: false
@@ -31,4 +31,31 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_11_200000) do
     t.index ["is_folder"], name: "index_documents_on_is_folder"
     t.index ["parent_id"], name: "index_documents_on_parent_id"
   end
+
+  create_table "folders", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "name"
+    t.datetime "updated_at", null: false
+  end
+
+  create_table "items", force: :cascade do |t|
+    t.text "body"
+    t.datetime "created_at", null: false
+    t.bigint "folder_id", null: false
+    t.string "item_type"
+    t.string "name"
+    t.jsonb "tasks"
+    t.datetime "updated_at", null: false
+    t.index ["folder_id"], name: "index_items_on_folder_id"
+  end
+
+  create_table "users", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "email", null: false
+    t.string "password_digest", null: false
+    t.datetime "updated_at", null: false
+    t.index ["email"], name: "index_users_on_email", unique: true
+  end
+
+  add_foreign_key "items", "folders"
 end

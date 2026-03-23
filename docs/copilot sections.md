@@ -1,7 +1,24 @@
 # Copilot Sections
 
-Updated: 2026-03-14
+Updated: 2026-03-22
 Scope: Major changes only (kept under 10240 chars)
+
+## Latest Major Changes (2026-03-22)
+- Organizer/Finder behavior now treats folders as inline tree toggles only; item selection is the only action that opens/collapses the Finder pane.
+- Added per-folder item creation modal flow (+ on folder row) and immediate inline insertion of created items under that folder.
+- Restored single-title inline editing in Note and Task List app windows.
+- Implemented live autosave for Note/Task List forms:
+  - Renaming title now saves immediately without requiring body/task edits.
+  - Task add/remove now triggers autosave automatically.
+  - Organizer item labels update immediately after save.
+- Added filesystem mirror synchronization for current app model (Folder + Item):
+  - New `ItemStorageSyncLite` rebuilds `storage/item_lists` from database state.
+  - Folder/item create/update/delete/rename now syncs disk via model `after_commit` callbacks.
+  - App behavior now mirrors storage as HMI output for notes/task lists.
+- Organizer sidebar behavior refinements:
+  - Deleting an item no longer collapses the folder tree (in-place remove, count update, folder remains open).
+  - Item rename now re-sorts that folder's item list alphabetically immediately.
+  - New item insertion also passes through alphabetical ordering.
 
 ## Feature Summary
 - Added nested subtasks under main tasks in task list workspaces.

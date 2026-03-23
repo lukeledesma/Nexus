@@ -1,0 +1,15 @@
+<%= render "shared/modal", modal_id: "new-folder-modal" do %>
+  <h2 class="modal-title">Create Folder</h2>
+
+  <%= form_with url: apps_folders_path, method: :post,
+        data: { action: "submit->organizer#submitNewFolder", turbo: "false" },
+        html: { class: "modal-form" } do |f| %>
+    <label class="modal-label">Folder Name</label>
+    <%= f.text_field :name, name: "folder[name]", class: "modal-input", placeholder: "New Folder", required: true %>
+
+    <div class="modal-actions">
+      <button type="button" data-action="click->modal#close" class="modal-cancel-btn">Cancel</button>
+      <button type="submit" class="modal-submit-btn">Create</button>
+    </div>
+  <% end %>
+<% end %>

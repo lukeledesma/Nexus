@@ -1,139 +1,136 @@
-# Alchemy
+# NEXUS
 
-Alchemy is a Rails-based Modbus/Uticor XML tag-list editor.
+Nexus is a Rails application for folder-based notes and task lists with filesystem-aware storage synchronization.
 
-Core flow:
-1. Organize PLC tag-list files in folders.
-2. Import XML (including `.xml.tar` and `.xml.tar.gz`) into an existing folder.
-3. Edit rows in the workspace table.
-4. Save (delta or full-save paths).
-5. Export XML with preloads rebuilt from current records.
+This README is a practical developer guide for building, running, and diagnosing the app.
 
-## Current V1 behavior
+## What Nexus Optimizes For
 
-- Brand/title is `ALCHEMY` (no superscript suffix).
-- Tab icon uses custom wizard favicon assets from `public/`.
-- Organizer supports folder creation, per-folder import, per-folder new file, rename, and delete.
-- Imports must target an existing folder (`parent_id` required).
-- Legacy root-level fallback `Imported` auto-folder is removed.
-- Data type popup includes bottom-row dynamic spacing behavior for last rows in workspace.
+- Simple content model: folders + notes + task lists.
+- Fast organizer UX for create, rename, and delete workflows.
+- Predictable backend behavior with clear operational diagnostics.
+- Safe production operation with explicit environment-driven configuration.
+
+## Architecture Snapshot
+
+- Rails app served by Puma.
+- Nginx reverse proxy for public traffic.
+- PostgreSQL for persistent data.
+- Filesystem storage root under `storage/tag_lists` for organizer synchronization.
+
+Request flow:
+1. Browser -> Nginx
+2. Nginx -> Puma (`127.0.0.1:3000`)
+3. Puma -> Rails controller/action
+4. Rails -> PostgreSQL + disk sync services
 
 ## Requirements
 
-- Ruby `3.2.3` (see `.ruby-version`)
+- Ruby 3.2.3
 - PostgreSQL
 - Bundler
 
-If `pg` install fails on macOS/Homebrew:
+## Setup (Local)
 
 ```bash
-gem install pg -- --with-pg-config=/opt/homebrew/bin/pg_config
-```
-
-## Setup
-
-```bash
-cd /path/to/Alchemy
 bundle install
 bin/rails db:create
 bin/rails db:migrate
 ```
 
-## Run
+Run server:
 
 ```bash
 bin/rails server
 ```
 
-Open `http://localhost:3000`.
+Open:
+
+`http://localhost:3000`
 
 ## Test
 
-Run full test suite:
+Run all tests:
 
 ```bash
 bin/rails test
 ```
 
-Focused integration/service checks used during recent updates:
+## Environment Variables
+
+Production DB config is Nexus-first with compatibility fallback.
+
+Preferred:
+- `NEXUS_DATABASE_PASSWORD`
+- `NEXUS_DB_NAME`
+- `NEXUS_DB_USER`
+
+Compatibility fallback still supported:
+- `ALCHEMY_DATABASE_PASSWORD`
+- Existing `alchemy_*` DB names if `NEXUS_*` names are not provided
+
+Rails credentials:
+- `RAILS_MASTER_KEY` must match `config/master.key`
+
+## Operations (Production)
+
+Health:
 
 ```bash
-bin/rails test test/integration/documents_import_test.rb test/services/tag_xml_exporter_test.rb
+sudo systemctl status puma
+sudo systemctl status nginx
+curl -I http://127.0.0.1
 ```
 
-## Feature summary
+Logs:
 
-### Home + Organizer
+```bash
+sudo journalctl -u puma -n 120 --no-pager
+sudo tail -n 120 /var/log/nginx/error.log
+```
 
-- Displays folders and file counts.
-- Per-folder actions:
-	- `Import` (AJAX multipart)
-	- `New` (scaffold file)
-	- `Rename`
-	- `Delete`
-- Unfiled file section appears when root files exist.
-- Organizer actions are no longer tied to a home lock toggle.
+Assets check:
 
-### Workspace
+```bash
+ASSET=$(curl -s http://127.0.0.1 | grep -o '/assets/application-[^"]*\.css' | head -1)
+echo "$ASSET"
+curl -I "http://127.0.0.1$ASSET"
+```
 
-- Editable columns:
-	- Tag Group
-	- Tag Name
-	- Data Type
-	- Address Start
-	- Data Length
-	- Scaling
-	- Read/Write
-- Toolbar includes add row, select mode, lock toggle, home, and export.
-- Save pipeline supports delta updates and full updates.
-- Validation and status highlighting are managed in Stimulus.
+If assets are missing:
 
-### Import
+```bash
+RAILS_ENV=production RAILS_MASTER_KEY="$(cat config/master.key)" NEXUS_DATABASE_PASSWORD="<db_password>" \
+  /home/luke/.rbenv/versions/3.2.3/bin/bundle exec rails assets:clobber
 
-- Accepts:
-	- `.xml`
-	- `.xml.tar`
-	- `.xml.tar.gz`
-- For tar archives, XML content is extracted and parsed.
-- Import requires destination folder (`parent_id`).
-- Filename collision resolution uses finder-style numeric suffixing.
+RAILS_ENV=production RAILS_MASTER_KEY="$(cat config/master.key)" NEXUS_DATABASE_PASSWORD="<db_password>" \
+  /home/luke/.rbenv/versions/3.2.3/bin/bundle exec rails assets:precompile
+```
 
-### Export
+## Diagnosability Principles
 
-- Exports current records as XML.
-- Rebuilds `Preload_Words_*` and `Preload_Bits_*` blocks.
-- Preload `DATALENGTH` rules:
-	- bits/coils use range delta to last address
-	- words/registers use range delta plus one
+- No disk sync at app boot (prevents unrelated task failures from boot side effects).
+- Disk sync errors include request ID and condensed backtrace in logs.
+- Routes and service wiring favor explicit behavior over hidden coupling.
 
-## Key files
+## Key Backend Files
 
-Backend:
 - `app/controllers/documents_controller.rb`
 - `app/models/document.rb`
-- `app/services/tag_xml.rb`
-- `app/services/document_storage_sync.rb`
+- `app/services/document_disk_loader.rb`
+- `app/services/document_storage_sync_lite.rb`
 
-Frontend:
+## Key Frontend Files
+
 - `app/views/documents/index.html.erb`
-- `app/views/documents/_organizer.html.erb`
 - `app/views/documents/edit.html.erb`
-- `app/javascript/controllers/tag_table_controller.js`
-- `app/javascript/controllers/data_type_picker_controller.js`
-- `app/javascript/controllers/recent_docs_controller.js`
+- `app/javascript/controllers/`
+- `app/assets/stylesheets/`
 
-Styling:
-- `app/assets/stylesheets/application.css`
+## Development Standard
 
-## Storage model
-
-- DB source of truth: `documents` table.
-- Disk mirror root: `storage/tag_lists`.
-- Folder/file renames, deletes, and writes sync through `DocumentStorageSync`.
-
-## Notes for maintainers
-
-- Keep `data-*` hooks stable when changing Stimulus-driven views.
-- Prefer small, behavior-preserving edits.
-- If touching import/export, validate with XML round-trip scenarios.
-- Use `docs/CODE_CATEGORIES.md` as a feature ownership/refactor map.
+When changing behavior:
+1. Keep backend and frontend changes cohesive.
+2. Preserve clear failure modes with useful logs.
+3. Update docs and command references in `/Users/luke/Projects/WEBSITE/docs`.
+4. Validate create/edit/delete and asset delivery in production-like mode.
