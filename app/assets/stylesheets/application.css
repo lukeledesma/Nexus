@@ -1661,9 +1661,9 @@ input.connection-inline {
   transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
 }
 
-.finder-item:hover {
-  background: rgba(59, 130, 246, 0.12);
-  border-color: rgba(59, 130, 246, 0.25);
+.finder-item:not(.is-active):not(.is-folder-selected):hover {
+  background: rgba(148, 163, 184, 0.1);
+  border-color: rgba(148, 163, 184, 0.28);
 }
 
 .finder-item.is-active {
@@ -1787,6 +1787,17 @@ input.connection-inline {
   border-bottom: 0;
   background: transparent;
   margin: 0;
+}
+
+.finder-item[data-folder-id].is-folder-selected + .folder-item-panel:not(.hidden) .finder-item-child:not(.is-active):hover {
+  background: rgba(148, 163, 184, 0.1);
+  border-left-color: rgba(148, 163, 184, 0.28);
+  border-right-color: rgba(148, 163, 184, 0.28);
+  border-top-color: rgba(148, 163, 184, 0.28);
+}
+
+.finder-item[data-folder-id].is-folder-selected + .folder-item-panel:not(.hidden) .finder-item-child:not(.is-active):hover:last-child {
+  border-bottom-color: rgba(148, 163, 184, 0.28);
 }
 
 .finder-item[data-folder-id].is-folder-selected + .folder-item-panel:not(.hidden) .finder-item-child:first-child {
