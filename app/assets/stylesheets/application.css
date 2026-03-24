@@ -2659,6 +2659,7 @@ input.connection-inline {
   --main-reveal-clip: inset(0 100% 0 0);
   background: transparent;
   border: none;
+  transition: opacity 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   pointer-events: none;
   z-index: 11;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
@@ -2676,7 +2677,7 @@ input.connection-inline {
   border: 1px solid var(--border);
   border-radius: inherit;
   clip-path: var(--main-reveal-clip);
-  transition: clip-path 0.125s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  transition: clip-path 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   pointer-events: none;
   z-index: 0;
 }
@@ -2700,7 +2701,7 @@ input.connection-inline {
   padding: 0;
   overflow: auto;
   clip-path: var(--main-reveal-clip);
-  transition: clip-path 0.125s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  transition: clip-path 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 .main-window .finder-app-frame {
