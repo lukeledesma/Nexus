@@ -60,10 +60,7 @@ Scope: Major changes only (kept under 10240 chars)
 - Main window shadow visibility pass:
   - Main pane shadow now matches organizer exactly (`0 8px 24px rgba(0,0,0,0.4)`) per final visual parity request.
   - Organizer remains above main (`z-index`) to keep seam layering behavior stable.
-- Main shadow rendering fix under seam reveal:
-  - Root cause: `clip-path` on `.main-window` was clipping the pane shadow itself, so matching values still looked weaker.
-  - Moved reveal clipping to inner paint/content layers (`.main-window::before` + `.main-window .window-content`) and kept the outer shell unclipped.
-  - Preserved left-to-right seam reveal timing while restoring full visible main-window depth.
+- Main shadow now reveals from the seam without clipping its depth.
 - Organizer/finder selection-collapse sync:
   - Collapsing a folder now closes the selected/open item if that item belongs to the collapsed folder.
   - Added finder close-request event handling so folder collapse can reliably close app-pane state.
@@ -74,6 +71,9 @@ Scope: Major changes only (kept under 10240 chars)
 - Conversion table content restore:
   - Restored missing backend/view wiring for the tool app in deploy repo (`/apps/conversion_chart` route + controller + show view).
   - Fixes empty "Content missing" pane state when selecting Conversion Table.
+- Main-window animation polish:
+  - Switching between already-open items now swaps content without replaying the seam reveal.
+  - Reveal masking now preserves the rounded right corners during open/close, removing the sharp ghost-corner artifact.
 
 ## Latest Major Changes (2026-03-22)
 - Organizer/Finder behavior now treats folders as inline tree toggles only; item selection is the only action that opens/collapses the Finder pane.

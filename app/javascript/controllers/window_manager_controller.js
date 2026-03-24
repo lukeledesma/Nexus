@@ -127,6 +127,8 @@ export default class extends Controller {
 
     // Initialize as closed: main window hidden
     this.mainWindow.classList.remove("visible")
+    this.mainWindow.classList.remove("is-opening")
+    this.mainWindow.classList.remove("is-closing")
     this.organizerWindow.classList.remove("pane-open")
   }
 
@@ -376,9 +378,31 @@ export default class extends Controller {
   onAppOpened(event) {
     this.openApp = event.detail?.appId
     if (this.mainWindow) {
+      const isAlreadyOpen =
+        this.mainWindow.classList.contains("visible") &&
+        !this.mainWindow.classList.contains("is-closing")
+
       // Cancel any pending close sequence
       clearTimeout(this._cornerResetTimer)
-      this.mainWindow.classList.add("visible")
+
+      if (isAlreadyOpen) {
+        this.mainWindow.classList.remove("is-opening")
+        this.mainWindow.classList.remove("is-closing")
+        this.mainWindow.classList.add("visible")
+        this.organizerWindow.classList.add("pane-open")
+        globalThis.setTimeout(() => this.enforceMainWindowMinimumWidth(), 0)
+        return
+      }
+
+      this.mainWindow.classList.remove("visible")
+      this.mainWindow.classList.remove("is-closing")
+      this.mainWindow.classList.add("is-opening")
+      globalThis.requestAnimationFrame(() => {
+        globalThis.requestAnimationFrame(() => {
+          this.mainWindow.classList.add("visible")
+          this.mainWindow.classList.remove("is-opening")
+        })
+      })
       this.organizerWindow.classList.add("pane-open")
       globalThis.setTimeout(() => this.enforceMainWindowMinimumWidth(), 0)
     }
@@ -394,16 +418,19 @@ export default class extends Controller {
   onAppClosed(event) {
     this.openApp = null
     if (this.mainWindow) {
-      // Step 1: close the window shell immediately (content remains visible during slide)
+      // Keep the shell visible during the close reveal so no transparent footprint appears.
+      this.mainWindow.classList.remove("is-opening")
+      this.mainWindow.classList.add("is-closing")
       this.mainWindow.classList.remove("visible")
 
-      // Step 2: after slide completes (0.125s), round organizer corners
+      // Step 2: after slide completes (0.25s), round organizer corners
       // and notify listeners that close is complete.
       clearTimeout(this._cornerResetTimer)
       this._cornerResetTimer = setTimeout(() => {
+        this.mainWindow.classList.remove("is-closing")
         this.organizerWindow.classList.remove("pane-open")
         window.dispatchEvent(new Event("app:closed:complete"))
-      }, 125)
+      }, 250)
     }
   }
 }
