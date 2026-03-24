@@ -71,6 +71,9 @@ Scope: Major changes only (kept under 10240 chars)
 - Main-pane minimum width stability during off-viewport resize:
   - Fixed resize clamp path that force-fit main window width inside viewport padding.
   - Main window now preserves `minMainWidth` even when dragged/resized partially outside browser bounds.
+- Conversion table content restore:
+  - Restored missing backend/view wiring for the tool app in deploy repo (`/apps/conversion_chart` route + controller + show view).
+  - Fixes empty "Content missing" pane state when selecting Conversion Table.
 
 ## Latest Major Changes (2026-03-22)
 - Organizer/Finder behavior now treats folders as inline tree toggles only; item selection is the only action that opens/collapses the Finder pane.
