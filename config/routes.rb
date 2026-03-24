@@ -9,6 +9,7 @@ Rails.application.routes.draw do
     resources :task_lists, only: %i[show create update destroy]
     get "calculator", to: "calculator#show"
     get "settings", to: "settings#show"
+    get "conversion_chart", to: "conversion_chart#show"
     get "all_notes",  to: "notes#index"
     get "all_tasks",  to: "task_lists#index"
   end
