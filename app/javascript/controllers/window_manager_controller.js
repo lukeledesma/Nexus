@@ -316,7 +316,9 @@ export default class extends Controller {
     left = Math.max(margin, left)
     top = Math.max(margin, top)
 
-    if (left + width > vw - margin) {
+    // Keep minimum-width behavior stable even when a pane is partially off-screen.
+    // Do not force-fit main width to viewport here; clamp via explicit minimums instead.
+    if (isOrganizer && left + width > vw - margin) {
       width = vw - margin - left
     }
     if (top + height > vh - margin) {
@@ -345,6 +347,8 @@ export default class extends Controller {
       this.mainWindow.style.width = mainWidth + "px"
       this.mainWindow.style.height = height + "px"
     } else {
+      width = Math.max(width, minMainWidth)
+
       // Main resizes: organizer width adjusts to keep seam
       this.mainWindow.style.left = left + "px"
       this.mainWindow.style.top = top + "px"

@@ -68,9 +68,9 @@ Scope: Major changes only (kept under 10240 chars)
   - Collapsing a folder now closes the selected/open item if that item belongs to the collapsed folder.
   - Added finder close-request event handling so folder collapse can reliably close app-pane state.
   - Selecting a Tool (e.g., Conversion Table) now collapses all folder panels for consistent organizer behavior.
-- Production parity restore (window manager shell):
-  - Synced missing window-manager foundation files into deploy repo: layout body controller, split-pane documents shell, organizer tools block, and `window_manager_controller.js`.
-  - Fixes runtime state where no Tools section appeared and drag/resize window interactions were unavailable after partial deploy.
+- Main-pane minimum width stability during off-viewport resize:
+  - Fixed resize clamp path that force-fit main window width inside viewport padding.
+  - Main window now preserves `minMainWidth` even when dragged/resized partially outside browser bounds.
 
 ## Latest Major Changes (2026-03-22)
 - Organizer/Finder behavior now treats folders as inline tree toggles only; item selection is the only action that opens/collapses the Finder pane.
