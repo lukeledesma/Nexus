@@ -92,6 +92,23 @@
     <% end %>
   </nav>
 
+  <%# Tools %>
+  <nav class="finder-nav-group" aria-label="Tools">
+    <div class="section-heading-row">
+      <h3>Tools</h3>
+    </div>
+
+    <button
+      type="button"
+      class="finder-item"
+      data-finder-target="item"
+      data-app-id="conversion_chart"
+      data-action="click->finder#toggle"
+    >
+      <span class="finder-item-label">Conversion Table</span>
+    </button>
+  </nav>
+
   <div
     class="modal-backdrop hidden"
     data-organizer-target="itemModalBackdrop"
