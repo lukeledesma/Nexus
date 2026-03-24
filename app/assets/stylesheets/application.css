@@ -14,6 +14,10 @@
   --surface: #1a1a1f;
   --surface-raised: #232329;
   --border: #2d2d35;
+  --scrollbar-thumb: #1d2233;
+  --scrollbar-thumb-hover: #1d2233;
+  --scrollbar-thumb-pane: #2a3246;
+  --scrollbar-thumb-pane-hover: #36415b;
   --text: #e4e4e7;
   --text-muted: #a1a1aa;
   --muted: #71717a;
@@ -280,7 +284,7 @@ a:hover { text-decoration: underline; }
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .home .organizer-header {
@@ -297,7 +301,7 @@ a:hover { text-decoration: underline; }
 
 @media (max-width: 720px) {
   .organizer-header {
-    margin-bottom: 0.79rem;
+    margin-bottom: 0.5rem;
   }
 }
 .file-input-hidden { position: absolute; width: 0.1px; height: 0.1px; opacity: 0; overflow: hidden; z-index: -1; }
@@ -1517,10 +1521,11 @@ input.connection-inline {
 }
 
 .auth-user-email {
-  max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 
 .auth-menu-icon {
@@ -1683,7 +1688,7 @@ input.connection-inline {
 
 .finder-item.is-active {
   background: rgba(59, 130, 246, 0.22);
-  border-color: rgba(59, 130, 246, 0.50);
+  border-color: rgba(59, 130, 246, 0.5);
   color: #f2f6ff;
 }
 
@@ -1869,8 +1874,9 @@ input.connection-inline {
 .finder-main-pane {
   position: fixed;
   top: 60px;
-  left: 360px;
-  right: 40px;
+  left: 340px;
+  right: auto;
+  width: 760px;
   height: calc(100vh - 140px);
   background: linear-gradient(180deg, #171823 0%, #11121a 100%);
   border: 1px solid var(--border);
@@ -1883,6 +1889,16 @@ input.connection-inline {
   transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
   pointer-events: auto;
   z-index: 15;
+  min-width: 420px;
+  min-height: 320px;
+}
+
+.finder-main-pane.open-left {
+  border-radius: 12px 0 0 12px;
+}
+
+.finder-main-pane.open-right {
+  border-radius: 0 12px 12px 0;
 }
 
 .finder-main-pane.opacity-0 {
@@ -1905,10 +1921,50 @@ input.connection-inline {
   height: 100%;
 }
 
+.pane-resize-handle {
+  position: absolute;
+  z-index: 30;
+  background: transparent;
+}
+
+.pane-resize-handle--top,
+.pane-resize-handle--bottom {
+  left: 14px;
+  right: 14px;
+  height: 12px;
+}
+
+.pane-resize-handle--left,
+.pane-resize-handle--right {
+  top: 14px;
+  bottom: 14px;
+  width: 12px;
+}
+
+.pane-resize-handle--top { top: -1px; cursor: ns-resize; }
+.pane-resize-handle--right { right: -1px; cursor: ew-resize; }
+.pane-resize-handle--bottom { bottom: -1px; cursor: ns-resize; }
+.pane-resize-handle--left { left: -1px; cursor: ew-resize; }
+
+.pane-resize-handle--top-left,
+.pane-resize-handle--top-right,
+.pane-resize-handle--bottom-left,
+.pane-resize-handle--bottom-right {
+  width: 14px;
+  height: 14px;
+}
+
+.pane-resize-handle--top-left { top: -1px; left: -1px; cursor: nwse-resize; }
+.pane-resize-handle--top-right { top: -1px; right: -1px; cursor: nesw-resize; }
+.pane-resize-handle--bottom-left { bottom: -1px; left: -1px; cursor: nesw-resize; }
+.pane-resize-handle--bottom-right { bottom: -1px; right: -1px; cursor: nwse-resize; }
+
 .app-surface {
+  --app-main-min-content-width: 432px;
   padding: 1.5rem 2rem;
   animation: app-surface-enter 0.2s ease;
   min-height: 100%;
+  container-type: inline-size;
 }
 
 .app-surface--note {
@@ -2398,12 +2454,295 @@ input.connection-inline {
   overflow: hidden;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────── */
+/* OS-Style Two-Window Manager                                                 */
+/* ─────────────────────────────────────────────────────────────────────────── */
+
+.window-manager-shell {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  z-index: 10;
+}
+
+/* OS Window Base — NO PADDING */
+.os-window {
+  position: absolute;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 10px;
+  background: #171822;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  border: none;
+  overflow: visible;
+  pointer-events: auto;
+  z-index: 10;
+}
+
+/* Window Content — ALL PADDING HERE */
+.window-content {
+  width: 100%;
+  height: 100%;
+  padding: 16px;
+  box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+}
+
+/* Title Bar (Minimal, invisible — cursor only) */
+.title-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 22px;
+  cursor: grab;
+  z-index: 50;
+  background: transparent;
+  pointer-events: auto;
+}
+
+.title-bar:active {
+  cursor: grabbing;
+}
+
+/* Resize Handles */
+.resize-handle {
+  position: absolute;
+  background: transparent;
+  z-index: 100;
+  pointer-events: auto;
+}
+
+/* Edge Handles */
+.resize-handle.left,
+.resize-handle.right {
+  width: 8px;
+  top: 0;
+  bottom: 0;
+}
+
+.resize-handle.top,
+.resize-handle.bottom {
+  height: 8px;
+  left: 0;
+  right: 0;
+}
+
+/* Corner Handles */
+.resize-handle.top-left,
+.resize-handle.top-right,
+.resize-handle.bottom-left,
+.resize-handle.bottom-right {
+  width: 12px;
+  height: 12px;
+}
+
+/* Positioning */
+.resize-handle.left { left: -4px; cursor: ew-resize; }
+.resize-handle.right { right: -4px; cursor: ew-resize; }
+.resize-handle.top { top: -4px; cursor: ns-resize; }
+.resize-handle.bottom { bottom: -4px; cursor: ns-resize; }
+
+.resize-handle.top-left { top: -4px; left: -4px; cursor: nwse-resize; }
+.resize-handle.top-right { top: -4px; right: -4px; cursor: nesw-resize; }
+.resize-handle.bottom-left { bottom: -4px; left: -4px; cursor: nesw-resize; }
+.resize-handle.bottom-right { bottom: -4px; right: -4px; cursor: nwse-resize; }
+
+/* Hide right-side organizer handles when main window is open (collapse state) */
+.window-manager-shell:has(> .main-window.visible) .organizer-window .resize-handle.top-right,
+.window-manager-shell:has(> .main-window.visible) .organizer-window .resize-handle.right,
+.window-manager-shell:has(> .main-window.visible) .organizer-window .resize-handle.bottom-right {
+  pointer-events: none;
+  display: none;
+}
+
+/* Organizer Window (Left) */
+.organizer-window {
+  display: flex;
+  flex-direction: column;
+  background: #13141c;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: border-radius 0.15s ease;
+  z-index: 12;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.organizer-window .finder-sidebar {
+  background: #13141c;
+}
+
+.organizer-window .window-content {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* NEXUS Header (Hidden — Organizer uses original theme) */
+.nexus-header {
+  display: none;
+}
+
+.organizer-window #organizer {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Organizer Header (Auth Menu at Top) */
+.organizer-header {
+  padding: 12px 16px;
+  margin-bottom: 0;
+  background: #151619;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  flex-shrink: 0;
+}
+
+.organizer-header .auth-menu-wrapper {
+  display: flex;
+  width: 100%;
+  position: relative;
+}
+
+.organizer-header .auth-menu-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 0;
+  background: #202125;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  min-width: 0;
+}
+
+.organizer-header .auth-menu-toggle:hover {
+  background: #25262b;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.organizer-header .auth-menu-dropdown {
+  background: #202125;
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.organizer-header .auth-user-email {
+  flex: 1;
+  text-align: left;
+  min-width: 0;
+  max-width: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Main Window (Right) — Strict slide reveal from seam using clip-path.
+   clip-path: inset(0 100% 0 0) = fully clipped from the right, revealing nothing.
+   clip-path: inset(0 0% 0 0)   = nothing clipped, full window visible.
+   This unmasks the window from left→right on open, right→left on close.
+   No translate, no opacity — window never paints over the organizer. */
+.main-window {
+  --main-reveal-clip: inset(0 100% 0 0);
+  background: transparent;
+  border: none;
+  transition: opacity 0.125s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  pointer-events: none;
+  z-index: 11;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  border-radius: 12px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  opacity: 0;
+}
+
+.main-window::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, #171823 0%, #11121a 100%);
+  border: 1px solid var(--border);
+  border-radius: inherit;
+  clip-path: var(--main-reveal-clip);
+  transition: clip-path 0.125s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.main-window.visible {
+  --main-reveal-clip: inset(0 0% 0 0);
+  pointer-events: auto;
+  opacity: 1;
+}
+
+/* Organizer right corners go flat when pane is open */
+.organizer-window.pane-open {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  transition: border-radius 0.15s ease;
+}
+
+.main-window .window-content {
+  position: relative;
+  z-index: 1;
+  padding: 0;
+  overflow: auto;
+  clip-path: var(--main-reveal-clip);
+  transition: clip-path 0.125s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.main-window .finder-app-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+}
+
+/* Seam Lock (Mechanical only) — Corners always rounded */
+/* No visual seam state changes; corners maintained at 12px */
+
+/* Animation Keyframes */
+@keyframes cc-light-sweep {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes app-title-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Launcher Window */
 .launcher-window {
   position: fixed;
   top: 60px;
   left: 40px;
-  width: 320px;
+  width: 300px;
   height: calc(100vh - 140px);
   background: rgba(20, 20, 20, 0.85);
   backdrop-filter: blur(12px);
@@ -2415,6 +2754,10 @@ input.connection-inline {
   flex-direction: column;
 }
 
+.launcher-window.is-dragging {
+  transition: none;
+}
+
 .launcher-window.animate-corners {
   transition: border-top-right-radius 0.4s ease, border-bottom-right-radius 0.4s ease;
 }
@@ -2424,10 +2767,28 @@ input.connection-inline {
   border-bottom-right-radius: 0;
 }
 
-.launcher-auth-header {
-  padding: 12px 16px;
+.launcher-brand-header {
+  padding: 14px 16px 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   flex-shrink: 0;
+  cursor: move;
+  user-select: none;
+}
+
+.launcher-brand-header .app-title {
+  margin: 0;
+  font-size: 2rem;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.launcher-auth-header {
+  padding: 10px 10px 2px 10px;
+  flex-shrink: 0;
+}
+
+.launcher-auth-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .launcher-auth-header .auth-menu-wrapper {
@@ -2482,6 +2843,11 @@ input.connection-inline {
   border-radius: 8px;
   z-index: 1000;
   min-width: 150px;
+}
+
+.launcher-auth-footer .auth-menu-dropdown {
+  top: auto;
+  bottom: calc(100% + 4px);
 }
 
 .launcher-auth-header .auth-menu-dropdown.active {
@@ -2582,19 +2948,231 @@ input.connection-inline {
   overflow-x: hidden;
 }
 
-#organizer::-webkit-scrollbar {
-  width: 8px;
+/* Subtle theme-matched scrollbars (Safari/Edge/Firefox) */
+.finder-main-pane,
+#organizer,
+.conversion-chart-view,
+.conversion-table-wrapper,
+.main-window .window-content,
+.finder-app-frame,
+.note-body-input {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
 }
 
-#organizer::-webkit-scrollbar-track {
+.finder-main-pane::-webkit-scrollbar,
+#organizer::-webkit-scrollbar,
+.conversion-chart-view::-webkit-scrollbar,
+.conversion-table-wrapper::-webkit-scrollbar,
+.main-window .window-content::-webkit-scrollbar,
+.finder-app-frame::-webkit-scrollbar,
+.note-body-input::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.finder-main-pane::-webkit-scrollbar-track,
+#organizer::-webkit-scrollbar-track,
+.conversion-chart-view::-webkit-scrollbar-track,
+.conversion-table-wrapper::-webkit-scrollbar-track,
+.main-window .window-content::-webkit-scrollbar-track,
+.finder-app-frame::-webkit-scrollbar-track,
+.note-body-input::-webkit-scrollbar-track {
   background: transparent;
+  margin-block: 10px;
 }
 
-#organizer::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
+.finder-main-pane::-webkit-scrollbar-thumb,
+#organizer::-webkit-scrollbar-thumb,
+.conversion-chart-view::-webkit-scrollbar-thumb,
+.conversion-table-wrapper::-webkit-scrollbar-thumb,
+.main-window .window-content::-webkit-scrollbar-thumb,
+.finder-app-frame::-webkit-scrollbar-thumb,
+.note-body-input::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  opacity: 0;
+  transition: opacity 520ms ease, background-color 160ms ease;
 }
 
-#organizer::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.15);
+.finder-main-pane.is-scrolling,
+#organizer.is-scrolling,
+.conversion-chart-view.is-scrolling,
+.conversion-table-wrapper.is-scrolling,
+.main-window .window-content.is-scrolling,
+.finder-app-frame.is-scrolling,
+.note-body-input.is-scrolling {
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+.finder-main-pane.is-scrolling::-webkit-scrollbar-thumb,
+#organizer.is-scrolling::-webkit-scrollbar-thumb,
+.conversion-chart-view.is-scrolling::-webkit-scrollbar-thumb,
+.conversion-table-wrapper.is-scrolling::-webkit-scrollbar-thumb,
+.main-window .window-content.is-scrolling::-webkit-scrollbar-thumb,
+.finder-app-frame.is-scrolling::-webkit-scrollbar-thumb,
+.note-body-input.is-scrolling::-webkit-scrollbar-thumb {
+  opacity: 0.94;
+}
+
+.finder-main-pane.is-scrolling::-webkit-scrollbar-thumb:hover,
+#organizer.is-scrolling::-webkit-scrollbar-thumb:hover,
+.conversion-chart-view.is-scrolling::-webkit-scrollbar-thumb:hover,
+.conversion-table-wrapper.is-scrolling::-webkit-scrollbar-thumb:hover,
+.main-window .window-content.is-scrolling::-webkit-scrollbar-thumb:hover,
+.finder-app-frame.is-scrolling::-webkit-scrollbar-thumb:hover,
+.note-body-input.is-scrolling::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+/* Task pane + converter use the restored tinted scrollbar tone. */
+.conversion-table-wrapper::-webkit-scrollbar-thumb,
+.main-window .window-content::-webkit-scrollbar-thumb,
+.finder-app-frame::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb-pane);
+}
+
+.conversion-table-wrapper.is-scrolling,
+.main-window .window-content.is-scrolling,
+.finder-app-frame.is-scrolling {
+  scrollbar-color: var(--scrollbar-thumb-pane) transparent;
+}
+
+.conversion-table-wrapper.is-scrolling::-webkit-scrollbar-thumb:hover,
+.main-window .window-content.is-scrolling::-webkit-scrollbar-thumb:hover,
+.finder-app-frame.is-scrolling::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-pane-hover);
+}
+
+/* Notes uses a slightly lighter scrollbar tone by request. */
+.note-body-input::-webkit-scrollbar-thumb {
+  background: #242730;
+}
+
+.note-body-input.is-scrolling {
+  scrollbar-color: #242730 transparent;
+}
+
+.note-body-input.is-scrolling::-webkit-scrollbar-thumb,
+.note-body-input.is-scrolling::-webkit-scrollbar-thumb:hover {
+  background: #242730;
+}
+
+/* Conversion Chart */
+.conversion-chart-view {
+  --conversion-card-min-width: 320px;
+  --conversion-grid-gap: 16px;
+  --conversion-stack-breakpoint: 760px;
+  padding: 1.5rem;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.conversion-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(var(--conversion-card-min-width), 1fr));
+  gap: var(--conversion-grid-gap);
+}
+
+.conversion-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+}
+
+.conversion-card-title {
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--border);
+}
+
+.conversion-table-wrapper {
+  overflow-x: auto;
+  padding: 0;
+}
+
+.conversion-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  color: var(--text);
+  table-layout: fixed;
+}
+
+.conversion-table thead {
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(45, 45, 53, 0.4);
+  position: sticky;
+  top: 0;
+}
+
+.conversion-table th {
+  padding: 0.6rem 0.5rem;
+  text-align: center;
+  font-weight: 600;
+  color: var(--text);
+  border-right: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.conversion-table th:last-child {
+  border-right: none;
+}
+
+.conversion-table tbody tr {
+  border-bottom: 1px solid rgba(45, 45, 53, 0.4);
+  transition: background-color 0.16s ease;
+}
+
+.conversion-table tbody tr:hover {
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.conversion-table td {
+  padding: 0.5rem 0.5rem;
+  text-align: center;
+  border-right: 1px solid rgba(45, 45, 53, 0.3);
+}
+
+.conversion-table th,
+.conversion-table td {
+  width: 33.333%;
+}
+
+.conversion-table td:last-child {
+  border-right: none;
+}
+
+.conversion-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.conversion-table--metric {
+  table-layout: fixed;
+}
+
+.conversion-table--metric th:first-child,
+.conversion-table--metric td:first-child {
+  width: 50%;
+}
+
+.conversion-table--metric th:last-child,
+.conversion-table--metric td:last-child {
+  width: 50%;
+}
+
+@container (max-width: 760px) {
+  .conversion-grid {
+    grid-template-columns: 1fr;
+  }
 }

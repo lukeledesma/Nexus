@@ -2,16 +2,32 @@ import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
 
 export default class extends Controller {
-  static targets = ["window", "mainPane", "sidebar", "item"]
+  static targets = ["sidebar", "item"]
 
   connect() {
     this.openApp = null
     this.currentFolder = null
     this.transitionMs = 280
-    this.expandTimer = null
-    this.closeTimer = null
-    this.closeEndHandler = null
-    this.setLauncherAttached(false)
+    this.scrollFadeDelayMs = 1100
+    this.scrollRevealTimers = new Map()
+
+    this.boundHandleScrollActivity = this.handleScrollActivity.bind(this)
+    this.boundCloseComplete = this.handleCloseComplete.bind(this)
+    this.boundRequestClose = this.handleRequestClose.bind(this)
+    document.addEventListener("scroll", this.boundHandleScrollActivity, true)
+    window.addEventListener("app:closed:complete", this.boundCloseComplete)
+    window.addEventListener("finder:request-close", this.boundRequestClose)
+  }
+
+  disconnect() {
+    document.removeEventListener("scroll", this.boundHandleScrollActivity, true)
+    window.removeEventListener("app:closed:complete", this.boundCloseComplete)
+    window.removeEventListener("finder:request-close", this.boundRequestClose)
+    this.scrollRevealTimers.forEach((timerId, element) => {
+      window.clearTimeout(timerId)
+      element.classList.remove("is-scrolling")
+    })
+    this.scrollRevealTimers.clear()
   }
 
   // Called when a folder row is clicked — no expansion, just tracks selection.
@@ -20,35 +36,59 @@ export default class extends Controller {
   }
 
   toggle(event) {
-    const appId = event.currentTarget.dataset.appId
+    const item = event.currentTarget
+    const appId = item.dataset.appId
 
     if (!appId) return
 
     if (this.openApp === appId) {
       this.close()
     } else {
-      this.open(appId)
+      const isToolSelection = !item.closest(".folder-item-panel")
+      this.open(appId, { collapseFolders: isToolSelection })
     }
   }
 
-  open(appId) {
+  open(appId, { collapseFolders = false } = {}) {
     this.openApp = appId
-    this.expand()
     this.highlight(appId)
     this.loadApp(appId)
+    // Dispatch event for window manager to show main window
+    window.dispatchEvent(new CustomEvent("app:opened", { detail: { appId } }))
+
+    if (collapseFolders) {
+      window.dispatchEvent(new Event("organizer:collapse-folders"))
+    }
   }
 
   close() {
     this.openApp = null
     this.highlight(null)
-    this.collapse()
-    this.clearApp()
+    // Dispatch event for window manager to hide main window
+    window.dispatchEvent(new Event("app:closed"))
+  }
+
+  handleCloseComplete() {
+    // Only clear when nothing was reopened during the close animation.
+    if (!this.openApp) this.clearApp()
+  }
+
+  handleRequestClose(event) {
+    const requestedAppId = event.detail?.appId
+    if (!this.openApp) return
+    if (requestedAppId && requestedAppId !== this.openApp) return
+    this.close()
   }
 
   loadApp(appId) {
-    this.mainPaneTarget.classList.add("is-switching")
-    Turbo.visit(`/apps/${appId}`, { frame: "app-pane" })
-    window.setTimeout(() => this.mainPaneTarget.classList.remove("is-switching"), this.transitionMs)
+    const frame = document.getElementById("app-pane")
+    if (frame) {
+      frame.classList.add("is-switching")
+      Turbo.visit(`/apps/${appId}`, { frame: "app-pane" })
+      window.setTimeout(() => {
+        if (frame) frame.classList.remove("is-switching")
+      }, this.transitionMs)
+    }
   }
 
   clearApp() {
@@ -56,95 +96,35 @@ export default class extends Controller {
     if (frame) frame.innerHTML = ""
   }
 
-  expand() {
-    if (this.expandTimer) {
-      window.clearTimeout(this.expandTimer)
-      this.expandTimer = null
-    }
-
-    if (this.closeTimer) {
-      window.clearTimeout(this.closeTimer)
-      this.closeTimer = null
-    }
-
-    this.removeCloseEndListener()
-
-    const launcher = document.getElementById("launcher-window")
-    if (launcher) launcher.classList.remove("animate-corners")
-
-    // Open immediately; no corner-delay on expand.
-    this.setLauncherAttached(true)
-
-    this.windowTarget.classList.remove("collapsed")
-    this.windowTarget.classList.add("expanded")
-
-    this.mainPaneTarget.classList.remove("hidden")
-    requestAnimationFrame(() => this.mainPaneTarget.classList.remove("opacity-0"))
-  }
-
-  collapse() {
-    if (this.expandTimer) {
-      window.clearTimeout(this.expandTimer)
-      this.expandTimer = null
-    }
-
-    if (this.closeTimer) {
-      window.clearTimeout(this.closeTimer)
-      this.closeTimer = null
-    }
-
-    this.removeCloseEndListener()
-
-    this.windowTarget.classList.remove("expanded")
-    this.windowTarget.classList.add("collapsed")
-
-    this.mainPaneTarget.classList.add("opacity-0")
-
-    const finishClose = () => {
-      if (!this.openApp) {
-        this.mainPaneTarget.classList.add("hidden")
-
-        const launcher = document.getElementById("launcher-window")
-        if (launcher) launcher.classList.add("animate-corners")
-        this.setLauncherAttached(false)
-      }
-
-      this.removeCloseEndListener()
-
-      if (this.closeTimer) {
-        window.clearTimeout(this.closeTimer)
-        this.closeTimer = null
-      }
-    }
-
-    this.closeEndHandler = (event) => {
-      if (event.target !== this.mainPaneTarget) return
-      if (event.propertyName !== "transform") return
-      finishClose()
-    }
-
-    this.mainPaneTarget.addEventListener("transitionend", this.closeEndHandler)
-
-    // Fallback in case transitionend does not fire (browser edge-case).
-    this.closeTimer = window.setTimeout(finishClose, this.transitionMs + 120)
-  }
-
-  removeCloseEndListener() {
-    if (!this.closeEndHandler) return
-    this.mainPaneTarget.removeEventListener("transitionend", this.closeEndHandler)
-    this.closeEndHandler = null
-  }
-
-  setLauncherAttached(attached) {
-    const launcher = document.getElementById("launcher-window")
-    if (!launcher) return
-
-    launcher.classList.toggle("has-open-pane", attached)
-  }
-
   highlight(activeId) {
     this.itemTargets.forEach((item) => {
       item.classList.toggle("is-active", item.dataset.appId === activeId)
     })
+  }
+
+  handleScrollActivity(event) {
+    const element = event.target
+    if (!(element instanceof Element)) return
+
+    const isTracked =
+      element.matches("#organizer") ||
+      element.matches(".window-content") ||
+      element.matches(".finder-app-frame") ||
+      element.matches(".conversion-table-wrapper") ||
+      element.matches(".note-body-input")
+
+    if (!isTracked) return
+
+    element.classList.add("is-scrolling")
+
+    const existingTimer = this.scrollRevealTimers.get(element)
+    if (existingTimer) window.clearTimeout(existingTimer)
+
+    const timerId = window.setTimeout(() => {
+      element.classList.remove("is-scrolling")
+      this.scrollRevealTimers.delete(element)
+    }, this.scrollFadeDelayMs)
+
+    this.scrollRevealTimers.set(element, timerId)
   }
 }

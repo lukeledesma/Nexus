@@ -10,6 +10,9 @@ export default class extends Controller {
   connect() {
     this.pendingFolderId = null
     this.draftRow = null
+    this.boundCollapseFolders = this.handleCollapseFolders.bind(this)
+
+    window.addEventListener("organizer:collapse-folders", this.boundCollapseFolders)
 
     this.element.querySelectorAll(".folder-item-panel").forEach((panel) => {
       if (panel.classList.contains("hidden")) {
@@ -19,6 +22,19 @@ export default class extends Controller {
         panel.classList.add("is-open")
         panel.style.maxHeight = "none"
       }
+    })
+  }
+
+  disconnect() {
+    window.removeEventListener("organizer:collapse-folders", this.boundCollapseFolders)
+  }
+
+  handleCollapseFolders() {
+    this.element.querySelectorAll(".folder-item-panel").forEach((panel) => {
+      this.#animateClosePanel(panel)
+    })
+    this.element.querySelectorAll(".finder-item[data-folder-id]").forEach((folderButton) => {
+      folderButton.classList.remove("is-folder-selected")
     })
   }
 
@@ -483,6 +499,17 @@ export default class extends Controller {
 
   #animateClosePanel(panel) {
     if (!panel.classList.contains("is-open") && panel.classList.contains("hidden")) return
+
+    const activeItem = panel.querySelector(".finder-item-child.is-active")
+    if (activeItem?.dataset?.appId) {
+      window.dispatchEvent(new CustomEvent("finder:request-close", {
+        detail: {
+          appId: activeItem.dataset.appId,
+          folderId: panel.dataset.folderPanelId,
+          reason: "folder-collapsed"
+        }
+      }))
+    }
 
     const startHeight = panel.scrollHeight
     panel.style.overflow = "hidden"
