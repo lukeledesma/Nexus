@@ -95,6 +95,8 @@ module Apps
         text = task["text"].to_s.strip
         next if text.empty?
 
+        note = task["note"].to_s
+
         subtasks = Array(task["subtasks"]).filter_map do |subtask|
           next unless subtask.is_a?(Hash)
 
@@ -103,7 +105,8 @@ module Apps
 
           {
             "text" => subtask_text,
-            "checked" => ActiveModel::Type::Boolean.new.cast(subtask["checked"])
+            "checked" => ActiveModel::Type::Boolean.new.cast(subtask["checked"]),
+            "note" => subtask["note"].to_s
           }
         end
 
@@ -113,6 +116,7 @@ module Apps
         {
           "text" => text,
           "checked" => checked,
+          "note" => note,
           "subtasks" => subtasks
         }
       end
@@ -126,11 +130,13 @@ module Apps
           text = task.to_s.strip
           next if text.empty?
 
-          { "text" => text, "checked" => false, "subtasks" => [] }
+          { "text" => text, "checked" => false, "note" => "", "subtasks" => [] }
         elsif task.respond_to?(:to_h)
           hash = task.to_h
           text = hash["text"].to_s.strip
           next if text.empty?
+
+          note = hash["note"].to_s
 
           subtasks = Array(hash["subtasks"]).filter_map do |subtask|
             next unless subtask.respond_to?(:to_h)
@@ -141,7 +147,8 @@ module Apps
 
             {
               "text" => subtask_text,
-              "checked" => ActiveModel::Type::Boolean.new.cast(subtask_hash["checked"])
+              "checked" => ActiveModel::Type::Boolean.new.cast(subtask_hash["checked"]),
+              "note" => subtask_hash["note"].to_s
             }
           end
 
@@ -151,6 +158,7 @@ module Apps
           {
             "text" => text,
             "checked" => checked,
+            "note" => note,
             "subtasks" => subtasks
           }
         end

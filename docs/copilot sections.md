@@ -69,11 +69,14 @@ Scope: Major changes only (kept under 10240 chars)
   - Fixed resize clamp path that force-fit main window width inside viewport padding.
   - Main window now preserves `minMainWidth` even when dragged/resized partially outside browser bounds.
 - Conversion table content restore:
-  - Restored missing backend/view wiring for the tool app in deploy repo (`/apps/conversion_chart` route + controller + show view).
-  - Fixes empty "Content missing" pane state when selecting Conversion Table.
+  - Restored `/apps/conversion_chart` route/controller/view in deploy repo to fix empty Content missing state.
 - Main-window animation polish:
   - Switching between already-open items now swaps content without replaying the seam reveal.
   - Reveal masking now preserves the rounded right corners during open/close, removing the sharp ghost-corner artifact.
+- Task list inline notes:
+  - Added per-row `✏` notes for tasks/subtasks with one-note-open-at-a-time behavior, stack-aware corners, and row-matched darker background while preserving auto-grow + payload persistence.
+  - Notes now slide open/closed like subtask rows, and adding a new subtask force-closes any open note first.
+  - Note close timing now follows the real transition end and is tuned to feel closer to subtask collapse speed.
 
 ## Latest Major Changes (2026-03-22)
 - Organizer/Finder behavior now treats folders as inline tree toggles only; item selection is the only action that opens/collapses the Finder pane.
