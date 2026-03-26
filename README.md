@@ -2,7 +2,13 @@
 
 Nexus is a Rails application for folder-based notes and task lists with filesystem-aware storage synchronization.
 
-This README is a practical developer guide for building, running, and diagnosing the app.
+This repository is the local source of truth for development and deployment.
+
+Primary paths:
+- Local repo: `/Users/luke/Projects/WEBSITE/Nexus_Dev`
+- Command shortcuts: `/Users/luke/Projects/WEBSITE/docs/COMMANDS.md`
+- Deploy scripts: `/Users/luke/Projects/WEBSITE/deploy/`
+- Technical docs: `docs/UI_GUIDE.md` and `docs/DEV_GUIDE.md`
 
 ## What Nexus Optimizes For
 
@@ -16,7 +22,7 @@ This README is a practical developer guide for building, running, and diagnosing
 - Rails app served by Puma.
 - Nginx reverse proxy for public traffic.
 - PostgreSQL for persistent data.
-- Filesystem storage root under `storage/tag_lists` for organizer synchronization.
+- Filesystem storage root under `storage/item_lists` for organizer synchronization.
 
 Request flow:
 1. Browser -> Nginx
@@ -41,6 +47,7 @@ bin/rails db:migrate
 Run server:
 
 ```bash
+cd /Users/luke/Projects/WEBSITE/Nexus_Dev
 bin/rails server
 ```
 
@@ -68,12 +75,20 @@ Rails credentials:
 
 ## Operations (Production)
 
+Deploy from the cleaned workflow:
+
+```bash
+/Users/luke/Projects/WEBSITE/deploy/deploy_github.sh
+/Users/luke/Projects/WEBSITE/deploy/deploy_server.sh
+```
+
 Health:
 
 ```bash
 sudo systemctl status puma
 sudo systemctl status nginx
 curl -I http://127.0.0.1
+curl -I http://172.232.163.176
 ```
 
 Logs:
@@ -81,6 +96,7 @@ Logs:
 ```bash
 sudo journalctl -u puma -n 120 --no-pager
 sudo tail -n 120 /var/log/nginx/error.log
+tail -n 120 /home/luke/apps/nexus/log/puma.log
 ```
 
 Assets check:
@@ -110,16 +126,19 @@ sudo systemctl restart puma
 ## Key Backend Files
 
 - `app/controllers/documents_controller.rb`
-- `app/models/document.rb`
-- `app/services/document_disk_loader.rb`
-- `app/services/document_storage_sync_lite.rb`
+- `app/models/folder.rb`
+- `app/models/item.rb`
+- `app/services/item_storage_sync_lite.rb`
+- `app/controllers/apps/notes_controller.rb`
+- `app/controllers/apps/task_lists_controller.rb`
 
 ## Key Frontend Files
 
-- `app/views/documents/index.html.erb`
-- `app/views/documents/edit.html.erb`
+- `app/views/organizer/_sidebar.html.erb`
+- `app/views/apps/notes/show.html.erb`
+- `app/views/apps/task_lists/show.html.erb`
 - `app/javascript/controllers/`
-- `app/assets/stylesheets/`
+- `app/assets/stylesheets/application.css`
 
 ## Development Standard
 
@@ -128,3 +147,4 @@ When changing behavior:
 2. Preserve clear failure modes with useful logs.
 3. Update docs and command references in `/Users/luke/Projects/WEBSITE/docs`.
 4. Validate create/edit/delete and asset delivery in production-like mode.
+5. Treat `Nexus_Dev` as the only app root.
