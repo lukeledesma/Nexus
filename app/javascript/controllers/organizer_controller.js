@@ -84,22 +84,16 @@ export default class extends Controller {
       <input
         type="text"
         class="finder-rename-input finder-draft-name"
-        placeholder="New item name..."
-        aria-label="New item name"
+        placeholder="New task list name..."
+        aria-label="New task list name"
       >
-      <select class="finder-item-type-select" aria-label="Select item type">
-        <option value="">Select type...</option>
-        <option value="note">Note</option>
-        <option value="task_list">Task List</option>
-      </select>
     `
 
     panel.appendChild(draft)
     this.draftRow = draft
 
     const input = draft.querySelector(".finder-draft-name")
-    const select = draft.querySelector(".finder-item-type-select")
-    if (!input || !select) return
+    if (!input) return
 
     input.focus()
     input.select()
@@ -117,16 +111,12 @@ export default class extends Controller {
     const submitDraft = async () => {
       if (draft.dataset.creating === "true") return
 
-      const itemType = select.value
-      if (itemType !== "note" && itemType !== "task_list") return
-
       draft.dataset.creating = "true"
       input.disabled = true
-      select.disabled = true
 
-      const defaultName = itemType === "task_list" ? "Untitled Task List" : "Untitled Note"
+      const defaultName = "Untitled Task List"
       const name = input.value.trim() || defaultName
-      const path = itemType === "task_list" ? "/apps/task_lists" : "/apps/notes"
+      const path = "/apps/task_lists"
 
       const created = await this.#createItem(path, folderId, name, { autoOpen: false })
       if (created) {
@@ -134,12 +124,10 @@ export default class extends Controller {
       } else {
         draft.dataset.creating = "false"
         input.disabled = false
-        select.disabled = false
         input.focus()
       }
     }
 
-    select.addEventListener("change", submitDraft)
     input.addEventListener("keydown", (keyEvent) => {
       if (keyEvent.key === "Enter") {
         keyEvent.preventDefault()
@@ -155,7 +143,6 @@ export default class extends Controller {
       window.setTimeout(() => {
         if (!this.draftRow || this.draftRow !== draft) return
         if (draft.dataset.creating === "true") return
-        if (select.value) return
         if (!input.value.trim()) cancelDraft()
       }, 80)
     })
@@ -164,12 +151,13 @@ export default class extends Controller {
   chooseItemType(event) {
     event.preventDefault()
     const selectedType = event.currentTarget.dataset.itemType
+    if (selectedType !== "task_list") return
     this.itemTypeInputTarget.value = selectedType
     this.itemTypeButtonTargets.forEach((button) => {
       button.classList.toggle("is-selected", button.dataset.itemType === selectedType)
     })
 
-    const defaultName = selectedType === "task_list" ? "Untitled Task List" : "Untitled Note"
+    const defaultName = "Untitled Task List"
     if (!this.itemNameInputTarget.value.trim()) this.itemNameInputTarget.value = defaultName
 
     this.itemNameInputTarget.disabled = false
@@ -200,14 +188,14 @@ export default class extends Controller {
     if (!this.pendingFolderId) return
 
     const itemType = this.itemTypeInputTarget.value
-    if (itemType !== "note" && itemType !== "task_list") {
-      alert("Choose Note or Task List first.")
+    if (itemType !== "task_list") {
+      alert("Choose Task List first.")
       return
     }
 
-    const defaultName = itemType === "task_list" ? "Untitled Task List" : "Untitled Note"
+    const defaultName = "Untitled Task List"
     const name = this.itemNameInputTarget.value.trim() || defaultName
-    const path = itemType === "task_list" ? "/apps/task_lists" : "/apps/notes"
+    const path = "/apps/task_lists"
 
     const created = await this.#createItem(path, this.pendingFolderId, name)
     if (created) this.#closeItemModal()
@@ -394,7 +382,7 @@ export default class extends Controller {
     this.itemTypeInputTarget.value = ""
     this.itemNameInputTarget.value = ""
     this.itemNameInputTarget.disabled = true
-    this.itemNameInputTarget.placeholder = "Choose a type first"
+    this.itemNameInputTarget.placeholder = "Task list name"
     this.itemCreateSubmitTarget.disabled = true
     this.itemTypeButtonTargets.forEach((button) => button.classList.remove("is-selected"))
   }
