@@ -5,11 +5,11 @@
     <h1 class="app-title">NEXUS</h1>
     <p class="login-subtitle">Sign in to your workspace</p>
 
-    <% if flash[:alert].present? %>
-      <p class="login-error"><%= flash[:alert] %></p>
+    <% if @login_error.present? || flash[:alert].present? %>
+      <p class="login-error"><%= @login_error.presence || flash[:alert] %></p>
     <% end %>
 
-    <%= form_with url: login_path, method: :post, local: true, class: "login-form" do %>
+    <%= form_with url: login_path, method: :post, local: true, data: { turbo: false }, class: "login-form" do %>
       <div class="form-group">
         <%= email_field_tag :email, params[:email], required: true, autofocus: true, autocomplete: "email", placeholder: "Email", class: "form-input" %>
       </div>
