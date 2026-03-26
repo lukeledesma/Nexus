@@ -133,6 +133,25 @@ export default class extends Controller {
   }
 
   // ════════════════════════════════════════════════════════════════════════════
+  // Helper: Extract coordinates from mouse or touch event
+  // ════════════════════════════════════════════════════════════════════════════
+
+  getEventCoordinates(event) {
+    if (event.touches) {
+      // Touch event
+      return {
+        x: event.touches[0].clientX,
+        y: event.touches[0].clientY
+      }
+    }
+    // Mouse event
+    return {
+      x: event.clientX,
+      y: event.clientY
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
   // Drag Logic
   // ════════════════════════════════════════════════════════════════════════════
 
@@ -141,31 +160,42 @@ export default class extends Controller {
     const win = titleBar.closest(".os-window")
 
     if (!win) return
-    if (event.button !== 0) return
+
+    // Skip if mouse event and it's not the primary button
+    if (event.button !== undefined && event.button !== 0) return
 
     event.preventDefault()
     event.stopPropagation()
 
     // Always anchor on organizer — both windows move as one fused unit
     const orgRect = this.organizerWindow.getBoundingClientRect()
+    const coords = this.getEventCoordinates(event)
 
     this.activeDrag = {
-      startX: event.clientX,
-      startY: event.clientY,
+      startX: coords.x,
+      startY: coords.y,
       orgStartLeft: orgRect.left,
       orgStartTop: orgRect.top
     }
 
     document.addEventListener("mousemove", this.boundDragMove)
     document.addEventListener("mouseup", this.boundDragEnd)
+    document.addEventListener("touchmove", this.boundDragMove, { passive: false })
+    document.addEventListener("touchend", this.boundDragEnd)
   }
 
   handleDragMove(event) {
     if (!this.activeDrag) return
 
+    // Prevent scrolling while dragging on touch devices
+    if (event.touches) {
+      event.preventDefault()
+    }
+
     const d = this.activeDrag
-    const deltaX = event.clientX - d.startX
-    const deltaY = event.clientY - d.startY
+    const coords = this.getEventCoordinates(event)
+    const deltaX = coords.x - d.startX
+    const deltaY = coords.y - d.startY
 
     const margin = this.viewportMarginPx
     const vw = window.innerWidth
@@ -191,6 +221,8 @@ export default class extends Controller {
     this.activeDrag = null
     document.removeEventListener("mousemove", this.boundDragMove)
     document.removeEventListener("mouseup", this.boundDragEnd)
+    document.removeEventListener("touchmove", this.boundDragMove)
+    document.removeEventListener("touchend", this.boundDragEnd)
   }
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -201,7 +233,10 @@ export default class extends Controller {
     const handle = event.currentTarget
     const window = handle.closest(".os-window")
 
-    if (!window || event.button !== 0) return
+    if (!window) return
+
+    // Skip if mouse event and it's not the primary button
+    if (event.button !== undefined && event.button !== 0) return
 
     // Determine edge from handle classes
     const edge = this.getEdgeFromHandle(handle)
@@ -211,12 +246,13 @@ export default class extends Controller {
     event.stopPropagation()
 
     const rect = window.getBoundingClientRect()
+    const coords = this.getEventCoordinates(event)
 
     this.activeResize = {
       window,
       edge,
-      startX: event.clientX,
-      startY: event.clientY,
+      startX: coords.x,
+      startY: coords.y,
       startLeft: rect.left,
       startTop: rect.top,
       startWidth: rect.width,
@@ -227,6 +263,8 @@ export default class extends Controller {
 
     document.addEventListener("mousemove", this.boundResizeMove)
     document.addEventListener("mouseup", this.boundResizeEnd)
+    document.addEventListener("touchmove", this.boundResizeMove, { passive: false })
+    document.addEventListener("touchend", this.boundResizeEnd)
   }
 
   getEdgeFromHandle(handle) {
@@ -245,9 +283,15 @@ export default class extends Controller {
   handleResizeMove(event) {
     if (!this.activeResize) return
 
+    // Prevent scrolling while resizing on touch devices
+    if (event.touches) {
+      event.preventDefault()
+    }
+
     const r = this.activeResize
-    const deltaX = event.clientX - r.startX
-    const deltaY = event.clientY - r.startY
+    const coords = this.getEventCoordinates(event)
+    const deltaX = coords.x - r.startX
+    const deltaY = coords.y - r.startY
 
     let newWidth = r.startWidth
     let newHeight = r.startHeight
@@ -369,6 +413,8 @@ export default class extends Controller {
     this.activeResize = null
     document.removeEventListener("mousemove", this.boundResizeMove)
     document.removeEventListener("mouseup", this.boundResizeEnd)
+    document.removeEventListener("touchmove", this.boundResizeMove)
+    document.removeEventListener("touchend", this.boundResizeEnd)
   }
 
   // ════════════════════════════════════════════════════════════════════════════

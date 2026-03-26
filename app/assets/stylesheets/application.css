@@ -324,6 +324,15 @@ a:hover { text-decoration: underline; }
 .recent-docs li.doc-row:focus { background: var(--surface-raised); }
 .recent-docs li.folder-item:focus { background: transparent; }
 .organizer .organizer-list { overflow: visible; }
+
+/* On touch devices, disable focus styling so single tap opens/closes folders */
+@media (hover: none) {
+  .recent-docs li.doc-row:focus,
+  .recent-docs li.folder-item:focus {
+    background: transparent;
+    outline: none;
+  }
+}
 .folder-item { overflow: hidden; }
 .folder-toggle {
   width: 100%;
@@ -334,6 +343,7 @@ a:hover { text-decoration: underline; }
   padding: 0.54rem 0;
   text-align: left;
   cursor: pointer;
+  touch-action: manipulation;
 }
 .folder-row,
 .plc-header-row {
@@ -382,7 +392,8 @@ a:hover { text-decoration: underline; }
 .folder-toggle.folder-expanded {
   background: var(--surface-raised);
 }
-.folder-toggle:hover {
+/* Only highlight on hover when folder is expanded */
+.folder-toggle.folder-expanded:hover {
   background: var(--surface-raised);
 }
 .folder-dropdown {
@@ -682,6 +693,7 @@ a:hover { text-decoration: underline; }
   padding: 0.5rem 0.7rem;
   margin: 0 !important;
   cursor: pointer;
+  touch-action: manipulation;
   transition: background-color 120ms ease, border-color 120ms ease;
 }
 
@@ -794,87 +806,6 @@ a:hover { text-decoration: underline; }
   background: rgba(255, 255, 255, 0.1);
 }
 
-.row-note-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  border-radius: 4px;
-  font-size: 0.78rem;
-  line-height: 1;
-  padding: 0.15rem 0.28rem;
-  margin-left: 0.24rem;
-  cursor: pointer;
-  transition: color 0.12s ease, background 0.12s ease;
-}
-
-.row-note-toggle:hover,
-.row-note-toggle:focus-visible {
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.task-note-row {
-  list-style: none;
-  border: 1px solid var(--border);
-  border-top: none;
-  border-radius: 0;
-  margin: 0 !important;
-  padding: 12px;
-  background: transparent;
-}
-
-.task-note-row.task-note-row--subtask {
-  background: transparent;
-}
-
-.task-note-row--tail {
-  border-bottom-left-radius: 8px;
-  border-bottom-right-radius: 8px;
-}
-
-.task-note-row--joined {
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-}
-
-.task-note-row.is-collapsed {
-  display: none;
-}
-
-.task-note-wrap {
-  padding-left: 0;
-}
-
-.task-note-input {
-  display: block;
-  box-sizing: border-box;
-  width: 100%;
-  min-height: 2.1rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: rgba(20, 21, 31, 0.6);
-  color: var(--muted);
-  font: inherit;
-  font-size: 0.88rem;
-  line-height: 1.35;
-  padding: 0.38rem 0.55rem;
-  resize: none;
-  overflow: hidden;
-  outline: none;
-}
-
-.task-note-input:focus {
-  border-color: var(--accent);
-}
-
-.task-item-row.has-open-note {
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-}
-
 .task-item-row:hover {
   background: var(--surface-raised);
 }
@@ -904,6 +835,8 @@ a:hover { text-decoration: underline; }
   color: var(--text-muted);
   font-size: 0.92rem;
   line-height: 1;
+  touch-action: manipulation;
+  cursor: pointer;
 }
 
 .task-item-row--checked .task-toggle {
@@ -916,22 +849,29 @@ a:hover { text-decoration: underline; }
 }
 
 .task-item-row .item-action-btn,
-.task-item-row .row-plus,
-.task-item-row .row-note-toggle {
+.task-item-row .row-plus {
   display: none;
 }
 
 .task-item-row:hover .item-action-btn,
 .task-item-row:hover .row-plus,
-.task-item-row:hover .row-note-toggle,
 .task-item-row:focus-within .item-action-btn,
-.task-item-row:focus-within .row-plus,
-.task-item-row:focus-within .row-note-toggle {
+.task-item-row:focus-within .row-plus {
   display: inline-flex;
 }
 
-.task-item-row .row-note-toggle.has-saved-note {
-  display: inline-flex;
+/* On touch devices (iPad, mobile), always show action buttons for single-tap functionality */
+@media (hover: none) {
+  .task-item-row .item-action-btn,
+  .task-item-row .row-plus {
+    display: inline-flex;
+  }
+  
+  /* Hide progress bar/label on touch to save space */
+  .task-item-row .task-progress-bar,
+  .task-item-row .task-progress-label {
+    display: none;
+  }
 }
 
 .task-item-row .task-progress-bar,
@@ -1363,6 +1303,14 @@ input.connection-inline {
   pointer-events: auto;
 }
 
+/* On touch devices (iPad, mobile), always show folder edit buttons for single-tap functionality */
+@media (hover: none) {
+  .row-pencil {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
 .rename-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -1766,6 +1714,7 @@ input.connection-inline {
   font: inherit;
   font-size: 0.88rem;
   cursor: pointer;
+  touch-action: manipulation;
   transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
 }
 
@@ -1775,8 +1724,8 @@ input.connection-inline {
 }
 
 .finder-item.is-active {
-  background: rgba(59, 130, 246, 0.22);
-  border-color: rgba(59, 130, 246, 0.5);
+  background: rgba(59, 130, 246, 0.10);
+  border-color: rgba(59, 130, 246, 0.32);
   color: #f2f6ff;
 }
 
@@ -1789,6 +1738,11 @@ input.connection-inline {
 .finder-item-meta {
   color: var(--text-muted);
   font-size: 0.78rem;
+}
+
+/* Hide folder item count — not needed as on-screen info */
+.finder-item[data-folder-id] .finder-item-meta {
+  display: none;
 }
 
 .finder-item-kind {
@@ -1922,6 +1876,23 @@ input.connection-inline {
 
 .finder-item[data-folder-id].is-folder-selected + .folder-item-panel:not(.hidden) .finder-item-child:not(.is-active):hover:last-child {
   border-bottom-color: rgba(148, 163, 184, 0.28);
+}
+
+/* On touch devices, suppress hover on child items to prevent ghost highlight when switching folders */
+@media (hover: none) {
+  .finder-item[data-folder-id].is-folder-selected + .folder-item-panel:not(.hidden) .finder-item-child:not(.is-active):hover,
+  .finder-item[data-folder-id].is-folder-selected + .folder-item-panel:not(.hidden) .finder-item-child:not(.is-active):hover:last-child {
+    background: transparent;
+    border-left-color: var(--border);
+    border-right-color: var(--border);
+    border-top-color: var(--border);
+    border-bottom-color: transparent;
+  }
+
+  .finder-item:not(.is-active):not(.is-folder-selected):hover {
+    background: transparent;
+    border-color: transparent;
+  }
 }
 
 .finder-item[data-folder-id].is-folder-selected + .folder-item-panel:not(.hidden) .finder-item-child:first-child {
@@ -2225,6 +2196,13 @@ input.connection-inline {
 
 .finder-item:hover .finder-item-actions {
   display: flex;
+}
+
+/* On touch devices, always show action buttons (same pattern as task rows) */
+@media (hover: none) {
+  .finder-item-actions {
+    display: flex;
+  }
 }
 
 /* Small icon action spans (pencil / ×) inside the button */

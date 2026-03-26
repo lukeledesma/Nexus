@@ -44,21 +44,16 @@ export default class extends Controller {
     if (this.openApp === appId) {
       this.close()
     } else {
-      const isToolSelection = !item.closest(".folder-item-panel")
-      this.open(appId, { collapseFolders: isToolSelection })
+      this.open(appId)
     }
   }
 
-  open(appId, { collapseFolders = false } = {}) {
+  open(appId) {
     this.openApp = appId
     this.highlight(appId)
     this.loadApp(appId)
     // Dispatch event for window manager to show main window
     window.dispatchEvent(new CustomEvent("app:opened", { detail: { appId } }))
-
-    if (collapseFolders) {
-      window.dispatchEvent(new Event("organizer:collapse-folders"))
-    }
   }
 
   close() {

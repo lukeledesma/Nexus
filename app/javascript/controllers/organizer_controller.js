@@ -217,6 +217,14 @@ export default class extends Controller {
     event.stopPropagation()
     const form = this.newFolderFormTarget
     if (form.classList.contains("hidden")) {
+      // Close all open folders and clear selection before showing the new folder form
+      this.element.querySelectorAll(".folder-item-panel").forEach((panel) => {
+        this.#animateClosePanel(panel)
+      })
+      this.element.querySelectorAll(".finder-item[data-folder-id]").forEach((folderButton) => {
+        folderButton.classList.remove("is-folder-selected")
+      })
+
       form.classList.remove("hidden")
       this.newFolderInputTarget.value = ""
       this.newFolderInputTarget.focus()

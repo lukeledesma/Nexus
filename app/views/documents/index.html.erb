@@ -2,18 +2,18 @@
   <!-- Left Organizer Window -->
   <div id="organizer-window" class="os-window organizer-window" data-window="organizer">
     <!-- Minimal title bar for dragging -->
-    <div class="title-bar" data-action="mousedown->window-manager#startDrag"></div>
+    <div class="title-bar" data-action="mousedown->window-manager#startDrag touchstart->window-manager#startDrag"></div>
 
     <!-- Resize Handles: top, top-left, left, bottom-left, bottom, top-right, right, bottom-right -->
     <!-- Right-side handles (top-right, right, bottom-right) only enabled when window is collapsed -->
-    <div class="resize-handle top" data-action="mousedown->window-manager#startResize"></div>
-    <div class="resize-handle top-left" data-action="mousedown->window-manager#startResize"></div>
-    <div class="resize-handle top-right" data-action="mousedown->window-manager#startResize"></div>
-    <div class="resize-handle left" data-action="mousedown->window-manager#startResize"></div>
-    <div class="resize-handle right" data-action="mousedown->window-manager#startResize"></div>
-    <div class="resize-handle bottom-left" data-action="mousedown->window-manager#startResize"></div>
-    <div class="resize-handle bottom-right" data-action="mousedown->window-manager#startResize"></div>
-    <div class="resize-handle bottom" data-action="mousedown->window-manager#startResize"></div>
+    <div class="resize-handle top" data-action="mousedown->window-manager#startResize touchstart->window-manager#startResize"></div>
+    <div class="resize-handle top-left" data-action="mousedown->window-manager#startResize touchstart->window-manager#startResize"></div>
+    <div class="resize-handle top-right" data-action="mousedown->window-manager#startResize touchstart->window-manager#startResize"></div>
+    <div class="resize-handle left" data-action="mousedown->window-manager#startResize touchstart->window-manager#startResize"></div>
+    <div class="resize-handle right" data-action="mousedown->window-manager#startResize touchstart->window-manager#startResize"></div>
+    <div class="resize-handle bottom-left" data-action="mousedown->window-manager#startResize touchstart->window-manager#startResize"></div>
+    <div class="resize-handle bottom-right" data-action="mousedown->window-manager#startResize touchstart->window-manager#startResize"></div>
+    <div class="resize-handle bottom" data-action="mousedown->window-manager#startResize touchstart->window-manager#startResize"></div>
 
     <!-- Window Content -->
     <div class="window-content">
@@ -40,14 +40,14 @@
   <!-- Right Main Window -->
   <div id="main-window" class="os-window main-window" data-window="main">
     <!-- Minimal title bar for dragging -->
-    <div class="title-bar" data-action="mousedown->window-manager#startDrag"></div>
+    <div class="title-bar" data-action="mousedown->window-manager#startDrag touchstart->window-manager#startDrag"></div>
 
     <!-- Resize Handles: top, top-right, right, bottom-right, bottom (NO left-side handles) -->
-    <div class="resize-handle top" data-action="mousedown->window-manager#startResize"></div>
-    <div class="resize-handle top-right" data-action="mousedown->window-manager#startResize"></div>
-    <div class="resize-handle right" data-action="mousedown->window-manager#startResize"></div>
-    <div class="resize-handle bottom-right" data-action="mousedown->window-manager#startResize"></div>
-    <div class="resize-handle bottom" data-action="mousedown->window-manager#startResize"></div>
+    <div class="resize-handle top" data-action="mousedown->window-manager#startResize touchstart->window-manager#startResize"></div>
+    <div class="resize-handle top-right" data-action="mousedown->window-manager#startResize touchstart->window-manager#startResize"></div>
+    <div class="resize-handle right" data-action="mousedown->window-manager#startResize touchstart->window-manager#startResize"></div>
+    <div class="resize-handle bottom-right" data-action="mousedown->window-manager#startResize touchstart->window-manager#startResize"></div>
+    <div class="resize-handle bottom" data-action="mousedown->window-manager#startResize touchstart->window-manager#startResize"></div>
 
     <!-- Window Content -->
     <div class="window-content">
