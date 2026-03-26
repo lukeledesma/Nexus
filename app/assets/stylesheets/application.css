@@ -794,6 +794,87 @@ a:hover { text-decoration: underline; }
   background: rgba(255, 255, 255, 0.1);
 }
 
+.row-note-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 4px;
+  font-size: 0.78rem;
+  line-height: 1;
+  padding: 0.15rem 0.28rem;
+  margin-left: 0.24rem;
+  cursor: pointer;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+
+.row-note-toggle:hover,
+.row-note-toggle:focus-visible {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.task-note-row {
+  list-style: none;
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0;
+  margin: 0 !important;
+  padding: 12px;
+  background: transparent;
+}
+
+.task-note-row.task-note-row--subtask {
+  background: transparent;
+}
+
+.task-note-row--tail {
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+
+.task-note-row--joined {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.task-note-row.is-collapsed {
+  display: none;
+}
+
+.task-note-wrap {
+  padding-left: 0;
+}
+
+.task-note-input {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 2.1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(20, 21, 31, 0.6);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.88rem;
+  line-height: 1.35;
+  padding: 0.38rem 0.55rem;
+  resize: none;
+  overflow: hidden;
+  outline: none;
+}
+
+.task-note-input:focus {
+  border-color: var(--accent);
+}
+
+.task-item-row.has-open-note {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
 .task-item-row:hover {
   background: var(--surface-raised);
 }
@@ -835,14 +916,21 @@ a:hover { text-decoration: underline; }
 }
 
 .task-item-row .item-action-btn,
-.task-item-row .row-plus {
+.task-item-row .row-plus,
+.task-item-row .row-note-toggle {
   display: none;
 }
 
 .task-item-row:hover .item-action-btn,
 .task-item-row:hover .row-plus,
+.task-item-row:hover .row-note-toggle,
 .task-item-row:focus-within .item-action-btn,
-.task-item-row:focus-within .row-plus {
+.task-item-row:focus-within .row-plus,
+.task-item-row:focus-within .row-note-toggle {
+  display: inline-flex;
+}
+
+.task-item-row .row-note-toggle.has-saved-note {
   display: inline-flex;
 }
 

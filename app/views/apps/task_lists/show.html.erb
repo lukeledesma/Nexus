@@ -25,11 +25,15 @@
           <% main_classes = ["task-item-row", "task-item-row--main", "organizer-row"] %>
           <% main_classes << "task-item-row--checked" if total_subtasks.positive? && completion >= 1.0 %>
           <% main_classes << "task-item-group--head" if total_subtasks.positive? %>
+          <% main_classes << "has-note" if task["note"].to_s.rstrip.present? %>
+          <% main_note_button_classes = ["row-note-toggle"] %>
+          <% main_note_button_classes << "has-saved-note" if task["note"].to_s.rstrip.present? %>
 
-          <li class="<%= main_classes.join(" ") %>" style="--completion: <%= completion %>;" data-role="main-task" data-main-checked="<%= task["checked"] ? "true" : "false" %>" data-collapsed="<%= total_subtasks.positive? ? "true" : "false" %>" data-has-subtasks="<%= total_subtasks.positive? ? "true" : "false" %>">
+          <li class="<%= main_classes.join(" ") %>" style="--completion: <%= completion %>;" data-role="main-task" data-main-checked="<%= task["checked"] ? "true" : "false" %>" data-collapsed="<%= total_subtasks.positive? ? "true" : "false" %>" data-has-subtasks="<%= total_subtasks.positive? ? "true" : "false" %>" data-note="<%= task["note"].to_s %>">
             <div class="organizer-row-left row-left">
               <span class="task-toggle" role="button" tabindex="0" aria-label="Toggle task completion"><%= task["checked"] ? "✓" : "○" %></span>
               <span class="task-item-text" data-role="task-text"><%= task["text"] %></span>
+              <button type="button" class="<%= main_note_button_classes.join(" ") %>" title="Toggle note" aria-label="Toggle note">≡</button>
             </div>
             <div class="organizer-row-right">
               <span class="task-progress-bar" aria-hidden="true"><span class="task-progress-bar-fill" style="width: <%= (completion * 100).round %>%;"></span></span>
@@ -46,10 +50,14 @@
             <% sub_classes = ["task-item-row", "task-item-row--subtask", "organizer-row", "task-item-group--child"] %>
             <% sub_classes << "task-item-row--checked" if subtask["checked"] %>
             <% sub_classes << "task-item-group--tail" if index == total_subtasks - 1 %>
-            <li class="<%= sub_classes.join(" ") %>" data-role="subtask">
+            <% sub_classes << "has-note" if subtask["note"].to_s.rstrip.present? %>
+            <% sub_note_button_classes = ["row-note-toggle", "row-note-toggle--subtask"] %>
+            <% sub_note_button_classes << "has-saved-note" if subtask["note"].to_s.rstrip.present? %>
+            <li class="<%= sub_classes.join(" ") %>" data-role="subtask" data-note="<%= subtask["note"].to_s %>">
               <div class="organizer-row-left row-left">
                 <span class="task-toggle" role="button" tabindex="0" aria-label="Toggle subtask completion"><%= subtask["checked"] ? "✓" : "○" %></span>
                 <span class="task-item-text task-item-text--subtask" data-role="task-text"><%= subtask["text"] %></span>
+                <button type="button" class="<%= sub_note_button_classes.join(" ") %>" title="Toggle note" aria-label="Toggle note">≡</button>
               </div>
               <div class="organizer-row-right">
                 <span class="item-action-btn" title="Rename">&#9998;</span>
