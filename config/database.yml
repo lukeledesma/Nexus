@@ -16,7 +16,7 @@ production:
     <<: *default
     database: <%= ENV.fetch("NEXUS_DB_NAME", "alchemy_production") %>
     username: <%= ENV.fetch("NEXUS_DB_USER", "alchemy") %>
-    password: <%= ENV["NEXUS_DATABASE_PASSWORD"].presence || ENV["ALCHEMY_DATABASE_PASSWORD"] %>
+    password: <%= ENV["NEXUS_DATABASE_PASSWORD"] %>
   cache:
     <<: *primary_production
     database: <%= ENV.fetch("NEXUS_CACHE_DB_NAME", "alchemy_production_cache") %>

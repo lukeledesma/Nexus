@@ -58,16 +58,10 @@ bin/rails test
 
 ## Environment Variables
 
-Production DB config is Nexus-first with compatibility fallback.
-
-Preferred:
+Production DB config uses:
 - `NEXUS_DATABASE_PASSWORD`
-- `NEXUS_DB_NAME`
-- `NEXUS_DB_USER`
-
-Compatibility fallback still supported:
-- `ALCHEMY_DATABASE_PASSWORD`
-- Existing `alchemy_*` DB names if `NEXUS_*` names are not provided
+- `NEXUS_DB_NAME` (default: `alchemy_production` — legacy DB name on server)
+- `NEXUS_DB_USER` (default: `alchemy` — legacy DB user on server)
 
 Rails credentials:
 - `RAILS_MASTER_KEY` must match `config/master.key`
@@ -100,11 +94,11 @@ curl -I "http://127.0.0.1$ASSET"
 If assets are missing:
 
 ```bash
-RAILS_ENV=production RAILS_MASTER_KEY="$(cat config/master.key)" NEXUS_DATABASE_PASSWORD="<db_password>" \
-  /home/luke/.rbenv/versions/3.2.3/bin/bundle exec rails assets:clobber
-
-RAILS_ENV=production RAILS_MASTER_KEY="$(cat config/master.key)" NEXUS_DATABASE_PASSWORD="<db_password>" \
-  /home/luke/.rbenv/versions/3.2.3/bin/bundle exec rails assets:precompile
+cd /home/luke/apps/nexus
+export PATH="/home/luke/.rbenv/versions/3.2.3/bin:$PATH"
+SECRET_KEY_BASE_DUMMY=1 RAILS_ENV=production bundle exec rails assets:clobber
+SECRET_KEY_BASE_DUMMY=1 RAILS_ENV=production bundle exec rails assets:precompile
+sudo systemctl restart puma
 ```
 
 ## Diagnosability Principles
