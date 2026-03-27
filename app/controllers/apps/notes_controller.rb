@@ -18,7 +18,7 @@ module Apps
 
       if @note.save
         respond_to do |format|
-          format.json { render json: { id: @note.id, url: apps_note_path(@note) } }
+          format.json { render json: { id: @note.id, item_type: @note.item_type, updated_at: @note.updated_at&.utc&.iso8601, url: apps_note_path(@note) } }
           format.html { redirect_to apps_note_path(@note) }
         end
       else
@@ -35,7 +35,7 @@ module Apps
 
       if @note.update(note_params)
         respond_to do |format|
-          format.json { render json: { ok: true, id: @note.id, item_type: @note.item_type, name: @note.name } }
+          format.json { render json: { ok: true, id: @note.id, item_type: @note.item_type, name: @note.name, updated_at: @note.updated_at&.utc&.iso8601 } }
           format.html { redirect_to apps_note_path(@note), notice: "Saved" }
         end
       else

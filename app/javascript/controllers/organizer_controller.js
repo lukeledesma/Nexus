@@ -2,7 +2,34 @@ import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
 
 export default class extends Controller {
-  static targets = ["newFolderForm", "newFolderInput"]
+  static targets = ["newFolderForm", "newFolderInput", "stamp", "notesSize", "tasksSize", "conversionPair"]
+
+  #conversionPairs = [
+    { sae: '5/16"', metric: '8 mm' },
+    { sae: '3/8"', metric: '10 mm' },
+    { sae: '7/16"', metric: '11 mm' },
+    { sae: '1/2"', metric: '13 mm' },
+    { sae: '9/16"', metric: '14 mm' },
+    { sae: '5/8"', metric: '16 mm' },
+    { sae: '11/16"', metric: '17 mm' },
+    { sae: '3/4"', metric: '19 mm' }
+  ]
+
+  #conversionIndex = 0
+  #conversionInterval = null
+
+  connect() {
+    this.boundSavedState = this.handleSavedState.bind(this)
+    window.addEventListener("nexus:item-saved", this.boundSavedState)
+    this.loadPersistedStamp()
+    this.loadFileSizes()
+    this.startConversionCycle()
+  }
+
+  disconnect() {
+    window.removeEventListener("nexus:item-saved", this.boundSavedState)
+    this.stopConversionCycle()
+  }
 
   toggleNewFolder(event) {
     event.stopPropagation()
@@ -45,6 +72,118 @@ export default class extends Controller {
     this.newFolderFormTarget.classList.add("hidden")
     this.newFolderInputTarget.value = ""
     Turbo.visit("/")
+  }
+
+  handleSavedState(event) {
+    if (!this.hasStampTarget) return
+
+    const itemType = event.detail?.itemType
+    const timestamp = event.detail?.timestamp
+    const label = this.labelForItemType(itemType)
+    if (!label) return
+
+    this.applyStamp(label, timestamp)
+  }
+
+  async loadPersistedStamp() {
+    if (!this.hasStampTarget) return
+
+    try {
+      const response = await fetch("/db_health", {
+        method: "GET",
+        headers: { Accept: "application/json" }
+      })
+      if (!response.ok) return
+
+      const payload = await response.json()
+      const lastUpdated = payload?.organizer?.last_updated
+      const label = lastUpdated?.label
+      const timestamp = lastUpdated?.updated_at
+      if (!label || !timestamp) return
+
+      this.applyStamp(label, timestamp)
+    } catch (_error) {
+      // Keep organizer status non-blocking if metrics endpoint is unavailable.
+    }
+  }
+
+  applyStamp(label, timestamp) {
+    const date = new Date(timestamp)
+    if (Number.isNaN(date.getTime())) return
+
+    if (this.latestUpdateAt && date <= this.latestUpdateAt) return
+    this.latestUpdateAt = date
+
+    this.stampTarget.textContent = `${label} Updated ${this.formatTimestamp(timestamp)}`
+  }
+
+  async loadFileSizes() {
+    try {
+      const response = await fetch("/db_health", {
+        method: "GET",
+        headers: { Accept: "application/json" }
+      })
+      if (!response.ok) return
+
+      const payload = await response.json()
+      const organizer = payload?.organizer
+      if (!organizer) return
+
+      if (this.hasNotesSizeTarget && organizer.note_size_bytes) {
+        this.notesSizeTarget.textContent = this.formatBytes(organizer.note_size_bytes)
+      }
+
+      if (this.hasTasksSizeTarget && organizer.task_size_bytes) {
+        this.tasksSizeTarget.textContent = this.formatBytes(organizer.task_size_bytes)
+      }
+    } catch (_error) {
+      // Keep size loading non-blocking if endpoint is unavailable
+    }
+  }
+
+  formatBytes(bytes) {
+    if (!bytes || bytes === 0) return "-"
+    const units = ["B", "KB", "MB", "GB"]
+    const index = Math.floor(Math.log(bytes) / Math.log(1024))
+    const value = (bytes / Math.pow(1024, index)).toFixed(0)
+    return `${value} ${units[index] || "B"}`
+  }
+
+  startConversionCycle() {
+    if (!this.hasConversionPairTarget) return
+    this.updateConversionDisplay()
+    this.#conversionInterval = setInterval(() => this.cycleConversion(), 2000)
+  }
+
+  stopConversionCycle() {
+    if (this.#conversionInterval) {
+      clearInterval(this.#conversionInterval)
+      this.#conversionInterval = null
+    }
+  }
+
+  cycleConversion() {
+    this.#conversionIndex = (this.#conversionIndex + 1) % this.#conversionPairs.length
+    this.updateConversionDisplay()
+  }
+
+  updateConversionDisplay() {
+    if (!this.hasConversionPairTarget) return
+    const pair = this.#conversionPairs[this.#conversionIndex]
+    this.conversionPairTarget.textContent = `${pair.sae} | ${pair.metric}`
+  }
+
+  labelForItemType(itemType) {
+    if (itemType === "note") return "Notes"
+    if (itemType === "task_list") return "Tasks"
+    return null
+  }
+
+  formatTimestamp(value) {
+    if (!value) return "just now"
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return "just now"
+    return date.toLocaleString()
   }
 
   renameFolder(event) {

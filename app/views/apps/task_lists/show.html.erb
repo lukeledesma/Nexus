@@ -32,7 +32,7 @@
               <span class="task-item-text" data-role="task-text"><%= task["text"] %></span>
             </div>
             <div class="organizer-row-right">
-              <span class="task-progress-bar" aria-hidden="true"><span class="task-progress-bar-fill" style="width: <%= (completion * 100).round %>%;"></span></span>
+              <span class="task-progress-bar" aria-hidden="true"><span class="task-progress-bar-fill"></span></span>
               <% if total_subtasks.positive? %>
                 <span class="task-progress-label"><%= completed_subtasks %>/<%= total_subtasks %></span>
               <% end %>

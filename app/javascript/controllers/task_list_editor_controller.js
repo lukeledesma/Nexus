@@ -7,6 +7,13 @@ export default class extends Controller {
     this.#refreshAll()
   }
 
+  disconnect() {
+    if (this.autosaveTimer) {
+      window.clearTimeout(this.autosaveTimer)
+      this.autosaveTimer = null
+    }
+  }
+
   addTask(event) {
     event.preventDefault()
     const row = this.#buildMainTaskRow("", false, [])
@@ -267,7 +274,7 @@ export default class extends Controller {
         `<span class="task-item-text" data-role="task-text">${this.#escapeHtml(text)}</span>` +
       "</div>" +
       '<div class="organizer-row-right">' +
-        '<span class="task-progress-bar" aria-hidden="true"><span class="task-progress-bar-fill" style="width: 0%;"></span></span>' +
+        '<span class="task-progress-bar" aria-hidden="true"><span class="task-progress-bar-fill"></span></span>' +
         '<span class="task-progress-label"></span>' +
         '<span class="row-plus" title="Add subtask">+</span>' +
         '<span class="item-action-btn" title="Rename">&#9998;</span>' +
@@ -341,12 +348,7 @@ export default class extends Controller {
 
       const fill = mainRow.querySelector(".task-progress-bar-fill")
       const label = mainRow.querySelector(".task-progress-label")
-      if (fill) {
-        const percent = subtaskCount > 0
-          ? (checkedSubtasks / subtaskCount) * 100
-          : (mainRow.classList.contains("task-item-row--checked") ? 100 : 0)
-        fill.style.width = `${Math.round(percent)}%`
-      }
+      if (fill) fill.style.removeProperty("width")
 
       if (label) {
         label.textContent = subtaskCount > 0 ? `${checkedSubtasks}/${subtaskCount}` : ""

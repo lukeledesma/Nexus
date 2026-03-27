@@ -30,66 +30,20 @@
       <div id="desktop" class="desktop-layer"></div>
 
       <header class="desktop-menubar" aria-label="Desktop menu bar">
-        <div class="desktop-menubar-left">
-          <div class="desktop-menubar-account" data-controller="desktop-account">
-            <button
-              type="button"
-              class="desktop-menubar-sun-toggle"
-              data-desktop-account-target="sunToggle"
-              data-action="click->desktop-account#toggleName"
-              aria-label="Toggle account name"
-              aria-expanded="false"
-            >
-              <span class="desktop-menubar-sun" aria-hidden="true">☼</span>
-            </button>
-
-            <button
-              type="button"
-              class="desktop-menubar-user-chip"
-              data-desktop-account-target="userChip"
-              data-action="click->desktop-account#openPanel"
-              aria-label="Open account panel"
-            ><%= current_user.email %></button>
-
-            <div
-              class="desktop-account-overlay hidden"
-              data-desktop-account-target="overlay"
-              data-action="click->desktop-account#backdropClick"
-            >
-              <section class="desktop-account-panel" role="dialog" aria-modal="true" aria-label="Account">
-                <header class="desktop-account-header">
-                  <div class="desktop-account-header-meta">
-                    <span class="desktop-account-header-user"><%= current_user.email %></span>
-                  </div>
-                </header>
-
-                <div class="desktop-account-row desktop-account-row--action">
-                  <div class="desktop-account-actions">
-                    <button
-                      type="button"
-                      class="desktop-account-action desktop-account-action--close"
-                      data-action="click->desktop-account#closePanel"
-                    >Close</button>
-                    <%= button_to "Logout", logout_path, method: :delete, class: "desktop-account-action desktop-account-action--logout" %>
-                  </div>
-                </div>
-              </section>
-            </div>
-          </div>
-        </div>
+        <div class="desktop-menubar-left"></div>
 
         <div class="desktop-menubar-right" data-controller="desktop-clock">
           <span class="desktop-menubar-time" data-desktop-clock-target="display"></span>
         </div>
       </header>
 
-      <div class="db-health-widget" data-controller="db-health" data-db-health-url-value="<%= db_health_path %>">
-        <button type="button" class="app-version-btn" data-db-health-target="toggleBtn" data-action="click->db-health#toggle" title="DB Health">V1</button>
-
-        <div class="db-health-overlay hidden" data-db-health-target="overlay">
-          <section class="db-health-panel" data-db-health-target="panel" aria-live="polite">
-          <header class="db-health-header">
-            <h3 data-db-health-target="title">DB Health</h3>
+      <section class="db-health-window os-window is-hidden" data-controller="db-health" data-db-health-url-value="<%= db_health_path %>" data-db-health-target="window" aria-live="polite">
+          <section class="db-health-panel" data-db-health-target="panel">
+          <header class="db-health-header" data-action="mousedown->db-health#startDrag touchstart->db-health#startDrag">
+            <div class="db-health-title-wrap">
+              <h3 data-db-health-target="title">DB Health</h3>
+              <span class="db-health-heartbeat" aria-hidden="true">♥</span>
+            </div>
             <div class="db-health-controls">
               <button type="button" class="db-health-back hidden" data-db-health-target="backButton" data-action="click->db-health#clearFocus" aria-label="Back" title="Back">←</button>
               <button type="button" class="db-health-refresh" data-action="click->db-health#refresh" aria-label="Refresh" title="Refresh">↻</button>
@@ -113,13 +67,31 @@
             <ul class="db-health-detail-list" data-db-health-target="detailList"></ul>
           </section>
           </section>
-        </div>
-      </div>
+      </section>
+
+      <section class="settings-window os-window is-hidden" data-controller="settings" data-settings-target="window" aria-live="polite">
+        <section class="settings-panel">
+          <header class="settings-header" data-action="mousedown->settings#startDrag touchstart->settings#startDrag">
+            <h3>Settings</h3>
+            <div class="settings-controls">
+              <button type="button" class="settings-close" data-action="click->settings#close" aria-label="Close Settings" title="Close">✕</button>
+            </div>
+          </header>
+
+          <p class="settings-stamp"><%= current_user&.email.presence || "Unknown user" %></p>
+
+          <div class="settings-actions">
+            <%= button_to logout_path, method: :delete, class: "settings-action settings-action--logout" do %>
+              <div class="organizer-tool-card">
+                <dt class="organizer-tool-label">LOGOUT</dt>
+                <dd class="organizer-tool-value">EXIT</dd>
+              </div>
+            <% end %>
+          </div>
+        </section>
+      </section>
     <% end %>
 
     <%= yield %>
-    <% unless logged_in? %>
-      <footer class="app-version">V1</footer>
-    <% end %>
   </body>
 </html>

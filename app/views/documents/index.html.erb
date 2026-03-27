@@ -1,19 +1,8 @@
-<div class="window-manager-shell" data-controller="window-manager finder">
+<div class="window-manager-shell" data-controller="finder">
   <!-- Left Organizer Window -->
-  <div id="organizer-window" class="os-window organizer-window" data-window="organizer">
+  <div id="organizer-window" class="os-window organizer-window is-hidden" data-window="organizer">
     <!-- Minimal title bar for dragging -->
     <div class="title-bar" data-action="mousedown->window-manager#startDrag touchstart->window-manager#startDrag"></div>
-
-    <!-- Resize Handles: top, top-left, left, bottom-left, bottom, top-right, right, bottom-right -->
-    <!-- Right-side handles (top-right, right, bottom-right) only enabled when window is collapsed -->
-    <div class="resize-handle top" data-action="mousedown->window-manager#startResize touchstart->window-manager#startResize"></div>
-    <div class="resize-handle top-left" data-action="mousedown->window-manager#startResize touchstart->window-manager#startResize"></div>
-    <div class="resize-handle top-right" data-action="mousedown->window-manager#startResize touchstart->window-manager#startResize"></div>
-    <div class="resize-handle left" data-action="mousedown->window-manager#startResize touchstart->window-manager#startResize"></div>
-    <div class="resize-handle right" data-action="mousedown->window-manager#startResize touchstart->window-manager#startResize"></div>
-    <div class="resize-handle bottom-left" data-action="mousedown->window-manager#startResize touchstart->window-manager#startResize"></div>
-    <div class="resize-handle bottom-right" data-action="mousedown->window-manager#startResize touchstart->window-manager#startResize"></div>
-    <div class="resize-handle bottom" data-action="mousedown->window-manager#startResize touchstart->window-manager#startResize"></div>
 
     <!-- Window Content -->
     <div class="window-content">
@@ -23,20 +12,54 @@
   </div>
 
   <!-- Right Main Window -->
-  <div id="main-window" class="os-window main-window" data-window="main">
+  <div id="main-window" class="os-window main-window is-hidden" data-window="main">
     <!-- Minimal title bar for dragging -->
     <div class="title-bar" data-action="mousedown->window-manager#startDrag touchstart->window-manager#startDrag"></div>
 
-    <!-- Resize Handles: top, top-right, right, bottom-right, bottom (NO left-side handles) -->
-    <div class="resize-handle top" data-action="mousedown->window-manager#startResize touchstart->window-manager#startResize"></div>
-    <div class="resize-handle top-right" data-action="mousedown->window-manager#startResize touchstart->window-manager#startResize"></div>
+    <button type="button" class="tools-close-btn tools-close-btn--main" data-action="click->window-manager#closeTools" aria-label="Close TOOLS" title="Close">✕</button>
+
+    <!-- Only the right edge of the extended window is resizable -->
     <div class="resize-handle right" data-action="mousedown->window-manager#startResize touchstart->window-manager#startResize"></div>
-    <div class="resize-handle bottom-right" data-action="mousedown->window-manager#startResize touchstart->window-manager#startResize"></div>
-    <div class="resize-handle bottom" data-action="mousedown->window-manager#startResize touchstart->window-manager#startResize"></div>
 
     <!-- Window Content -->
     <div class="window-content">
       <turbo-frame id="app-pane" class="finder-app-frame"></turbo-frame>
     </div>
   </div>
+
+</div>
+
+<div class="app-dock" aria-label="Pinned apps">
+  <button
+    type="button"
+    class="app-dock-button app-dock-button--tools"
+    data-action="click->window-manager#toggleTools"
+    data-hover-label="Tools"
+    aria-label="Open TOOLS"
+    aria-pressed="false"
+  >
+    ⚒
+  </button>
+
+  <button
+    type="button"
+    class="app-dock-button app-dock-button--db-health"
+    data-action="click->window-manager#toggleDbHealth"
+    data-hover-label="DB Health"
+    aria-label="Open DB Health"
+    aria-pressed="false"
+  >
+    ♥
+  </button>
+
+  <button
+    type="button"
+    class="app-dock-button app-dock-button--settings"
+    data-action="click->window-manager#toggleSettings"
+    data-hover-label="Settings"
+    aria-label="Open Settings"
+    aria-pressed="false"
+  >
+    ⚙
+  </button>
 </div>

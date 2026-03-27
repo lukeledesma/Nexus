@@ -2,9 +2,8 @@ import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
   static targets = [
-    "overlay",
+    "window",
     "panel",
-    "toggleBtn",
     "title",
     "stamp",
     "grid",
@@ -29,33 +28,160 @@ export default class extends Controller {
     this.refreshTimer = null
     this.focusedMetricKey = null
     this.latestPayload = null
-    this.lockedPanelHeight = null
     this.defaultTitle = "DB Health"
+    this.windowWidth = 360
+    this.windowHeight = 320
+    this.viewportMargin = 20
+    this.activeDrag = null
+    this.boundDragMove = this.handleDragMove.bind(this)
+    this.boundDragEnd = this.stopDrag.bind(this)
+    this.boundToggleRequest = this.handleToggleRequest.bind(this)
+      this.boundWindowInteraction = this.handleWindowInteraction.bind(this)
+
+    this.positionWindow()
+    window.addEventListener("db-health:toggle", this.boundToggleRequest)
+      this.windowTarget.addEventListener("mousedown", this.boundWindowInteraction)
   }
 
   disconnect() {
     this.stopAutoRefresh()
+    this.stopDrag()
+    window.removeEventListener("db-health:toggle", this.boundToggleRequest)
+      this.windowTarget.removeEventListener("mousedown", this.boundWindowInteraction)
+  }
+
+    handleWindowInteraction() {
+      this.bringToFront()
+    }
+
+  handleToggleRequest() {
+    this.toggle()
   }
 
   async toggle() {
-    const shouldOpen = this.overlayTarget.classList.contains("hidden")
-    this.overlayTarget.classList.toggle("hidden", !shouldOpen)
-    this.toggleBtnTarget.classList.toggle("is-active", shouldOpen)
+    const shouldOpen = this.windowTarget.classList.contains("is-hidden")
 
     if (shouldOpen) {
+      this.open()
       this.clearFocus()
       await this.fetchAndRender()
-      this.lockPanelHeightToOverviewContent()
       this.startAutoRefresh()
     } else {
-      this.stopAutoRefresh()
+      this.close()
     }
   }
 
+  open() {
+    this.windowTarget.classList.remove("is-hidden")
+    this.bringToFront()
+    this.emitWindowState(true)
+  }
+
   close() {
-    this.overlayTarget.classList.add("hidden")
-    this.toggleBtnTarget.classList.remove("is-active")
+    this.windowTarget.classList.add("is-hidden")
     this.stopAutoRefresh()
+    this.emitWindowState(false)
+  }
+
+  emitWindowState(isOpen) {
+    window.dispatchEvent(new CustomEvent("db-health:state", {
+      detail: { open: Boolean(isOpen) }
+    }))
+  }
+
+  startDrag(event) {
+    if (event.button !== undefined && event.button !== 0) return
+    if (event.target.closest(".db-health-controls")) return
+
+    this.beginDrag(event)
+  }
+
+  startResize(event) {
+    if (event.button !== undefined && event.button !== 0) return
+    this.beginDrag(event)
+  }
+
+  beginDrag(event) {
+    if (this.windowTarget.classList.contains("is-hidden")) return
+
+    event.preventDefault()
+    this.bringToFront()
+
+    const rect = this.windowTarget.getBoundingClientRect()
+    const coords = this.getEventCoordinates(event)
+
+    this.activeDrag = {
+      offsetX: coords.x - rect.left,
+      offsetY: coords.y - rect.top
+    }
+
+    document.addEventListener("mousemove", this.boundDragMove)
+    document.addEventListener("mouseup", this.boundDragEnd)
+    document.addEventListener("touchmove", this.boundDragMove, { passive: false })
+    document.addEventListener("touchend", this.boundDragEnd)
+  }
+
+  handleDragMove(event) {
+    if (!this.activeDrag) return
+    if (event.touches) event.preventDefault()
+
+    const coords = this.getEventCoordinates(event)
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    const margin = this.viewportMargin
+    const width = this.windowTarget.offsetWidth
+    const height = this.windowTarget.offsetHeight
+
+    let left = coords.x - this.activeDrag.offsetX
+    let top = coords.y - this.activeDrag.offsetY
+
+    left = Math.max(margin, Math.min(left, vw - margin - width))
+    top = Math.max(margin, Math.min(top, vh - margin - height))
+
+    this.windowTarget.style.left = `${left}px`
+    this.windowTarget.style.top = `${top}px`
+  }
+
+  stopDrag() {
+    this.activeDrag = null
+    document.removeEventListener("mousemove", this.boundDragMove)
+    document.removeEventListener("mouseup", this.boundDragEnd)
+    document.removeEventListener("touchmove", this.boundDragMove)
+    document.removeEventListener("touchend", this.boundDragEnd)
+  }
+
+  getEventCoordinates(event) {
+    if (event.touches) {
+      return {
+        x: event.touches[0].clientX,
+        y: event.touches[0].clientY
+      }
+    }
+
+    return {
+      x: event.clientX,
+      y: event.clientY
+    }
+  }
+
+  positionWindow() {
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    const width = Math.min(this.windowWidth, Math.max(280, vw - 40))
+    const height = Math.min(this.windowHeight, Math.max(240, vh - 40))
+    const left = Math.max(this.viewportMargin, Math.round((vw - width) / 2) + 120)
+    const top = Math.max(this.viewportMargin, Math.round((vh - height) / 2) - 80)
+
+    this.windowTarget.style.width = `${width}px`
+    this.windowTarget.style.height = `${height}px`
+    this.windowTarget.style.left = `${Math.min(left, vw - this.viewportMargin - width)}px`
+    this.windowTarget.style.top = `${Math.min(top, vh - this.viewportMargin - height)}px`
+  }
+
+  bringToFront() {
+      const next = Number(window.__nexusDesktopZIndex || 1500) + 1
+      window.__nexusDesktopZIndex = next
+    this.windowTarget.style.zIndex = String(next)
   }
 
   focusMetric(event) {
@@ -73,12 +199,10 @@ export default class extends Controller {
     this.applyFocusState()
     this.detailListTarget.innerHTML = ""
     this.detailListTarget.style.maxHeight = ""
-    this.lockPanelHeightToOverviewContent()
   }
 
   async refresh() {
     await this.fetchAndRender()
-    if (!this.focusedMetricKey) this.lockPanelHeightToOverviewContent()
   }
 
   async fetchAndRender() {
@@ -121,9 +245,6 @@ export default class extends Controller {
     this.backButtonTarget.classList.toggle("hidden", !focused)
     this.titleTarget.textContent = focused ? this.focusLabelForKey(focused) : this.defaultTitle
 
-    if (this.lockedPanelHeight) {
-      this.panelTarget.style.height = `${this.lockedPanelHeight}px`
-    }
   }
 
   focusLabelForKey(key) {
@@ -134,19 +255,6 @@ export default class extends Controller {
     if (key === "users") return "Users"
     if (key === "db_size") return "DB Size"
     return this.defaultTitle
-  }
-
-  lockPanelHeightToOverviewContent() {
-    if (this.focusedMetricKey) return
-    if (this.overlayTarget.classList.contains("hidden")) return
-
-    this.panelTarget.style.height = "auto"
-    const measuredHeight = Math.ceil(this.panelTarget.scrollHeight)
-
-    if (measuredHeight > 0) {
-      this.lockedPanelHeight = measuredHeight
-      this.panelTarget.style.height = `${measuredHeight}px`
-    }
   }
 
   renderFocusedDetails() {
@@ -239,7 +347,7 @@ export default class extends Controller {
 
   adjustDetailListMaxHeight() {
     if (!this.focusedMetricKey) return
-    if (this.overlayTarget.classList.contains("hidden")) return
+    if (this.windowTarget.classList.contains("is-hidden")) return
 
     const panelRect = this.panelTarget.getBoundingClientRect()
     const listRect = this.detailListTarget.getBoundingClientRect()

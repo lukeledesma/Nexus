@@ -19,7 +19,7 @@ module Apps
 
       if @task_list.save
         respond_to do |format|
-          format.json { render json: { id: @task_list.id, url: apps_task_list_path(@task_list) } }
+          format.json { render json: { id: @task_list.id, item_type: @task_list.item_type, updated_at: @task_list.updated_at&.utc&.iso8601, url: apps_task_list_path(@task_list) } }
           format.html { redirect_to apps_task_list_path(@task_list) }
         end
       else
@@ -46,7 +46,7 @@ module Apps
 
       if @task_list.update(attrs)
         respond_to do |format|
-          format.json { render json: { ok: true, id: @task_list.id, item_type: @task_list.item_type, name: @task_list.name } }
+          format.json { render json: { ok: true, id: @task_list.id, item_type: @task_list.item_type, name: @task_list.name, updated_at: @task_list.updated_at&.utc&.iso8601 } }
           format.html { redirect_to apps_task_list_path(@task_list), notice: "Saved" }
         end
       else

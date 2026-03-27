@@ -7,6 +7,7 @@ class DbHealthController < ApplicationController
       database: database_metrics,
       records: record_metrics,
       workspace: workspace_metrics,
+      organizer: organizer_metrics,
       details: detail_metrics
     }
   end
@@ -95,6 +96,52 @@ class DbHealthController < ApplicationController
       workspace_files: workspace_file_details,
       db_tables: db_table_details
     }
+  end
+
+  def organizer_metrics
+    note_updated_at = workspace_item_updated_at("Notes.txt")
+    task_updated_at = workspace_item_updated_at("Tasks.txt")
+    note_size = workspace_item_size("Notes.txt")
+    task_size = workspace_item_size("Tasks.txt")
+
+    latest = [
+      { label: "Notes", updated_at: note_updated_at },
+      { label: "Tasks", updated_at: task_updated_at }
+    ].select { |entry| entry[:updated_at].present? }
+      .max_by { |entry| entry[:updated_at] }
+
+    {
+      note_updated_at: note_updated_at&.utc&.iso8601,
+      task_updated_at: task_updated_at&.utc&.iso8601,
+      note_size_bytes: note_size,
+      task_size_bytes: task_size,
+      last_updated: latest.present? ? { label: latest[:label], updated_at: latest[:updated_at].utc.iso8601 } : nil
+    }
+  end
+
+  def workspace_item_size(file_name)
+    workspace_root = Rails.root.join("storage", "workspace")
+    file_path = workspace_root.join(file_name)
+    return nil unless file_path.exist?
+    File.size(file_path)
+  rescue StandardError
+    nil
+  end
+
+  def workspace_item_updated_at(file_name)
+    workspace_root = Rails.root.join("storage", "workspace")
+    file_path = workspace_root.join(file_name)
+    return nil unless file_path.exist?
+
+    updated_line = File.foreach(file_path).find { |line| line.start_with?("# updated_at:") }
+    return nil unless updated_line
+
+    raw_value = updated_line.split(":", 2).last.to_s.strip
+    return nil if raw_value.blank? || raw_value == "null"
+
+    Time.zone.parse(raw_value)
+  rescue StandardError
+    nil
   end
 
   def db_table_details

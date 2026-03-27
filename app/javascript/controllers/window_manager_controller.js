@@ -6,13 +6,19 @@ export default class extends Controller {
     // Window references
     this.organizerWindow = document.getElementById("organizer-window")
     this.mainWindow = document.getElementById("main-window")
+    this.windowManagerShell = this.organizerWindow?.closest(".window-manager-shell") || null
+    this.toolsDockButton = this.element.querySelector(".app-dock-button--tools")
+    this.dbHealthDockButton = this.element.querySelector(".app-dock-button--db-health")
+    this.settingsDockButton = this.element.querySelector(".app-dock-button--settings")
 
     // State
     this.openApp = null
     this.minWindowWidth = 300
     this.sharedContentMinWidth = 432
     this.minWindowHeight = 200
-    this.viewportMarginPx = 40
+    this.viewportMarginPx = 20
+    this.defaultOrganizerWidth = 320
+    this.defaultOrganizerHeight = 360
 
     this.activeDrag = null
     this.activeResize = null
@@ -25,6 +31,9 @@ export default class extends Controller {
     this.boundAppOpened = this.onAppOpened.bind(this)
     this.boundAppClosed = this.onAppClosed.bind(this)
     this.boundFrameLoad = this.onFrameLoad.bind(this)
+    this.boundToolsInteraction = this.handleToolsInteraction.bind(this)
+    this.boundDbHealthState = this.handleDbHealthState.bind(this)
+    this.boundSettingsState = this.handleSettingsState.bind(this)
 
     // Initialize layout
     this.initializeWindows()
@@ -33,6 +42,12 @@ export default class extends Controller {
     window.addEventListener("app:opened", this.boundAppOpened)
     window.addEventListener("app:closed", this.boundAppClosed)
     document.addEventListener("turbo:frame-load", this.boundFrameLoad)
+    window.addEventListener("db-health:state", this.boundDbHealthState)
+    window.addEventListener("settings:state", this.boundSettingsState)
+
+      this.bindToolsInteractionListeners()
+    this.updateDbHealthDockState(false)
+    this.updateSettingsDockState(false)
   }
 
   disconnect() {
@@ -41,7 +56,67 @@ export default class extends Controller {
     window.removeEventListener("app:opened", this.boundAppOpened)
     window.removeEventListener("app:closed", this.boundAppClosed)
     document.removeEventListener("turbo:frame-load", this.boundFrameLoad)
+    window.removeEventListener("db-health:state", this.boundDbHealthState)
+    window.removeEventListener("settings:state", this.boundSettingsState)
+      this.unbindToolsInteractionListeners()
   }
+
+  toggleDbHealth(event) {
+    if (event) event.preventDefault()
+    window.dispatchEvent(new CustomEvent("db-health:toggle"))
+  }
+
+  toggleSettings(event) {
+    if (event) event.preventDefault()
+    window.dispatchEvent(new CustomEvent("settings:toggle"))
+  }
+
+  handleDbHealthState(event) {
+    const isOpen = Boolean(event?.detail?.open)
+    this.updateDbHealthDockState(isOpen)
+  }
+
+  handleSettingsState(event) {
+    const isOpen = Boolean(event?.detail?.open)
+    this.updateSettingsDockState(isOpen)
+  }
+
+    bindToolsInteractionListeners() {
+      if (this.organizerWindow) {
+        this.organizerWindow.addEventListener("mousedown", this.boundToolsInteraction)
+      }
+      if (this.mainWindow) {
+        this.mainWindow.addEventListener("mousedown", this.boundToolsInteraction)
+      }
+    }
+
+    unbindToolsInteractionListeners() {
+      if (this.organizerWindow) {
+        this.organizerWindow.removeEventListener("mousedown", this.boundToolsInteraction)
+      }
+      if (this.mainWindow) {
+        this.mainWindow.removeEventListener("mousedown", this.boundToolsInteraction)
+      }
+    }
+
+    handleToolsInteraction() {
+      this.bringToolsToFront()
+    }
+
+    bringToolsToFront() {
+        if (!this.organizerWindow || !this.mainWindow || !this.windowManagerShell) return
+        if (this.organizerWindow.classList.contains("is-hidden")) return
+
+        const next = Number(window.__nexusDesktopZIndex || 1500) + 1
+        window.__nexusDesktopZIndex = next
+
+        // Lift the entire TOOLS app stack (shell) above other desktop windows.
+        this.windowManagerShell.style.zIndex = String(next)
+
+        // Keep internal pane ordering controlled by stylesheet defaults.
+        this.mainWindow.style.removeProperty("z-index")
+        this.organizerWindow.style.removeProperty("z-index")
+      }
 
   getMainMinWidth() {
     const baseMin = this.minWindowWidth
@@ -97,39 +172,87 @@ export default class extends Controller {
     }
   }
 
+  sizeMainWindowToCompactWidth() {
+    if (!this.mainWindow || !this.organizerWindow) return
+
+    const margin = this.viewportMarginPx
+    const vw = globalThis.innerWidth
+    const minMainWidth = this.getMainMinWidth()
+    const orgLeft = parseFloat(this.organizerWindow.style.left) || this.organizerWindow.getBoundingClientRect().left
+    const orgWidth = parseFloat(this.organizerWindow.style.width) || this.organizerWindow.offsetWidth
+    const mainLeft = orgLeft + orgWidth
+    const available = Math.max(this.minWindowWidth, vw - margin - mainLeft)
+    const compactWidth = Math.min(minMainWidth, available)
+
+    this.mainWindow.style.left = mainLeft + "px"
+    this.mainWindow.style.width = compactWidth + "px"
+  }
+
   // ════════════════════════════════════════════════════════════════════════════
   // Initialization
   // ════════════════════════════════════════════════════════════════════════════
 
   initializeWindows() {
     if (!this.organizerWindow) return
-
-    const vw = window.innerWidth
-    const vh = window.innerHeight
-    const sideMargin = this.viewportMarginPx
-    const topOffset = 60
-    const bottomOffset = 80
-    const orgWidth = 320
-    const windowHeight = Math.max(this.minWindowHeight, vh - topOffset - bottomOffset)
-    const mainWidth = Math.max(this.getMainMinWidth(), vw - (sideMargin + orgWidth) - sideMargin)
-
-    // Set organizer initial position/size
-    this.organizerWindow.style.left = sideMargin + "px"
-    this.organizerWindow.style.top = topOffset + "px"
-    this.organizerWindow.style.width = orgWidth + "px"
-    this.organizerWindow.style.height = windowHeight + "px"
-
-    // Seam lock: main window left = organizer left + organizer width (no gap)
-    this.mainWindow.style.left = (sideMargin + orgWidth) + "px"
-    this.mainWindow.style.top = topOffset + "px"
-    this.mainWindow.style.width = mainWidth + "px"
-    this.mainWindow.style.height = windowHeight + "px"
+    this.positionToolsWindow()
 
     // Initialize as closed: main window hidden
     this.mainWindow.classList.remove("visible")
     this.mainWindow.classList.remove("is-opening")
     this.mainWindow.classList.remove("is-closing")
     this.organizerWindow.classList.remove("pane-open")
+    this.mainWindow.classList.add("is-hidden")
+    this.organizerWindow.classList.add("is-hidden")
+    this.updateToolsDockState(false)
+  }
+
+  positionToolsWindow() {
+    if (!this.organizerWindow || !this.mainWindow) return
+
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    const margin = this.viewportMarginPx
+    const minMainWidth = this.getMainMinWidth()
+
+    const maxOrganizerWidth = Math.max(
+      this.minWindowWidth,
+      vw - (margin * 2) - minMainWidth
+    )
+    const organizerWidth = Math.max(
+      this.minWindowWidth,
+      Math.min(this.defaultOrganizerWidth, maxOrganizerWidth)
+    )
+
+    const maxWindowHeight = Math.max(this.minWindowHeight, vh - (margin * 2))
+    const windowHeight = Math.max(
+      this.minWindowHeight,
+      Math.min(this.defaultOrganizerHeight, maxWindowHeight)
+    )
+
+    let organizerLeft = Math.round((vw - organizerWidth) / 2)
+    const maxOrganizerLeft = vw - margin - organizerWidth - minMainWidth
+    if (maxOrganizerLeft >= margin) {
+      organizerLeft = Math.min(organizerLeft, maxOrganizerLeft)
+    }
+    organizerLeft = Math.max(margin, Math.min(organizerLeft, vw - margin - organizerWidth))
+
+    const organizerTop = Math.max(
+      margin,
+      Math.min(Math.round((vh - windowHeight) / 2), vh - margin - windowHeight)
+    )
+
+    const mainLeft = organizerLeft + organizerWidth
+    const mainWidth = Math.min(minMainWidth, Math.max(this.minWindowWidth, vw - margin - mainLeft))
+
+    this.organizerWindow.style.left = organizerLeft + "px"
+    this.organizerWindow.style.top = organizerTop + "px"
+    this.organizerWindow.style.width = organizerWidth + "px"
+    this.organizerWindow.style.height = windowHeight + "px"
+
+    this.mainWindow.style.left = mainLeft + "px"
+    this.mainWindow.style.top = organizerTop + "px"
+    this.mainWindow.style.width = mainWidth + "px"
+    this.mainWindow.style.height = windowHeight + "px"
   }
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -161,11 +284,17 @@ export default class extends Controller {
 
     if (!win) return
 
+    // Allow interactive controls inside draggable headers without triggering drag.
+    if (event.target instanceof Element && event.target.closest("button, a, input, textarea, select, [role='button']")) {
+      return
+    }
+
     // Skip if mouse event and it's not the primary button
     if (event.button !== undefined && event.button !== 0) return
 
     event.preventDefault()
     event.stopPropagation()
+    this.bringToolsToFront()
 
     // Always anchor on organizer — both windows move as one fused unit
     const orgRect = this.organizerWindow.getBoundingClientRect()
@@ -244,6 +373,7 @@ export default class extends Controller {
 
     event.preventDefault()
     event.stopPropagation()
+    this.bringToolsToFront()
 
     const rect = window.getBoundingClientRect()
     const coords = this.getEventCoordinates(event)
@@ -443,6 +573,7 @@ export default class extends Controller {
       this.mainWindow.classList.remove("visible")
       this.mainWindow.classList.remove("is-closing")
       this.mainWindow.classList.add("is-opening")
+      this.sizeMainWindowToCompactWidth()
       globalThis.requestAnimationFrame(() => {
         globalThis.requestAnimationFrame(() => {
           this.mainWindow.classList.add("visible")
@@ -478,6 +609,66 @@ export default class extends Controller {
         window.dispatchEvent(new Event("app:closed:complete"))
       }, 250)
     }
+  }
+
+  toggleTools(event) {
+    if (event) event.preventDefault()
+    if (!this.organizerWindow || !this.mainWindow) return
+
+    const isHidden = this.organizerWindow.classList.contains("is-hidden")
+    if (isHidden) {
+      this.openTools()
+      return
+    }
+
+    this.closeTools()
+  }
+
+  openTools() {
+    this.organizerWindow.classList.remove("is-hidden")
+    this.mainWindow.classList.remove("is-hidden")
+    this.mainWindow.classList.remove("visible")
+    this.mainWindow.classList.remove("is-opening")
+    this.mainWindow.classList.remove("is-closing")
+    this.organizerWindow.classList.remove("pane-open")
+    this.organizerWindow.classList.add("is-focused")
+    clearTimeout(this._organizerFocusTimer)
+    this._organizerFocusTimer = setTimeout(() => {
+      this.organizerWindow.classList.remove("is-focused")
+    }, 260)
+      this.bringToolsToFront()
+    this.updateToolsDockState(true)
+  }
+
+  closeTools() {
+    this.mainWindow.classList.remove("visible")
+    this.mainWindow.classList.remove("is-opening")
+    this.mainWindow.classList.remove("is-closing")
+    this.organizerWindow.classList.remove("pane-open")
+    this.mainWindow.classList.add("is-hidden")
+    this.organizerWindow.classList.add("is-hidden")
+    this.updateToolsDockState(false)
+  }
+
+  updateToolsDockState(isOpen) {
+    if (!this.toolsDockButton) return
+    this.toolsDockButton.classList.toggle("is-active", isOpen)
+    this.toolsDockButton.setAttribute("aria-pressed", isOpen ? "true" : "false")
+    this.toolsDockButton.setAttribute("aria-label", isOpen ? "Hide TOOLS" : "Open TOOLS")
+  }
+
+  updateDbHealthDockState(isOpen) {
+    if (!this.dbHealthDockButton) return
+    this.dbHealthDockButton.classList.toggle("is-active", isOpen)
+    this.dbHealthDockButton.setAttribute("aria-pressed", isOpen ? "true" : "false")
+    this.dbHealthDockButton.setAttribute("aria-label", isOpen ? "Hide DB Health" : "Open DB Health")
+  }
+
+  updateSettingsDockState(isOpen) {
+    if (!this.settingsDockButton) return
+    this.settingsDockButton.classList.toggle("is-active", isOpen)
+    this.settingsDockButton.setAttribute("aria-pressed", isOpen ? "true" : "false")
+    this.settingsDockButton.setAttribute("aria-label", isOpen ? "Hide Settings" : "Open Settings")
   }
 }
 

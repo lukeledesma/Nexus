@@ -1,79 +1,14 @@
-<aside id="organizer" class="finder-sidebar" data-controller="organizer" data-finder-target="sidebar">
-  <div class="finder-sidebar-header">
-    <h2>Organizer</h2>
-  </div>
-
-  <%# Folders %>
-  <nav class="finder-nav-group" aria-label="Folders">
-    <div class="section-heading-row section-heading-row--folders">
-      <h3>Folders</h3>
-      <button
-        type="button"
-        class="section-add-btn"
-        data-action="click->organizer#toggleNewFolder"
-        title="New Folder"
-        aria-label="New Folder"
-      >+</button>
+<section id="organizer" class="organizer-panel" data-controller="organizer" data-finder-target="sidebar">
+  <header class="organizer-panel-header" data-action="mousedown->window-manager#startDrag touchstart->window-manager#startDrag">
+    <h2>TOOLS</h2>
+    <div class="organizer-panel-controls">
+      <button type="button" class="tools-close-btn tools-close-btn--organizer" data-action="click->window-manager#closeTools" aria-label="Close TOOLS" title="Close">✕</button>
     </div>
+  </header>
 
-    <%= form_with url: apps_folders_path, method: :post,
-          class: "new-folder-form hidden",
-          data: { organizer_target: "newFolderForm", action: "submit->organizer#submitNewFolder" } do |f| %>
-      <div class="new-folder-row">
-        <%= f.text_field :name,
-              placeholder: "Folder name...",
-              autocomplete: "off",
-              class: "new-folder-input",
-              name: "folder[name]",
-              required: true,
-              data: {
-                organizer_target: "newFolderInput",
-                action: "keydown->organizer#newFolderKeydown"
-              } %>
-        <%= f.submit "Create", class: "new-folder-submit" %>
-      </div>
-    <% end %>
+  <p class="organizer-panel-stamp" data-organizer-target="stamp">No recent updates yet</p>
 
-    <% if @folders&.any? %>
-      <% @folders.each do |folder| %>
-        <button
-          type="button"
-          class="finder-item"
-          data-finder-target="item"
-          data-app-id="folders/<%= folder.id %>"
-          data-folder-id="<%= folder.id %>"
-          data-action="click->finder#toggle"
-        >
-          <span class="finder-item-label"><%= folder.name %></span>
-          <span class="finder-item-actions">
-            <span class="item-action-btn"
-                  data-action="click->organizer#renameFolder"
-                  title="Rename">&#9998;</span>
-            <span class="item-action-btn item-action-delete"
-                  data-action="click->organizer#deleteFolder"
-                  title="Delete">&times;</span>
-          </span>
-        </button>
-      <% end %>
-    <% end %>
-  </nav>
-
-  <%# Tools %>
-  <nav class="finder-nav-group" aria-label="Tools">
-    <div class="section-heading-row">
-      <h3>Tools</h3>
-    </div>
-
-    <button
-      type="button"
-      class="finder-item"
-      data-finder-target="item"
-      data-app-id="conversion_chart"
-      data-action="click->finder#toggle"
-    >
-      <span class="finder-item-label">SAE/Metric 🔧</span>
-    </button>
-
+  <nav class="organizer-tools-grid" aria-label="Tools">
     <button
       type="button"
       class="finder-item"
@@ -81,7 +16,10 @@
       data-app-id="singular_note"
       data-action="click->finder#toggle"
     >
-      <span class="finder-item-label">Notes 📓</span>
+      <div class="organizer-tool-card">
+        <dt class="organizer-tool-label">NOTES</dt>
+        <dd class="organizer-tool-value" data-organizer-target="notesSize">-</dd>
+      </div>
     </button>
 
     <button
@@ -91,7 +29,23 @@
       data-app-id="singular_task_list"
       data-action="click->finder#toggle"
     >
-      <span class="finder-item-label">Tasks 📆</span>
+      <div class="organizer-tool-card">
+        <dt class="organizer-tool-label">TASKS</dt>
+        <dd class="organizer-tool-value" data-organizer-target="tasksSize">-</dd>
+      </div>
+    </button>
+
+    <button
+      type="button"
+      class="finder-item"
+      data-finder-target="item"
+      data-app-id="conversion_chart"
+      data-action="click->finder#toggle"
+    >
+      <div class="organizer-tool-card">
+        <dt class="organizer-tool-label">SAE/METRIC</dt>
+        <dd class="organizer-tool-value" data-organizer-target="conversionPair">—</dd>
+      </div>
     </button>
   </nav>
-</aside>
+</section>

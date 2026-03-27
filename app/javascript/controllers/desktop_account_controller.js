@@ -1,60 +1,32 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static targets = ["sunToggle", "userChip", "overlay"]
+  static targets = ["settingsToggle"]
 
   connect() {
-    this.boundHandleEscape = this.handleEscape.bind(this)
-    document.addEventListener("keydown", this.boundHandleEscape)
-    this.syncSunState(false)
-    this.closePanel()
+    this.boundSettingsState = this.handleSettingsState.bind(this)
+    window.addEventListener("settings:state", this.boundSettingsState)
+    this.syncState(false)
   }
 
   disconnect() {
-    document.removeEventListener("keydown", this.boundHandleEscape)
+    window.removeEventListener("settings:state", this.boundSettingsState)
   }
 
-  toggleName() {
-    const willOpen = !this.element.classList.contains("is-name-open")
-    this.element.classList.toggle("is-name-open", willOpen)
-    this.syncSunState(willOpen)
-
-    if (!willOpen) this.closePanel()
+  toggleSettings(event) {
+    if (event) event.preventDefault()
+    window.dispatchEvent(new CustomEvent("settings:toggle"))
   }
 
-  openPanel() {
-    if (!this.element.classList.contains("is-name-open")) return
-    if (!this.hasOverlayTarget) return
-
-    this.overlayTarget.classList.remove("hidden")
+  handleSettingsState(event) {
+    const isOpen = Boolean(event?.detail?.open)
+    this.syncState(isOpen)
   }
 
-  closePanel() {
-    if (!this.hasOverlayTarget) return
-    this.overlayTarget.classList.add("hidden")
-  }
-
-  backdropClick(event) {
-    if (event.target !== this.overlayTarget) return
-    this.closePanel()
-  }
-
-  handleEscape(event) {
-    if (event.key !== "Escape") return
-
-    if (this.hasOverlayTarget && !this.overlayTarget.classList.contains("hidden")) {
-      this.closePanel()
-      return
-    }
-
-    if (this.element.classList.contains("is-name-open")) {
-      this.element.classList.remove("is-name-open")
-      this.syncSunState(false)
-    }
-  }
-
-  syncSunState(isOpen) {
-    if (!this.hasSunToggleTarget) return
-    this.sunToggleTarget.setAttribute("aria-expanded", isOpen ? "true" : "false")
+  syncState(isOpen) {
+    if (!this.hasSettingsToggleTarget) return
+    this.settingsToggleTarget.setAttribute("aria-expanded", isOpen ? "true" : "false")
+    this.settingsToggleTarget.setAttribute("aria-pressed", isOpen ? "true" : "false")
+    this.settingsToggleTarget.setAttribute("aria-label", isOpen ? "Close Settings" : "Open Settings")
   }
 }

@@ -1,8 +1,9 @@
 <turbo-frame id="app-pane">
-  <section class="app-surface app-surface--note" data-controller="title-editor">
-    <header class="app-surface-header">
-      <h2>Notes 📓</h2>
+  <section class="app-surface app-surface--note app-surface--tool" data-controller="title-editor tool-window-status" data-tool-window-status-item-type-value="note" data-tool-window-status-updated-at-value="<%= @note.updated_at&.utc&.iso8601 %>">
+    <header class="app-surface-header tool-window-header">
+      <h2 class="tool-window-title">NOTES</h2>
     </header>
+    <p class="tool-window-subtitle" data-tool-window-status-target="subtitle">Notes Updated just now</p>
 
     <%= form_with model: @note, url: apps_note_path(@note), method: :patch,
           data: {

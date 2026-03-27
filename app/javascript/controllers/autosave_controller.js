@@ -83,6 +83,7 @@ export default class extends Controller {
       const json = await response.json().catch(() => ({}))
       const savedName = (json.name || nameBeforeSave || "").toString().trim()
       if (savedName.length > 0) this.#updateSidebarName(savedName)
+      this.#publishSaveState(json)
     } catch (_error) {
       // Keep autosave silent; user can still press explicit Save.
     } finally {
@@ -101,5 +102,19 @@ export default class extends Controller {
     document.querySelectorAll(selector).forEach((label) => {
       label.textContent = newName
     })
+  }
+
+  #publishSaveState(json) {
+    const itemType = (json.item_type || this.itemTypeValue || "").toString().trim()
+    if (!itemType) return
+
+    const timestamp = (json.updated_at || "").toString().trim() || new Date().toISOString()
+
+    window.dispatchEvent(new CustomEvent("nexus:item-saved", {
+      detail: {
+        itemType,
+        timestamp
+      }
+    }))
   }
 }
