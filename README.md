@@ -22,7 +22,7 @@ Primary paths:
 - Rails app served by Puma.
 - Nginx reverse proxy for public traffic.
 - PostgreSQL for persistent data.
-- Filesystem storage root under `storage/item_lists` for organizer synchronization.
+- Filesystem storage root under `storage/workspace` for organizer synchronization.
 
 Request flow:
 1. Browser -> Nginx

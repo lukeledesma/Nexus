@@ -64,7 +64,7 @@ Nexus_Dev/
 │   │   ├── folder.rb     # after_commit disk sync hooks
 │   │   └── item.rb       # after_commit disk sync hooks
 │   ├── services/
-│   │   └── item_storage_sync_lite.rb  # Rebuilds storage/item_lists from DB
+│   │   └── item_storage_sync_lite.rb  # Rebuilds storage/workspace from DB
 │   └── views/
 │       ├── layouts/application.html.erb
 │       ├── organizer/_sidebar.html.erb
@@ -84,7 +84,7 @@ Nexus_Dev/
 │   ├── schema.rb
 │   └── migrate/
 ├── storage/
-│   └── item_lists/           # Disk mirror of organizer state
+│   └── workspace/            # Disk mirror of organizer state (Notes.nexus, Tasks.nexus, user folders)
 └── docs/
     ├── UI_GUIDE.md           # This app's UI behavior reference
     └── DEV_GUIDE.md          # This file
@@ -184,6 +184,28 @@ Key conventions:
 - `--app-main-min-content-width: 432px` — shared minimum width CSS variable.
 - Dark palette variables at `:root`.
 
+### Scrollbar UX Standard (Do Not Regress)
+
+Baseline expectation across Nexus scrollable regions:
+
+- Thin scrollbar geometry.
+- Theme-matched thumb contrast.
+- Reveal on scroll activity, then fade out.
+
+Primary implementation:
+
+- CSS selector block in `app/assets/stylesheets/application.css` under comment:
+  - `Subtle theme-matched scrollbars (Safari/Edge/Firefox)`
+- Runtime state class toggling in `app/javascript/controllers/finder_controller.js`:
+  - `handleScrollActivity(event)`
+  - applies/removes `.is-scrolling` with timeout (`scrollFadeDelayMs`)
+
+When adding a new scrollable container:
+
+1. Add the container selector to the scrollbar CSS lists (`scrollbar-width`, `::-webkit-scrollbar*`, and `.is-scrolling` variants).
+2. Include the selector in `finder_controller.js` `isTracked` matching logic if fade behavior is desired.
+3. Verify on macOS + non-macOS browsers; keep native overlay behavior where it looks better and remains accessible.
+
 ---
 
 ## 6. Server-Rendered State
@@ -203,7 +225,10 @@ Pattern:
 ## 7. Disk Mirror — `ItemStorageSyncLite`
 
 - Location: `app/services/item_storage_sync_lite.rb`
-- Root: `storage/item_lists/`
+- Root: `storage/workspace/`
+  - `Notes.nexus`: Singular note document (always present)
+  - `Tasks.nexus`: Singular task list document (always present)
+  - User folders as subdirectories (no items inside)
 - Triggered: `after_commit` on `Folder` and `Item` models.
 - Behavior: rebuilds folder directories and `.nexus` files from current DB state.
 - File names sanitized, duplicates suffixed with numbers.

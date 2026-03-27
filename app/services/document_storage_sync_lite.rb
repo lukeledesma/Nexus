@@ -5,10 +5,10 @@ require "fileutils"
 class DocumentStorageSyncLite
   class << self
     def storage_root
-      Rails.root.join("storage", "item_lists")
+      Rails.root.join("storage", "workspace")
     end
 
-    def next_available_filename(base_path, title, extension: ".nexus", exclude_path: nil)
+    def next_available_filename(base_path, title, extension: ".txt", exclude_path: nil)
       base_name = normalize_name(title, fallback: "Untitled Item")
       candidate = "#{base_name}#{extension}"
       return candidate unless path_taken?(base_path.join(candidate), exclude_path)
@@ -126,7 +126,7 @@ class DocumentStorageSyncLite
 
     File.write(target_path, item_file_contents)
     persist_storage_path(target_relative)
-    persist_title_from_basename(File.basename(filename, ".nexus"))
+    persist_title_from_basename(strip_supported_extension(filename))
   end
 
   def sync_folder_update
@@ -172,7 +172,7 @@ class DocumentStorageSyncLite
 
     File.write(target_path, item_file_contents)
     persist_storage_path(target_relative) if previous_relative != target_relative
-    persist_title_from_basename(File.basename(target_filename, ".nexus"))
+    persist_title_from_basename(strip_supported_extension(target_filename))
   end
 
   def update_child_storage_paths_for_folder_rename(old_relative, new_relative)
@@ -218,6 +218,14 @@ class DocumentStorageSyncLite
     @document.title = normalized
   end
 
+  def strip_supported_extension(filename)
+    value = filename.to_s
+    return File.basename(value, ".txt") if value.end_with?(".txt")
+    return File.basename(value, ".nexus") if value.end_with?(".nexus")
+
+    value
+  end
+
   def item_file_contents
     @document.content_type == "task_list" ? task_list_contents : note_contents
   end
@@ -236,17 +244,21 @@ class DocumentStorageSyncLite
   def task_list_contents
     task_groups = Array(@document.tasks).map do |task|
       value = task.respond_to?(:to_h) ? task.to_h : {}
-      marker = ActiveModel::Type::Boolean.new.cast(value["checked"]) ? "x" : " "
-      lines = ["- [#{marker}] #{value["text"].to_s}"]
+      text = value["text"].to_s.strip
+      next if text.empty?
+
+      lines = [task_list_line(text, value["checked"], subtask: false)]
 
       Array(value["subtasks"]).each do |subtask|
         subtask_value = subtask.respond_to?(:to_h) ? subtask.to_h : {}
-        subtask_marker = ActiveModel::Type::Boolean.new.cast(subtask_value["checked"]) ? "x" : " "
-        lines << "- [#{subtask_marker}] #{subtask_value["text"].to_s}"
+        subtask_text = subtask_value["text"].to_s.strip
+        next if subtask_text.empty?
+
+        lines << task_list_line(subtask_text, subtask_value["checked"], subtask: true)
       end
 
       lines
-    end
+    end.compact
 
     task_lines = task_groups.flat_map.with_index do |group, index|
       index < task_groups.length - 1 ? (group + [""]) : group
@@ -265,5 +277,11 @@ class DocumentStorageSyncLite
 
   def iso8601_or_nil(value)
     value&.iso8601 || "null"
+  end
+
+  def task_list_line(text, checked, subtask: false)
+    marker = ActiveModel::Type::Boolean.new.cast(checked) ? "x" : " "
+    prefix = subtask ? "- " : ""
+    "#{prefix}[#{marker}] #{text}"
   end
 end

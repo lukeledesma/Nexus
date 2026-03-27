@@ -85,7 +85,7 @@ class DocumentDiskLoader
     def upsert_files_from_disk!(folder_docs, seen_paths)
       Find.find(storage_root.to_s) do |path|
         next unless File.file?(path)
-        next unless path.end_with?(".nexus")
+        next unless supported_file_extension?(path)
 
         relative_path = relative_disk_path(path)
         next if hidden_path?(relative_path)
@@ -104,7 +104,7 @@ class DocumentDiskLoader
 
     def upsert_file_from_path!(absolute_file, relative_path, parent)
       parsed = parse_nexus_file(absolute_file)
-      title = File.basename(absolute_file, ".nexus")
+      title = basename_without_supported_extension(absolute_file)
       document = find_or_initialize_by_storage_path(relative_path, is_folder: false)
 
       attributes = {
@@ -148,6 +148,18 @@ class DocumentDiskLoader
       relative_path.split("/").any? { |segment| segment.start_with?(".") }
     end
 
+    def supported_file_extension?(path)
+      path.end_with?(".nexus") || path.end_with?(".txt")
+    end
+
+    def basename_without_supported_extension(path)
+      base = File.basename(path)
+      return File.basename(base, ".nexus") if base.end_with?(".nexus")
+      return File.basename(base, ".txt") if base.end_with?(".txt")
+
+      base
+    end
+
     def parse_nexus_file(path)
       text = File.read(path)
       lines = text.split("\n", -1)
@@ -187,12 +199,25 @@ class DocumentDiskLoader
           next
         end
 
-        main_match = line.match(/^\- \[(x| )\] (.*)$/i)
-        next unless main_match
+        main_match = line.match(/^\[(x| )\] (.*)$/i)
+        subtask_match = line.match(/^\- \[(x| )\] (.*)$/i)
+
+        if main_match
+          current_main_task = {
+            "text" => main_match[2].to_s,
+            "checked" => main_match[1].downcase == "x",
+            "subtasks" => []
+          }
+          tasks << current_main_task
+          new_group = false
+          next
+        end
+
+        next unless subtask_match
 
         entry = {
-          "text" => main_match[2].to_s,
-          "checked" => main_match[1].downcase == "x"
+          "text" => subtask_match[2].to_s,
+          "checked" => subtask_match[1].downcase == "x"
         }
 
         if current_main_task.nil? || new_group

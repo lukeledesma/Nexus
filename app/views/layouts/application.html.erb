@@ -28,9 +28,44 @@
   <body class="<%= logged_in? ? "nexus-os" : "" %>" data-controller="window-manager">
     <% if logged_in? %>
       <div id="desktop" class="desktop-layer"></div>
+
+      <div class="db-health-widget" data-controller="db-health" data-db-health-url-value="<%= db_health_path %>">
+        <button type="button" class="app-version-btn" data-db-health-target="toggleBtn" data-action="click->db-health#toggle" title="DB Health">V1</button>
+
+        <div class="db-health-overlay hidden" data-db-health-target="overlay">
+          <section class="db-health-panel" data-db-health-target="panel" aria-live="polite">
+          <header class="db-health-header">
+            <h3 data-db-health-target="title">DB Health</h3>
+            <div class="db-health-controls">
+              <button type="button" class="db-health-back hidden" data-db-health-target="backButton" data-action="click->db-health#clearFocus" aria-label="Back" title="Back">←</button>
+              <button type="button" class="db-health-refresh" data-action="click->db-health#refresh" aria-label="Refresh" title="Refresh">↻</button>
+              <button type="button" class="db-health-close" data-action="click->db-health#close" aria-label="Close" title="Close">✕</button>
+            </div>
+          </header>
+
+          <p class="db-health-stamp" data-db-health-target="stamp">Waiting for data...</p>
+
+          <dl class="db-health-grid" data-db-health-target="grid">
+            <div class="db-health-card db-health-card--selectable" data-db-health-target="metricCard" data-db-health-focus-key="folders" data-action="click->db-health#focusMetric"><dt>Folders</dt><dd data-db-health-target="foldersCount">-</dd></div>
+            <div class="db-health-card db-health-card--selectable" data-db-health-target="metricCard" data-db-health-focus-key="items" data-action="click->db-health#focusMetric"><dt>Items</dt><dd data-db-health-target="itemsCount">-</dd></div>
+            <div class="db-health-card db-health-card--selectable" data-db-health-target="metricCard" data-db-health-focus-key="item_id_total" data-action="click->db-health#focusMetric"><dt>Item IDs</dt><dd data-db-health-target="maxItemId">-</dd></div>
+            <div class="db-health-card db-health-card--selectable" data-db-health-target="metricCard" data-db-health-focus-key="workspace" data-action="click->db-health#focusMetric"><dt>Workspace Size</dt><dd data-db-health-target="workspaceSize">-</dd></div>
+            <div class="db-health-card db-health-card--selectable" data-db-health-target="metricCard" data-db-health-focus-key="users" data-action="click->db-health#focusMetric"><dt>Users</dt><dd data-db-health-target="usersCount">-</dd></div>
+            <div class="db-health-card db-health-card--selectable" data-db-health-target="metricCard" data-db-health-focus-key="db_size" data-action="click->db-health#focusMetric"><dt>DB Size</dt><dd data-db-health-target="dbSize">-</dd></div>
+          </dl>
+
+          <section class="db-health-detail hidden" data-db-health-target="detailWrap">
+            <h4 data-db-health-target="detailTitle">Details</h4>
+            <ul class="db-health-detail-list" data-db-health-target="detailList"></ul>
+          </section>
+          </section>
+        </div>
+      </div>
     <% end %>
 
     <%= yield %>
-    <footer class="app-version" aria-hidden="true">V1</footer>
+    <% unless logged_in? %>
+      <footer class="app-version">V1</footer>
+    <% end %>
   </body>
 </html>

@@ -1,49 +1,7 @@
 <turbo-frame id="app-pane">
-  <section class="app-surface" data-controller="organizer">
+  <section class="app-surface">
     <header class="app-surface-header">
       <h2><%= @folder.name %></h2>
-      <p><%= @items.size %> item<%= "s" if @items.size != 1 %></p>
     </header>
-
-    <% if @items.any? %>
-      <ul class="app-list">
-        <% @items.each do |item| %>
-          <% path = item.item_type == "task_list" ? apps_task_list_path(item) : apps_note_path(item) %>
-          <li class="item-row"
-              data-item-id="<%= item.id %>"
-              data-item-type="<%= item.item_type %>"
-              data-folder-id="<%= @folder.id %>">
-            <%= link_to path, data: { turbo_frame: "app-pane" }, class: "app-list-link" do %>
-              <span class="item-name"><%= item.name %></span>
-            <% end %>
-            <span class="app-list-badge"><%= item.item_type == "task_list" ? "task list" : "note" %></span>
-            <div class="item-row-actions">
-              <button type="button" class="item-action-btn"
-                      data-action="click->organizer#renameItem"
-                      title="Rename">✎</button>
-              <button type="button" class="item-action-btn item-action-delete"
-                      data-action="click->organizer#deleteItem"
-                      title="Delete">×</button>
-            </div>
-          </li>
-        <% end %>
-      </ul>
-    <% else %>
-      <p class="app-empty">This folder is empty.</p>
-    <% end %>
-
-    <footer class="app-surface-footer">
-      <%= form_with url: apps_notes_path, method: :post, data: { turbo_frame: "app-pane" } do |f| %>
-        <%= f.hidden_field :folder_id, value: @folder.id, name: "item[folder_id]" %>
-        <%= f.hidden_field :name, value: "Untitled Note", name: "item[name]" %>
-        <%= f.submit "+ New Note", class: "btn-create" %>
-      <% end %>
-
-      <%= form_with url: apps_task_lists_path, method: :post, data: { turbo_frame: "app-pane" } do |f| %>
-        <%= f.hidden_field :folder_id, value: @folder.id, name: "item[folder_id]" %>
-        <%= f.hidden_field :name, value: "Untitled Task List", name: "item[name]" %>
-        <%= f.submit "+ New Task List", class: "btn-create" %>
-      <% end %>
-    </footer>
   </section>
 </turbo-frame>

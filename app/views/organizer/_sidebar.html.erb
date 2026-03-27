@@ -5,7 +5,7 @@
 
   <%# Folders %>
   <nav class="finder-nav-group" aria-label="Folders">
-    <div class="section-heading-row">
+    <div class="section-heading-row section-heading-row--folders">
       <h3>Folders</h3>
       <button
         type="button"
@@ -39,14 +39,13 @@
         <button
           type="button"
           class="finder-item"
+          data-finder-target="item"
+          data-app-id="folders/<%= folder.id %>"
           data-folder-id="<%= folder.id %>"
-          data-action="click->organizer#toggleFolder"
+          data-action="click->finder#toggle"
         >
           <span class="finder-item-label"><%= folder.name %></span>
           <span class="finder-item-actions">
-            <span class="item-action-btn"
-              data-action="click->organizer#addItem"
-              title="Add Item">+</span>
             <span class="item-action-btn"
                   data-action="click->organizer#renameFolder"
                   title="Rename">&#9998;</span>
@@ -54,41 +53,8 @@
                   data-action="click->organizer#deleteFolder"
                   title="Delete">&times;</span>
           </span>
-          <span class="finder-item-meta"><%= folder.items.size %></span>
         </button>
-
-        <div class="folder-item-panel hidden" data-folder-panel-id="<%= folder.id %>">
-          <% items = folder.items.ordered %>
-          <% if items.any? %>
-            <% items.each do |item| %>
-              <button
-                type="button"
-                class="finder-item finder-item-child"
-                data-finder-target="item"
-                data-item-id="<%= item.id %>"
-                data-item-type="<%= item.item_type %>"
-                data-app-id="<%= item.item_type == "task_list" ? "task_lists" : "notes" %>/<%= item.id %>"
-                data-action="click->finder#toggle"
-              >
-                <span class="finder-item-label"><%= item.name %></span>
-                <span class="finder-item-meta finder-item-kind"><%= item.item_type == "task_list" ? "Task List" : "Note" %></span>
-                <span class="finder-item-actions">
-                  <span class="item-action-btn"
-                        data-action="click->organizer#renameItem"
-                        title="Rename">&#9998;</span>
-                  <span class="item-action-btn item-action-delete"
-                        data-action="click->organizer#deleteItem"
-                        title="Delete">&times;</span>
-                </span>
-              </button>
-            <% end %>
-          <% else %>
-            <p class="finder-empty finder-empty-child">No items yet</p>
-          <% end %>
-        </div>
       <% end %>
-    <% else %>
-      <p class="finder-empty">No folders yet</p>
     <% end %>
   </nav>
 
@@ -105,43 +71,27 @@
       data-app-id="conversion_chart"
       data-action="click->finder#toggle"
     >
-      <span class="finder-item-label">Conversion Table</span>
+      <span class="finder-item-label">SAE/Metric 🔧</span>
+    </button>
+
+    <button
+      type="button"
+      class="finder-item"
+      data-finder-target="item"
+      data-app-id="singular_note"
+      data-action="click->finder#toggle"
+    >
+      <span class="finder-item-label">Notes 📓</span>
+    </button>
+
+    <button
+      type="button"
+      class="finder-item"
+      data-finder-target="item"
+      data-app-id="singular_task_list"
+      data-action="click->finder#toggle"
+    >
+      <span class="finder-item-label">Tasks 📆</span>
     </button>
   </nav>
-
-  <div
-    class="modal-backdrop hidden"
-    data-organizer-target="itemModalBackdrop"
-    data-action="click->organizer#clickItemModalBackdrop"
-  >
-    <div class="modal-window p-6">
-      <h2 class="modal-title">Create Item</h2>
-      <p class="finder-empty">Create a new Task List.</p>
-
-      <div class="item-type-picker">
-        <button
-          type="button"
-          class="item-type-btn"
-          data-item-type="task_list"
-          data-organizer-target="itemTypeButton"
-          data-action="click->organizer#chooseItemType"
-        >Task List</button>
-      </div>
-
-      <%= form_with url: "#", method: :post, class: "modal-form", data: { action: "submit->organizer#submitNewItem" } do |f| %>
-        <%= f.hidden_field :item_type, value: "", data: { organizer_target: "itemTypeInput" } %>
-        <label class="modal-label">Name</label>
-        <%= f.text_field :name,
-              class: "modal-input",
-              placeholder: "Choose a type first",
-              data: { organizer_target: "itemNameInput", action: "keydown->organizer#itemNameKeydown" },
-              disabled: true %>
-
-        <div class="modal-actions">
-          <button type="button" class="modal-cancel-btn" data-action="click->organizer#cancelItemCreate">Cancel</button>
-          <button type="submit" class="modal-submit-btn" data-organizer-target="itemCreateSubmit" disabled>Create</button>
-        </div>
-      <% end %>
-    </div>
-  </div>
 </aside>

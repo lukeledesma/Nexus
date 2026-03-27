@@ -135,3 +135,22 @@ The UI uses a dark blue-gray palette:
 | Auth dropdown | `#202125` |
 | Main window body | `#171823` → `#11121A` gradient |
 | Active item highlight | Blue accent |
+
+---
+
+## Scrollbar Standard (Important)
+
+Nexus uses a subtle scrollbar style as the default UX target:
+
+- Thin track/thumb profile.
+- Theme-matched contrast (visible but not loud).
+- Fade-in during active scroll and fade-out after inactivity.
+
+This behavior should be preserved for all new scrollable panes whenever practical.
+
+Implementation references:
+
+- CSS standard: `app/assets/stylesheets/application.css` (section comment: `Subtle theme-matched scrollbars`)
+- Scroll activity toggle: `app/javascript/controllers/finder_controller.js` (`handleScrollActivity` + `.is-scrolling` class)
+
+Note: on macOS, native overlay scrollbars may appear especially refined. That look is acceptable and should not be replaced with heavier custom chrome.

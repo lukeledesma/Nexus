@@ -2,12 +2,13 @@
 
 require "fileutils"
 
-# Rebuilds storage/item_lists from Folder + Item records.
+# Rebuilds storage/workspace from Folder + Item records.
 # This keeps filesystem state aligned with the app's organizer model.
+# Notes and Tasks are always singular and stored at the workspace root.
 class ItemStorageSyncLite
   class << self
     def storage_root
-      Rails.root.join("storage", "item_lists")
+      Rails.root.join("storage", "workspace")
     end
 
     def sync_all!
@@ -22,18 +23,31 @@ class ItemStorageSyncLite
     FileUtils.rm_rf(temp_root)
     FileUtils.mkdir_p(temp_root)
 
-    used_folder_names = {}
+    # Write the singular Note and TaskList from the App folder at the root
+    app_folder = Folder.find_by(name: "App")
+      if app_folder
+        note = app_folder.items.find_by(item_type: "note")
+        task_list = app_folder.items.find_by(item_type: "task_list")
 
-    Folder.includes(:items).ordered.find_each do |folder|
+        # Write Note (or empty placeholder if it doesn't exist)
+        note_content = note ? item_contents(note) : empty_note_contents
+        File.write(temp_root.join("Notes.txt"), note_content)
+
+        # Write TaskList (or empty placeholder if it doesn't exist)
+        task_content = task_list ? item_contents(task_list) : empty_task_list_contents
+        File.write(temp_root.join("Tasks.txt"), task_content)
+      else
+        # Create empty placeholders if App folder doesn't exist yet
+        File.write(temp_root.join("Notes.txt"), empty_note_contents)
+        File.write(temp_root.join("Tasks.txt"), empty_task_list_contents)
+      end
+
+    # Write user folders as subdirectories (without items inside them)
+    used_folder_names = {}
+    Folder.where.not(name: "App").includes(:items).ordered.find_each do |folder|
       folder_name = next_available_name(folder.name, used_folder_names)
       folder_path = temp_root.join(folder_name)
       FileUtils.mkdir_p(folder_path)
-
-      used_item_names = {}
-      folder.items.ordered.each do |item|
-        filename = next_available_name(item.name, used_item_names, extension: ".nexus")
-        File.write(folder_path.join(filename), item_contents(item))
-      end
     end
 
     swap_storage(temp_root)
@@ -104,14 +118,35 @@ class ItemStorageSyncLite
   end
 
   def task_list_contents(item)
-    task_lines = Array(item.tasks).filter_map do |task|
-      if task.is_a?(Hash)
-        text = task["text"].to_s
-        checked = ActiveModel::Type::Boolean.new.cast(task["checked"])
-        "- [#{checked ? "x" : " "}] #{text}"
+    task_groups = Array(item.tasks).filter_map do |task|
+      if task.respond_to?(:to_h)
+        value = task.to_h
+        text = value["text"].to_s.strip
+        next if text.empty?
+
+        lines = [task_line(text, value["checked"], subtask: false)]
+
+        Array(value["subtasks"]).each do |subtask|
+          next unless subtask.respond_to?(:to_h)
+
+          subtask_value = subtask.to_h
+          subtask_text = subtask_value["text"].to_s.strip
+          next if subtask_text.empty?
+
+          lines << task_line(subtask_text, subtask_value["checked"], subtask: true)
+        end
+
+        lines
       else
-        "- [ ] #{task.to_s}"
+        text = task.to_s.strip
+        next if text.empty?
+
+        [task_line(text, false, subtask: false)]
       end
+    end
+
+    task_lines = task_groups.flat_map.with_index do |group, index|
+      index < task_groups.length - 1 ? (group + [""]) : group
     end
 
     [
@@ -127,5 +162,34 @@ class ItemStorageSyncLite
 
   def iso8601_or_nil(value)
     value&.iso8601 || "null"
+  end
+
+  def task_line(text, checked, subtask: false)
+    marker = ActiveModel::Type::Boolean.new.cast(checked) ? "x" : " "
+    prefix = subtask ? "- " : ""
+    "#{prefix}[#{marker}] #{text}"
+  end
+
+  def empty_note_contents
+    [
+      "# NEXUS_NOTE",
+      "# name: Notes",
+      "# folder: App",
+      "# item_id: ",
+      "# updated_at: null",
+      "",
+      ""
+    ].join("\n")
+  end
+
+  def empty_task_list_contents
+    [
+      "# NEXUS_TASK_LIST",
+      "# name: Tasks",
+      "# folder: App",
+      "# item_id: ",
+      "# updated_at: null",
+      ""
+    ].join("\n")
   end
 end

@@ -10,6 +10,8 @@ Rails.application.routes.draw do
     get "calculator", to: "calculator#show"
     get "settings", to: "settings#show"
     get "conversion_chart", to: "conversion_chart#show"
+    get "singular_note", to: "singular#note"
+    get "singular_task_list", to: "singular#task_list"
     get "all_notes",  to: "notes#index"
     get "all_tasks",  to: "task_lists#index"
   end
@@ -21,6 +23,7 @@ Rails.application.routes.draw do
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
   # Can be used by load balancers and uptime monitors to verify that the app is live.
   get "up" => "rails/health#show", as: :rails_health_check
+  get "db_health", to: "db_health#show"
 
   # Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.erb)
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
