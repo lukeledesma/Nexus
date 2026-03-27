@@ -29,6 +29,60 @@
     <% if logged_in? %>
       <div id="desktop" class="desktop-layer"></div>
 
+      <header class="desktop-menubar" aria-label="Desktop menu bar">
+        <div class="desktop-menubar-left">
+          <div class="desktop-menubar-account" data-controller="desktop-account">
+            <button
+              type="button"
+              class="desktop-menubar-sun-toggle"
+              data-desktop-account-target="sunToggle"
+              data-action="click->desktop-account#toggleName"
+              aria-label="Toggle account name"
+              aria-expanded="false"
+            >
+              <span class="desktop-menubar-sun" aria-hidden="true">☼</span>
+            </button>
+
+            <button
+              type="button"
+              class="desktop-menubar-user-chip"
+              data-desktop-account-target="userChip"
+              data-action="click->desktop-account#openPanel"
+              aria-label="Open account panel"
+            ><%= current_user.email %></button>
+
+            <div
+              class="desktop-account-overlay hidden"
+              data-desktop-account-target="overlay"
+              data-action="click->desktop-account#backdropClick"
+            >
+              <section class="desktop-account-panel" role="dialog" aria-modal="true" aria-label="Account">
+                <header class="desktop-account-header">
+                  <div class="desktop-account-header-meta">
+                    <span class="desktop-account-header-user"><%= current_user.email %></span>
+                  </div>
+                </header>
+
+                <div class="desktop-account-row desktop-account-row--action">
+                  <div class="desktop-account-actions">
+                    <button
+                      type="button"
+                      class="desktop-account-action desktop-account-action--close"
+                      data-action="click->desktop-account#closePanel"
+                    >Close</button>
+                    <%= button_to "Logout", logout_path, method: :delete, class: "desktop-account-action desktop-account-action--logout" %>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+
+        <div class="desktop-menubar-right" data-controller="desktop-clock">
+          <span class="desktop-menubar-time" data-desktop-clock-target="display"></span>
+        </div>
+      </header>
+
       <div class="db-health-widget" data-controller="db-health" data-db-health-url-value="<%= db_health_path %>">
         <button type="button" class="app-version-btn" data-db-health-target="toggleBtn" data-action="click->db-health#toggle" title="DB Health">V1</button>
 

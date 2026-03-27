@@ -17,21 +17,6 @@
 
     <!-- Window Content -->
     <div class="window-content">
-      <!-- User Dropdown (Top) -->
-      <div class="organizer-header">
-        <div class="auth-menu-wrapper" data-controller="auth-menu">
-          <button class="auth-menu-toggle" data-action="click->auth-menu#toggle">
-            <span class="auth-user-email"><%= current_user.email %></span>
-            <svg class="auth-menu-icon" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-            </svg>
-          </button>
-          <div class="auth-menu-dropdown" data-auth-menu-target="menu">
-            <%= button_to "Logout", logout_path, method: :delete, class: "auth-menu-item" %>
-          </div>
-        </div>
-      </div>
-
       <!-- Organizer Sidebar Content -->
       <%= render "organizer/sidebar" %>
     </div>

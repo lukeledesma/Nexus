@@ -2792,6 +2792,231 @@ input.connection-inline {
   overflow: hidden;
 }
 
+.desktop-menubar {
+  --desktop-menubar-account-gap: 0.38rem;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0.65rem 0 var(--desktop-menubar-account-gap);
+  background: transparent;
+  backdrop-filter: none;
+  border-bottom: none;
+  z-index: 25;
+}
+
+.desktop-menubar-left,
+.desktop-menubar-right {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.desktop-menubar-account {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.desktop-menubar-sun-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.06rem;
+  height: 1.06rem;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: rgba(228, 228, 231, 0.9);
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.desktop-menubar-sun-toggle:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: transparent;
+}
+
+.desktop-menubar-sun {
+  line-height: 1;
+}
+
+.desktop-menubar-sun-toggle[aria-expanded="true"] {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.desktop-menubar-user-chip {
+  max-width: 0;
+  opacity: 0;
+  transform: translateX(-10px);
+  pointer-events: none;
+  margin-left: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: rgba(228, 228, 231, 0.9);
+  font: inherit;
+  font-size: 0.8rem;
+  line-height: 1.06rem;
+  padding: 0 0;
+  text-align: center;
+  cursor: pointer;
+  transition: max-width 220ms ease, opacity 180ms ease, transform 220ms ease, margin-left 220ms ease, padding 220ms ease;
+}
+
+.desktop-menubar-account.is-name-open .desktop-menubar-user-chip {
+  max-width: 280px;
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+  margin-left: var(--desktop-menubar-account-gap);
+  padding: 0 0.45rem;
+  background: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+}
+
+.desktop-menubar-user-chip:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.desktop-menubar-account.is-name-open .desktop-menubar-user-chip:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.desktop-account-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  background: rgba(0, 0, 0, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.desktop-account-overlay.hidden {
+  display: none;
+}
+
+.desktop-account-panel {
+  width: min(250px, calc(100vw - 2rem));
+  background: linear-gradient(170deg, rgba(8, 12, 24, 0.96) 0%, rgba(7, 10, 20, 0.96) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.desktop-account-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+  box-sizing: border-box;
+  padding: 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.desktop-account-header-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.desktop-account-header-user {
+  color: rgba(228, 228, 231, 0.95);
+  font-size: 0.84rem;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  text-align: center;
+}
+
+.desktop-account-row {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  padding: 0 0.85rem;
+  font-size: 0.86rem;
+  line-height: 1.1;
+}
+
+.desktop-account-row--user {
+  color: rgba(228, 228, 231, 0.88);
+}
+
+.desktop-account-row--action {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.75rem;
+}
+
+.desktop-account-actions {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: stretch;
+  gap: 0.35rem;
+}
+
+.desktop-account-actions .button_to {
+  margin: 0;
+  width: 100%;
+}
+
+.desktop-account-action {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.88rem;
+  line-height: 1.1;
+  padding: 0.5rem 0.6rem;
+  text-align: center;
+  cursor: pointer;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+
+.desktop-account-action:hover,
+.desktop-account-action:focus-visible {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.desktop-account-action--logout:hover,
+.desktop-account-action--logout:focus-visible {
+  color: #fecaca;
+  background: rgba(239, 68, 68, 0.16);
+}
+
+.desktop-menubar-time {
+  color: rgba(228, 228, 231, 0.9);
+  font-size: 0.84rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.05;
+  white-space: nowrap;
+}
+
 /* ─────────────────────────────────────────────────────────────────────────── */
 /* OS-Style Two-Window Manager                                                 */
 /* ─────────────────────────────────────────────────────────────────────────── */
