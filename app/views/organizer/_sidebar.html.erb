@@ -6,41 +6,14 @@
     </div>
   </header>
 
-  <p class="organizer-panel-stamp" data-organizer-target="stamp">No recent updates yet</p>
+  <p class="organizer-panel-stamp">Measure twice, cut once.</p>
 
   <nav class="organizer-tools-grid" aria-label="Tools">
     <button
       type="button"
       class="finder-item"
-      data-finder-target="item"
-      data-app-id="singular_note"
-      data-action="click->finder#toggle"
-    >
-      <div class="organizer-tool-card">
-        <dt class="organizer-tool-label">NOTES</dt>
-        <dd class="organizer-tool-value" data-organizer-target="notesSize">-</dd>
-      </div>
-    </button>
-
-    <button
-      type="button"
-      class="finder-item"
-      data-finder-target="item"
-      data-app-id="singular_task_list"
-      data-action="click->finder#toggle"
-    >
-      <div class="organizer-tool-card">
-        <dt class="organizer-tool-label">TASKS</dt>
-        <dd class="organizer-tool-value" data-organizer-target="tasksSize">-</dd>
-      </div>
-    </button>
-
-    <button
-      type="button"
-      class="finder-item"
-      data-finder-target="item"
-      data-app-id="conversion_chart"
-      data-action="click->finder#toggle"
+      data-app-url="/apps/conversion_chart"
+      data-action="click->organizer#launchApp"
     >
       <div class="organizer-tool-card">
         <dt class="organizer-tool-label">SAE/METRIC</dt>

@@ -2,7 +2,7 @@ import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
 
 export default class extends Controller {
-  static targets = ["newFolderForm", "newFolderInput", "stamp", "notesSize", "tasksSize", "conversionPair"]
+  static targets = ["newFolderForm", "newFolderInput", "stamp", "conversionPair"]
 
   #conversionPairs = [
     { sae: '5/16"', metric: '8 mm' },
@@ -22,7 +22,6 @@ export default class extends Controller {
     this.boundSavedState = this.handleSavedState.bind(this)
     window.addEventListener("nexus:item-saved", this.boundSavedState)
     this.loadPersistedStamp()
-    this.loadFileSizes()
     this.startConversionCycle()
   }
 
@@ -117,30 +116,6 @@ export default class extends Controller {
     this.stampTarget.textContent = `${label} Updated ${this.formatTimestamp(timestamp)}`
   }
 
-  async loadFileSizes() {
-    try {
-      const response = await fetch("/db_health", {
-        method: "GET",
-        headers: { Accept: "application/json" }
-      })
-      if (!response.ok) return
-
-      const payload = await response.json()
-      const organizer = payload?.organizer
-      if (!organizer) return
-
-      if (this.hasNotesSizeTarget && organizer.note_size_bytes) {
-        this.notesSizeTarget.textContent = this.formatBytes(organizer.note_size_bytes)
-      }
-
-      if (this.hasTasksSizeTarget && organizer.task_size_bytes) {
-        this.tasksSizeTarget.textContent = this.formatBytes(organizer.task_size_bytes)
-      }
-    } catch (_error) {
-      // Keep size loading non-blocking if endpoint is unavailable
-    }
-  }
-
   formatBytes(bytes) {
     if (!bytes || bytes === 0) return "-"
     const units = ["B", "KB", "MB", "GB"]
@@ -177,6 +152,12 @@ export default class extends Controller {
     if (itemType === "note") return "Notes"
     if (itemType === "task_list") return "Tasks"
     return null
+  }
+
+  launchApp(event) {
+    const url = event.currentTarget.dataset.appUrl
+    if (!url) return
+    window.dispatchEvent(new CustomEvent("content-window:open", { detail: { url } }))
   }
 
   formatTimestamp(value) {

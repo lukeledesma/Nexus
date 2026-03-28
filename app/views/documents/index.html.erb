@@ -1,46 +1,4 @@
-<div class="window-manager-shell" data-controller="finder">
-  <!-- Left Organizer Window -->
-  <div id="organizer-window" class="os-window organizer-window is-hidden" data-window="organizer">
-    <!-- Minimal title bar for dragging -->
-    <div class="title-bar" data-action="mousedown->window-manager#startDrag touchstart->window-manager#startDrag"></div>
-
-    <!-- Window Content -->
-    <div class="window-content">
-      <!-- Organizer Sidebar Content -->
-      <%= render "organizer/sidebar" %>
-    </div>
-  </div>
-
-  <!-- Right Main Window -->
-  <div id="main-window" class="os-window main-window is-hidden" data-window="main">
-    <!-- Minimal title bar for dragging -->
-    <div class="title-bar" data-action="mousedown->window-manager#startDrag touchstart->window-manager#startDrag"></div>
-
-    <button type="button" class="tools-close-btn tools-close-btn--main" data-action="click->window-manager#closeTools" aria-label="Close TOOLS" title="Close">✕</button>
-
-    <!-- Only the right edge of the extended window is resizable -->
-    <div class="resize-handle right" data-action="mousedown->window-manager#startResize touchstart->window-manager#startResize"></div>
-
-    <!-- Window Content -->
-    <div class="window-content">
-      <turbo-frame id="app-pane" class="finder-app-frame"></turbo-frame>
-    </div>
-  </div>
-
-</div>
-
 <div class="app-dock" aria-label="Pinned apps">
-  <button
-    type="button"
-    class="app-dock-button app-dock-button--tools"
-    data-action="click->window-manager#toggleTools"
-    data-hover-label="Tools"
-    aria-label="Open TOOLS"
-    aria-pressed="false"
-  >
-    ⚒
-  </button>
-
   <button
     type="button"
     class="app-dock-button app-dock-button--db-health"
@@ -61,5 +19,27 @@
     aria-pressed="false"
   >
     ⚙
+  </button>
+
+  <button
+    type="button"
+    class="app-dock-button app-dock-button--stationary"
+    data-action="click->window-manager#toggleStationary"
+    data-hover-label="Stationary"
+    aria-label="Open Stationary"
+    aria-pressed="false"
+  >
+    ✎
+  </button>
+
+  <button
+    type="button"
+    class="app-dock-button app-dock-button--tools"
+    data-action="click->window-manager#toggleTools"
+    data-hover-label="Tools"
+    aria-label="Open TOOLS"
+    aria-pressed="false"
+  >
+    ⚒
   </button>
 </div>

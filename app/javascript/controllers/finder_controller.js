@@ -14,15 +14,18 @@ export default class extends Controller {
     this.boundHandleScrollActivity = this.handleScrollActivity.bind(this)
     this.boundCloseComplete = this.handleCloseComplete.bind(this)
     this.boundRequestClose = this.handleRequestClose.bind(this)
+    this.boundFinderOpen = this.handleFinderOpen.bind(this)
     document.addEventListener("scroll", this.boundHandleScrollActivity, true)
     window.addEventListener("app:closed:complete", this.boundCloseComplete)
     window.addEventListener("finder:request-close", this.boundRequestClose)
+    window.addEventListener("finder:open", this.boundFinderOpen)
   }
 
   disconnect() {
     document.removeEventListener("scroll", this.boundHandleScrollActivity, true)
     window.removeEventListener("app:closed:complete", this.boundCloseComplete)
     window.removeEventListener("finder:request-close", this.boundRequestClose)
+    window.removeEventListener("finder:open", this.boundFinderOpen)
     this.scrollRevealTimers.forEach((timerId, element) => {
       window.clearTimeout(timerId)
       element.classList.remove("is-scrolling")
@@ -73,6 +76,12 @@ export default class extends Controller {
     if (!this.openApp) return
     if (requestedAppId && requestedAppId !== this.openApp) return
     this.close()
+  }
+
+  handleFinderOpen(event) {
+    const appId = event.detail?.appId
+    if (!appId) return
+    this.open(appId)
   }
 
   loadApp(appId) {

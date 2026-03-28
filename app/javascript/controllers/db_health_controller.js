@@ -29,9 +29,13 @@ export default class extends Controller {
     this.focusedMetricKey = null
     this.latestPayload = null
     this.defaultTitle = "DB Health"
-    this.windowWidth = 360
-    this.windowHeight = 320
-    this.viewportMargin = 20
+    this.windowWidth = 320
+    this.minimumWindowHeight = 180
+    this.windowHeight = this.calculateCardGridWindowHeight(
+      this.calculateGridRows(this.metricCardTargets.length, 2)
+    )
+    this.viewportMargin = 6
+    this.dockLeftBoundary = 41
     this.activeDrag = null
     this.boundDragMove = this.handleDragMove.bind(this)
     this.boundDragEnd = this.stopDrag.bind(this)
@@ -135,7 +139,7 @@ export default class extends Controller {
     let left = coords.x - this.activeDrag.offsetX
     let top = coords.y - this.activeDrag.offsetY
 
-    left = Math.max(margin, Math.min(left, vw - margin - width))
+    left = Math.max(this.dockLeftBoundary, Math.min(left, vw - margin - width))
     top = Math.max(margin, Math.min(top, vh - margin - height))
 
     this.windowTarget.style.left = `${left}px`
@@ -167,21 +171,34 @@ export default class extends Controller {
   positionWindow() {
     const vw = window.innerWidth
     const vh = window.innerHeight
+    const defaultTop = this.viewportMargin
+    const leftColumnLeft = this.dockLeftBoundary
     const width = Math.min(this.windowWidth, Math.max(280, vw - 40))
-    const height = Math.min(this.windowHeight, Math.max(240, vh - 40))
-    const left = Math.max(this.viewportMargin, Math.round((vw - width) / 2) + 120)
-    const top = Math.max(this.viewportMargin, Math.round((vh - height) / 2) - 80)
+    const height = Math.min(this.windowHeight, Math.max(this.minimumWindowHeight, vh - 40))
+    const left = Math.max(leftColumnLeft, Math.min(leftColumnLeft, vw - this.viewportMargin - width))
+    const top = Math.max(this.viewportMargin, Math.min(defaultTop, vh - this.viewportMargin - height))
 
     this.windowTarget.style.width = `${width}px`
     this.windowTarget.style.height = `${height}px`
-    this.windowTarget.style.left = `${Math.min(left, vw - this.viewportMargin - width)}px`
-    this.windowTarget.style.top = `${Math.min(top, vh - this.viewportMargin - height)}px`
+    this.windowTarget.style.left = `${left}px`
+    this.windowTarget.style.top = `${top}px`
   }
 
   bringToFront() {
       const next = Number(window.__nexusDesktopZIndex || 1500) + 1
       window.__nexusDesktopZIndex = next
     this.windowTarget.style.zIndex = String(next)
+  }
+
+  calculateGridRows(itemCount, columns = 2) {
+    return Math.max(1, Math.ceil(itemCount / columns))
+  }
+
+  calculateCardGridWindowHeight(rows) {
+    const baseChromeHeight = 75
+    const cardHeight = 50
+    const rowGap = 5
+    return baseChromeHeight + (rows * cardHeight) + (Math.max(0, rows - 1) * rowGap)
   }
 
   focusMetric(event) {

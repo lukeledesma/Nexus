@@ -4,9 +4,12 @@ export default class extends Controller {
   static targets = ["window"]
 
   connect() {
-    this.windowWidth = 300
-    this.windowHeight = 200
-    this.viewportMargin = 20
+    this.windowWidth = 320
+    this.minimumWindowHeight = 125
+    const actionCount = this.element.querySelectorAll(".settings-actions .button_to").length || 1
+    this.windowHeight = this.calculateCardGridWindowHeight(this.calculateGridRows(actionCount, 2))
+    this.viewportMargin = 6
+    this.dockLeftBoundary = 41
     this.activeDrag = null
 
     this.boundDragMove = this.handleDragMove.bind(this)
@@ -99,7 +102,7 @@ export default class extends Controller {
     const maxLeft = window.innerWidth - width - margin
     const maxTop = window.innerHeight - height - margin
 
-    const left = Math.min(Math.max(coords.x - this.activeDrag.offsetX, margin), Math.max(margin, maxLeft))
+    const left = Math.min(Math.max(coords.x - this.activeDrag.offsetX, this.dockLeftBoundary), Math.max(this.dockLeftBoundary, maxLeft))
     const top = Math.min(Math.max(coords.y - this.activeDrag.offsetY, margin), Math.max(margin, maxTop))
 
     this.windowTarget.style.left = `${left}px`
@@ -131,10 +134,15 @@ export default class extends Controller {
   positionWindow() {
     const vw = window.innerWidth
     const vh = window.innerHeight
+    const defaultTop = this.viewportMargin
+    const rowGap = 15
+    const dbHealthHeight = 235
+    const leftColumnLeft = this.dockLeftBoundary
     const width = Math.min(this.windowWidth, Math.max(260, vw - 40))
-    const height = Math.min(this.windowHeight, Math.max(170, vh - 40))
-    const left = Math.max(this.viewportMargin, Math.round((vw - width) / 2) - 140)
-    const top = Math.max(this.viewportMargin, Math.round((vh - height) / 2) - 30)
+    const height = Math.min(this.windowHeight, Math.max(this.minimumWindowHeight, vh - 40))
+    const desiredTop = defaultTop + dbHealthHeight + rowGap
+    const left = Math.max(leftColumnLeft, Math.min(leftColumnLeft, vw - this.viewportMargin - width))
+    const top = Math.max(this.viewportMargin, Math.min(desiredTop, vh - this.viewportMargin - height))
 
     this.windowTarget.style.width = `${width}px`
     this.windowTarget.style.height = `${height}px`
@@ -146,5 +154,16 @@ export default class extends Controller {
     const next = Number(window.__nexusDesktopZIndex || 1500) + 1
     window.__nexusDesktopZIndex = next
     this.windowTarget.style.zIndex = String(next)
+  }
+
+  calculateGridRows(itemCount, columns = 2) {
+    return Math.max(1, Math.ceil(itemCount / columns))
+  }
+
+  calculateCardGridWindowHeight(rows) {
+    const baseChromeHeight = 75
+    const cardHeight = 50
+    const rowGap = 5
+    return baseChromeHeight + (rows * cardHeight) + (Math.max(0, rows - 1) * rowGap)
   }
 }

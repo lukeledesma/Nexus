@@ -29,13 +29,31 @@
     <% if logged_in? %>
       <div id="desktop" class="desktop-layer"></div>
 
-      <header class="desktop-menubar" aria-label="Desktop menu bar">
-        <div class="desktop-menubar-left"></div>
+      <div class="desktop-clock" data-controller="desktop-clock">
+        <span class="desktop-clock-display" data-desktop-clock-target="display"></span>
+      </div>
 
-        <div class="desktop-menubar-right" data-controller="desktop-clock">
-          <span class="desktop-menubar-time" data-desktop-clock-target="display"></span>
+      <section id="organizer-window" class="os-window organizer-window is-hidden" aria-live="polite">
+        <div class="window-content">
+          <%= render "organizer/sidebar" %>
         </div>
-      </header>
+      </section>
+
+      <section class="content-window os-window is-hidden" data-controller="content-window" aria-live="polite">
+        <div class="title-bar" data-action="mousedown->content-window#startDrag touchstart->content-window#startDrag"></div>
+        <button type="button" class="tools-close-btn content-window-close" data-action="click->content-window#close" aria-label="Close" title="Close">✕</button>
+        <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="window-content">
+          <turbo-frame id="app-pane" class="finder-app-frame"></turbo-frame>
+        </div>
+      </section>
 
       <section class="db-health-window os-window is-hidden" data-controller="db-health" data-db-health-url-value="<%= db_health_path %>" data-db-health-target="window" aria-live="polite">
           <section class="db-health-panel" data-db-health-target="panel">
@@ -87,6 +105,32 @@
                 <dd class="organizer-tool-value">EXIT</dd>
               </div>
             <% end %>
+          </div>
+        </section>
+      </section>
+
+      <section class="stationary-window os-window is-hidden" data-controller="stationary" data-stationary-target="window" aria-live="polite">
+        <section class="stationary-panel">
+          <header class="stationary-header" data-action="mousedown->stationary#startDrag touchstart->stationary#startDrag">
+            <h3>Stationary</h3>
+            <div class="stationary-controls">
+              <button type="button" class="stationary-close" data-action="click->stationary#close" aria-label="Close Stationary" title="Close">✕</button>
+            </div>
+          </header>
+          <p class="stationary-stamp" data-stationary-target="stamp">—</p>
+          <div class="stationary-grid">
+            <button type="button" class="stationary-card-btn" data-app-url="/apps/singular_note" data-action="click->stationary#launchApp">
+              <div class="organizer-tool-card">
+                <dt class="organizer-tool-label">NOTES</dt>
+                <dd class="organizer-tool-value" data-stationary-target="notesSize">-</dd>
+              </div>
+            </button>
+            <button type="button" class="stationary-card-btn" data-app-url="/apps/singular_task_list" data-action="click->stationary#launchApp">
+              <div class="organizer-tool-card">
+                <dt class="organizer-tool-label">TASKS</dt>
+                <dd class="organizer-tool-value" data-stationary-target="tasksSize">-</dd>
+              </div>
+            </button>
           </div>
         </section>
       </section>
