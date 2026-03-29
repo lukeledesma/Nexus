@@ -1,17 +1,18 @@
-<turbo-frame id="app-pane">
+<% frame_id = params[:frame_id].presence || "app-pane" %>
+<turbo-frame id="<%= frame_id %>">
   <section class="app-surface app-surface--tool" data-controller="title-editor task-list-editor tool-window-status" data-tool-window-status-item-type-value="task_list" data-tool-window-status-updated-at-value="<%= @task_list.updated_at&.utc&.iso8601 %>">
-    <header class="app-surface-header tool-window-header">
-      <h2 class="tool-window-title">TASKS</h2>
+    <header class="app-surface-header tool-window-header os-window-header">
+      <h2 class="tool-window-title os-window-title">TASKS</h2>
     </header>
-    <p class="tool-window-subtitle" data-tool-window-status-target="subtitle">Tasks Updated just now</p>
+    <p class="tool-window-subtitle os-window-subtitle" data-tool-window-status-target="subtitle">Tasks Updated just now</p>
 
-    <%= form_with model: @task_list, url: apps_task_list_path(@task_list), method: :patch,
+    <%= form_with model: @task_list, url: apps_task_list_path(@task_list, frame_id: frame_id), method: :patch,
           data: {
-        turbo_frame: "app-pane",
+        turbo_frame: frame_id,
         controller: "autosave",
         autosave_item_id_value: @task_list.id,
         autosave_item_type_value: "task_list"
-          }, class: "task-list-form" do |f| %>
+          }, class: "task-list-form os-window-body-start" do |f| %>
       <input type="hidden" name="item[tasks_payload]" value="" data-task-list-editor-target="payload">
 
       <ul class="task-list-rows" data-task-list-editor-target="list" data-action="click->task-list-editor#handleListClick keydown->task-list-editor#handleListKeydown">

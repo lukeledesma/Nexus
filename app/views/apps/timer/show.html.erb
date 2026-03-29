@@ -1,0 +1,64 @@
+<% frame_id = params[:frame_id].presence || "app-pane" %>
+<turbo-frame id="<%= frame_id %>">
+  <section class="app-surface app-surface--tool app-surface--timer" data-controller="timer" data-timer-initial-state-value="<%= json_escape(@timer_state.to_json) %>">
+    <header class="app-surface-header tool-window-header os-window-header">
+      <h2 class="tool-window-title os-window-title">TIMER</h2>
+    </header>
+    <p class="tool-window-subtitle os-window-subtitle" data-timer-target="subtitle">Quiet numbers, loud progress.</p>
+
+    <div class="timer-view os-window-body-start">
+      <div class="timer-tabs" role="tablist" aria-label="Timer modes">
+        <button type="button" class="timer-tab-btn" data-tab="stopwatch" data-action="click->timer#selectTab" role="tab" aria-selected="false">Stopwatch</button>
+        <button type="button" class="timer-tab-btn is-active" data-tab="timer" data-action="click->timer#selectTab" role="tab" aria-selected="true">Timer</button>
+      </div>
+
+      <div class="timer-face" aria-live="off">
+        <div class="timer-time" aria-label="Time display">
+          <input
+            type="text"
+            class="timer-time-segment"
+            data-segment="hours"
+            data-timer-target="hoursInput"
+            data-action="focus->timer#handleTimeFocus input->timer#handleTimeInput blur->timer#handleTimeBlur keydown->timer#handleTimeKeydown"
+            inputmode="numeric"
+            autocomplete="off"
+            spellcheck="false"
+            value="00"
+            aria-label="Hours"
+          >
+          <span class="timer-time-separator">:</span>
+          <input
+            type="text"
+            class="timer-time-segment"
+            data-segment="minutes"
+            data-timer-target="minutesInput"
+            data-action="focus->timer#handleTimeFocus input->timer#handleTimeInput blur->timer#handleTimeBlur keydown->timer#handleTimeKeydown"
+            inputmode="numeric"
+            autocomplete="off"
+            spellcheck="false"
+            value="10"
+            aria-label="Minutes"
+          >
+          <span class="timer-time-separator">:</span>
+          <input
+            type="text"
+            class="timer-time-segment"
+            data-segment="seconds"
+            data-timer-target="secondsInput"
+            data-action="focus->timer#handleTimeFocus input->timer#handleTimeInput blur->timer#handleTimeBlur keydown->timer#handleTimeKeydown"
+            inputmode="numeric"
+            autocomplete="off"
+            spellcheck="false"
+            value="00"
+            aria-label="Seconds"
+          >
+        </div>
+      </div>
+
+      <div class="timer-controls">
+        <button type="button" class="timer-start-btn" data-action="click->timer#toggle" data-timer-target="startBtn">START</button>
+        <button type="button" class="timer-reset-btn" data-action="click->timer#reset" aria-label="Reset current tab" title="Reset">↺</button>
+      </div>
+    </div>
+  </section>
+</turbo-frame>

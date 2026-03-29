@@ -17,20 +17,24 @@ export default class extends Controller {
     this.boundToggleRequest = this.handleToggleRequest.bind(this)
     this.boundWindowInteraction = this.handleWindowInteraction.bind(this)
     this.boundSavedState = this.handleSavedState.bind(this)
+    this.boundAppWindowState = this.handleAppWindowState.bind(this)
 
-    this.positionWindow()
+    this.restoreWindowBounds()
     window.addEventListener("stationary:toggle", this.boundToggleRequest)
     window.addEventListener("nexus:item-saved", this.boundSavedState)
+    window.addEventListener("app-window:state", this.boundAppWindowState)
     this.windowTarget.addEventListener("mousedown", this.boundWindowInteraction)
 
     this.loadFileSizes()
     this.loadPersistedStamp()
+    this.clearLauncherState()
   }
 
   disconnect() {
     this.stopDrag()
     window.removeEventListener("stationary:toggle", this.boundToggleRequest)
     window.removeEventListener("nexus:item-saved", this.boundSavedState)
+    window.removeEventListener("app-window:state", this.boundAppWindowState)
     this.windowTarget.removeEventListener("mousedown", this.boundWindowInteraction)
   }
 
@@ -59,13 +63,18 @@ export default class extends Controller {
 
   close(event) {
     if (event) event.preventDefault()
-    this.windowTarget.classList.add("is-hidden")
     this.emitWindowState(false)
+    this.windowTarget.classList.add("is-hidden")
   }
 
   emitWindowState(isOpen) {
+    const rect = this.windowTarget.getBoundingClientRect()
     window.dispatchEvent(new CustomEvent("stationary:state", {
-      detail: { open: Boolean(isOpen) }
+      detail: {
+        open: Boolean(isOpen),
+        x: Math.round(rect.left),
+        y: Math.round(rect.top)
+      }
     }))
   }
 
@@ -179,11 +188,40 @@ export default class extends Controller {
   }
 
   stopDrag() {
+    if (this.activeDrag) {
+      this.saveWindowBounds()
+      this.emitWindowState(!this.windowTarget.classList.contains("is-hidden"))
+    }
     this.activeDrag = null
     document.removeEventListener("mousemove", this.boundDragMove)
     document.removeEventListener("mouseup", this.boundDragEnd)
     document.removeEventListener("touchmove", this.boundDragMove)
     document.removeEventListener("touchend", this.boundDragEnd)
+  }
+
+  restoreWindowBounds() {
+    const bounds = this.readStoredBounds("nexus.window.stationary.bounds")
+    if (!bounds) { this.positionWindow(); return }
+    this.windowTarget.style.left   = `${bounds.left}px`
+    this.windowTarget.style.top    = `${bounds.top}px`
+    this.windowTarget.style.width  = `${this.windowWidth}px`
+    this.windowTarget.style.height = `${this.windowHeight}px`
+  }
+
+  saveWindowBounds() {
+    const rect = this.windowTarget.getBoundingClientRect()
+    const bounds = { left: Math.round(rect.left), top: Math.round(rect.top) }
+    try { localStorage.setItem("nexus.window.stationary.bounds", JSON.stringify(bounds)) } catch (_) {}
+  }
+
+  readStoredBounds(key) {
+    try {
+      const raw = localStorage.getItem(key)
+      if (!raw) return null
+      const parsed = JSON.parse(raw)
+      if (typeof parsed?.left !== "number" || typeof parsed?.top !== "number") return null
+      return parsed
+    } catch (_) { return null }
   }
 
   getEventCoordinates(event) {
@@ -229,9 +267,27 @@ export default class extends Controller {
   }
 
   launchApp(event) {
-    const url = event.currentTarget.dataset.appUrl
-    if (!url) return
-    window.dispatchEvent(new CustomEvent("content-window:open", { detail: { url } }))
+    const appKey = event.currentTarget.dataset.windowKey
+    if (!appKey) return
+    window.dispatchEvent(new CustomEvent("app-window:toggle", { detail: { appKey } }))
+  }
+
+  handleAppWindowState(event) {
+    this.updateLauncherState(event.detail?.appKey, Boolean(event.detail?.open))
+  }
+
+  updateLauncherState(appKey, isOpen) {
+    const button = this.element.querySelector(`[data-window-key="${appKey}"]`)
+    if (!button) return
+    button.classList.toggle("is-active", isOpen)
+    button.setAttribute("aria-pressed", isOpen ? "true" : "false")
+  }
+
+  clearLauncherState() {
+    this.element.querySelectorAll("[data-window-key]").forEach((button) => {
+      button.classList.remove("is-active")
+      button.setAttribute("aria-pressed", "false")
+    })
   }
 
   formatBytes(bytes) {

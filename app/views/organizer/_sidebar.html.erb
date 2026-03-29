@@ -1,23 +1,59 @@
 <section id="organizer" class="organizer-panel" data-controller="organizer" data-finder-target="sidebar">
-  <header class="organizer-panel-header" data-action="mousedown->window-manager#startDrag touchstart->window-manager#startDrag">
-    <h2>TOOLS</h2>
-    <div class="organizer-panel-controls">
-      <button type="button" class="tools-close-btn tools-close-btn--organizer" data-action="click->window-manager#closeTools" aria-label="Close TOOLS" title="Close">✕</button>
+  <header class="organizer-panel-header os-window-header" data-action="mousedown->window-manager#startDrag touchstart->window-manager#startDrag">
+    <h2 class="os-window-title">LAUNCHER</h2>
+    <div class="organizer-panel-controls os-window-controls">
+      <button type="button" class="tools-close-btn tools-close-btn--organizer" data-action="click->window-manager#closeLauncher" aria-label="Close Launcher" title="Close">✕</button>
     </div>
   </header>
 
-  <p class="organizer-panel-stamp">Measure twice, cut once.</p>
+  <p class="organizer-panel-stamp os-window-subtitle">Measure twice, cut once.</p>
 
-  <nav class="organizer-tools-grid" aria-label="Tools">
+  <nav class="organizer-tools-grid os-window-body-start os-window-grid os-window-grid--2" aria-label="Launcher Apps">
     <button
       type="button"
-      class="finder-item"
-      data-app-url="/apps/conversion_chart"
+      class="os-window-card"
+      data-window-key="singular-note"
       data-action="click->organizer#launchApp"
     >
-      <div class="organizer-tool-card">
-        <dt class="organizer-tool-label">SAE/METRIC</dt>
-        <dd class="organizer-tool-value" data-organizer-target="conversionPair">—</dd>
+      <div class="os-window-card-content">
+        <dt class="os-window-card-label">NOTES</dt>
+        <dd class="os-window-card-value" data-organizer-target="notesSize">-</dd>
+      </div>
+    </button>
+
+    <button
+      type="button"
+      class="os-window-card"
+      data-window-key="singular-task-list"
+      data-action="click->organizer#launchApp"
+    >
+      <div class="os-window-card-content">
+        <dt class="os-window-card-label">TASKS</dt>
+        <dd class="os-window-card-value" data-organizer-target="tasksSize">-</dd>
+      </div>
+    </button>
+
+    <button
+      type="button"
+      class="os-window-card"
+      data-window-key="conversion-chart"
+      data-action="click->organizer#launchApp"
+    >
+      <div class="os-window-card-content">
+        <dt class="os-window-card-label">SAE/METRIC</dt>
+        <dd class="os-window-card-value" data-organizer-target="conversionPair">—</dd>
+      </div>
+    </button>
+
+    <button
+      type="button"
+      class="os-window-card"
+      data-window-key="timer"
+      data-action="click->organizer#launchApp"
+    >
+      <div class="os-window-card-content">
+        <dt class="os-window-card-label">TIMER</dt>
+        <dd class="os-window-card-value" data-organizer-target="timerDisplay">10:00</dd>
       </div>
     </button>
   </nav>

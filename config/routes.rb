@@ -10,6 +10,9 @@ Rails.application.routes.draw do
     get "calculator", to: "calculator#show"
     get "settings", to: "settings#show"
     get "conversion_chart", to: "conversion_chart#show"
+    get "timer", to: "timer#show"
+    get "timer_state", to: "timer#state"
+    patch "timer_state", to: "timer#update_state"
     get "singular_note", to: "singular#note"
     get "singular_task_list", to: "singular#task_list"
     get "all_notes",  to: "notes#index"
@@ -24,6 +27,10 @@ Rails.application.routes.draw do
   # Can be used by load balancers and uptime monitors to verify that the app is live.
   get "up" => "rails/health#show", as: :rails_health_check
   get "db_health", to: "db_health#show"
+
+  get    "workspace_preferences", to: "workspace_preferences#show"
+  patch  "workspace_preferences", to: "workspace_preferences#update"
+  delete "workspace_preferences", to: "workspace_preferences#destroy"
 
   # Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.erb)
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest

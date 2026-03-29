@@ -6,7 +6,7 @@ export default class extends Controller {
   connect() {
     this.windowWidth = 320
     this.minimumWindowHeight = 125
-    const actionCount = this.element.querySelectorAll(".settings-actions .button_to").length || 1
+    const actionCount = this.element.querySelectorAll(".settings-action").length || 1
     this.windowHeight = this.calculateCardGridWindowHeight(this.calculateGridRows(actionCount, 2))
     this.viewportMargin = 6
     this.dockLeftBoundary = 41
@@ -17,7 +17,7 @@ export default class extends Controller {
     this.boundToggleRequest = this.handleToggleRequest.bind(this)
     this.boundWindowInteraction = this.handleWindowInteraction.bind(this)
 
-    this.positionWindow()
+    this.restoreWindowBounds()
     window.addEventListener("settings:toggle", this.boundToggleRequest)
     this.windowTarget.addEventListener("mousedown", this.boundWindowInteraction)
   }
@@ -54,13 +54,20 @@ export default class extends Controller {
 
   close(event) {
     if (event) event.preventDefault()
-    this.windowTarget.classList.add("is-hidden")
     this.emitWindowState(false)
+    this.windowTarget.classList.add("is-hidden")
   }
 
   emitWindowState(isOpen) {
+    const rect = this.windowTarget.getBoundingClientRect()
+    const z = Number.parseInt(this.windowTarget.style.zIndex || window.getComputedStyle(this.windowTarget).zIndex, 10)
     window.dispatchEvent(new CustomEvent("settings:state", {
-      detail: { open: Boolean(isOpen) }
+      detail: {
+        open: Boolean(isOpen),
+        x: Math.round(rect.left),
+        y: Math.round(rect.top),
+        z: Number.isFinite(z) ? z : 1500
+      }
     }))
   }
 
@@ -110,11 +117,46 @@ export default class extends Controller {
   }
 
   stopDrag() {
+    if (this.activeDrag) {
+      this.saveWindowBounds()
+      this.emitWindowState(!this.windowTarget.classList.contains("is-hidden"))
+    }
     this.activeDrag = null
     document.removeEventListener("mousemove", this.boundDragMove)
     document.removeEventListener("mouseup", this.boundDragEnd)
     document.removeEventListener("touchmove", this.boundDragMove)
     document.removeEventListener("touchend", this.boundDragEnd)
+  }
+
+  resetLayout(event) {
+    if (event) event.preventDefault()
+    if (!window.confirm("Are you sure you want to reset the window layout?")) return
+    window.dispatchEvent(new CustomEvent("nexus:layout-reset"))
+  }
+
+  restoreWindowBounds() {
+    const bounds = this.readStoredBounds("nexus.window.settings.bounds")
+    if (!bounds) { this.positionWindow(); return }
+    this.windowTarget.style.left   = `${bounds.left}px`
+    this.windowTarget.style.top    = `${bounds.top}px`
+    this.windowTarget.style.width  = `${this.windowWidth}px`
+    this.windowTarget.style.height = `${this.windowHeight}px`
+  }
+
+  saveWindowBounds() {
+    const rect = this.windowTarget.getBoundingClientRect()
+    const bounds = { left: Math.round(rect.left), top: Math.round(rect.top) }
+    try { localStorage.setItem("nexus.window.settings.bounds", JSON.stringify(bounds)) } catch (_) {}
+  }
+
+  readStoredBounds(key) {
+    try {
+      const raw = localStorage.getItem(key)
+      if (!raw) return null
+      const parsed = JSON.parse(raw)
+      if (typeof parsed?.left !== "number" || typeof parsed?.top !== "number") return null
+      return parsed
+    } catch (_) { return null }
   }
 
   getEventCoordinates(event) {
@@ -151,9 +193,11 @@ export default class extends Controller {
   }
 
   bringToFront() {
+    if (window.__nexusRestoringLayout) return
     const next = Number(window.__nexusDesktopZIndex || 1500) + 1
     window.__nexusDesktopZIndex = next
     this.windowTarget.style.zIndex = String(next)
+    this.emitWindowState(!this.windowTarget.classList.contains("is-hidden"))
   }
 
   calculateGridRows(itemCount, columns = 2) {

@@ -1,12 +1,24 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
+  static targets = ["frame"]
+  static values = {
+    appKey: String,
+    appUrl: String,
+    storageKey: String,
+    frameId: String,
+    defaultWidth: Number,
+    defaultHeight: Number,
+    defaultOffsetX: Number,
+    defaultOffsetY: Number
+  }
+
   connect() {
-    this.currentUrl = null
+    this.currentUrl = this.buildAppUrl()
     this.viewportMargin = 6
     this.dockLeftBoundary = 41
-    this.windowWidth = 550
-    this.windowHeight = 480
+    this.windowWidth = this.hasDefaultWidthValue ? this.defaultWidthValue : 550
+    this.windowHeight = this.hasDefaultHeightValue ? this.defaultHeightValue : 480
     this.minWindowWidth = 320
     this.minWindowHeight = 200
     this.activeDrag = null
@@ -16,51 +28,57 @@ export default class extends Controller {
     this.boundDragEnd = this.stopDrag.bind(this)
     this.boundResizeMove = this.handleResizeMove.bind(this)
     this.boundResizeEnd = this.stopResize.bind(this)
-    this.boundOpen = this.handleOpenRequest.bind(this)
+    this.boundToggleRequest = this.handleToggleRequest.bind(this)
 
-    window.addEventListener("content-window:open", this.boundOpen)
+    window.addEventListener("app-window:toggle", this.boundToggleRequest)
     this.element.addEventListener("mousedown", () => this.bringToFront())
 
-    this.positionWindow()
+    this.restoreWindowBounds()
   }
 
   disconnect() {
     this.stopDrag()
     this.stopResize()
-    window.removeEventListener("content-window:open", this.boundOpen)
+    window.removeEventListener("app-window:toggle", this.boundToggleRequest)
   }
 
-  handleOpenRequest(event) {
-    const url = event.detail?.url
-    if (!url) return
+  handleToggleRequest(event) {
+    if (event.detail?.appKey !== this.appKeyValue) return
+    this.toggle()
+  }
 
-    // Toggle closed if same app is already showing
-    if (!this.element.classList.contains("is-hidden") && this.currentUrl === url) {
-      this.close()
+  toggle() {
+    if (this.element.classList.contains("is-hidden")) {
+      this.open()
       return
     }
 
-    this.loadUrl(url)
-    this.open()
-  }
-
-  loadUrl(url) {
-    this.currentUrl = url
-    const frame = this.element.querySelector("turbo-frame#app-pane")
-    if (frame) frame.src = url
+    this.close()
   }
 
   open() {
-    this.positionWindow()
+    this.ensureFrameLoaded()
     this.element.classList.remove("is-hidden")
     this.bringToFront()
+    this.emitWindowState(true)
   }
 
   close() {
+    this.emitWindowState(false)
     this.element.classList.add("is-hidden")
   }
 
-  // ── Drag ──────────────────────────────────────────────────────────────────
+  ensureFrameLoaded() {
+    if (!this.hasFrameTarget) return
+    if (this.frameTarget.getAttribute("src") === this.currentUrl) return
+    this.frameTarget.src = this.currentUrl
+  }
+
+  buildAppUrl() {
+    const url = new URL(this.appUrlValue, window.location.origin)
+    if (this.hasFrameIdValue) url.searchParams.set("frame_id", this.frameIdValue)
+    return `${url.pathname}${url.search}`
+  }
 
   startDrag(event) {
     if (event.button !== undefined && event.button !== 0) return
@@ -99,14 +117,16 @@ export default class extends Controller {
   }
 
   stopDrag() {
+    if (this.activeDrag) {
+      this.saveWindowBounds()
+      this.emitWindowState(!this.element.classList.contains("is-hidden"))
+    }
     this.activeDrag = null
     document.removeEventListener("mousemove", this.boundDragMove)
     document.removeEventListener("mouseup", this.boundDragEnd)
     document.removeEventListener("touchmove", this.boundDragMove)
     document.removeEventListener("touchend", this.boundDragEnd)
   }
-
-  // ── Resize ─────────────────────────────────────────────────────────────────
 
   startResize(event) {
     if (event.button !== undefined && event.button !== 0) return
@@ -154,16 +174,12 @@ export default class extends Controller {
       left += deltaX
       width -= deltaX
     }
-    if (edge.includes("right")) {
-      width += deltaX
-    }
+    if (edge.includes("right")) width += deltaX
     if (edge.includes("top")) {
       top += deltaY
       height -= deltaY
     }
-    if (edge.includes("bottom")) {
-      height += deltaY
-    }
+    if (edge.includes("bottom")) height += deltaY
 
     if (width < this.minWindowWidth) {
       if (edge.includes("left")) left = this.activeResize.startLeft + this.activeResize.startWidth - this.minWindowWidth
@@ -187,6 +203,10 @@ export default class extends Controller {
   }
 
   stopResize() {
+    if (this.activeResize) {
+      this.saveWindowBounds()
+      this.emitWindowState(!this.element.classList.contains("is-hidden"))
+    }
     this.activeResize = null
     document.removeEventListener("mousemove", this.boundResizeMove)
     document.removeEventListener("mouseup", this.boundResizeEnd)
@@ -194,20 +214,81 @@ export default class extends Controller {
     document.removeEventListener("touchend", this.boundResizeEnd)
   }
 
-  // ── Position & z-index ────────────────────────────────────────────────────
-
   positionWindow() {
+    const offsetX = this.hasDefaultOffsetXValue ? this.defaultOffsetXValue : 0
+    const offsetY = this.hasDefaultOffsetYValue ? this.defaultOffsetYValue : 0
     const vw = window.innerWidth
     const vh = window.innerHeight
     const width = Math.min(this.windowWidth, vw - 40)
     const height = Math.min(this.windowHeight, vh - 40)
-    const left = Math.max(this.dockLeftBoundary, Math.round((vw - width) / 2))
-    const top = Math.max(this.viewportMargin, Math.round((vh - height) / 2))
+    const centeredLeft = Math.round((vw - width) / 2) + offsetX
+    const centeredTop = Math.round((vh - height) / 2) + offsetY
+    const maxLeft = Math.max(this.dockLeftBoundary, vw - this.viewportMargin - width)
+    const maxTop = Math.max(this.viewportMargin, vh - this.viewportMargin - height)
+    const left = Math.min(Math.max(centeredLeft, this.dockLeftBoundary), maxLeft)
+    const top = Math.min(Math.max(centeredTop, this.viewportMargin), maxTop)
 
     this.element.style.width = `${width}px`
     this.element.style.height = `${height}px`
     this.element.style.left = `${left}px`
     this.element.style.top = `${top}px`
+  }
+
+  restoreWindowBounds() {
+    const bounds = this.readStoredBounds()
+    if (!bounds) {
+      this.positionWindow()
+      this.saveWindowBounds()
+      return
+    }
+
+    this.applyBounds(this.clampBounds(bounds))
+  }
+
+  readStoredBounds() {
+    try {
+      const raw = window.localStorage.getItem(this.storageKeyValue)
+      if (!raw) return null
+      const parsed = JSON.parse(raw)
+      if (![parsed?.left, parsed?.top, parsed?.width, parsed?.height].every(Number.isFinite)) return null
+      return parsed
+    } catch (_error) {
+      return null
+    }
+  }
+
+  saveWindowBounds() {
+    const rect = this.element.getBoundingClientRect()
+    const bounds = this.clampBounds({ left: rect.left, top: rect.top, width: rect.width, height: rect.height })
+
+    try {
+      window.localStorage.setItem(this.storageKeyValue, JSON.stringify(bounds))
+    } catch (_error) {
+      // non-blocking
+    }
+  }
+
+  clampBounds(bounds) {
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    const margin = this.viewportMargin
+    const maxWidth = Math.max(this.minWindowWidth, vw - this.dockLeftBoundary - margin)
+    const maxHeight = Math.max(this.minWindowHeight, vh - (margin * 2))
+    const width = Math.min(Math.max(bounds.width, this.minWindowWidth), maxWidth)
+    const height = Math.min(Math.max(bounds.height, this.minWindowHeight), maxHeight)
+    const maxLeft = Math.max(this.dockLeftBoundary, vw - margin - width)
+    const maxTop = Math.max(margin, vh - margin - height)
+    const left = Math.min(Math.max(bounds.left, this.dockLeftBoundary), maxLeft)
+    const top = Math.min(Math.max(bounds.top, margin), maxTop)
+
+    return { left, top, width, height }
+  }
+
+  applyBounds(bounds) {
+    this.element.style.left = `${bounds.left}px`
+    this.element.style.top = `${bounds.top}px`
+    this.element.style.width = `${bounds.width}px`
+    this.element.style.height = `${bounds.height}px`
   }
 
   getEdgeFromHandle(handle) {
@@ -223,13 +304,32 @@ export default class extends Controller {
   }
 
   bringToFront() {
+    if (window.__nexusRestoringLayout) return
     const next = Number(window.__nexusDesktopZIndex || 1500) + 1
     window.__nexusDesktopZIndex = next
     this.element.style.zIndex = String(next)
+    this.emitWindowState(!this.element.classList.contains("is-hidden"))
   }
 
   getCoords(event) {
     if (event.touches) return { x: event.touches[0].clientX, y: event.touches[0].clientY }
     return { x: event.clientX, y: event.clientY }
+  }
+
+  emitWindowState(isOpen) {
+    const rect = this.element.getBoundingClientRect()
+    const z = Number.parseInt(this.element.style.zIndex || window.getComputedStyle(this.element).zIndex, 10)
+    window.dispatchEvent(new CustomEvent("app-window:state", {
+      detail: {
+        appKey: this.appKeyValue,
+        open: Boolean(isOpen),
+        x: Math.round(rect.left),
+        y: Math.round(rect.top),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+        z: Number.isFinite(z) ? z : 1500,
+        url: isOpen ? this.currentUrl : null
+      }
+    }))
   }
 }

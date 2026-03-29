@@ -2,6 +2,7 @@
 
 module Apps
   class SingularController < BaseController
+    before_action :redirect_top_level_frame_requests, only: %i[note task_list]
     before_action :ensure_singular_items
 
     # GET /apps/singular_note
@@ -16,6 +17,13 @@ module Apps
     end
 
     private
+
+      def redirect_top_level_frame_requests
+        return if params[:frame_id].blank?
+        return if request.headers["Turbo-Frame"].present?
+
+        redirect_to root_path
+      end
 
     def ensure_singular_items
       @app_folder = Folder.find_or_create_by!(name: "App") do |folder|
@@ -40,8 +48,14 @@ module Apps
         item.tasks = []
       end
 
-      # Sync to disk to ensure workspace text files exist
-      ItemStorageSyncLite.sync_all!
+      # Sync to disk to ensure workspace text files exist.
+      # Rare cache-clear reload spikes can trigger transient file races; retry once.
+      begin
+        ItemStorageSyncLite.sync_all!
+      rescue Errno::ENOENT
+        sleep 0.03
+        ItemStorageSyncLite.sync_all!
+      end
     rescue StandardError => e
       Rails.logger.error("[SingularController] ensure_singular_items failed: #{e.class}: #{e.message}")
       raise

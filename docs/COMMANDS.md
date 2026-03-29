@@ -29,6 +29,15 @@ bin/rails db:migrate
 Autoload check:
 bin/rails zeitwerk:check
 
+UI contract check:
+bin/rake ui:contract
+
+What it does:
+- Verifies shared OS/app window UI contract tokens and classes exist in the stylesheet
+- Verifies DB Health, Settings, Launcher, Notes, Tasks, SAE/METRIC, and TIMER use the required shared contract classes
+- Fails if legacy organizer-specific visual card classes reappear in ERB views
+- Prints `UI contract check passed` on success
+
 List routes:
 bin/rails routes
 

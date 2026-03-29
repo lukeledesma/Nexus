@@ -2,7 +2,7 @@ import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
 
 export default class extends Controller {
-  static targets = ["newFolderForm", "newFolderInput", "stamp", "conversionPair"]
+  static targets = ["newFolderForm", "newFolderInput", "stamp", "conversionPair", "notesSize", "tasksSize", "timerDisplay"]
 
   #conversionPairs = [
     { sae: '5/16"', metric: '8 mm' },
@@ -20,13 +20,22 @@ export default class extends Controller {
 
   connect() {
     this.boundSavedState = this.handleSavedState.bind(this)
+    this.boundAppWindowState = this.handleAppWindowState.bind(this)
+    this.boundTimerState = this.handleTimerState.bind(this)
     window.addEventListener("nexus:item-saved", this.boundSavedState)
+    window.addEventListener("app-window:state", this.boundAppWindowState)
+    window.addEventListener("timer:state", this.boundTimerState)
     this.loadPersistedStamp()
+    this.loadFileSizes()
+    this.loadTimerDisplay()
     this.startConversionCycle()
+    this.clearLauncherState()
   }
 
   disconnect() {
     window.removeEventListener("nexus:item-saved", this.boundSavedState)
+    window.removeEventListener("app-window:state", this.boundAppWindowState)
+    window.removeEventListener("timer:state", this.boundTimerState)
     this.stopConversionCycle()
   }
 
@@ -124,6 +133,29 @@ export default class extends Controller {
     return `${value} ${units[index] || "B"}`
   }
 
+  async loadFileSizes() {
+    try {
+      const response = await fetch("/db_health", {
+        method: "GET",
+        headers: { Accept: "application/json" }
+      })
+      if (!response.ok) return
+
+      const payload = await response.json()
+      const organizer = payload?.organizer
+      if (!organizer) return
+
+      if (this.hasNotesSizeTarget && organizer.note_size_bytes) {
+        this.notesSizeTarget.textContent = this.formatBytes(organizer.note_size_bytes)
+      }
+      if (this.hasTasksSizeTarget && organizer.task_size_bytes) {
+        this.tasksSizeTarget.textContent = this.formatBytes(organizer.task_size_bytes)
+      }
+    } catch (_error) {
+      // Keep launcher status non-blocking if metrics endpoint is unavailable.
+    }
+  }
+
   startConversionCycle() {
     if (!this.hasConversionPairTarget) return
     this.updateConversionDisplay()
@@ -148,6 +180,26 @@ export default class extends Controller {
     this.conversionPairTarget.textContent = `${pair.sae} | ${pair.metric}`
   }
 
+  loadTimerDisplay() {
+    if (!this.hasTimerDisplayTarget) return
+
+    try {
+      const persisted = window.localStorage.getItem("nexus.timer.launcherDisplay")
+      if (persisted) this.timerDisplayTarget.textContent = persisted
+    } catch (_error) {
+      // Keep launcher non-blocking if localStorage is unavailable.
+    }
+  }
+
+  handleTimerState(event) {
+    if (!this.hasTimerDisplayTarget) return
+
+    const display = event.detail?.launcherDisplay
+    if (!display) return
+
+    this.timerDisplayTarget.textContent = display
+  }
+
   labelForItemType(itemType) {
     if (itemType === "note") return "Notes"
     if (itemType === "task_list") return "Tasks"
@@ -155,9 +207,27 @@ export default class extends Controller {
   }
 
   launchApp(event) {
-    const url = event.currentTarget.dataset.appUrl
-    if (!url) return
-    window.dispatchEvent(new CustomEvent("content-window:open", { detail: { url } }))
+    const appKey = event.currentTarget.dataset.windowKey
+    if (!appKey) return
+    window.dispatchEvent(new CustomEvent("app-window:toggle", { detail: { appKey } }))
+  }
+
+  handleAppWindowState(event) {
+    this.updateLauncherState(event.detail?.appKey, Boolean(event.detail?.open))
+  }
+
+  updateLauncherState(appKey, isOpen) {
+    const button = this.element.querySelector(`[data-window-key="${appKey}"]`)
+    if (!button) return
+    button.classList.toggle("is-active", isOpen)
+    button.setAttribute("aria-pressed", isOpen ? "true" : "false")
+  }
+
+  clearLauncherState() {
+    this.element.querySelectorAll("[data-window-key]").forEach((button) => {
+      button.classList.remove("is-active")
+      button.setAttribute("aria-pressed", "false")
+    })
   }
 
   formatTimestamp(value) {

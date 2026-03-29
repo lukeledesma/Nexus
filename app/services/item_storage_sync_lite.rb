@@ -1,11 +1,16 @@
 # frozen_string_literal: true
 
 require "fileutils"
+require "tmpdir"
 
 # Rebuilds storage/workspace from Folder + Item records.
 # This keeps filesystem state aligned with the app's organizer model.
 # Notes and Tasks are always singular and stored at the workspace root.
 class ItemStorageSyncLite
+  OS_CONFIG_FILENAME = "OSConfig.txt".freeze
+  LEGACY_WINDOWS_FILENAME = "Windows.txt".freeze
+  SYNC_MUTEX = Mutex.new
+
   class << self
     def storage_root
       Rails.root.join("storage", "workspace")
@@ -17,11 +22,17 @@ class ItemStorageSyncLite
   end
 
   def sync_all!
+    SYNC_MUTEX.synchronize do
+      perform_sync_all!
+    end
+  end
+
+  private
+
+  def perform_sync_all!
     FileUtils.mkdir_p(self.class.storage_root)
 
-    temp_root = self.class.storage_root.join(".sync_tmp")
-    FileUtils.rm_rf(temp_root)
-    FileUtils.mkdir_p(temp_root)
+    temp_root = Pathname.new(Dir.mktmpdir(".sync_tmp-", self.class.storage_root.to_s))
 
     # Write the singular Note and TaskList from the App folder at the root
     app_folder = Folder.find_by(name: "App")
@@ -52,17 +63,23 @@ class ItemStorageSyncLite
 
     swap_storage(temp_root)
   ensure
-    FileUtils.rm_rf(temp_root) if temp_root.exist?
+    FileUtils.rm_rf(temp_root.to_s) if temp_root && temp_root.exist?
   end
-
-  private
 
   def swap_storage(temp_root)
     root = self.class.storage_root
-    backup = root.join(".sync_old")
+    active_temp_dirname = File.basename(temp_root.to_s)
+
+    # Preserve workspace config files across Notes/Tasks rebuilds.
+    preserved_configs = {}
+    [OS_CONFIG_FILENAME, LEGACY_WINDOWS_FILENAME].each do |filename|
+      path = root.join(filename)
+      preserved_configs[filename] = File.read(path) if File.exist?(path)
+    end
 
     Dir.children(root).each do |entry|
-      next if [".sync_tmp", ".sync_old"].include?(entry)
+      next if [".sync_old", active_temp_dirname].include?(entry)
+      next if [OS_CONFIG_FILENAME, LEGACY_WINDOWS_FILENAME].include?(entry)
 
       FileUtils.rm_rf(root.join(entry))
     end
@@ -71,7 +88,11 @@ class ItemStorageSyncLite
       FileUtils.mv(temp_root.join(entry), root.join(entry))
     end
 
-    FileUtils.rm_rf(backup)
+    preserved_configs.each do |filename, contents|
+      File.write(root.join(filename), contents)
+    end
+
+    FileUtils.rm_rf(root.join(".sync_old"))
   end
 
   def next_available_name(raw, used, extension: "")
@@ -109,7 +130,6 @@ class ItemStorageSyncLite
     [
       "# NEXUS_NOTE",
       "# name: #{item.name}",
-      "# folder: #{item.folder.name}",
       "# item_id: #{item.id}",
       "# updated_at: #{iso8601_or_nil(item.updated_at)}",
       "",
@@ -152,7 +172,6 @@ class ItemStorageSyncLite
     [
       "# NEXUS_TASK_LIST",
       "# name: #{item.name}",
-      "# folder: #{item.folder.name}",
       "# item_id: #{item.id}",
       "# updated_at: #{iso8601_or_nil(item.updated_at)}",
       "",
@@ -174,7 +193,6 @@ class ItemStorageSyncLite
     [
       "# NEXUS_NOTE",
       "# name: Notes",
-      "# folder: App",
       "# item_id: ",
       "# updated_at: null",
       "",
@@ -186,7 +204,6 @@ class ItemStorageSyncLite
     [
       "# NEXUS_TASK_LIST",
       "# name: Tasks",
-      "# folder: App",
       "# item_id: ",
       "# updated_at: null",
       ""

@@ -2,17 +2,16 @@ import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
   connect() {
-    this.organizerWindow = document.getElementById("organizer-window")
-    this.toolsDockButton = this.element.querySelector(".app-dock-button--tools")
+    this.launcherWindow = document.getElementById("organizer-window")
+    this.launcherDockButton = this.element.querySelector(".app-dock-button--launcher")
     this.dbHealthDockButton = this.element.querySelector(".app-dock-button--db-health")
     this.settingsDockButton = this.element.querySelector(".app-dock-button--settings")
-    this.stationaryDockButton = this.element.querySelector(".app-dock-button--stationary")
 
     this.minWindowHeight = 120
     this.viewportMarginPx = 6
     this.dockLeftBoundary = 41
     this.defaultOrganizerWidth = 320
-    this.defaultOrganizerHeight = this.getToolsWindowHeight()
+    this.defaultOrganizerHeight = this.getLauncherWindowHeight()
 
     this.activeDrag = null
 
@@ -20,27 +19,26 @@ export default class extends Controller {
     this.boundDragEnd = this.stopDrag.bind(this)
     this.boundDbHealthState = this.handleDbHealthState.bind(this)
     this.boundSettingsState = this.handleSettingsState.bind(this)
-    this.boundStationaryState = this.handleStationaryState.bind(this)
+    this.boundLauncherToggle = this.toggleLauncher.bind(this)
 
     this.initializeWindows()
 
     window.addEventListener("db-health:state", this.boundDbHealthState)
     window.addEventListener("settings:state", this.boundSettingsState)
-    window.addEventListener("stationary:state", this.boundStationaryState)
+    window.addEventListener("launcher:toggle", this.boundLauncherToggle)
 
-    if (this.organizerWindow) {
-      this.organizerWindow.addEventListener("mousedown", () => this.bringToolsToFront())
+    if (this.launcherWindow) {
+      this.launcherWindow.addEventListener("mousedown", () => this.bringLauncherToFront())
     }
     this.updateDbHealthDockState(false)
     this.updateSettingsDockState(false)
-    this.updateStationaryDockState(false)
   }
 
   disconnect() {
     this.stopDrag()
     window.removeEventListener("db-health:state", this.boundDbHealthState)
     window.removeEventListener("settings:state", this.boundSettingsState)
-    window.removeEventListener("stationary:state", this.boundStationaryState)
+    window.removeEventListener("launcher:toggle", this.boundLauncherToggle)
   }
 
   toggleDbHealth(event) {
@@ -53,28 +51,29 @@ export default class extends Controller {
     window.dispatchEvent(new CustomEvent("settings:toggle"))
   }
 
-  toggleStationary(event) {
+  toggleLauncher(event) {
     if (event) event.preventDefault()
-    window.dispatchEvent(new CustomEvent("stationary:toggle"))
+    if (!this.launcherWindow) return
+    const isHidden = this.launcherWindow.classList.contains("is-hidden")
+    if (isHidden) { this.openLauncher() } else { this.closeLauncher() }
   }
 
   handleDbHealthState(event) { this.updateDbHealthDockState(Boolean(event?.detail?.open)) }
   handleSettingsState(event) { this.updateSettingsDockState(Boolean(event?.detail?.open)) }
-  handleStationaryState(event) { this.updateStationaryDockState(Boolean(event?.detail?.open)) }
 
   // ════════════════════════════════════════════════════════════════════════════
   // Initialization
   // ════════════════════════════════════════════════════════════════════════════
 
   initializeWindows() {
-    if (!this.organizerWindow) return
-    this.positionToolsWindow()
-    this.organizerWindow.classList.add("is-hidden")
-    this.updateToolsDockState(false)
+    if (!this.launcherWindow) return
+    this.restoreLauncherWindowBounds()
+    this.launcherWindow.classList.add("is-hidden")
+    this.updateLauncherDockState(false)
   }
 
-  positionToolsWindow() {
-    if (!this.organizerWindow) return
+  positionLauncherWindow() {
+    if (!this.launcherWindow) return
 
     const vw = window.innerWidth
     const vh = window.innerHeight
@@ -84,7 +83,7 @@ export default class extends Controller {
     const defaultTop = margin
     const leftColumnLeft = this.dockLeftBoundary
     const leftColumnWidth = 320
-    const organizerWidth = this.defaultOrganizerWidth
+    const launcherWidth = this.defaultOrganizerWidth
     const maxWindowHeight = Math.max(this.minWindowHeight, vh - (margin * 2))
     const windowHeight = Math.max(
       this.minWindowHeight,
@@ -95,17 +94,17 @@ export default class extends Controller {
     const desiredLeft = rightColumnLeft
     const desiredTop = defaultTop + 125 + rowGap
 
-    const organizerLeft = Math.max(this.dockLeftBoundary, Math.min(desiredLeft, vw - margin - organizerWidth))
-    const organizerTop = Math.max(margin, Math.min(desiredTop, vh - margin - windowHeight))
+    const launcherLeft = Math.max(this.dockLeftBoundary, Math.min(desiredLeft, vw - margin - launcherWidth))
+    const launcherTop = Math.max(margin, Math.min(desiredTop, vh - margin - windowHeight))
 
-    this.organizerWindow.style.left = organizerLeft + "px"
-    this.organizerWindow.style.top = organizerTop + "px"
-    this.organizerWindow.style.width = organizerWidth + "px"
-    this.organizerWindow.style.height = windowHeight + "px"
+    this.launcherWindow.style.left = launcherLeft + "px"
+    this.launcherWindow.style.top = launcherTop + "px"
+    this.launcherWindow.style.width = launcherWidth + "px"
+    this.launcherWindow.style.height = windowHeight + "px"
   }
 
-  getToolsWindowHeight() {
-    const count = this.organizerWindow?.querySelectorAll(".organizer-tools-grid .finder-item")?.length || 0
+  getLauncherWindowHeight() {
+    const count = this.launcherWindow?.querySelectorAll(".organizer-tools-grid .os-window-card")?.length || 0
     const rows = this.calculateGridRows(count || 3, 2)
     return this.calculateCardGridWindowHeight(rows)
   }
@@ -156,16 +155,16 @@ export default class extends Controller {
 
     event.preventDefault()
     event.stopPropagation()
-    this.bringToolsToFront()
+    this.bringLauncherToFront()
 
-    const orgRect = this.organizerWindow.getBoundingClientRect()
+    const orgRect = this.launcherWindow.getBoundingClientRect()
     const coords = this.getEventCoordinates(event)
 
     this.activeDrag = {
       startX: coords.x,
       startY: coords.y,
-      orgStartLeft: orgRect.left,
-      orgStartTop: orgRect.top
+      launcherStartLeft: orgRect.left,
+      launcherStartTop: orgRect.top
     }
 
     document.addEventListener("mousemove", this.boundDragMove)
@@ -187,17 +186,21 @@ export default class extends Controller {
     const vw = window.innerWidth
     const vh = window.innerHeight
 
-    let newOrgLeft = d.orgStartLeft + deltaX
-    let newOrgTop = d.orgStartTop + deltaY
+    let newOrgLeft = d.launcherStartLeft + deltaX
+    let newOrgTop = d.launcherStartTop + deltaY
 
-    newOrgLeft = Math.max(this.dockLeftBoundary, Math.min(newOrgLeft, vw - margin - this.organizerWindow.offsetWidth))
-    newOrgTop = Math.max(margin, Math.min(newOrgTop, vh - margin - this.organizerWindow.offsetHeight))
+    newOrgLeft = Math.max(this.dockLeftBoundary, Math.min(newOrgLeft, vw - margin - this.launcherWindow.offsetWidth))
+    newOrgTop = Math.max(margin, Math.min(newOrgTop, vh - margin - this.launcherWindow.offsetHeight))
 
-    this.organizerWindow.style.left = newOrgLeft + "px"
-    this.organizerWindow.style.top = newOrgTop + "px"
+    this.launcherWindow.style.left = newOrgLeft + "px"
+    this.launcherWindow.style.top = newOrgTop + "px"
   }
 
   stopDrag() {
+    if (this.activeDrag) {
+      this.saveLauncherWindowBounds()
+      this.emitLauncherState(!this.launcherWindow.classList.contains("is-hidden"))
+    }
     this.activeDrag = null
     document.removeEventListener("mousemove", this.boundDragMove)
     document.removeEventListener("mouseup", this.boundDragEnd)
@@ -205,40 +208,76 @@ export default class extends Controller {
     document.removeEventListener("touchend", this.boundDragEnd)
   }
 
+  restoreLauncherWindowBounds() {
+    const bounds = this.readStoredBounds("nexus.window.launcher.bounds")
+    if (!bounds) { this.positionLauncherWindow(); return }
+    this.launcherWindow.style.left   = `${bounds.left}px`
+    this.launcherWindow.style.top    = `${bounds.top}px`
+    this.launcherWindow.style.width  = `${this.defaultOrganizerWidth}px`
+    this.launcherWindow.style.height = `${this.defaultOrganizerHeight}px`
+  }
+
+  saveLauncherWindowBounds() {
+    if (!this.launcherWindow) return
+    const rect = this.launcherWindow.getBoundingClientRect()
+    const bounds = { left: Math.round(rect.left), top: Math.round(rect.top) }
+    try { localStorage.setItem("nexus.window.launcher.bounds", JSON.stringify(bounds)) } catch (_) {}
+  }
+
+  readStoredBounds(key) {
+    try {
+      const raw = localStorage.getItem(key)
+      if (!raw) return null
+      const parsed = JSON.parse(raw)
+      if (typeof parsed?.left !== "number" || typeof parsed?.top !== "number") return null
+      return parsed
+    } catch (_) { return null }
+  }
+
   // ════════════════════════════════════════════════════════════════════════════
-  // TOOLS toggle
+  // LAUNCHER toggle
   // ════════════════════════════════════════════════════════════════════════════
 
-  toggleTools(event) {
-    if (event) event.preventDefault()
-    if (!this.organizerWindow) return
-    const isHidden = this.organizerWindow.classList.contains("is-hidden")
-    if (isHidden) { this.openTools() } else { this.closeTools() }
+  openLauncher() {
+    this.launcherWindow.classList.remove("is-hidden")
+    this.bringLauncherToFront()
+    this.updateLauncherDockState(true)
+    this.emitLauncherState(true)
   }
 
-  openTools() {
-    this.organizerWindow.classList.remove("is-hidden")
-    this.bringToolsToFront()
-    this.updateToolsDockState(true)
+  closeLauncher() {
+    this.emitLauncherState(false)
+    this.launcherWindow.classList.add("is-hidden")
+    this.updateLauncherDockState(false)
   }
 
-  closeTools() {
-    this.organizerWindow.classList.add("is-hidden")
-    this.updateToolsDockState(false)
+  emitLauncherState(isOpen) {
+    const rect = this.launcherWindow.getBoundingClientRect()
+    const z = Number.parseInt(this.launcherWindow.style.zIndex || window.getComputedStyle(this.launcherWindow).zIndex, 10)
+    window.dispatchEvent(new CustomEvent("launcher:state", {
+      detail: {
+        open: Boolean(isOpen),
+        x: Math.round(rect.left),
+        y: Math.round(rect.top),
+        z: Number.isFinite(z) ? z : 1500
+      }
+    }))
   }
 
-  bringToolsToFront() {
-    if (!this.organizerWindow || this.organizerWindow.classList.contains("is-hidden")) return
+  bringLauncherToFront() {
+    if (!this.launcherWindow || this.launcherWindow.classList.contains("is-hidden")) return
+    if (window.__nexusRestoringLayout) return
     const next = Number(window.__nexusDesktopZIndex || 1500) + 1
     window.__nexusDesktopZIndex = next
-    this.organizerWindow.style.zIndex = String(next)
+    this.launcherWindow.style.zIndex = String(next)
+    this.emitLauncherState(true)
   }
 
-  updateToolsDockState(isOpen) {
-    if (!this.toolsDockButton) return
-    this.toolsDockButton.classList.toggle("is-active", isOpen)
-    this.toolsDockButton.setAttribute("aria-pressed", isOpen ? "true" : "false")
-    this.toolsDockButton.setAttribute("aria-label", isOpen ? "Hide TOOLS" : "Open TOOLS")
+  updateLauncherDockState(isOpen) {
+    if (!this.launcherDockButton) return
+    this.launcherDockButton.classList.toggle("is-active", isOpen)
+    this.launcherDockButton.setAttribute("aria-pressed", isOpen ? "true" : "false")
+    this.launcherDockButton.setAttribute("aria-label", isOpen ? "Hide Launcher" : "Open Launcher")
   }
 
   updateDbHealthDockState(isOpen) {
@@ -255,11 +294,5 @@ export default class extends Controller {
     this.settingsDockButton.setAttribute("aria-label", isOpen ? "Hide Settings" : "Open Settings")
   }
 
-  updateStationaryDockState(isOpen) {
-    if (!this.stationaryDockButton) return
-    this.stationaryDockButton.classList.toggle("is-active", isOpen)
-    this.stationaryDockButton.setAttribute("aria-pressed", isOpen ? "true" : "false")
-    this.stationaryDockButton.setAttribute("aria-label", isOpen ? "Hide Stationary" : "Open Stationary")
-  }
 }
 

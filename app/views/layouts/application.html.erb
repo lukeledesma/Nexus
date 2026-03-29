@@ -28,6 +28,7 @@
   <body class="<%= logged_in? ? "nexus-os" : "" %>" data-controller="window-manager">
     <% if logged_in? %>
       <div id="desktop" class="desktop-layer"></div>
+      <div data-controller="workspace-manager" data-workspace-manager-url-value="/workspace_preferences" hidden></div>
 
       <div class="desktop-clock" data-controller="desktop-clock">
         <span class="desktop-clock-display" data-desktop-clock-target="display"></span>
@@ -39,7 +40,17 @@
         </div>
       </section>
 
-      <section class="content-window os-window is-hidden" data-controller="content-window" aria-live="polite">
+      <section class="content-window os-window is-hidden"
+        data-controller="content-window"
+        data-content-window-app-key-value="timer"
+        data-content-window-app-url-value="/apps/timer"
+        data-content-window-storage-key-value="nexus.contentWindow.timer.bounds"
+        data-content-window-frame-id-value="timer-pane"
+        data-content-window-default-width-value="320"
+        data-content-window-default-height-value="250"
+        data-content-window-default-offset-x-value="0"
+        data-content-window-default-offset-y-value="-90"
+        aria-live="polite">
         <div class="title-bar" data-action="mousedown->content-window#startDrag touchstart->content-window#startDrag"></div>
         <button type="button" class="tools-close-btn content-window-close" data-action="click->content-window#close" aria-label="Close" title="Close">✕</button>
         <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
@@ -51,27 +62,105 @@
         <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="window-content">
-          <turbo-frame id="app-pane" class="finder-app-frame"></turbo-frame>
+          <turbo-frame id="timer-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
+        </div>
+      </section>
+
+      <section class="content-window os-window is-hidden"
+        data-controller="content-window"
+        data-content-window-app-key-value="conversion-chart"
+        data-content-window-app-url-value="/apps/conversion_chart"
+        data-content-window-storage-key-value="nexus.contentWindow.conversionChart.bounds"
+        data-content-window-frame-id-value="conversion-chart-pane"
+        data-content-window-default-width-value="407"
+        data-content-window-default-height-value="407"
+        data-content-window-default-offset-x-value="67"
+        data-content-window-default-offset-y-value="-92"
+        aria-live="polite">
+        <div class="title-bar" data-action="mousedown->content-window#startDrag touchstart->content-window#startDrag"></div>
+        <button type="button" class="tools-close-btn content-window-close" data-action="click->content-window#close" aria-label="Close" title="Close">✕</button>
+        <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="window-content">
+          <turbo-frame id="conversion-chart-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
+        </div>
+      </section>
+
+      <section class="content-window os-window is-hidden"
+        data-controller="content-window"
+        data-content-window-app-key-value="singular-note"
+        data-content-window-app-url-value="/apps/singular_note"
+        data-content-window-storage-key-value="nexus.contentWindow.singularNote.bounds"
+        data-content-window-frame-id-value="singular-note-pane"
+        data-content-window-default-width-value="407"
+        data-content-window-default-height-value="407"
+        data-content-window-default-offset-x-value="-4"
+        data-content-window-default-offset-y-value="-174"
+        aria-live="polite">
+        <div class="title-bar" data-action="mousedown->content-window#startDrag touchstart->content-window#startDrag"></div>
+        <button type="button" class="tools-close-btn content-window-close" data-action="click->content-window#close" aria-label="Close" title="Close">✕</button>
+        <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="window-content">
+          <turbo-frame id="singular-note-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
+        </div>
+      </section>
+
+      <section class="content-window os-window is-hidden"
+        data-controller="content-window"
+        data-content-window-app-key-value="singular-task-list"
+        data-content-window-app-url-value="/apps/singular_task_list"
+        data-content-window-storage-key-value="nexus.contentWindow.singularTaskList.bounds"
+        data-content-window-frame-id-value="singular-task-list-pane"
+        data-content-window-default-width-value="407"
+        data-content-window-default-height-value="407"
+        data-content-window-default-offset-x-value="32"
+        data-content-window-default-offset-y-value="-132"
+        aria-live="polite">
+        <div class="title-bar" data-action="mousedown->content-window#startDrag touchstart->content-window#startDrag"></div>
+        <button type="button" class="tools-close-btn content-window-close" data-action="click->content-window#close" aria-label="Close" title="Close">✕</button>
+        <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="window-content">
+          <turbo-frame id="singular-task-list-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
         </div>
       </section>
 
       <section class="db-health-window os-window is-hidden" data-controller="db-health" data-db-health-url-value="<%= db_health_path %>" data-db-health-target="window" aria-live="polite">
           <section class="db-health-panel" data-db-health-target="panel">
-          <header class="db-health-header" data-action="mousedown->db-health#startDrag touchstart->db-health#startDrag">
+          <header class="db-health-header os-window-header" data-action="mousedown->db-health#startDrag touchstart->db-health#startDrag">
             <div class="db-health-title-wrap">
-              <h3 data-db-health-target="title">DB Health</h3>
+              <h3 class="os-window-title" data-db-health-target="title">DB Health</h3>
               <span class="db-health-heartbeat" aria-hidden="true">♥</span>
             </div>
-            <div class="db-health-controls">
+            <div class="db-health-controls os-window-controls">
               <button type="button" class="db-health-back hidden" data-db-health-target="backButton" data-action="click->db-health#clearFocus" aria-label="Back" title="Back">←</button>
               <button type="button" class="db-health-refresh" data-action="click->db-health#refresh" aria-label="Refresh" title="Refresh">↻</button>
               <button type="button" class="db-health-close" data-action="click->db-health#close" aria-label="Close" title="Close">✕</button>
             </div>
           </header>
 
-          <p class="db-health-stamp" data-db-health-target="stamp">Waiting for data...</p>
+          <p class="db-health-stamp os-window-subtitle" data-db-health-target="stamp">Waiting for data...</p>
 
-          <dl class="db-health-grid" data-db-health-target="grid">
+          <dl class="db-health-grid os-window-body-start" data-db-health-target="grid">
             <div class="db-health-card db-health-card--selectable" data-db-health-target="metricCard" data-db-health-focus-key="folders" data-action="click->db-health#focusMetric"><dt>Folders</dt><dd data-db-health-target="foldersCount">-</dd></div>
             <div class="db-health-card db-health-card--selectable" data-db-health-target="metricCard" data-db-health-focus-key="items" data-action="click->db-health#focusMetric"><dt>Items</dt><dd data-db-health-target="itemsCount">-</dd></div>
             <div class="db-health-card db-health-card--selectable" data-db-health-target="metricCard" data-db-health-focus-key="item_id_total" data-action="click->db-health#focusMetric"><dt>Item IDs</dt><dd data-db-health-target="maxItemId">-</dd></div>
@@ -89,51 +178,32 @@
 
       <section class="settings-window os-window is-hidden" data-controller="settings" data-settings-target="window" aria-live="polite">
         <section class="settings-panel">
-          <header class="settings-header" data-action="mousedown->settings#startDrag touchstart->settings#startDrag">
-            <h3>Settings</h3>
-            <div class="settings-controls">
+          <header class="settings-header os-window-header" data-action="mousedown->settings#startDrag touchstart->settings#startDrag">
+            <h3 class="os-window-title">Settings</h3>
+            <div class="settings-controls os-window-controls">
               <button type="button" class="settings-close" data-action="click->settings#close" aria-label="Close Settings" title="Close">✕</button>
             </div>
           </header>
 
-          <p class="settings-stamp"><%= current_user&.email.presence || "Unknown user" %></p>
+          <p class="settings-stamp os-window-subtitle"><%= current_user&.email.presence || "Unknown user" %></p>
 
-          <div class="settings-actions">
-            <%= button_to logout_path, method: :delete, class: "settings-action settings-action--logout" do %>
-              <div class="organizer-tool-card">
-                <dt class="organizer-tool-label">LOGOUT</dt>
-                <dd class="organizer-tool-value">EXIT</dd>
+          <div class="settings-actions os-window-body-start os-window-grid os-window-grid--2">
+            <%= button_to logout_path, method: :delete, class: "settings-action os-window-card settings-action--logout", form: { data: { turbo_confirm: "Are you sure you want to log out?" } } do %>
+              <div class="os-window-card-content">
+                <dt class="os-window-card-label">LOGOUT</dt>
+                <dd class="os-window-card-value">EXIT</dd>
               </div>
             <% end %>
+            <button type="button" class="settings-action os-window-card settings-action--reset" data-action="click->settings#resetLayout">
+              <div class="os-window-card-content">
+                <dt class="os-window-card-label">WINDOW LAYOUT</dt>
+                <dd class="os-window-card-value">RESET</dd>
+              </div>
+            </button>
           </div>
         </section>
       </section>
 
-      <section class="stationary-window os-window is-hidden" data-controller="stationary" data-stationary-target="window" aria-live="polite">
-        <section class="stationary-panel">
-          <header class="stationary-header" data-action="mousedown->stationary#startDrag touchstart->stationary#startDrag">
-            <h3>Stationary</h3>
-            <div class="stationary-controls">
-              <button type="button" class="stationary-close" data-action="click->stationary#close" aria-label="Close Stationary" title="Close">✕</button>
-            </div>
-          </header>
-          <p class="stationary-stamp" data-stationary-target="stamp">—</p>
-          <div class="stationary-grid">
-            <button type="button" class="stationary-card-btn" data-app-url="/apps/singular_note" data-action="click->stationary#launchApp">
-              <div class="organizer-tool-card">
-                <dt class="organizer-tool-label">NOTES</dt>
-                <dd class="organizer-tool-value" data-stationary-target="notesSize">-</dd>
-              </div>
-            </button>
-            <button type="button" class="stationary-card-btn" data-app-url="/apps/singular_task_list" data-action="click->stationary#launchApp">
-              <div class="organizer-tool-card">
-                <dt class="organizer-tool-label">TASKS</dt>
-                <dd class="organizer-tool-value" data-stationary-target="tasksSize">-</dd>
-              </div>
-            </button>
-          </div>
-        </section>
-      </section>
     <% end %>
 
     <%= yield %>
