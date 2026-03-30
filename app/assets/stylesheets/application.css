@@ -43,6 +43,14 @@
   --os-card-padding-y: 0.32rem;
   --os-card-padding-x: 0.44rem;
   --os-card-radius: 8px;
+  --window-bg-h: 180;
+  --window-bg-saturation: 0%;
+  --window-bg-brightness: 15%;
+  --window-bg-alpha: 0.15;
+  --window-ui-hue: 180;
+  --window-ui-saturation: 0%;
+  --window-ui-brightness: 15%;
+  --window-bg: hsl(var(--window-bg-h) var(--window-bg-saturation) var(--window-bg-brightness) / var(--window-bg-alpha));
 }
 
 * { box-sizing: border-box; }
@@ -185,12 +193,13 @@
 .db-health-panel {
   position: relative;
   width: 100%;
-  height: 100%;
   background: transparent;
   border-radius: 12px;
   padding: var(--os-window-padding);
   box-sizing: border-box;
-  overflow: hidden;
+  max-height: 100%;
+  overflow-y: hidden;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -232,6 +241,7 @@
 .db-health-refresh,
 .db-health-back,
 .db-health-close,
+.settings-back,
 .settings-close,
 .tools-close-btn {
   border: none;
@@ -252,6 +262,8 @@
 .db-health-back:focus-visible,
 .db-health-close:hover,
 .db-health-close:focus-visible,
+.settings-back:hover,
+.settings-back:focus-visible,
 .settings-close:hover,
 .settings-close:focus-visible,
 .tools-close-btn:hover,
@@ -282,7 +294,8 @@
 .db-health-card.hidden,
 .db-health-grid.hidden,
 .db-health-detail.hidden,
-.db-health-back.hidden {
+.db-health-back.hidden,
+.settings-back.hidden {
   display: none;
 }
 
@@ -311,7 +324,7 @@
 }
 
 .db-health-detail {
-  margin-top: 0.62rem;
+  margin-top: 0;
   flex: 0 0 auto;
   min-height: 0;
   display: flex;
@@ -319,34 +332,50 @@
   overflow: hidden;
 }
 
-.db-health-detail h4 {
-  margin: 0 0 0.25rem;
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
 .db-health-detail-list {
+  --db-health-row-height: 35px;
+  --db-health-list-padding: 0.38rem;
   margin: 0;
-  padding: 0.3rem 0.38rem;
+  padding: 0 var(--db-health-list-padding) 0;
   list-style: none;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.02);
   flex: 0 0 auto;
   min-height: 0;
-  max-height: 250px;
-  overflow-y: auto;
+  max-height: none;
+  overflow-y: hidden;
+  overflow-x: hidden;
+}
+
+.db-health-detail-list::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.db-health-detail-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.db-health-detail-list::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+}
+
+.db-health-detail-list.is-scrolling::-webkit-scrollbar-thumb,
+.db-health-detail-list:hover::-webkit-scrollbar-thumb {
+  background: rgba(40, 51, 78, 0.98);
 }
 
 .db-health-detail-list li {
   display: flex;
+  box-sizing: border-box;
   align-items: center;
-  height: 2.2rem;
+  height: var(--db-health-row-height);
+  min-height: var(--db-health-row-height);
   padding: 0 0.22rem;
   font-size: 0.79rem;
-  line-height: 1;
+  line-height: 1.1;
   color: var(--text);
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -354,7 +383,7 @@
 }
 
 .db-health-detail-list li + li {
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .db-health-detail-row {
@@ -3086,12 +3115,13 @@ input.connection-inline {
 .settings-panel {
   position: relative;
   width: 100%;
-  height: 100%;
   background: transparent;
   border-radius: 12px;
   padding: var(--os-window-padding);
   box-sizing: border-box;
-  overflow: hidden;
+  max-height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -3114,6 +3144,11 @@ input.connection-inline {
   align-content: start;
 }
 
+.settings-actions.hidden,
+.settings-interface.hidden {
+  display: none;
+}
+
 .settings-actions .button_to {
   margin: 0;
   width: 100%;
@@ -3122,6 +3157,124 @@ input.connection-inline {
 
 .settings-action {
   box-sizing: border-box;
+}
+
+.settings-interface {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0;
+}
+
+.settings-interface-label {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.settings-interface-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.settings-interface-slider {
+  width: 100%;
+  accent-color: var(--accent);
+  appearance: none;
+  -webkit-appearance: none;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  outline: none;
+  cursor: pointer;
+}
+
+.settings-interface-slider--hue {
+  background: linear-gradient(
+    90deg,
+    hsl(0 100% 50%) 0%,
+    hsl(60 100% 50%) 16.67%,
+    hsl(120 100% 50%) 33.33%,
+    hsl(180 100% 50%) 50%,
+    hsl(240 100% 50%) 66.67%,
+    hsl(300 100% 50%) 83.33%,
+    hsl(360 100% 50%) 100%
+  );
+}
+
+.settings-interface-slider--saturation {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--window-ui-hue) 0% var(--window-ui-brightness)) 0%,
+    hsl(var(--window-ui-hue) 100% var(--window-ui-brightness)) 100%
+  );
+}
+
+.settings-interface-slider--brightness {
+  background: linear-gradient(
+    90deg,
+    #000 0%,
+    hsl(var(--window-ui-hue) var(--window-ui-saturation) 50%) 100%
+  );
+}
+
+.settings-interface-slider--alpha {
+  background-image:
+    linear-gradient(45deg, rgba(255,255,255,0.10) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.10) 75%, rgba(255,255,255,0.10)),
+    linear-gradient(45deg, rgba(255,255,255,0.10) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.10) 75%, rgba(255,255,255,0.10)),
+    linear-gradient(90deg, transparent 0%, hsl(var(--window-ui-hue) var(--window-ui-saturation) var(--window-ui-brightness)) 100%);
+  background-position: 0 0, 8px 8px, 0 0;
+  background-size: 16px 16px, 16px 16px, 100% 100%;
+  background-color: rgba(0, 0, 0, 0.35);
+}
+
+.settings-interface-slider::-webkit-slider-runnable-track {
+  height: 100%;
+  background: transparent;
+}
+
+.settings-interface-slider::-moz-range-track {
+  height: 100%;
+  background: transparent;
+  border: none;
+}
+
+.settings-interface-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 17px;
+  height: 17px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  background: rgba(15, 18, 28, 0.95);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  margin-top: 2px;
+}
+
+.settings-interface-slider::-moz-range-thumb {
+  width: 17px;
+  height: 17px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  background: rgba(15, 18, 28, 0.95);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.settings-interface-value {
+  min-width: 2.7rem;
+  text-align: right;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.settings-interface-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.72rem;
 }
 
 .settings-action:hover,
@@ -3164,7 +3317,7 @@ input.connection-inline {
   padding: 0 !important;
   margin: 0 !important;
   border-radius: 10px;
-  background: #171822;
+  background: var(--window-bg);
   backdrop-filter: blur(8px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   border: none;
@@ -3194,12 +3347,12 @@ input.connection-inline {
 /* DB Health window overrides: fixed position so drag math is viewport-relative */
 .db-health-window.os-window {
   position: fixed;
-  background: rgba(19, 20, 28, 0.5);
+  background: var(--window-bg);
 }
 
 .settings-window.os-window {
   position: fixed;
-  background: rgba(19, 20, 28, 0.5);
+  background: var(--window-bg);
 }
 
 .organizer-window.os-window {
@@ -3208,7 +3361,7 @@ input.connection-inline {
 
 .content-window.os-window {
   position: fixed;
-  background: rgba(19, 20, 28, 0.5);
+  background: var(--window-bg);
 }
 
 .content-window {
@@ -3426,7 +3579,7 @@ input.connection-inline {
 .organizer-window {
   display: flex;
   flex-direction: column;
-  background: rgba(19, 20, 28, 0.5);
+  background: var(--window-bg);
   border-radius: 12px;
   overflow: hidden;
   transition: border-radius 0.15s ease;
@@ -3534,7 +3687,7 @@ input.connection-inline {
    No translate, no opacity — window never paints over the organizer. */
 .main-window {
   --main-reveal-clip: inset(0 100% 0 0 round 0 12px 12px 0);
-  background: rgba(19, 20, 28, 0.5);
+  background: var(--window-bg);
   border: none;
   clip-path: var(--main-reveal-clip);
   transition: clip-path 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
@@ -3612,7 +3765,7 @@ input.connection-inline {
   left: 40px;
   width: 300px;
   height: calc(100vh - 140px);
-  background: rgba(20, 20, 20, 0.85);
+  background: var(--window-bg);
   backdrop-filter: blur(12px);
   border-radius: 12px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);

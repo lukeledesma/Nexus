@@ -6,13 +6,13 @@
 # File format:
 # ========= OS CONFIG =========
 #
-# [WINDOWS]
+# [POSITIONS]
 #
-#   [WINDOWS.DEFAULTS]
+#   [POSITIONS.DEFAULTS]
 #   # windowKey | x | y | w | h | z | state
 #   conversion-chart | 782 | 88 | 407 | 407 | 1506 | closed
 #
-#   [WINDOWS.CURRENT]
+#   [POSITIONS.CURRENT]
 #   # windowKey | x | y | w | h | z | state
 #   conversion-chart | 790 | 96 | 407 | 407 | 1506 | open
 class WorkspacePreferencesController < ApplicationController
@@ -22,7 +22,7 @@ class WorkspacePreferencesController < ApplicationController
 
   DEFAULT_WINDOWS = {
     "db-health" => { "x" => 41, "y" => 6, "width" => 320, "height" => 235, "z" => 1501, "open" => false },
-    "settings" => { "x" => 41, "y" => 256, "width" => 320, "height" => 125, "z" => 1502, "open" => false },
+    "settings" => { "x" => 41, "y" => 256, "width" => 320, "height" => 180, "z" => 1502, "open" => false },
     "launcher" => { "x" => 376, "y" => 6, "width" => 320, "height" => 180, "z" => 1503, "open" => false },
     "singular-note" => { "x" => 711, "y" => 6, "width" => 407, "height" => 407, "z" => 1504, "open" => false },
     "singular-task-list" => { "x" => 747, "y" => 48, "width" => 407, "height" => 407, "z" => 1505, "open" => false },
@@ -30,19 +30,30 @@ class WorkspacePreferencesController < ApplicationController
     "timer" => { "x" => 376, "y" => 196, "width" => 320, "height" => 250, "z" => 1507, "open" => false }
   }.freeze
 
+  DEFAULT_APPEARANCE = {
+    "hue" => 180,
+    "saturation" => 0,
+    "brightness" => 15,
+    "transparency" => 0.15
+  }.freeze
+
   def show
-    render json: { "windows" => read_rows_for_user }
+    render json: {
+      "windows" => read_rows_for_user,
+      "appearance" => read_appearance_for_user
+    }
   end
 
   def update
     incoming = normalize_windows_payload(params[:windows])
-    merged = read_rows_for_user.deep_merge(incoming)
-    rewrite_config(merged)
+    merged_windows = read_rows_for_user.deep_merge(incoming)
+    merged_appearance = read_appearance_for_user.merge(normalize_appearance_payload(params[:appearance]))
+    rewrite_config(merged_windows, merged_appearance)
     render json: { ok: true }
   end
 
   def destroy
-    rewrite_config({})
+    rewrite_config({}, DEFAULT_APPEARANCE)
     render json: { ok: true }
   end
 
@@ -64,7 +75,8 @@ class WorkspacePreferencesController < ApplicationController
       next if stripped.blank? || stripped.start_with?("#")
 
       if stripped.start_with?("[")
-        in_current = stripped.upcase == "[WINDOWS.CURRENT]"
+        upper = stripped.upcase
+        in_current = upper == "[POSITIONS.CURRENT]" || upper == "[WINDOWS.CURRENT]"
         next
       end
 
@@ -112,6 +124,99 @@ class WorkspacePreferencesController < ApplicationController
     rows
   end
 
+  def read_appearance_for_user
+    normalize_appearance(parse_os_config_appearance)
+  end
+
+  def parse_os_config_appearance
+    ensure_os_config_file
+
+    in_hsb_current = false
+    appearance = {}
+
+    File.readlines(OS_CONFIG_FILE, chomp: true).each do |line|
+      stripped = line.to_s.strip
+      next if stripped.blank? || stripped.start_with?("#")
+
+      if stripped.start_with?("[")
+        upper = stripped.upcase
+        in_hsb_current = upper == "[HSB.CURRENT]" || upper == "[HSB]"
+        next
+      end
+
+      next unless in_hsb_current
+
+      key, value = if stripped.include?("|")
+        tokens = stripped.split("|", 2).map { |token| token.to_s.strip }
+        [tokens[0], tokens[1]]
+      elsif stripped.include?(":")
+        tokens = stripped.split(":", 2).map { |token| token.to_s.strip }
+        [tokens[0], tokens[1]]
+      else
+        [nil, nil]
+      end
+
+      next if key.blank? || value.blank?
+
+      normalized_key = key.to_s.downcase
+      next unless DEFAULT_APPEARANCE.key?(normalized_key)
+
+      appearance[normalized_key] = Float(value)
+    rescue ArgumentError, TypeError
+      next
+    end
+
+    appearance
+  end
+
+  def normalize_appearance_payload(raw)
+    payload = if raw.respond_to?(:to_unsafe_h)
+      raw.to_unsafe_h
+    elsif raw.respond_to?(:to_h)
+      raw.to_h
+    else
+      {}
+    end
+
+    return {} if payload.blank?
+
+    keyed = payload.transform_keys { |key| key.to_s.downcase }
+    normalized = {}
+
+    if keyed.key?("hue")
+      normalized["hue"] = clamp_integer(keyed["hue"], 0, 360, DEFAULT_APPEARANCE["hue"])
+    end
+
+    if keyed.key?("saturation")
+      normalized["saturation"] = clamp_integer(keyed["saturation"], 0, 100, DEFAULT_APPEARANCE["saturation"])
+    end
+
+    if keyed.key?("brightness")
+      normalized["brightness"] = clamp_integer(keyed["brightness"], 0, 100, DEFAULT_APPEARANCE["brightness"])
+    end
+
+    if keyed.key?("transparency")
+      normalized["transparency"] = clamp_float(keyed["transparency"], 0.15, 0.95, DEFAULT_APPEARANCE["transparency"])
+    end
+
+    normalized
+  end
+
+  def normalize_appearance(raw)
+    input = if raw.respond_to?(:transform_keys)
+      raw.transform_keys { |key| key.to_s.downcase }
+    else
+      {}
+    end
+
+    {
+      "hue" => clamp_integer(input["hue"], 0, 360, DEFAULT_APPEARANCE["hue"]),
+      "saturation" => clamp_integer(input["saturation"], 0, 100, DEFAULT_APPEARANCE["saturation"]),
+      "brightness" => clamp_integer(input["brightness"], 0, 100, DEFAULT_APPEARANCE["brightness"]),
+      "transparency" => clamp_float(input["transparency"], 0.15, 0.95, DEFAULT_APPEARANCE["transparency"])
+    }
+  end
+
   def normalize_windows_payload(raw_windows)
     windows = if raw_windows.respond_to?(:to_unsafe_h)
       raw_windows.to_unsafe_h
@@ -147,20 +252,21 @@ class WorkspacePreferencesController < ApplicationController
     end
   end
 
-  def rewrite_config(user_windows)
+  def rewrite_config(user_windows, appearance = DEFAULT_APPEARANCE)
     current_rows = normalize_rows_with_defaults(DEFAULT_WINDOWS.deep_merge(user_windows))
-    write_os_config_file(current_rows)
+    current_appearance = normalize_appearance(appearance)
+    write_os_config_file(current_rows, current_appearance)
   end
 
-  def write_os_config_file(current_rows)
+  def write_os_config_file(current_rows, appearance)
     FileUtils.mkdir_p(STORAGE_DIR)
 
     output = []
     output << "========= OS CONFIG ========="
     output << ""
-    output << "[WINDOWS]"
+    output << "[POSITIONS]"
     output << ""
-    output << "  [WINDOWS.DEFAULTS]"
+    output << "  [POSITIONS.DEFAULTS]"
     output << "  windowKey | x | y | w | h | z | state"
 
     DEFAULT_WINDOWS.keys.sort.each do |window_key|
@@ -168,12 +274,31 @@ class WorkspacePreferencesController < ApplicationController
     end
 
     output << ""
-    output << "  [WINDOWS.CURRENT]"
+    output << "  [POSITIONS.CURRENT]"
     output << "  windowKey | x | y | w | h | z | state"
 
     current_rows.keys.sort.each do |window_key|
       output << "  #{format_row(window_key, current_rows[window_key])}"
     end
+
+    output << ""
+    output << "__________"
+    output << ""
+    output << "[HSB]"
+    output << ""
+    output << "  [HSB.DEFAULTS]"
+    output << "  key | value"
+    output << "  hue | #{DEFAULT_APPEARANCE["hue"]}"
+    output << "  saturation | #{DEFAULT_APPEARANCE["saturation"]}"
+    output << "  brightness | #{DEFAULT_APPEARANCE["brightness"]}"
+    output << "  transparency | #{format("%.2f", DEFAULT_APPEARANCE["transparency"])}"
+    output << ""
+    output << "  [HSB.CURRENT]"
+    output << "  key | value"
+    output << "  hue | #{appearance["hue"]}"
+    output << "  saturation | #{appearance["saturation"]}"
+    output << "  brightness | #{appearance["brightness"]}"
+    output << "  transparency | #{format("%.2f", appearance["transparency"])}"
 
     File.write(OS_CONFIG_FILE, output.join("\n") + "\n")
   end
@@ -183,9 +308,9 @@ class WorkspacePreferencesController < ApplicationController
     return if File.exist?(OS_CONFIG_FILE)
 
     if File.exist?(LEGACY_WINDOWS_FILE)
-      write_os_config_file(parse_legacy_windows_rows)
+      write_os_config_file(parse_legacy_windows_rows, DEFAULT_APPEARANCE)
     else
-      write_os_config_file({})
+      write_os_config_file({}, DEFAULT_APPEARANCE)
     end
   end
 
@@ -267,6 +392,26 @@ class WorkspacePreferencesController < ApplicationController
 
   def integer_or_default(value, default)
     Integer(value)
+  rescue ArgumentError, TypeError
+    default
+  end
+
+  def clamp_integer(value, minimum, maximum, default)
+    parsed = Integer(value)
+    return minimum if parsed < minimum
+    return maximum if parsed > maximum
+
+    parsed
+  rescue ArgumentError, TypeError
+    default
+  end
+
+  def clamp_float(value, minimum, maximum, default)
+    parsed = Float(value)
+    return minimum if parsed < minimum
+    return maximum if parsed > maximum
+
+    parsed
   rescue ArgumentError, TypeError
     default
   end

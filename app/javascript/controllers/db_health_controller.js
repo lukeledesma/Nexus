@@ -9,7 +9,6 @@ export default class extends Controller {
     "grid",
     "metricCard",
     "detailWrap",
-    "detailTitle",
     "detailList",
     "backButton",
     "itemsCount",
@@ -30,10 +29,12 @@ export default class extends Controller {
     this.latestPayload = null
     this.defaultTitle = "DB Health"
     this.windowWidth = 320
-    this.minimumWindowHeight = 180
-    this.windowHeight = this.calculateCardGridWindowHeight(
+    this.minimumWindowHeight = 112
+    this.maximumWindowHeight = 407
+    this.mainWindowHeight = this.calculateCardGridWindowHeight(
       this.calculateGridRows(this.metricCardTargets.length, 2)
     )
+    this.windowHeight = this.mainWindowHeight
     this.viewportMargin = 6
     this.dockLeftBoundary = 41
     this.activeDrag = null
@@ -77,6 +78,7 @@ export default class extends Controller {
 
   open() {
     this.windowTarget.classList.remove("is-hidden")
+    this.snapWindowToActiveContent()
     this.bringToFront()
     this.emitWindowState(true)
   }
@@ -254,7 +256,11 @@ export default class extends Controller {
     this.focusedMetricKey = null
     this.applyFocusState()
     this.detailListTarget.innerHTML = ""
+    this.detailListTarget.style.height = ""
     this.detailListTarget.style.maxHeight = ""
+    this.detailListTarget.style.overflowY = "hidden"
+    this.detailListTarget.classList.remove("is-scrolling")
+    this.setWindowHeight(this.mainWindowHeight)
   }
 
   async refresh() {
@@ -291,6 +297,7 @@ export default class extends Controller {
     this.workspaceSizeTarget.textContent = this.formatBytes(workspace.total_size_bytes)
     this.usersCountTarget.textContent = this.formatNumber(records.users_count)
     this.dbSizeTarget.textContent = this.formatBytes(database.database_size_bytes)
+    if (!this.focusedMetricKey) this.snapWindowToActiveContent()
   }
 
   applyFocusState() {
@@ -300,6 +307,7 @@ export default class extends Controller {
     this.detailWrapTarget.classList.toggle("hidden", !focused)
     this.backButtonTarget.classList.toggle("hidden", !focused)
     this.titleTarget.textContent = focused ? this.focusLabelForKey(focused) : this.defaultTitle
+    this.snapWindowToActiveContent()
 
   }
 
@@ -368,7 +376,6 @@ export default class extends Controller {
 
     if (rows.length === 0 && lines.length === 0) lines = ["Nothing to show yet"]
 
-    this.detailTitleTarget.textContent = title
     this.detailListTarget.innerHTML = ""
 
     if (rows.length > 0) {
@@ -388,6 +395,7 @@ export default class extends Controller {
         this.detailListTarget.appendChild(item)
       })
 
+      this.snapWindowToActiveContent()
       this.adjustDetailListMaxHeight()
       return
     }
@@ -398,6 +406,7 @@ export default class extends Controller {
       this.detailListTarget.appendChild(item)
     })
 
+    this.snapWindowToActiveContent()
     this.adjustDetailListMaxHeight()
   }
 
@@ -405,16 +414,109 @@ export default class extends Controller {
     if (!this.focusedMetricKey) return
     if (this.windowTarget.classList.contains("is-hidden")) return
 
+    const atWindowCap = this.windowHeight >= (this.maximumWindowHeight - 1)
+    if (!atWindowCap) {
+      this.detailListTarget.style.height = ""
+      this.detailListTarget.style.maxHeight = ""
+      this.detailListTarget.style.overflowY = "hidden"
+      this.detailListTarget.classList.remove("is-scrolling")
+      return
+    }
+
     const panelRect = this.panelTarget.getBoundingClientRect()
     const listRect = this.detailListTarget.getBoundingClientRect()
     const bottomInset = 12
-    const available = Math.floor(panelRect.bottom - listRect.top - bottomInset)
+    const offsetWithinPanel = Math.max(0, listRect.top - panelRect.top)
+    const available = Math.floor(this.panelTarget.clientHeight - offsetWithinPanel - bottomInset)
+    const contentHeight = Math.ceil(this.detailListTarget.scrollHeight)
+    const rowHeight = this.resolveDetailRowHeight()
+    const listVerticalPadding = this.resolveDetailListVerticalPadding()
 
     if (available > 0) {
-      this.detailListTarget.style.maxHeight = `${available}px`
+      const viewportCandidate = available + 2
+      const quantizedViewport = rowHeight > 0
+        ? this.quantizeListViewport(viewportCandidate, rowHeight, listVerticalPadding)
+        : viewportCandidate
+      const shouldScroll = contentHeight > (quantizedViewport + 1)
+      const target = shouldScroll ? quantizedViewport : contentHeight
+      const clamped = Math.max(0, target)
+      this.detailListTarget.style.height = `${clamped}px`
+      this.detailListTarget.style.maxHeight = `${clamped}px`
+      this.detailListTarget.style.overflowY = shouldScroll ? "auto" : "hidden"
+      this.detailListTarget.classList.toggle("is-scrolling", shouldScroll)
     } else {
+      this.detailListTarget.style.height = ""
       this.detailListTarget.style.maxHeight = ""
+      this.detailListTarget.style.overflowY = "hidden"
+      this.detailListTarget.classList.remove("is-scrolling")
     }
+  }
+
+  resolveDetailRowHeight() {
+    const styles = window.getComputedStyle(this.detailListTarget)
+    const cssVar = Number.parseFloat(styles.getPropertyValue("--db-health-row-height"))
+    if (Number.isFinite(cssVar) && cssVar > 0) return cssVar
+
+    const firstRow = this.detailListTarget.querySelector("li")
+    if (!firstRow) return 0
+
+    const measured = Math.ceil(firstRow.getBoundingClientRect().height)
+    return Number.isFinite(measured) && measured > 0 ? measured : 0
+  }
+
+  resolveDetailListVerticalPadding() {
+    const styles = window.getComputedStyle(this.detailListTarget)
+    const paddingTop = Number.parseFloat(styles.paddingTop)
+    const paddingBottom = Number.parseFloat(styles.paddingBottom)
+    const top = Number.isFinite(paddingTop) && paddingTop > 0 ? paddingTop : 0
+    const bottom = Number.isFinite(paddingBottom) && paddingBottom > 0 ? paddingBottom : 0
+    return Math.ceil(top + bottom)
+  }
+
+  quantizeListViewport(viewportCandidate, rowHeight, listVerticalPadding) {
+    const usable = Math.max(0, viewportCandidate - listVerticalPadding)
+    const rows = Math.max(1, Math.floor(usable / rowHeight))
+    return (rows * rowHeight) + listVerticalPadding
+  }
+
+  setWindowHeight(height) {
+    const bounded = Math.min(this.maximumWindowHeight, Math.max(this.minimumWindowHeight, Math.floor(height)))
+    this.windowHeight = bounded
+    this.windowTarget.style.height = `${bounded}px`
+  }
+
+  snapWindowToActiveContent() {
+    window.requestAnimationFrame(() => {
+      if (this.windowTarget.classList.contains("is-hidden")) return
+
+      const panel = this.panelTarget
+      if (!panel) return
+
+      // Temporarily remove detail list cap while measuring intrinsic content size.
+      let previousHeight = null
+      let previousMaxHeight = null
+      let previousOverflowY = null
+      if (this.focusedMetricKey) {
+        previousHeight = this.detailListTarget.style.height
+        previousMaxHeight = this.detailListTarget.style.maxHeight
+        previousOverflowY = this.detailListTarget.style.overflowY
+        this.detailListTarget.style.height = "auto"
+        this.detailListTarget.style.maxHeight = "none"
+        this.detailListTarget.style.overflowY = "hidden"
+      }
+
+      // Measure true content height; cap logic in setWindowHeight handles overflow cutoff.
+      const desired = Math.ceil(panel.scrollHeight + 2)
+      this.setWindowHeight(desired)
+
+      if (this.focusedMetricKey) {
+        this.detailListTarget.style.height = previousHeight || ""
+        this.detailListTarget.style.maxHeight = previousMaxHeight || ""
+        this.detailListTarget.style.overflowY = previousOverflowY || ""
+      }
+
+      this.adjustDetailListMaxHeight()
+    })
   }
 
   startAutoRefresh() {

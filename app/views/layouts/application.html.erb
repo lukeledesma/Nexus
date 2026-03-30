@@ -169,8 +169,7 @@
             <div class="db-health-card db-health-card--selectable" data-db-health-target="metricCard" data-db-health-focus-key="db_size" data-action="click->db-health#focusMetric"><dt>DB Size</dt><dd data-db-health-target="dbSize">-</dd></div>
           </dl>
 
-          <section class="db-health-detail hidden" data-db-health-target="detailWrap">
-            <h4 data-db-health-target="detailTitle">Details</h4>
+          <section class="db-health-detail os-window-body-start hidden" data-db-health-target="detailWrap">
             <ul class="db-health-detail-list" data-db-health-target="detailList"></ul>
           </section>
           </section>
@@ -179,28 +178,106 @@
       <section class="settings-window os-window is-hidden" data-controller="settings" data-settings-target="window" aria-live="polite">
         <section class="settings-panel">
           <header class="settings-header os-window-header" data-action="mousedown->settings#startDrag touchstart->settings#startDrag">
-            <h3 class="os-window-title">Settings</h3>
+            <h3 class="os-window-title" data-settings-target="title">Settings</h3>
             <div class="settings-controls os-window-controls">
+              <button type="button" class="settings-back hidden" data-settings-target="backButton" data-action="click->settings#showMain" aria-label="Back to Settings" title="Back">←</button>
               <button type="button" class="settings-close" data-action="click->settings#close" aria-label="Close Settings" title="Close">✕</button>
             </div>
           </header>
 
-          <p class="settings-stamp os-window-subtitle"><%= current_user&.email.presence || "Unknown user" %></p>
+          <p class="settings-stamp os-window-subtitle" data-settings-target="stamp"><%= current_user&.email.presence || "Unknown user" %></p>
 
-          <div class="settings-actions os-window-body-start os-window-grid os-window-grid--2">
+          <div class="settings-actions os-window-body-start os-window-grid os-window-grid--2" data-settings-target="actions">
+            <button type="button" class="settings-action os-window-card settings-action--interface" data-action="click->settings#showInterface">
+              <div class="os-window-card-content">
+                <dt class="os-window-card-label">INTERFACE</dt>
+                <dd class="os-window-card-value">CONFIG</dd>
+              </div>
+            </button>
+            <button type="button" class="settings-action os-window-card settings-action--reset" data-action="click->settings#factoryReset">
+              <div class="os-window-card-content">
+                <dt class="os-window-card-label">FACTORY RESET</dt>
+                <dd class="os-window-card-value">DEFAULT</dd>
+              </div>
+            </button>
             <%= button_to logout_path, method: :delete, class: "settings-action os-window-card settings-action--logout", form: { data: { turbo_confirm: "Are you sure you want to log out?" } } do %>
               <div class="os-window-card-content">
                 <dt class="os-window-card-label">LOGOUT</dt>
                 <dd class="os-window-card-value">EXIT</dd>
               </div>
             <% end %>
-            <button type="button" class="settings-action os-window-card settings-action--reset" data-action="click->settings#resetLayout">
-              <div class="os-window-card-content">
-                <dt class="os-window-card-label">WINDOW LAYOUT</dt>
-                <dd class="os-window-card-value">RESET</dd>
-              </div>
-            </button>
           </div>
+
+          <section class="settings-interface hidden" data-settings-target="interfaceSection">
+            <label class="settings-interface-label" for="settings-window-hue">Hue</label>
+            <div class="settings-interface-slider-row">
+              <input
+                id="settings-window-hue"
+                type="range"
+                min="0"
+                max="360"
+                step="1"
+                value="232"
+                class="settings-interface-slider settings-interface-slider--hue"
+                data-settings-target="hueSlider"
+                data-action="input->settings#updateHue"
+                aria-label="Window hue"
+              >
+              <output class="settings-interface-value" data-settings-target="hueValue">232°</output>
+            </div>
+
+            <label class="settings-interface-label" for="settings-window-saturation">Saturation</label>
+            <div class="settings-interface-slider-row">
+              <input
+                id="settings-window-saturation"
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value="62"
+                class="settings-interface-slider settings-interface-slider--saturation"
+                data-settings-target="saturationSlider"
+                data-action="input->settings#updateSaturation"
+                aria-label="Window saturation"
+              >
+              <output class="settings-interface-value" data-settings-target="saturationValue">62%</output>
+            </div>
+
+            <label class="settings-interface-label" for="settings-window-brightness">Brightness</label>
+            <div class="settings-interface-slider-row">
+              <input
+                id="settings-window-brightness"
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value="18"
+                class="settings-interface-slider settings-interface-slider--brightness"
+                data-settings-target="brightnessSlider"
+                data-action="input->settings#updateBrightness"
+                aria-label="Window brightness"
+              >
+              <output class="settings-interface-value" data-settings-target="brightnessValue">18%</output>
+            </div>
+
+            <label class="settings-interface-label" for="settings-window-transparency">Transparency</label>
+            <div class="settings-interface-slider-row">
+              <input
+                id="settings-window-transparency"
+                type="range"
+                min="15"
+                max="95"
+                step="1"
+                value="50"
+                class="settings-interface-slider settings-interface-slider--alpha"
+                data-settings-target="transparencySlider"
+                data-action="input->settings#updateTransparency"
+                aria-label="Window transparency"
+              >
+              <output class="settings-interface-value" data-settings-target="transparencyValue">50%</output>
+            </div>
+            <p class="settings-interface-note">Applies to all desktop windows.</p>
+          </section>
         </section>
       </section>
 
