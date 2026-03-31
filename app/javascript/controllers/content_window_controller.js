@@ -20,7 +20,7 @@ export default class extends Controller {
     this.windowWidth = this.hasDefaultWidthValue ? this.defaultWidthValue : 550
     this.windowHeight = this.hasDefaultHeightValue ? this.defaultHeightValue : 480
     this.minWindowWidth = 320
-    this.minWindowHeight = 200
+    this.minWindowHeight = 320
     this.activeDrag = null
     this.activeResize = null
 
@@ -219,8 +219,8 @@ export default class extends Controller {
     const offsetY = this.hasDefaultOffsetYValue ? this.defaultOffsetYValue : 0
     const vw = window.innerWidth
     const vh = window.innerHeight
-    const width = Math.min(this.windowWidth, vw - 40)
-    const height = Math.min(this.windowHeight, vh - 40)
+    const width = Math.max(this.minWindowWidth, Math.min(this.windowWidth, vw - 40))
+    const height = Math.max(this.minWindowHeight, Math.min(this.windowHeight, vh - 40))
     const centeredLeft = Math.round((vw - width) / 2) + offsetX
     const centeredTop = Math.round((vh - height) / 2) + offsetY
     const maxLeft = Math.max(this.dockLeftBoundary, vw - this.viewportMargin - width)

@@ -2,7 +2,7 @@ import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
 
 export default class extends Controller {
-  static targets = ["newFolderForm", "newFolderInput", "stamp", "conversionPair", "notesSize", "tasksSize", "timerDisplay"]
+  static targets = ["newFolderForm", "newFolderInput", "stamp", "conversionPair", "notesSize", "tasksSize", "timerDisplay", "themeBuilderStatus"]
 
   #conversionPairs = [
     { sae: '5/16"', metric: '8 mm' },
@@ -22,12 +22,15 @@ export default class extends Controller {
     this.boundSavedState = this.handleSavedState.bind(this)
     this.boundAppWindowState = this.handleAppWindowState.bind(this)
     this.boundTimerState = this.handleTimerState.bind(this)
+    this.boundThemeStatus = this.handleThemeStatus.bind(this)
     window.addEventListener("nexus:item-saved", this.boundSavedState)
     window.addEventListener("app-window:state", this.boundAppWindowState)
     window.addEventListener("timer:state", this.boundTimerState)
+    window.addEventListener("workspace:theme-status", this.boundThemeStatus)
     this.loadPersistedStamp()
     this.loadFileSizes()
     this.loadTimerDisplay()
+    this.loadThemeStatus()
     this.startConversionCycle()
     this.clearLauncherState()
   }
@@ -36,6 +39,7 @@ export default class extends Controller {
     window.removeEventListener("nexus:item-saved", this.boundSavedState)
     window.removeEventListener("app-window:state", this.boundAppWindowState)
     window.removeEventListener("timer:state", this.boundTimerState)
+    window.removeEventListener("workspace:theme-status", this.boundThemeStatus)
     this.stopConversionCycle()
   }
 
@@ -198,6 +202,36 @@ export default class extends Controller {
     if (!display) return
 
     this.timerDisplayTarget.textContent = display
+  }
+
+  async loadThemeStatus() {
+    if (!this.hasThemeBuilderStatusTarget) return
+
+    try {
+      const response = await fetch("/workspace_preferences", {
+        method: "GET",
+        headers: { Accept: "application/json" }
+      })
+      if (!response.ok) return
+
+      const payload = await response.json()
+      this.applyThemeStatus(payload)
+    } catch (_error) {
+      // Keep launcher non-blocking if workspace preferences are unavailable.
+    }
+  }
+
+  handleThemeStatus(event) {
+    const detail = event.detail || {}
+    this.applyThemeStatus(detail)
+  }
+
+  applyThemeStatus(payload) {
+    if (!this.hasThemeBuilderStatusTarget) return
+
+    const activeThemeName = String(payload?.active_theme_name || "CUSTOM").trim()
+    const isCustomLayout = Boolean(payload?.is_custom_layout)
+    this.themeBuilderStatusTarget.textContent = isCustomLayout ? "CUSTOM" : activeThemeName
   }
 
   labelForItemType(itemType) {

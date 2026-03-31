@@ -7,6 +7,7 @@ export default class extends Controller {
   connect() {
     this.timer = null
     this.editingContext = null
+    this.editingRow = null
     this.completionFrameIds = new Map()
     this.expandedMainIndices = new Set()
     this.boundKeydown = this.handleKeydown.bind(this)
@@ -113,6 +114,8 @@ export default class extends Controller {
     if (!task) return
 
     this.editingContext = { mainIndex, subIndex: Number.isInteger(subIndex) ? subIndex : null }
+    this.editingRow = row
+    row.classList.add("is-editing")
     if (this.hasEditInputTarget) this.editInputTarget.value = task.text || ""
     if (this.hasEditModalBackdropTarget) {
       this.editModalBackdropTarget.classList.remove("hidden")
@@ -164,6 +167,10 @@ export default class extends Controller {
 
   closeTaskEdit() {
     this.editingContext = null
+    this.editingRow = null
+    this.rowsTarget.querySelectorAll(".task-item-row.is-editing").forEach((row) => {
+      row.classList.remove("is-editing")
+    })
     if (!this.hasEditModalBackdropTarget) return
     this.editModalBackdropTarget.classList.add("hidden")
     this.editModalBackdropTarget.setAttribute("aria-hidden", "true")
@@ -188,6 +195,7 @@ export default class extends Controller {
     const nextText = this.hasEditInputTarget ? this.editInputTarget.value.trim() : ""
     task.text = nextText
     this.renderTasks()
+    this.reapplyEditingHighlight()
     this.queueSave()
     this.closeTaskEdit()
   }
@@ -213,6 +221,20 @@ export default class extends Controller {
     this.renderTasks()
     this.queueSave()
     this.closeTaskEdit()
+  }
+
+  reapplyEditingHighlight() {
+    if (!this.editingContext || !Number.isInteger(this.editingContext.mainIndex)) return
+    const mainIndex = this.editingContext.mainIndex
+    const subIndex = this.editingContext.subIndex
+    const selector = Number.isInteger(subIndex)
+      ? `.task-item-row--subtask[data-main-index="${mainIndex}"][data-sub-index="${subIndex}"]`
+      : `.task-item-row--main[data-main-index="${mainIndex}"]:not(.task-item-row--subtask)`
+    const row = this.rowsTarget.querySelector(selector)
+    if (row) {
+      row.classList.add("is-editing")
+      this.editingRow = row
+    }
   }
 
   toggleResetSettings() {

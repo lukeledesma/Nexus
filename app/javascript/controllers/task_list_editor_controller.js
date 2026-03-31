@@ -4,6 +4,8 @@ export default class extends Controller {
   static targets = ["list", "payload"]
 
   connect() {
+    this.boundWindowState = this.handleWindowState.bind(this)
+    window.addEventListener("app-window:state", this.boundWindowState)
     this.#refreshAll()
   }
 
@@ -12,10 +14,26 @@ export default class extends Controller {
       window.clearTimeout(this.autosaveTimer)
       this.autosaveTimer = null
     }
+    window.removeEventListener("app-window:state", this.boundWindowState)
+  }
+
+  handleWindowState(event) {
+    if (event.detail?.appKey !== "singular-task-list") return
+    if (event.detail?.open !== false) return
+    this.#commitActiveEditIfAny()
   }
 
   addTask(event) {
     event.preventDefault()
+    if (!this.#commitActiveEditIfAny()) return
+
+    const existingUnnamedMain = this.#findUnnamedMainRow()
+    if (existingUnnamedMain) {
+      this.#startEditRow(existingUnnamedMain)
+      this.#refreshAll()
+      return
+    }
+
     const row = this.#buildMainTaskRow("", false, [])
     this.listTarget.appendChild(row)
     this.#startEditRow(row)
@@ -43,6 +61,8 @@ export default class extends Controller {
       this.startEdit(event)
       return
     }
+
+    this.#commitActiveEditIfAny(row)
 
     if (row.querySelector(".task-edit-input")) return
 
@@ -86,6 +106,12 @@ export default class extends Controller {
     const row = event.target.closest(".task-item-row")
     if (!row) return
 
+    const activeInput = row.querySelector(".task-edit-input")
+    if (activeInput) {
+      this.#finishEdit(activeInput, true)
+      return
+    }
+
     this.#startEditRow(row)
   }
 
@@ -93,8 +119,17 @@ export default class extends Controller {
     event.preventDefault()
     event.stopPropagation()
 
+    if (!this.#commitActiveEditIfAny()) return
+
     const mainRow = event.target.closest(".task-item-row--main")
     if (!mainRow) return
+
+    const existingUnnamedSubtask = this.#findUnnamedSubtaskRow(mainRow)
+    if (existingUnnamedSubtask) {
+      this.#startEditRow(existingUnnamedSubtask)
+      this.#refreshAll()
+      return
+    }
 
     const subtaskRow = this.#buildSubtaskRow("", false)
     const insertionPoint = this.#lastSubtaskFor(mainRow)
@@ -150,6 +185,18 @@ export default class extends Controller {
   }
 
   #startEditRow(row) {
+    const rowInput = row.querySelector(".task-edit-input")
+    if (rowInput) {
+      rowInput.focus()
+      rowInput.select()
+      return
+    }
+
+    this.#commitActiveEditIfAny(row)
+
+    this.#clearEditingState()
+    row.classList.add("is-editing")
+
     const textNode = row.querySelector("[data-role='task-text']")
     if (!textNode) return
 
@@ -165,14 +212,29 @@ export default class extends Controller {
     input.focus()
     input.select()
 
-    input.addEventListener("blur", () => this.#finishEdit(input, true), { once: true })
+    this.#bindEditBlur(input)
   }
 
   #finishEdit(input, save) {
     const row = input.closest(".task-item-row")
     if (!row) return
 
-    const value = save ? input.value.trim() : (input.dataset.originalValue || "")
+    const originalValue = (input.dataset.originalValue || "").trim()
+    let value = save ? input.value.trim() : originalValue
+
+    // Finalization rule:
+    // 1) Blank with original -> revert to original
+    // 2) Blank without original (new row) -> delete row
+    // 3) Non-blank -> save new value
+    if (save && value.length === 0) {
+      value = originalValue
+    }
+
+    if (value.length === 0) {
+      this.#removeEditingRow(input)
+      return
+    }
+
     const text = document.createElement("span")
     text.dataset.role = "task-text"
     text.className = row.matches(".task-item-row--subtask") ? "task-item-text task-item-text--subtask" : "task-item-text"
@@ -180,15 +242,52 @@ export default class extends Controller {
 
     input.replaceWith(text)
 
-    if (save && value.length === 0) {
-      this.#removeRowAndChildrenIfNeeded(row)
-    }
-
+    row.classList.remove("is-editing")
     this.#refreshAll()
     this.#triggerAutosave(0)
   }
 
-  #removeRowAndChildrenIfNeeded(row) {
+  #bindEditBlur(input) {
+    input.addEventListener("blur", () => this.#finishEdit(input, true), { once: true })
+  }
+
+  #clearEditingState() {
+    this.listTarget.querySelectorAll(".task-item-row.is-editing").forEach((row) => {
+      row.classList.remove("is-editing")
+    })
+  }
+
+  #activeEditInput(excludeRow = null) {
+    const inputs = Array.from(this.listTarget.querySelectorAll(".task-edit-input"))
+    if (!excludeRow) return inputs[0] || null
+    return inputs.find((input) => !excludeRow.contains(input)) || null
+  }
+
+  #commitActiveEditIfAny(excludeRow = null) {
+    const activeInput = this.#activeEditInput(excludeRow)
+    if (!activeInput) return true
+    this.#finishEdit(activeInput, true)
+    return !activeInput.isConnected
+  }
+
+  #rowValue(row) {
+    const input = row.querySelector(".task-edit-input")
+    if (input) return input.value.trim()
+    return row.querySelector("[data-role='task-text']")?.textContent.trim() || ""
+  }
+
+  #findUnnamedMainRow() {
+    const mainRows = Array.from(this.listTarget.querySelectorAll(".task-item-row--main"))
+    return mainRows.find((row) => this.#rowValue(row).length === 0) || null
+  }
+
+  #findUnnamedSubtaskRow(mainRow) {
+    const subtasks = this.#subtasksFor(mainRow)
+    return subtasks.find((row) => this.#rowValue(row).length === 0) || null
+  }
+
+  #removeEditingRow(input) {
+    const row = input.closest(".task-item-row")
     if (!row) return
 
     if (row.matches(".task-item-row--main")) {
@@ -198,9 +297,22 @@ export default class extends Controller {
         cursor.remove()
         cursor = next
       }
+      row.remove()
+      this.#refreshAll()
+      this.#triggerAutosave(0)
+      return
     }
 
-    row.remove()
+    if (row.matches(".task-item-row--subtask")) {
+      const mainRow = this.#findMainRowForSubtask(row)
+      row.remove()
+      if (mainRow && this.#subtasksFor(mainRow).length === 0) {
+        mainRow.classList.remove("task-item-group--head")
+        mainRow.dataset.collapsed = "false"
+      }
+      this.#refreshAll()
+      this.#triggerAutosave(0)
+    }
   }
 
   #toggleRowComplete(row) {

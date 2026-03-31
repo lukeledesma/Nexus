@@ -9,6 +9,7 @@ Rails.application.routes.draw do
     resources :task_lists, only: %i[show create update destroy]
     get "calculator", to: "calculator#show"
     get "settings", to: "settings#show"
+    get "theme_builder", to: "theme_builder#show"
     get "conversion_chart", to: "conversion_chart#show"
     get "timer", to: "timer#show"
     get "timer_state", to: "timer#state"

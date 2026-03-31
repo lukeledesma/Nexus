@@ -1,0 +1,205 @@
+<% frame_id = params[:frame_id].presence || "app-pane" %>
+<turbo-frame id="<%= frame_id %>">
+<section class="app-surface app-surface--tool theme-builder-view" data-controller="theme-builder">
+  <header class="tool-window-header app-surface-header">
+    <h2 class="os-window-title tool-window-title">THEME BUILDER</h2>
+  </header>
+
+  <p class="os-window-subtitle tool-window-subtitle" data-theme-builder-target="statusText">CUSTOM</p>
+
+  <section class="theme-builder-section">
+    <h3 class="theme-builder-section-title">SHELL</h3>
+
+    <label class="settings-interface-label" for="theme-builder-window-hue">Hue</label>
+    <div class="settings-interface-slider-row">
+      <input
+        id="theme-builder-window-hue"
+        type="range"
+        min="0"
+        max="360"
+        step="1"
+        value="180"
+        class="settings-interface-slider settings-interface-slider--hue"
+        data-theme-builder-target="hueSlider"
+        data-action="input->theme-builder#updateHue"
+        aria-label="Window hue"
+      >
+      <output class="settings-interface-value" data-theme-builder-target="hueValue">180°</output>
+    </div>
+
+    <label class="settings-interface-label" for="theme-builder-window-saturation">Saturation</label>
+    <div class="settings-interface-slider-row">
+      <input
+        id="theme-builder-window-saturation"
+        type="range"
+        min="0"
+        max="100"
+        step="1"
+        value="0"
+        class="settings-interface-slider settings-interface-slider--saturation"
+        data-theme-builder-target="saturationSlider"
+        data-action="input->theme-builder#updateSaturation"
+        aria-label="Window saturation"
+      >
+      <output class="settings-interface-value" data-theme-builder-target="saturationValue">0%</output>
+    </div>
+
+    <label class="settings-interface-label" for="theme-builder-window-brightness">Brightness</label>
+    <div class="settings-interface-slider-row">
+      <input
+        id="theme-builder-window-brightness"
+        type="range"
+        min="0"
+        max="100"
+        step="1"
+        value="15"
+        class="settings-interface-slider settings-interface-slider--brightness"
+        data-theme-builder-target="brightnessSlider"
+        data-action="input->theme-builder#updateBrightness"
+        aria-label="Window brightness"
+      >
+      <output class="settings-interface-value" data-theme-builder-target="brightnessValue">15%</output>
+    </div>
+
+    <label class="settings-interface-label" for="theme-builder-window-transparency">Transparency</label>
+    <div class="settings-interface-slider-row">
+      <input
+        id="theme-builder-window-transparency"
+        type="range"
+        min="15"
+        max="95"
+        step="1"
+        value="15"
+        class="settings-interface-slider settings-interface-slider--alpha"
+        data-theme-builder-target="transparencySlider"
+        data-action="input->theme-builder#updateTransparency"
+        aria-label="Window transparency"
+      >
+      <output class="settings-interface-value" data-theme-builder-target="transparencyValue">15%</output>
+    </div>
+  </section>
+
+  <section class="theme-builder-section">
+    <h3 class="theme-builder-section-title">BACKGROUND</h3>
+
+    <label class="settings-interface-label" for="theme-builder-bg-1-hue">Color 1 Hue</label>
+    <div class="settings-interface-slider-row">
+      <input
+        id="theme-builder-bg-1-hue"
+        type="range"
+        min="0"
+        max="360"
+        step="1"
+        value="240"
+        class="settings-interface-slider settings-interface-slider--hue"
+        data-theme-builder-target="bgOneHueSlider"
+        data-action="input->theme-builder#updateBgOneHue"
+        aria-label="Background color one hue"
+      >
+      <output class="settings-interface-value" data-theme-builder-target="bgOneHueValue">240°</output>
+    </div>
+
+    <label class="settings-interface-label" for="theme-builder-bg-1-saturation">Color 1 Saturation</label>
+    <div class="settings-interface-slider-row">
+      <input
+        id="theme-builder-bg-1-saturation"
+        type="range"
+        min="0"
+        max="100"
+        step="1"
+        value="28"
+        class="settings-interface-slider settings-interface-slider--bg-1-saturation"
+        data-theme-builder-target="bgOneSaturationSlider"
+        data-action="input->theme-builder#updateBgOneSaturation"
+        aria-label="Background color one saturation"
+      >
+      <output class="settings-interface-value" data-theme-builder-target="bgOneSaturationValue">28%</output>
+    </div>
+
+    <label class="settings-interface-label" for="theme-builder-bg-1-brightness">Color 1 Brightness</label>
+    <div class="settings-interface-slider-row">
+      <input
+        id="theme-builder-bg-1-brightness"
+        type="range"
+        min="0"
+        max="100"
+        step="1"
+        value="14"
+        class="settings-interface-slider settings-interface-slider--bg-1-brightness"
+        data-theme-builder-target="bgOneBrightnessSlider"
+        data-action="input->theme-builder#updateBgOneBrightness"
+        aria-label="Background color one brightness"
+      >
+      <output class="settings-interface-value" data-theme-builder-target="bgOneBrightnessValue">14%</output>
+    </div>
+
+    <label class="settings-interface-label" for="theme-builder-bg-2-hue">Color 2 Hue</label>
+    <div class="settings-interface-slider-row">
+      <input
+        id="theme-builder-bg-2-hue"
+        type="range"
+        min="0"
+        max="360"
+        step="1"
+        value="213"
+        class="settings-interface-slider settings-interface-slider--hue"
+        data-theme-builder-target="bgTwoHueSlider"
+        data-action="input->theme-builder#updateBgTwoHue"
+        aria-label="Background color two hue"
+      >
+      <output class="settings-interface-value" data-theme-builder-target="bgTwoHueValue">213°</output>
+    </div>
+
+    <label class="settings-interface-label" for="theme-builder-bg-2-saturation">Color 2 Saturation</label>
+    <div class="settings-interface-slider-row">
+      <input
+        id="theme-builder-bg-2-saturation"
+        type="range"
+        min="0"
+        max="100"
+        step="1"
+        value="73"
+        class="settings-interface-slider settings-interface-slider--bg-2-saturation"
+        data-theme-builder-target="bgTwoSaturationSlider"
+        data-action="input->theme-builder#updateBgTwoSaturation"
+        aria-label="Background color two saturation"
+      >
+      <output class="settings-interface-value" data-theme-builder-target="bgTwoSaturationValue">73%</output>
+    </div>
+
+    <label class="settings-interface-label" for="theme-builder-bg-2-brightness">Color 2 Brightness</label>
+    <div class="settings-interface-slider-row">
+      <input
+        id="theme-builder-bg-2-brightness"
+        type="range"
+        min="0"
+        max="100"
+        step="1"
+        value="22"
+        class="settings-interface-slider settings-interface-slider--bg-2-brightness"
+        data-theme-builder-target="bgTwoBrightnessSlider"
+        data-action="input->theme-builder#updateBgTwoBrightness"
+        aria-label="Background color two brightness"
+      >
+      <output class="settings-interface-value" data-theme-builder-target="bgTwoBrightnessValue">22%</output>
+    </div>
+
+    <label class="settings-interface-label" for="theme-builder-bg-angle">Gradient Angle</label>
+    <div class="settings-interface-slider-row">
+      <input
+        id="theme-builder-bg-angle"
+        type="range"
+        min="0"
+        max="360"
+        step="1"
+        value="135"
+        class="settings-interface-slider settings-interface-slider--bg-angle"
+        data-theme-builder-target="bgAngleSlider"
+        data-action="input->theme-builder#updateBgAngle"
+        aria-label="Background gradient angle"
+      >
+      <output class="settings-interface-value" data-theme-builder-target="bgAngleValue">135°</output>
+    </div>
+  </section>
+</section>
+</turbo-frame>

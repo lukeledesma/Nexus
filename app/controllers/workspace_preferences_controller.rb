@@ -1,76 +1,302 @@
 # frozen_string_literal: true
 
-# Stores and retrieves workspace layout in a shared text file:
-# storage/workspace/OSConfig.txt
-#
-# File format:
-# ========= OS CONFIG =========
-#
-# [POSITIONS]
-#
-#   [POSITIONS.DEFAULTS]
-#   # windowKey | x | y | w | h | z | state
-#   conversion-chart | 782 | 88 | 407 | 407 | 1506 | closed
-#
-#   [POSITIONS.CURRENT]
-#   # windowKey | x | y | w | h | z | state
-#   conversion-chart | 790 | 96 | 407 | 407 | 1506 | open
+require "json"
+require "securerandom"
+
+# Persists workspace state and saved themes in text files under storage/workspace:
+# - WorkspaceState.txt: current open state, positions, and appearance
+# - LayoutThemes.txt: default + custom named theme snapshots
 class WorkspacePreferencesController < ApplicationController
   STORAGE_DIR = Rails.root.join("storage", "workspace").freeze
-  OS_CONFIG_FILE = STORAGE_DIR.join("OSConfig.txt").freeze
+  WORKSPACE_STATE_FILE = STORAGE_DIR.join("WorkspaceState.txt").freeze
+  LAYOUT_THEMES_FILE = STORAGE_DIR.join("LayoutThemes.txt").freeze
+  LEGACY_OS_CONFIG_FILE = STORAGE_DIR.join("OSConfig.txt").freeze
   LEGACY_WINDOWS_FILE = STORAGE_DIR.join("Windows.txt").freeze
 
+  DEFAULT_THEME_ID = "default"
+  DEFAULT_THEME_NAME = "Default"
+
   DEFAULT_WINDOWS = {
-    "db-health" => { "x" => 41, "y" => 6, "width" => 320, "height" => 235, "z" => 1501, "open" => false },
-    "settings" => { "x" => 41, "y" => 256, "width" => 320, "height" => 180, "z" => 1502, "open" => false },
-    "launcher" => { "x" => 376, "y" => 6, "width" => 320, "height" => 180, "z" => 1503, "open" => false },
-    "singular-note" => { "x" => 711, "y" => 6, "width" => 407, "height" => 407, "z" => 1504, "open" => false },
-    "singular-task-list" => { "x" => 747, "y" => 48, "width" => 407, "height" => 407, "z" => 1505, "open" => false },
-    "conversion-chart" => { "x" => 782, "y" => 88, "width" => 407, "height" => 407, "z" => 1506, "open" => false },
-    "timer" => { "x" => 376, "y" => 196, "width" => 320, "height" => 250, "z" => 1507, "open" => false }
+    "db-health" => { "x" => 41, "y" => 6, "width" => 320, "height" => 235, "z" => 1501, "open" => true },
+    "settings" => { "x" => 41, "y" => 256, "width" => 320, "height" => 180, "z" => 1502, "open" => true },
+    "theme-builder" => { "x" => 41, "y" => 256, "width" => 760, "height" => 430, "z" => 1508, "open" => false },
+    "launcher" => { "x" => 376, "y" => 6, "width" => 320, "height" => 180, "z" => 1503, "open" => true },
+    "singular-note" => { "x" => 711, "y" => 6, "width" => 407, "height" => 407, "z" => 1504, "open" => true },
+    "singular-task-list" => { "x" => 747, "y" => 48, "width" => 407, "height" => 407, "z" => 1505, "open" => true },
+    "conversion-chart" => { "x" => 782, "y" => 88, "width" => 407, "height" => 407, "z" => 1506, "open" => true },
+    "timer" => { "x" => 376, "y" => 196, "width" => 320, "height" => 250, "z" => 1507, "open" => true }
   }.freeze
 
   DEFAULT_APPEARANCE = {
     "hue" => 180,
     "saturation" => 0,
     "brightness" => 15,
-    "transparency" => 0.15
+    "transparency" => 0.15,
+    "color_1_hue" => 240,
+    "color_1_saturation" => 28,
+    "color_1_brightness" => 14,
+    "color_2_hue" => 213,
+    "color_2_saturation" => 73,
+    "color_2_brightness" => 22,
+    "angle" => 135
   }.freeze
 
   def show
-    render json: {
-      "windows" => read_rows_for_user,
-      "appearance" => read_appearance_for_user
-    }
+    ensure_storage_files
+    render_current_payload
   end
 
   def update
-    incoming = normalize_windows_payload(params[:windows])
-    merged_windows = read_rows_for_user.deep_merge(incoming)
-    merged_appearance = read_appearance_for_user.merge(normalize_appearance_payload(params[:appearance]))
-    rewrite_config(merged_windows, merged_appearance)
-    render json: { ok: true }
+    ensure_storage_files
+
+    if params[:theme].present?
+      update_theme
+      return
+    end
+
+    incoming_windows = normalize_windows_payload(params[:windows])
+
+    state = read_state_data
+    state["windows"] = normalize_rows_with_defaults((state["windows"] || {}).deep_merge(incoming_windows))
+
+    write_state_data(state)
+    render_current_payload
   end
 
   def destroy
-    rewrite_config({}, DEFAULT_APPEARANCE)
-    render json: { ok: true }
+    ensure_storage_files
+    write_state_data(default_state)
+    render_current_payload
   end
 
   private
 
-  def read_rows_for_user
-    current_rows = parse_os_config_current_rows
-    normalize_rows_with_defaults(DEFAULT_WINDOWS.deep_merge(current_rows))
+  def update_theme
+    payload = params[:theme].respond_to?(:to_unsafe_h) ? params[:theme].to_unsafe_h : params[:theme].to_h
+    action = payload["action"].to_s.downcase
+
+    state = read_state_data
+    themes = ensure_default_theme(read_themes_data)
+
+    case action
+    when "save"
+      apply_save_theme!(themes, state, payload)
+    when "rename"
+      apply_rename_theme!(themes, payload)
+    when "delete"
+      apply_delete_theme!(themes, state, payload)
+    when "apply"
+      apply_theme_snapshot!(themes, state, payload)
+    else
+      render json: { error: "Invalid theme action" }, status: :unprocessable_entity
+      return
+    end
+
+    write_themes_data(themes)
+    write_state_data(state)
+    render_current_payload
   end
 
-  def parse_os_config_current_rows
-    ensure_os_config_file
+  def apply_save_theme!(themes, state, payload)
+    name = payload["name"].to_s.strip
+    name = next_theme_name(themes) if name.blank? || name.casecmp?(DEFAULT_THEME_NAME)
+
+    appearance_raw = payload["appearance"]
+    appearance_hash = appearance_raw.respond_to?(:to_unsafe_h) ? appearance_raw.to_unsafe_h : appearance_raw.to_h
+    appearance = normalize_appearance(appearance_hash)
+    id = "theme-#{SecureRandom.hex(4)}"
+
+    themes << {
+      "id" => id,
+      "name" => name.first(64),
+      "locked" => false,
+      "appearance" => appearance
+    }
+
+    state["active_theme_id"] = id
+  end
+
+  def apply_rename_theme!(themes, payload)
+    theme_id = payload["theme_id"].to_s
+    name = payload["name"].to_s.strip.first(64)
+    return if theme_id.blank? || name.blank? || name.casecmp?(DEFAULT_THEME_NAME)
+
+    theme = themes.find { |item| item["id"] == theme_id }
+    return if theme.blank? || ActiveModel::Type::Boolean.new.cast(theme["locked"])
+
+    theme["name"] = name
+  end
+
+  def apply_delete_theme!(themes, state, payload)
+    theme_id = payload["theme_id"].to_s
+    return if theme_id.blank? || theme_id == DEFAULT_THEME_ID
+
+    theme = themes.find { |item| item["id"] == theme_id }
+    return if theme.blank? || ActiveModel::Type::Boolean.new.cast(theme["locked"])
+
+    themes.reject! { |item| item["id"] == theme_id }
+
+    state["active_theme_id"] = DEFAULT_THEME_ID if state["active_theme_id"] == theme_id
+  end
+
+  def apply_theme_snapshot!(themes, state, payload)
+    theme_id = payload["theme_id"].to_s
+    return if theme_id.blank?
+
+    theme = themes.find { |item| item["id"] == theme_id }
+    return if theme.blank?
+
+    state["active_theme_id"] = theme["id"]
+  end
+
+  def next_theme_name(themes)
+    base = "Custom Layout"
+    existing = themes.map { |theme| theme["name"].to_s.downcase }
+    return base unless existing.include?(base.downcase)
+
+    suffix = 2
+    loop do
+      candidate = "#{base} #{suffix}"
+      return candidate unless existing.include?(candidate.downcase)
+
+      suffix += 1
+    end
+  end
+
+  def render_current_payload
+    state = read_state_data
+    themes = ensure_default_theme(read_themes_data)
+    active_theme_id = state["active_theme_id"].presence || DEFAULT_THEME_ID
+    active_theme = themes.find { |theme| theme["id"] == active_theme_id }
+    current_appearance = normalize_appearance(active_theme&.dig("appearance") || DEFAULT_APPEARANCE)
+    active_theme_name = active_theme&.dig("name").presence || DEFAULT_THEME_NAME
+
+    render json: {
+      "windows" => normalize_rows_with_defaults(state["windows"] || {}),
+      "appearance" => current_appearance,
+      "active_theme_id" => active_theme_id,
+      "active_theme_name" => active_theme_name,
+      "is_custom_layout" => false,
+      "themes" => theme_summaries(themes)
+    }
+  end
+
+  def theme_summaries(themes)
+    themes.map do |theme|
+      {
+        "id" => theme["id"].to_s,
+        "name" => theme["name"].to_s,
+        "locked" => ActiveModel::Type::Boolean.new.cast(theme["locked"])
+      }
+    end.sort_by { |theme| [theme["locked"] ? 0 : 1, theme["name"].downcase] }
+  end
+
+  def default_state
+    {
+      "active_theme_id" => DEFAULT_THEME_ID,
+      "windows" => normalize_rows_with_defaults(DEFAULT_WINDOWS)
+    }
+  end
+
+  def default_theme_snapshot
+    {
+      "id" => DEFAULT_THEME_ID,
+      "name" => DEFAULT_THEME_NAME,
+      "locked" => true,
+      "appearance" => normalize_appearance(DEFAULT_APPEARANCE)
+    }
+  end
+
+  def ensure_default_theme(themes)
+    list = Array(themes).map { |theme| normalize_theme(theme) }.compact
+    default_theme = list.find { |theme| theme["id"] == DEFAULT_THEME_ID }
+
+    if default_theme
+      default_theme["name"] = DEFAULT_THEME_NAME
+      default_theme["locked"] = true
+      default_theme["appearance"] = normalize_appearance(DEFAULT_APPEARANCE)
+    else
+      list << default_theme_snapshot
+    end
+
+    list.uniq { |theme| theme["id"] }
+  end
+
+  def normalize_theme(theme)
+    return nil unless theme.respond_to?(:to_h)
+
+    raw = theme.to_h.transform_keys(&:to_s)
+    id = raw["id"].to_s.presence
+    name = raw["name"].to_s.strip.presence
+    return nil if id.blank? || name.blank?
+
+    {
+      "id" => id,
+      "name" => name.first(64),
+      "locked" => ActiveModel::Type::Boolean.new.cast(raw["locked"]),
+      "appearance" => normalize_appearance(raw["appearance"] || {})
+    }
+  end
+
+  def ensure_storage_files
+    FileUtils.mkdir_p(STORAGE_DIR)
+    return if File.exist?(WORKSPACE_STATE_FILE) && File.exist?(LAYOUT_THEMES_FILE)
+
+    state = default_state
+
+    legacy_rows = parse_legacy_os_config_current_rows
+    legacy_rows = parse_legacy_windows_rows if legacy_rows.blank?
+    state["windows"] = normalize_rows_with_defaults(DEFAULT_WINDOWS.deep_merge(legacy_rows)) if legacy_rows.present?
+
+    write_state_data(state)
+    write_themes_data([default_theme_snapshot])
+  end
+
+  def read_state_data
+    payload = parse_json_file(WORKSPACE_STATE_FILE)
+    return default_state unless payload.respond_to?(:to_h)
+
+    state = payload.to_h.transform_keys(&:to_s)
+    {
+      "active_theme_id" => state["active_theme_id"].presence || DEFAULT_THEME_ID,
+      "windows" => normalize_rows_with_defaults(state["windows"] || {})
+    }
+  end
+
+  def write_state_data(state)
+    output = {
+      "active_theme_id" => state["active_theme_id"].presence || DEFAULT_THEME_ID,
+      "windows" => normalize_rows_with_defaults(state["windows"] || {})
+    }
+    File.write(WORKSPACE_STATE_FILE, JSON.pretty_generate(output) + "\n")
+  end
+
+  def read_themes_data
+    payload = parse_json_file(LAYOUT_THEMES_FILE)
+    themes = payload.respond_to?(:to_h) ? payload.to_h["themes"] : []
+    ensure_default_theme(themes)
+  end
+
+  def write_themes_data(themes)
+    output = { "themes" => ensure_default_theme(themes) }
+    File.write(LAYOUT_THEMES_FILE, JSON.pretty_generate(output) + "\n")
+  end
+
+  def parse_json_file(path)
+    return {} unless File.exist?(path)
+
+    JSON.parse(File.read(path))
+  rescue JSON::ParserError
+    {}
+  end
+
+  def parse_legacy_os_config_current_rows
+    return {} unless File.exist?(LEGACY_OS_CONFIG_FILE)
 
     rows = {}
     in_current = false
 
-    File.readlines(OS_CONFIG_FILE, chomp: true).each do |line|
+    File.readlines(LEGACY_OS_CONFIG_FILE, chomp: true).each do |line|
       stripped = line.to_s.strip
       next if stripped.blank? || stripped.start_with?("#")
 
@@ -85,10 +311,6 @@ class WorkspacePreferencesController < ApplicationController
       tokens = stripped.split("|").map { |token| token.to_s.strip }
       next if tokens.empty?
 
-      # Backward compatibility with previous formats:
-      # user_id | window_key | x | y | width | height | state
-      # window_key | x | y | width | height | state
-      # window_key | x | y | width | height | z|l | state
       if tokens[0].match?(/^\d+$/) && tokens.length >= 8
         window_key, x_raw, y_raw, width_raw, height_raw, z_raw, open_raw = tokens[1, 7]
       elsif tokens[0].match?(/^\d+$/) && tokens.length >= 7
@@ -104,17 +326,15 @@ class WorkspacePreferencesController < ApplicationController
       end
 
       next if window_key.blank?
-      raw_window_key = window_key.to_s
-      window_key = canonical_window_key(window_key)
-      next unless DEFAULT_WINDOWS.key?(window_key)
-      next if window_key == "launcher" && raw_window_key == "tools" && rows.key?("launcher")
+      normalized_key = canonical_window_key(window_key)
+      next unless DEFAULT_WINDOWS.key?(normalized_key)
 
-      rows[window_key] = {
+      rows[normalized_key] = {
         "x" => Integer(x_raw),
         "y" => Integer(y_raw),
         "width" => Integer(width_raw),
         "height" => Integer(height_raw),
-        "z" => integer_or_default(z_raw, DEFAULT_WINDOWS[window_key]["z"]),
+        "z" => integer_or_default(z_raw, DEFAULT_WINDOWS[normalized_key]["z"]),
         "open" => open_raw.to_s.downcase == "open"
       }
     rescue ArgumentError
@@ -124,27 +344,25 @@ class WorkspacePreferencesController < ApplicationController
     rows
   end
 
-  def read_appearance_for_user
-    normalize_appearance(parse_os_config_appearance)
-  end
+  def parse_legacy_os_config_appearance
+    return {} unless File.exist?(LEGACY_OS_CONFIG_FILE)
 
-  def parse_os_config_appearance
-    ensure_os_config_file
-
-    in_hsb_current = false
+    in_shell_current = false
+    in_background_current = false
     appearance = {}
 
-    File.readlines(OS_CONFIG_FILE, chomp: true).each do |line|
+    File.readlines(LEGACY_OS_CONFIG_FILE, chomp: true).each do |line|
       stripped = line.to_s.strip
       next if stripped.blank? || stripped.start_with?("#")
 
       if stripped.start_with?("[")
         upper = stripped.upcase
-        in_hsb_current = upper == "[HSB.CURRENT]" || upper == "[HSB]"
+        in_shell_current = upper == "[SHELL.CURRENT]" || upper == "[HSB.CURRENT]" || upper == "[HSB]"
+        in_background_current = upper == "[BACKGROUND.CURRENT]" || upper == "[BACKGROUND]"
         next
       end
 
-      next unless in_hsb_current
+      next unless in_shell_current || in_background_current
 
       key, value = if stripped.include?("|")
         tokens = stripped.split("|", 2).map { |token| token.to_s.strip }
@@ -157,7 +375,6 @@ class WorkspacePreferencesController < ApplicationController
       end
 
       next if key.blank? || value.blank?
-
       normalized_key = key.to_s.downcase
       next unless DEFAULT_APPEARANCE.key?(normalized_key)
 
@@ -167,6 +384,35 @@ class WorkspacePreferencesController < ApplicationController
     end
 
     appearance
+  end
+
+  def parse_legacy_windows_rows
+    return {} unless File.exist?(LEGACY_WINDOWS_FILE)
+
+    rows = {}
+
+    File.readlines(LEGACY_WINDOWS_FILE, chomp: true).each do |line|
+      stripped = line.to_s.strip
+      next if stripped.blank? || stripped.start_with?("#")
+
+      _user_id, window_key, x_raw, y_raw, open_raw = stripped.split("|", 5)
+      next if window_key.blank?
+
+      normalized_key = canonical_window_key(window_key)
+      next unless DEFAULT_WINDOWS.key?(normalized_key)
+
+      defaults = DEFAULT_WINDOWS[normalized_key]
+      rows[normalized_key] = {
+        "x" => integer_or_default(x_raw, defaults["x"]),
+        "y" => integer_or_default(y_raw, defaults["y"]),
+        "width" => defaults["width"],
+        "height" => defaults["height"],
+        "z" => defaults["z"],
+        "open" => open_raw.to_s.downcase == "open"
+      }
+    end
+
+    rows
   end
 
   def normalize_appearance_payload(raw)
@@ -183,37 +429,36 @@ class WorkspacePreferencesController < ApplicationController
     keyed = payload.transform_keys { |key| key.to_s.downcase }
     normalized = {}
 
-    if keyed.key?("hue")
-      normalized["hue"] = clamp_integer(keyed["hue"], 0, 360, DEFAULT_APPEARANCE["hue"])
-    end
-
-    if keyed.key?("saturation")
-      normalized["saturation"] = clamp_integer(keyed["saturation"], 0, 100, DEFAULT_APPEARANCE["saturation"])
-    end
-
-    if keyed.key?("brightness")
-      normalized["brightness"] = clamp_integer(keyed["brightness"], 0, 100, DEFAULT_APPEARANCE["brightness"])
-    end
-
-    if keyed.key?("transparency")
-      normalized["transparency"] = clamp_float(keyed["transparency"], 0.15, 0.95, DEFAULT_APPEARANCE["transparency"])
-    end
+    normalized["hue"] = clamp_integer(keyed["hue"], 0, 360, DEFAULT_APPEARANCE["hue"]) if keyed.key?("hue")
+    normalized["saturation"] = clamp_integer(keyed["saturation"], 0, 100, DEFAULT_APPEARANCE["saturation"]) if keyed.key?("saturation")
+    normalized["brightness"] = clamp_integer(keyed["brightness"], 0, 100, DEFAULT_APPEARANCE["brightness"]) if keyed.key?("brightness")
+    normalized["transparency"] = clamp_float(keyed["transparency"], 0.15, 0.95, DEFAULT_APPEARANCE["transparency"]) if keyed.key?("transparency")
+    normalized["color_1_hue"] = clamp_integer(keyed["color_1_hue"], 0, 360, DEFAULT_APPEARANCE["color_1_hue"]) if keyed.key?("color_1_hue")
+    normalized["color_1_saturation"] = clamp_integer(keyed["color_1_saturation"], 0, 100, DEFAULT_APPEARANCE["color_1_saturation"]) if keyed.key?("color_1_saturation")
+    normalized["color_1_brightness"] = clamp_integer(keyed["color_1_brightness"], 0, 100, DEFAULT_APPEARANCE["color_1_brightness"]) if keyed.key?("color_1_brightness")
+    normalized["color_2_hue"] = clamp_integer(keyed["color_2_hue"], 0, 360, DEFAULT_APPEARANCE["color_2_hue"]) if keyed.key?("color_2_hue")
+    normalized["color_2_saturation"] = clamp_integer(keyed["color_2_saturation"], 0, 100, DEFAULT_APPEARANCE["color_2_saturation"]) if keyed.key?("color_2_saturation")
+    normalized["color_2_brightness"] = clamp_integer(keyed["color_2_brightness"], 0, 100, DEFAULT_APPEARANCE["color_2_brightness"]) if keyed.key?("color_2_brightness")
+    normalized["angle"] = clamp_integer(keyed["angle"], 0, 360, DEFAULT_APPEARANCE["angle"]) if keyed.key?("angle")
 
     normalized
   end
 
   def normalize_appearance(raw)
-    input = if raw.respond_to?(:transform_keys)
-      raw.transform_keys { |key| key.to_s.downcase }
-    else
-      {}
-    end
+    input = raw.respond_to?(:transform_keys) ? raw.transform_keys { |key| key.to_s.downcase } : {}
 
     {
       "hue" => clamp_integer(input["hue"], 0, 360, DEFAULT_APPEARANCE["hue"]),
       "saturation" => clamp_integer(input["saturation"], 0, 100, DEFAULT_APPEARANCE["saturation"]),
       "brightness" => clamp_integer(input["brightness"], 0, 100, DEFAULT_APPEARANCE["brightness"]),
-      "transparency" => clamp_float(input["transparency"], 0.15, 0.95, DEFAULT_APPEARANCE["transparency"])
+      "transparency" => clamp_float(input["transparency"], 0.15, 0.95, DEFAULT_APPEARANCE["transparency"]),
+      "color_1_hue" => clamp_integer(input["color_1_hue"], 0, 360, DEFAULT_APPEARANCE["color_1_hue"]),
+      "color_1_saturation" => clamp_integer(input["color_1_saturation"], 0, 100, DEFAULT_APPEARANCE["color_1_saturation"]),
+      "color_1_brightness" => clamp_integer(input["color_1_brightness"], 0, 100, DEFAULT_APPEARANCE["color_1_brightness"]),
+      "color_2_hue" => clamp_integer(input["color_2_hue"], 0, 360, DEFAULT_APPEARANCE["color_2_hue"]),
+      "color_2_saturation" => clamp_integer(input["color_2_saturation"], 0, 100, DEFAULT_APPEARANCE["color_2_saturation"]),
+      "color_2_brightness" => clamp_integer(input["color_2_brightness"], 0, 100, DEFAULT_APPEARANCE["color_2_brightness"]),
+      "angle" => clamp_integer(input["angle"], 0, 360, DEFAULT_APPEARANCE["angle"])
     }
   end
 
@@ -228,6 +473,7 @@ class WorkspacePreferencesController < ApplicationController
 
     windows.each_with_object({}) do |(window_key, state), normalized|
       next unless state.respond_to?(:to_h)
+
       canonical_key = canonical_window_key(window_key)
       next unless DEFAULT_WINDOWS.key?(canonical_key)
 
@@ -235,10 +481,7 @@ class WorkspacePreferencesController < ApplicationController
       open_value = state_hash[:open]
       open_value = state_hash["open"] if open_value.nil?
 
-      defaults = DEFAULT_WINDOWS[canonical_key] || {
-        "x" => 41, "y" => 6, "width" => 407, "height" => 407, "z" => 1500, "open" => false
-      }
-
+      defaults = DEFAULT_WINDOWS[canonical_key]
       z_value = state_hash[:z] || state_hash["z"] || state_hash[:layer] || state_hash["layer"]
 
       normalized[canonical_key] = {
@@ -252,115 +495,11 @@ class WorkspacePreferencesController < ApplicationController
     end
   end
 
-  def rewrite_config(user_windows, appearance = DEFAULT_APPEARANCE)
-    current_rows = normalize_rows_with_defaults(DEFAULT_WINDOWS.deep_merge(user_windows))
-    current_appearance = normalize_appearance(appearance)
-    write_os_config_file(current_rows, current_appearance)
-  end
-
-  def write_os_config_file(current_rows, appearance)
-    FileUtils.mkdir_p(STORAGE_DIR)
-
-    output = []
-    output << "========= OS CONFIG ========="
-    output << ""
-    output << "[POSITIONS]"
-    output << ""
-    output << "  [POSITIONS.DEFAULTS]"
-    output << "  windowKey | x | y | w | h | z | state"
-
-    DEFAULT_WINDOWS.keys.sort.each do |window_key|
-      output << "  #{format_row(window_key, DEFAULT_WINDOWS[window_key])}"
-    end
-
-    output << ""
-    output << "  [POSITIONS.CURRENT]"
-    output << "  windowKey | x | y | w | h | z | state"
-
-    current_rows.keys.sort.each do |window_key|
-      output << "  #{format_row(window_key, current_rows[window_key])}"
-    end
-
-    output << ""
-    output << "__________"
-    output << ""
-    output << "[HSB]"
-    output << ""
-    output << "  [HSB.DEFAULTS]"
-    output << "  key | value"
-    output << "  hue | #{DEFAULT_APPEARANCE["hue"]}"
-    output << "  saturation | #{DEFAULT_APPEARANCE["saturation"]}"
-    output << "  brightness | #{DEFAULT_APPEARANCE["brightness"]}"
-    output << "  transparency | #{format("%.2f", DEFAULT_APPEARANCE["transparency"])}"
-    output << ""
-    output << "  [HSB.CURRENT]"
-    output << "  key | value"
-    output << "  hue | #{appearance["hue"]}"
-    output << "  saturation | #{appearance["saturation"]}"
-    output << "  brightness | #{appearance["brightness"]}"
-    output << "  transparency | #{format("%.2f", appearance["transparency"])}"
-
-    File.write(OS_CONFIG_FILE, output.join("\n") + "\n")
-  end
-
-  def ensure_os_config_file
-    FileUtils.mkdir_p(STORAGE_DIR)
-    return if File.exist?(OS_CONFIG_FILE)
-
-    if File.exist?(LEGACY_WINDOWS_FILE)
-      write_os_config_file(parse_legacy_windows_rows, DEFAULT_APPEARANCE)
-    else
-      write_os_config_file({}, DEFAULT_APPEARANCE)
-    end
-  end
-
-  def parse_legacy_windows_rows
-    rows = {}
-
-    File.readlines(LEGACY_WINDOWS_FILE, chomp: true).each do |line|
-      stripped = line.to_s.strip
-      next if stripped.blank? || stripped.start_with?("#")
-
-      user_id, window_key, x_raw, y_raw, open_raw = stripped.split("|", 5)
-      next if user_id.blank? || window_key.blank?
-      next if user_id == "default"
-      next unless user_id.to_s == current_user.id.to_s
-
-      raw_window_key = window_key.to_s
-      window_key = canonical_window_key(window_key)
-      next unless DEFAULT_WINDOWS.key?(window_key)
-      next if window_key == "launcher" && raw_window_key == "tools" && rows.key?("launcher")
-
-      defaults = DEFAULT_WINDOWS[window_key] || {
-        "x" => 41, "y" => 6, "width" => 407, "height" => 407, "z" => 1500, "open" => false
-      }
-
-      rows[window_key] = {
-        "x" => integer_or_default(x_raw, defaults["x"]),
-        "y" => integer_or_default(y_raw, defaults["y"]),
-        "width" => defaults["width"],
-        "height" => defaults["height"],
-        "z" => defaults["z"],
-        "open" => open_raw.to_s.downcase == "open"
-      }
-    end
-
-    rows
-  end
-
   def normalize_rows_with_defaults(rows)
     rows.each_with_object({}) do |(window_key, state), normalized|
       next unless DEFAULT_WINDOWS.key?(window_key)
 
-      default_state = DEFAULT_WINDOWS[window_key] || {
-        "x" => 41,
-        "y" => 6,
-        "width" => 407,
-        "height" => 407,
-        "z" => 1500,
-        "open" => false
-      }
-
+      default_state = DEFAULT_WINDOWS[window_key]
       x = integer_or_default(state["x"], default_state["x"])
       y = integer_or_default(state["y"], default_state["y"])
       width = integer_or_default(state["width"], default_state["width"])
@@ -383,11 +522,6 @@ class WorkspacePreferencesController < ApplicationController
         "open" => ActiveModel::Type::Boolean.new.cast(state["open"])
       }
     end
-  end
-
-  def format_row(window_key, state)
-    open_value = state["open"] ? "open" : "closed"
-    [window_key, state["x"], state["y"], state["width"], state["height"], state["z"], open_value].join(" | ")
   end
 
   def integer_or_default(value, default)
@@ -421,5 +555,18 @@ class WorkspacePreferencesController < ApplicationController
     return "launcher" if %w[stationary tools launcher].include?(key)
 
     key
+  end
+
+  def appearance_changed?(current, baseline)
+    current_hash = normalize_appearance(current || {})
+    baseline_hash = normalize_appearance(baseline || {})
+
+    current_hash.any? do |key, value|
+      if key == "transparency"
+        (value.to_f - baseline_hash[key].to_f).abs > 0.005
+      else
+        value.to_i != baseline_hash[key].to_i
+      end
+    end
   end
 end

@@ -144,6 +144,32 @@
         </div>
       </section>
 
+      <section class="content-window os-window is-hidden"
+        data-controller="content-window"
+        data-content-window-app-key-value="theme-builder"
+        data-content-window-app-url-value="/apps/theme_builder"
+        data-content-window-storage-key-value="nexus.contentWindow.themeBuilder.bounds"
+        data-content-window-frame-id-value="theme-builder-pane"
+        data-content-window-default-width-value="760"
+        data-content-window-default-height-value="430"
+        data-content-window-default-offset-x-value="-104"
+        data-content-window-default-offset-y-value="-132"
+        aria-live="polite">
+        <div class="title-bar" data-action="mousedown->content-window#startDrag touchstart->content-window#startDrag"></div>
+        <button type="button" class="tools-close-btn content-window-close" data-action="click->content-window#close" aria-label="Close" title="Close">✕</button>
+        <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="window-content">
+          <turbo-frame id="theme-builder-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
+        </div>
+      </section>
+
       <section class="db-health-window os-window is-hidden" data-controller="db-health" data-db-health-url-value="<%= db_health_path %>" data-db-health-target="window" aria-live="polite">
           <section class="db-health-panel" data-db-health-target="panel">
           <header class="db-health-header os-window-header" data-action="mousedown->db-health#startDrag touchstart->db-health#startDrag">
@@ -188,16 +214,10 @@
           <p class="settings-stamp os-window-subtitle" data-settings-target="stamp"><%= current_user&.email.presence || "Unknown user" %></p>
 
           <div class="settings-actions os-window-body-start os-window-grid os-window-grid--2" data-settings-target="actions">
-            <button type="button" class="settings-action os-window-card settings-action--interface" data-action="click->settings#showInterface">
+            <button type="button" class="settings-action os-window-card settings-action--themes" data-action="click->settings#showThemes">
               <div class="os-window-card-content">
-                <dt class="os-window-card-label">INTERFACE</dt>
-                <dd class="os-window-card-value">CONFIG</dd>
-              </div>
-            </button>
-            <button type="button" class="settings-action os-window-card settings-action--reset" data-action="click->settings#factoryReset">
-              <div class="os-window-card-content">
-                <dt class="os-window-card-label">FACTORY RESET</dt>
-                <dd class="os-window-card-value">DEFAULT</dd>
+                <dt class="os-window-card-label">THEMES</dt>
+                <dd class="os-window-card-value" data-settings-target="themeStatus">MANAGE</dd>
               </div>
             </button>
             <%= button_to logout_path, method: :delete, class: "settings-action os-window-card settings-action--logout", form: { data: { turbo_confirm: "Are you sure you want to log out?" } } do %>
@@ -208,75 +228,11 @@
             <% end %>
           </div>
 
-          <section class="settings-interface hidden" data-settings-target="interfaceSection">
-            <label class="settings-interface-label" for="settings-window-hue">Hue</label>
-            <div class="settings-interface-slider-row">
-              <input
-                id="settings-window-hue"
-                type="range"
-                min="0"
-                max="360"
-                step="1"
-                value="232"
-                class="settings-interface-slider settings-interface-slider--hue"
-                data-settings-target="hueSlider"
-                data-action="input->settings#updateHue"
-                aria-label="Window hue"
-              >
-              <output class="settings-interface-value" data-settings-target="hueValue">232°</output>
+          <section class="settings-interface hidden" data-settings-target="themesSection">
+            <ul class="settings-themes-list" data-settings-target="themesList" aria-label="Saved themes"></ul>
+            <div class="settings-theme-add-row">
+              <button type="button" class="btn-add-task settings-theme-add-btn" data-action="click->settings#addTheme">Save Theme</button>
             </div>
-
-            <label class="settings-interface-label" for="settings-window-saturation">Saturation</label>
-            <div class="settings-interface-slider-row">
-              <input
-                id="settings-window-saturation"
-                type="range"
-                min="0"
-                max="100"
-                step="1"
-                value="62"
-                class="settings-interface-slider settings-interface-slider--saturation"
-                data-settings-target="saturationSlider"
-                data-action="input->settings#updateSaturation"
-                aria-label="Window saturation"
-              >
-              <output class="settings-interface-value" data-settings-target="saturationValue">62%</output>
-            </div>
-
-            <label class="settings-interface-label" for="settings-window-brightness">Brightness</label>
-            <div class="settings-interface-slider-row">
-              <input
-                id="settings-window-brightness"
-                type="range"
-                min="0"
-                max="100"
-                step="1"
-                value="18"
-                class="settings-interface-slider settings-interface-slider--brightness"
-                data-settings-target="brightnessSlider"
-                data-action="input->settings#updateBrightness"
-                aria-label="Window brightness"
-              >
-              <output class="settings-interface-value" data-settings-target="brightnessValue">18%</output>
-            </div>
-
-            <label class="settings-interface-label" for="settings-window-transparency">Transparency</label>
-            <div class="settings-interface-slider-row">
-              <input
-                id="settings-window-transparency"
-                type="range"
-                min="15"
-                max="95"
-                step="1"
-                value="50"
-                class="settings-interface-slider settings-interface-slider--alpha"
-                data-settings-target="transparencySlider"
-                data-action="input->settings#updateTransparency"
-                aria-label="Window transparency"
-              >
-              <output class="settings-interface-value" data-settings-target="transparencyValue">50%</output>
-            </div>
-            <p class="settings-interface-note">Applies to all desktop windows.</p>
           </section>
         </section>
       </section>

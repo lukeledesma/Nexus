@@ -10,7 +10,8 @@ const ALL_BOUNDS_KEYS = [
   "nexus.contentWindow.conversionChart.bounds",
   "nexus.contentWindow.timer.bounds",
   "nexus.contentWindow.singularNote.bounds",
-  "nexus.contentWindow.singularTaskList.bounds"
+  "nexus.contentWindow.singularTaskList.bounds",
+  "nexus.contentWindow.themeBuilder.bounds"
 ]
 
 const WINDOW_BOUNDS_KEY_MAP = {
@@ -20,8 +21,11 @@ const WINDOW_BOUNDS_KEY_MAP = {
   "conversion-chart": "nexus.contentWindow.conversionChart.bounds",
   "timer": "nexus.contentWindow.timer.bounds",
   "singular-note": "nexus.contentWindow.singularNote.bounds",
-  "singular-task-list": "nexus.contentWindow.singularTaskList.bounds"
+  "singular-task-list": "nexus.contentWindow.singularTaskList.bounds",
+  "theme-builder": "nexus.contentWindow.themeBuilder.bounds"
 }
+
+const OS_WINDOW_IDS = new Set(["db-health", "settings", "launcher"])
 
 // Maps custom event name → stable window ID.
 // For "app-window:state" the ID comes from event.detail.appKey instead.
@@ -71,6 +75,7 @@ export default class extends Controller {
     if (!windowId) return
 
     const prev = this.windowState[windowId] || {}
+    const isOsWindow = OS_WINDOW_IDS.has(windowId)
     const bounds = this.readBoundsForWindow(windowId)
     const detailX = Number(event.detail?.x)
     const detailY = Number(event.detail?.y)
@@ -89,8 +94,10 @@ export default class extends Controller {
       ...prev,
       x: Number.isFinite(coords.x) ? coords.x : (prev.x || 0),
       y: Number.isFinite(coords.y) ? coords.y : (prev.y || 0),
-      width: Number.isFinite(coords.width) ? coords.width : (prev.width || 407),
-      height: Number.isFinite(coords.height) ? coords.height : (prev.height || 407),
+      ...(isOsWindow ? {} : {
+        width: Number.isFinite(coords.width) ? coords.width : (prev.width || 407),
+        height: Number.isFinite(coords.height) ? coords.height : (prev.height || 407)
+      }),
       z: Number.isFinite(coords.z) ? coords.z : (prev.z || 1500),
       open: Boolean(event.detail?.open)
     }
@@ -199,8 +206,9 @@ export default class extends Controller {
 
     element.style.left = `${Math.round(x)}px`
     element.style.top = `${Math.round(y)}px`
-    if (Number.isFinite(width) && width > 0) element.style.width = `${Math.round(width)}px`
-    if (Number.isFinite(height) && height > 0) element.style.height = `${Math.round(height)}px`
+    const isOsWindow = OS_WINDOW_IDS.has(windowId)
+    if (!isOsWindow && Number.isFinite(width) && width > 0) element.style.width = `${Math.round(width)}px`
+    if (!isOsWindow && Number.isFinite(height) && height > 0) element.style.height = `${Math.round(height)}px`
     if (Number.isFinite(z) && z > 0) element.style.zIndex = String(Math.round(z))
 
     const storageKey = WINDOW_BOUNDS_KEY_MAP[windowId]
@@ -211,8 +219,8 @@ export default class extends Controller {
       ...existing,
       left: Math.round(x),
       top: Math.round(y),
-      width: Number.isFinite(width) && width > 0 ? Math.round(width) : existing.width,
-      height: Number.isFinite(height) && height > 0 ? Math.round(height) : existing.height,
+      width: isOsWindow ? existing.width : (Number.isFinite(width) && width > 0 ? Math.round(width) : existing.width),
+      height: isOsWindow ? existing.height : (Number.isFinite(height) && height > 0 ? Math.round(height) : existing.height),
       z: Number.isFinite(z) && z > 0 ? Math.round(z) : (existing.z ?? existing.layer)
     }
 
@@ -250,6 +258,7 @@ export default class extends Controller {
     if (windowId === "timer") return document.querySelector("[data-content-window-app-key-value='timer']")
     if (windowId === "singular-note") return document.querySelector("[data-content-window-app-key-value='singular-note']")
     if (windowId === "singular-task-list") return document.querySelector("[data-content-window-app-key-value='singular-task-list']")
+    if (windowId === "theme-builder") return document.querySelector("[data-content-window-app-key-value='theme-builder']")
     return null
   }
 

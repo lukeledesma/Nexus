@@ -1,92 +1,67 @@
 # frozen_string_literal: true
 
+require "json"
+
 workspace_dir = Rails.root.join("storage", "workspace")
-os_config_file = workspace_dir.join("OSConfig.txt")
-legacy_windows_file = workspace_dir.join("Windows.txt")
+workspace_state_file = workspace_dir.join("WorkspaceState.txt")
+layout_themes_file = workspace_dir.join("LayoutThemes.txt")
 
-unless File.exist?(os_config_file)
-  FileUtils.mkdir_p(workspace_dir)
+FileUtils.mkdir_p(workspace_dir)
 
-  rows = [
-    "========= OS CONFIG =========",
-    "",
-    "[POSITIONS]",
-    "",
-    "  [POSITIONS.DEFAULTS]",
-    "  windowKey | x | y | w | h | z | state",
-    "  conversion-chart | 782 | 88 | 407 | 407 | 1506 | closed",
-    "  db-health | 41 | 6 | 320 | 235 | 1501 | closed",
-    "  timer | 376 | 196 | 320 | 250 | 1507 | closed",
-    "  launcher | 376 | 6 | 320 | 180 | 1503 | closed",
-    "  settings | 41 | 256 | 320 | 180 | 1502 | closed",
-    "  singular-note | 711 | 6 | 407 | 407 | 1504 | closed",
-    "  singular-task-list | 747 | 48 | 407 | 407 | 1505 | closed",
-    "",
-    "  [POSITIONS.CURRENT]",
-    "  windowKey | x | y | w | h | z | state",
-    "",
-    "__________",
-    "",
-    "[HSB]",
-    "",
-    "  [HSB.DEFAULTS]",
-    "  key | value",
-    "  hue | 180",
-    "  saturation | 0",
-    "  brightness | 15",
-    "  transparency | 0.15",
-    "",
-    "  [HSB.CURRENT]",
-    "  key | value",
-    "  hue | 180",
-    "  saturation | 0",
-    "  brightness | 15",
-    "  transparency | 0.15"
-  ]
+unless File.exist?(workspace_state_file)
+  state_payload = {
+    "active_theme_id" => "default",
+    "windows" => {
+      "conversion-chart" => { "x" => 782, "y" => 88, "width" => 407, "height" => 407, "z" => 1506, "open" => true },
+      "db-health" => { "x" => 41, "y" => 6, "width" => 320, "height" => 235, "z" => 1501, "open" => true },
+      "launcher" => { "x" => 376, "y" => 6, "width" => 320, "height" => 180, "z" => 1503, "open" => true },
+      "settings" => { "x" => 41, "y" => 256, "width" => 320, "height" => 180, "z" => 1502, "open" => true },
+      "theme-builder" => { "x" => 41, "y" => 256, "width" => 760, "height" => 430, "z" => 1508, "open" => false },
+      "singular-note" => { "x" => 711, "y" => 6, "width" => 407, "height" => 407, "z" => 1504, "open" => true },
+      "singular-task-list" => { "x" => 747, "y" => 48, "width" => 407, "height" => 407, "z" => 1505, "open" => true },
+      "timer" => { "x" => 376, "y" => 196, "width" => 320, "height" => 250, "z" => 1507, "open" => true }
+    },
+    "appearance" => {
+      "hue" => 180,
+      "saturation" => 0,
+      "brightness" => 15,
+      "transparency" => 0.15,
+      "color_1_hue" => 240,
+      "color_1_saturation" => 28,
+      "color_1_brightness" => 14,
+      "color_2_hue" => 213,
+      "color_2_saturation" => 73,
+      "color_2_brightness" => 22,
+      "angle" => 135
+    }
+  }
 
-  if File.exist?(legacy_windows_file)
-    current_rows = File.readlines(legacy_windows_file, chomp: true)
-      .map(&:strip)
-      .reject { |line| line.empty? || line.start_with?("#") || line.start_with?("default|") }
-      .filter_map do |line|
-        user_id, window_key, x_raw, y_raw, open_raw = line.split("|", 5)
-        next if user_id.blank? || window_key.blank?
-        next_key = %w[stationary tools launcher].include?(window_key) ? "launcher" : window_key
+  File.write(workspace_state_file, JSON.pretty_generate(state_payload) + "\n")
+end
 
-        width, height = if %w[conversion-chart singular-note singular-task-list].include?(next_key)
-          [407, 407]
-        elsif next_key == "db-health"
-          [320, 235]
-        elsif next_key == "settings"
-          [320, 125]
-        elsif next_key == "launcher"
-          [320, 180]
-        else
-          [407, 407]
-        end
+unless File.exist?(layout_themes_file)
+  themes_payload = {
+    "themes" => [
+      {
+        "id" => "default",
+        "name" => "Default",
+        "locked" => true,
+        "appearance" => {
+          "hue" => 180,
+          "saturation" => 0,
+          "brightness" => 15,
+          "transparency" => 0.15,
+          "color_1_hue" => 240,
+          "color_1_saturation" => 28,
+          "color_1_brightness" => 14,
+          "color_2_hue" => 213,
+          "color_2_saturation" => 73,
+          "color_2_brightness" => 22,
+          "angle" => 135
+        }
+      }
+    ]
+  }
 
-        z = if next_key == "db-health"
-          1501
-        elsif next_key == "settings"
-          1502
-        elsif next_key == "launcher"
-          1503
-        elsif next_key == "singular-note"
-          1504
-        elsif next_key == "singular-task-list"
-          1505
-        elsif next_key == "conversion-chart"
-          1506
-        else
-          1500
-        end
-
-        open_value = open_raw.to_s.downcase == "open" ? "open" : "closed"
-        "  #{next_key} | #{x_raw.to_i} | #{y_raw.to_i} | #{width} | #{height} | #{z} | #{open_value}"
-      end
-
-    rows.concat(current_rows)
-  end
-
-  File.write(os_config_file, rows.join("\n") + "\n")
+  File.write(layout_themes_file, JSON.pretty_generate(themes_payload) + "\n")
 end

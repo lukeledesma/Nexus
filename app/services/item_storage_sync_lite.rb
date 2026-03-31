@@ -7,7 +7,8 @@ require "tmpdir"
 # This keeps filesystem state aligned with the app's organizer model.
 # Notes and Tasks are always singular and stored at the workspace root.
 class ItemStorageSyncLite
-  OS_CONFIG_FILENAME = "OSConfig.txt".freeze
+  WORKSPACE_STATE_FILENAME = "WorkspaceState.txt".freeze
+  LAYOUT_THEMES_FILENAME = "LayoutThemes.txt".freeze
   LEGACY_WINDOWS_FILENAME = "Windows.txt".freeze
   SYNC_MUTEX = Mutex.new
 
@@ -72,14 +73,14 @@ class ItemStorageSyncLite
 
     # Preserve workspace config files across Notes/Tasks rebuilds.
     preserved_configs = {}
-    [OS_CONFIG_FILENAME, LEGACY_WINDOWS_FILENAME].each do |filename|
+    [WORKSPACE_STATE_FILENAME, LAYOUT_THEMES_FILENAME, LEGACY_WINDOWS_FILENAME].each do |filename|
       path = root.join(filename)
       preserved_configs[filename] = File.read(path) if File.exist?(path)
     end
 
     Dir.children(root).each do |entry|
       next if [".sync_old", active_temp_dirname].include?(entry)
-      next if [OS_CONFIG_FILENAME, LEGACY_WINDOWS_FILENAME].include?(entry)
+      next if [WORKSPACE_STATE_FILENAME, LAYOUT_THEMES_FILENAME, LEGACY_WINDOWS_FILENAME].include?(entry)
 
       FileUtils.rm_rf(root.join(entry))
     end

@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { createOsWindowSizer } from "lib/os_window_sizing"
 
 export default class extends Controller {
   static targets = [
@@ -29,12 +30,6 @@ export default class extends Controller {
     this.latestPayload = null
     this.defaultTitle = "DB Health"
     this.windowWidth = 320
-    this.minimumWindowHeight = 112
-    this.maximumWindowHeight = 407
-    this.mainWindowHeight = this.calculateCardGridWindowHeight(
-      this.calculateGridRows(this.metricCardTargets.length, 2)
-    )
-    this.windowHeight = this.mainWindowHeight
     this.viewportMargin = 6
     this.dockLeftBoundary = 41
     this.activeDrag = null
@@ -44,6 +39,14 @@ export default class extends Controller {
       this.boundWindowInteraction = this.handleWindowInteraction.bind(this)
 
     this.restoreWindowBounds()
+    this.windowSizer = createOsWindowSizer({
+      windowId: "db-health",
+      windowElement: this.windowTarget,
+      contentElement: this.panelTarget,
+      viewportMargin: this.viewportMargin,
+      isWindowOpen: () => !this.windowTarget.classList.contains("is-hidden")
+    })
+    this.windowSizer.observeContent()
     window.addEventListener("db-health:toggle", this.boundToggleRequest)
       this.windowTarget.addEventListener("mousedown", this.boundWindowInteraction)
   }
@@ -51,6 +54,7 @@ export default class extends Controller {
   disconnect() {
     this.stopAutoRefresh()
     this.stopDrag()
+    if (this.windowSizer) this.windowSizer.disconnect()
     window.removeEventListener("db-health:toggle", this.boundToggleRequest)
       this.windowTarget.removeEventListener("mousedown", this.boundWindowInteraction)
   }
@@ -78,7 +82,7 @@ export default class extends Controller {
 
   open() {
     this.windowTarget.classList.remove("is-hidden")
-    this.snapWindowToActiveContent()
+    if (this.windowSizer) this.windowSizer.syncOnOpen()
     this.bringToFront()
     this.emitWindowState(true)
   }
@@ -174,7 +178,6 @@ export default class extends Controller {
     this.windowTarget.style.top  = `${bounds.top}px`
     // Preserve default width/height; only position is stored for fixed-size windows.
     this.windowTarget.style.width  = `${this.windowWidth}px`
-    this.windowTarget.style.height = `${this.windowHeight}px`
   }
 
   saveWindowBounds() {
@@ -213,12 +216,12 @@ export default class extends Controller {
     const defaultTop = this.viewportMargin
     const leftColumnLeft = this.dockLeftBoundary
     const width = Math.min(this.windowWidth, Math.max(280, vw - 40))
-    const height = Math.min(this.windowHeight, Math.max(this.minimumWindowHeight, vh - 40))
+    const currentHeight = Math.ceil(this.windowTarget.getBoundingClientRect().height)
+    const height = Math.max(1, Math.min(currentHeight || 1, Math.max(1, vh - 40)))
     const left = Math.max(leftColumnLeft, Math.min(leftColumnLeft, vw - this.viewportMargin - width))
     const top = Math.max(this.viewportMargin, Math.min(defaultTop, vh - this.viewportMargin - height))
 
     this.windowTarget.style.width = `${width}px`
-    this.windowTarget.style.height = `${height}px`
     this.windowTarget.style.left = `${left}px`
     this.windowTarget.style.top = `${top}px`
   }
@@ -229,17 +232,6 @@ export default class extends Controller {
       window.__nexusDesktopZIndex = next
     this.windowTarget.style.zIndex = String(next)
     this.emitWindowState(!this.windowTarget.classList.contains("is-hidden"))
-  }
-
-  calculateGridRows(itemCount, columns = 2) {
-    return Math.max(1, Math.ceil(itemCount / columns))
-  }
-
-  calculateCardGridWindowHeight(rows) {
-    const baseChromeHeight = 75
-    const cardHeight = 50
-    const rowGap = 5
-    return baseChromeHeight + (rows * cardHeight) + (Math.max(0, rows - 1) * rowGap)
   }
 
   focusMetric(event) {
@@ -260,7 +252,7 @@ export default class extends Controller {
     this.detailListTarget.style.maxHeight = ""
     this.detailListTarget.style.overflowY = "hidden"
     this.detailListTarget.classList.remove("is-scrolling")
-    this.setWindowHeight(this.mainWindowHeight)
+    this.snapWindowToActiveContent()
   }
 
   async refresh() {
@@ -414,7 +406,7 @@ export default class extends Controller {
     if (!this.focusedMetricKey) return
     if (this.windowTarget.classList.contains("is-hidden")) return
 
-    const atWindowCap = this.windowHeight >= (this.maximumWindowHeight - 1)
+    const atWindowCap = this.panelTarget.scrollHeight > (this.panelTarget.clientHeight + 1)
     if (!atWindowCap) {
       this.detailListTarget.style.height = ""
       this.detailListTarget.style.maxHeight = ""
@@ -479,18 +471,9 @@ export default class extends Controller {
     return (rows * rowHeight) + listVerticalPadding
   }
 
-  setWindowHeight(height) {
-    const bounded = Math.min(this.maximumWindowHeight, Math.max(this.minimumWindowHeight, Math.floor(height)))
-    this.windowHeight = bounded
-    this.windowTarget.style.height = `${bounded}px`
-  }
-
   snapWindowToActiveContent() {
     window.requestAnimationFrame(() => {
       if (this.windowTarget.classList.contains("is-hidden")) return
-
-      const panel = this.panelTarget
-      if (!panel) return
 
       // Temporarily remove detail list cap while measuring intrinsic content size.
       let previousHeight = null
@@ -505,9 +488,7 @@ export default class extends Controller {
         this.detailListTarget.style.overflowY = "hidden"
       }
 
-      // Measure true content height; cap logic in setWindowHeight handles overflow cutoff.
-      const desired = Math.ceil(panel.scrollHeight + 2)
-      this.setWindowHeight(desired)
+      if (this.windowSizer) this.windowSizer.sync()
 
       if (this.focusedMetricKey) {
         this.detailListTarget.style.height = previousHeight || ""

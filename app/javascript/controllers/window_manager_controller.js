@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { createOsWindowSizer } from "lib/os_window_sizing"
 
 export default class extends Controller {
   connect() {
@@ -7,11 +8,10 @@ export default class extends Controller {
     this.dbHealthDockButton = this.element.querySelector(".app-dock-button--db-health")
     this.settingsDockButton = this.element.querySelector(".app-dock-button--settings")
 
-    this.minWindowHeight = 120
     this.viewportMarginPx = 6
     this.dockLeftBoundary = 41
     this.defaultOrganizerWidth = 320
-    this.defaultOrganizerHeight = this.getLauncherWindowHeight()
+    this.defaultOrganizerHeight = 0
 
     this.activeDrag = null
 
@@ -22,6 +22,15 @@ export default class extends Controller {
     this.boundLauncherToggle = this.toggleLauncher.bind(this)
 
     this.initializeWindows()
+
+    this.launcherSizer = createOsWindowSizer({
+      windowId: "launcher",
+      windowElement: this.launcherWindow,
+      contentElement: this.launcherWindow?.querySelector(".organizer-panel"),
+      viewportMargin: this.viewportMarginPx,
+      isWindowOpen: () => !this.launcherWindow?.classList.contains("is-hidden")
+    })
+    this.launcherSizer.observeContent()
 
     window.addEventListener("db-health:state", this.boundDbHealthState)
     window.addEventListener("settings:state", this.boundSettingsState)
@@ -39,6 +48,7 @@ export default class extends Controller {
     window.removeEventListener("db-health:state", this.boundDbHealthState)
     window.removeEventListener("settings:state", this.boundSettingsState)
     window.removeEventListener("launcher:toggle", this.boundLauncherToggle)
+    if (this.launcherSizer) this.launcherSizer.disconnect()
   }
 
   toggleDbHealth(event) {
@@ -84,11 +94,8 @@ export default class extends Controller {
     const leftColumnLeft = this.dockLeftBoundary
     const leftColumnWidth = 320
     const launcherWidth = this.defaultOrganizerWidth
-    const maxWindowHeight = Math.max(this.minWindowHeight, vh - (margin * 2))
-    const windowHeight = Math.max(
-      this.minWindowHeight,
-      Math.min(this.defaultOrganizerHeight, maxWindowHeight)
-    )
+    const maxWindowHeight = Math.max(1, vh - (margin * 2))
+    const windowHeight = Math.max(1, Math.min(this.getLauncherWindowHeight(), maxWindowHeight))
 
     const rightColumnLeft = leftColumnLeft + leftColumnWidth + columnGap
     const desiredLeft = rightColumnLeft
@@ -104,20 +111,14 @@ export default class extends Controller {
   }
 
   getLauncherWindowHeight() {
-    const count = this.launcherWindow?.querySelectorAll(".organizer-tools-grid .os-window-card")?.length || 0
-    const rows = this.calculateGridRows(count || 3, 2)
-    return this.calculateCardGridWindowHeight(rows)
+    const panel = this.launcherWindow?.querySelector(".organizer-panel")
+    if (!panel) return 1
+    return Math.max(1, Math.ceil(panel.scrollHeight), Math.ceil(panel.getBoundingClientRect().height))
   }
 
-  calculateGridRows(itemCount, columns = 2) {
-    return Math.max(1, Math.ceil(itemCount / columns))
-  }
-
-  calculateCardGridWindowHeight(rows) {
-    const baseChromeHeight = 75
-    const cardHeight = 50
-    const rowGap = 5
-    return baseChromeHeight + (rows * cardHeight) + (Math.max(0, rows - 1) * rowGap)
+  syncLauncherWindowToContent() {
+    if (!this.launcherSizer) return
+    this.launcherSizer.sync()
   }
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -240,6 +241,7 @@ export default class extends Controller {
 
   openLauncher() {
     this.launcherWindow.classList.remove("is-hidden")
+    if (this.launcherSizer) this.launcherSizer.syncOnOpen()
     this.bringLauncherToFront()
     this.updateLauncherDockState(true)
     this.emitLauncherState(true)
