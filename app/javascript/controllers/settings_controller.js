@@ -61,12 +61,20 @@ export default class extends Controller {
       colorTwoBrightness: 22,
       angle: 135
     }
+    this.defaultContentModel = {
+      fontOne: 89,
+      fontOneAlpha: 100,
+      fontTwo: 63,
+      fontTwoAlpha: 100,
+      border: 20,
+      borderAlpha: 100
+    }
 
     this.themes = []
     this.themeDraft = null
     this.selectedThemeId = "default"
     this.activeThemeId = "default"
-    this.activeThemeAppearanceSnapshot = this.buildAppearancePayload(this.defaultShellModel, this.defaultBackgroundModel)
+    this.activeThemeAppearanceSnapshot = this.buildAppearancePayload(this.defaultShellModel, this.defaultBackgroundModel, this.defaultContentModel)
     this.serverIsCustomLayout = false
     this.currentLiveAppearance = null
 
@@ -107,12 +115,32 @@ export default class extends Controller {
   }
 
   handleThemeStatus(event) {
-    const isCustomLayout = Boolean(event?.detail?.is_custom_layout)
+    const detail = event?.detail || {}
+    const previousActiveThemeId = this.activeThemeId
+    const previousThemesSignature = this.themes.map((theme) => `${theme.id}:${theme.name}:${theme.locked ? 1 : 0}`).join("|")
+    const isCustomLayout = Boolean(detail?.is_custom_layout)
     this.serverIsCustomLayout = isCustomLayout
-    if (event?.detail?.appearance) {
-      this.currentLiveAppearance = event.detail.appearance
+    if (detail?.active_theme_id) {
+      this.activeThemeId = String(detail.active_theme_id)
     }
-    this.refreshActionStatusBadges()
+    if (Array.isArray(detail?.themes)) {
+      this.themes = detail.themes
+    }
+    if (detail?.appearance) {
+      const snapshot = this.normalizedAppearanceSnapshot(detail.appearance)
+      this.currentLiveAppearance = snapshot
+      if (!isCustomLayout) {
+        this.activeThemeAppearanceSnapshot = snapshot
+      }
+    }
+    this.selectedThemeId = this.resolveSelectableThemeId(this.selectedThemeId)
+    this.refreshActionStatusBadges(false)
+    if (this.currentView === "themes") {
+      const currentThemesSignature = this.themes.map((theme) => `${theme.id}:${theme.name}:${theme.locked ? 1 : 0}`).join("|")
+      const shouldRender = previousActiveThemeId !== this.activeThemeId || previousThemesSignature !== currentThemesSignature
+      if (shouldRender) this.renderThemesList(false)
+      return
+    }
   }
 
   handleToggleRequest() {
@@ -542,7 +570,7 @@ export default class extends Controller {
     return `${base} ${suffix}`
   }
 
-  renderThemesList() {
+  renderThemesList(shouldBroadcast = false) {
     if (!this.hasThemesListTarget) return
 
     const sortedThemes = [...this.themes].sort((a, b) => {
@@ -630,7 +658,7 @@ export default class extends Controller {
 
     this.renderDraftThemeRow()
 
-    this.refreshActionStatusBadges()
+    this.refreshActionStatusBadges(shouldBroadcast)
   }
 
   renderDraftThemeRow() {
@@ -730,11 +758,11 @@ export default class extends Controller {
     this.themes = Array.isArray(payload?.themes) ? payload.themes : []
     this.activeThemeId = payload?.active_theme_id || this.activeThemeId
     if (payload?.appearance) {
-      this.activeThemeAppearanceSnapshot = this.normalizedAppearanceSnapshot(payload.appearance)
+      const snapshot = this.normalizedAppearanceSnapshot(payload.appearance)
+      this.activeThemeAppearanceSnapshot = snapshot
+      this.currentLiveAppearance = snapshot
     }
-    if (!this.themes.some(theme => theme.id === this.selectedThemeId)) {
-      this.selectedThemeId = this.activeThemeId || "default"
-    }
+    this.selectedThemeId = this.resolveSelectableThemeId(this.selectedThemeId)
   }
 
   applyAppearanceSnapshot(appearance) {
@@ -755,8 +783,18 @@ export default class extends Controller {
       angle: this.clampAngle(Number.isFinite(Number(appearance.angle)) ? appearance.angle : this.defaultBackgroundModel.angle)
     }
 
+    const contentModel = {
+      fontOne: this.clampPercent(Number.isFinite(Number(appearance.font_1)) ? appearance.font_1 : this.defaultContentModel.fontOne),
+      fontOneAlpha: this.clampPercent(Number.isFinite(Number(appearance.font_1_alpha)) ? appearance.font_1_alpha : this.defaultContentModel.fontOneAlpha),
+      fontTwo: this.clampPercent(Number.isFinite(Number(appearance.font_2)) ? appearance.font_2 : this.defaultContentModel.fontTwo),
+      fontTwoAlpha: this.clampPercent(Number.isFinite(Number(appearance.font_2_alpha)) ? appearance.font_2_alpha : this.defaultContentModel.fontTwoAlpha),
+      border: this.clampPercent(Number.isFinite(Number(appearance.border)) ? appearance.border : this.defaultContentModel.border),
+      borderAlpha: this.clampPercent(Number.isFinite(Number(appearance.border_alpha)) ? appearance.border_alpha : this.defaultContentModel.borderAlpha)
+    }
+
     this.applyWindowShellModel(shellModel)
     this.applyDesktopBackgroundModel(backgroundModel)
+    this.applyContentToneModel(contentModel)
 
     if (this.hasShellControlTargets()) {
       this.syncInterfaceControls(shellModel)
@@ -828,6 +866,9 @@ export default class extends Controller {
   }
 
   currentShellModel() {
+    if (!this.hasShellControlTargets()) {
+      return this.defaultShellModel
+    }
     const hue = this.clampHue(Number.parseInt(this.hueSliderTarget.value, 10))
     const saturation = this.clampPercent(Number.parseInt(this.saturationSliderTarget.value, 10))
     const brightness = this.clampPercent(Number.parseInt(this.brightnessSliderTarget.value, 10))
@@ -836,6 +877,9 @@ export default class extends Controller {
   }
 
   currentBackgroundModel() {
+    if (!this.hasBackgroundControlTargets()) {
+      return this.defaultBackgroundModel
+    }
     const colorOneHue = this.clampHue(Number.parseInt(this.bgOneHueSliderTarget.value, 10))
     const colorOneSaturation = this.clampPercent(Number.parseInt(this.bgOneSaturationSliderTarget.value, 10))
     const colorOneBrightness = this.clampPercent(Number.parseInt(this.bgOneBrightnessSliderTarget.value, 10))
@@ -913,8 +957,18 @@ export default class extends Controller {
         angle: this.clampAngle(Number.isFinite(Number(appearance.angle)) ? appearance.angle : this.defaultBackgroundModel.angle)
       }
 
+      const contentModel = {
+        fontOne: this.clampPercent(Number.isFinite(Number(appearance.font_1)) ? appearance.font_1 : this.defaultContentModel.fontOne),
+        fontOneAlpha: this.clampPercent(Number.isFinite(Number(appearance.font_1_alpha)) ? appearance.font_1_alpha : this.defaultContentModel.fontOneAlpha),
+        fontTwo: this.clampPercent(Number.isFinite(Number(appearance.font_2)) ? appearance.font_2 : this.defaultContentModel.fontTwo),
+        fontTwoAlpha: this.clampPercent(Number.isFinite(Number(appearance.font_2_alpha)) ? appearance.font_2_alpha : this.defaultContentModel.fontTwoAlpha),
+        border: this.clampPercent(Number.isFinite(Number(appearance.border)) ? appearance.border : this.defaultContentModel.border),
+        borderAlpha: this.clampPercent(Number.isFinite(Number(appearance.border_alpha)) ? appearance.border_alpha : this.defaultContentModel.borderAlpha)
+      }
+
       this.applyWindowShellModel(shellModel)
       this.applyDesktopBackgroundModel(backgroundModel)
+      this.applyContentToneModel(contentModel)
 
       if (this.hasShellControlTargets()) {
         this.syncInterfaceControls(shellModel)
@@ -925,7 +979,7 @@ export default class extends Controller {
 
       this.themes = Array.isArray(payload?.themes) ? payload.themes : []
       this.activeThemeId = payload?.active_theme_id || "default"
-      this.selectedThemeId = this.activeThemeId
+      this.selectedThemeId = this.resolveSelectableThemeId(this.activeThemeId)
       this.activeThemeAppearanceSnapshot = this.normalizedAppearanceSnapshot(appearance)
       this.currentLiveAppearance = this.activeThemeAppearanceSnapshot
       this.renderThemesList()
@@ -935,7 +989,7 @@ export default class extends Controller {
     }
   }
 
-  buildAppearancePayload(shellModel, backgroundModel) {
+  buildAppearancePayload(shellModel, backgroundModel, contentModel = this.currentContentToneModelFromCss()) {
     return {
       hue: Math.round(shellModel.hue),
       saturation: Math.round(shellModel.saturation),
@@ -947,11 +1001,17 @@ export default class extends Controller {
       color_2_hue: Math.round(backgroundModel.colorTwoHue),
       color_2_saturation: Math.round(backgroundModel.colorTwoSaturation),
       color_2_brightness: Math.round(backgroundModel.colorTwoBrightness),
-      angle: Math.round(backgroundModel.angle)
+      angle: Math.round(backgroundModel.angle),
+      font_1: Math.round(contentModel.fontOne),
+      font_1_alpha: Math.round(contentModel.fontOneAlpha),
+      font_2: Math.round(contentModel.fontTwo),
+      font_2_alpha: Math.round(contentModel.fontTwoAlpha),
+      border: Math.round(contentModel.border),
+      border_alpha: Math.round(contentModel.borderAlpha)
     }
   }
 
-  refreshActionStatusBadges() {
+  refreshActionStatusBadges(shouldBroadcast = true) {
     const activeTheme = this.themes.find(theme => theme.id === this.activeThemeId)
     const activeThemeName = activeTheme?.name || "DEFAULT"
     const hasUnsavedAppearance = this.hasAppearanceControlTargets()
@@ -968,12 +1028,37 @@ export default class extends Controller {
       this.themeStatusTarget.textContent = hasUnsavedAppearance ? "CUSTOM" : activeThemeName
     }
 
+    if (!shouldBroadcast) return
+
     window.dispatchEvent(new CustomEvent("workspace:theme-status", {
       detail: {
         active_theme_name: activeThemeName,
-        is_custom_layout: hasUnsavedAppearance
+        active_theme_id: this.activeThemeId,
+        is_custom_layout: hasUnsavedAppearance,
+        appearance: this.currentAppearanceSnapshot(),
+        themes: this.themes
       }
     }))
+  }
+
+  resolveSelectableThemeId(preferredId) {
+    const preferred = String(preferredId || "")
+    if (preferred && this.themes.some(theme => theme.id === preferred)) {
+      return preferred
+    }
+
+    if (this.selectedThemeId && this.themes.some(theme => theme.id === this.selectedThemeId)) {
+      return this.selectedThemeId
+    }
+
+    if (this.activeThemeId && this.themes.some(theme => theme.id === this.activeThemeId)) {
+      return this.activeThemeId
+    }
+
+    const defaultTheme = this.themes.find(theme => theme.id === "default")
+    if (defaultTheme) return "default"
+
+    return this.themes[0]?.id || "default"
   }
 
   hasUnsavedAppearanceChanges() {
@@ -1028,7 +1113,16 @@ export default class extends Controller {
   }
 
   currentAppearanceSnapshot() {
-    return this.buildAppearancePayload(this.currentShellModel(), this.currentBackgroundModel())
+    if (!this.hasShellControlTargets() || !this.hasBackgroundControlTargets()) {
+      if (this.currentLiveAppearance) {
+        return this.normalizedAppearanceSnapshot(this.currentLiveAppearance)
+      }
+      if (this.activeThemeAppearanceSnapshot) {
+        return this.normalizedAppearanceSnapshot(this.activeThemeAppearanceSnapshot)
+      }
+    }
+
+    return this.buildAppearancePayload(this.currentShellModel(), this.currentBackgroundModel(), this.currentContentToneModelFromCss())
   }
 
   normalizedAppearanceSnapshot(appearance) {
@@ -1049,7 +1143,37 @@ export default class extends Controller {
       angle: this.clampAngle(Number.isFinite(Number(appearance.angle)) ? appearance.angle : this.defaultBackgroundModel.angle)
     }
 
-    return this.buildAppearancePayload(shellModel, backgroundModel)
+    const contentModel = {
+      fontOne: this.clampPercent(Number.isFinite(Number(appearance.font_1)) ? appearance.font_1 : this.defaultContentModel.fontOne),
+      fontOneAlpha: this.clampPercent(Number.isFinite(Number(appearance.font_1_alpha)) ? appearance.font_1_alpha : this.defaultContentModel.fontOneAlpha),
+      fontTwo: this.clampPercent(Number.isFinite(Number(appearance.font_2)) ? appearance.font_2 : this.defaultContentModel.fontTwo),
+      fontTwoAlpha: this.clampPercent(Number.isFinite(Number(appearance.font_2_alpha)) ? appearance.font_2_alpha : this.defaultContentModel.fontTwoAlpha),
+      border: this.clampPercent(Number.isFinite(Number(appearance.border)) ? appearance.border : this.defaultContentModel.border),
+      borderAlpha: this.clampPercent(Number.isFinite(Number(appearance.border_alpha)) ? appearance.border_alpha : this.defaultContentModel.borderAlpha)
+    }
+
+    return this.buildAppearancePayload(shellModel, backgroundModel, contentModel)
+  }
+
+  applyContentToneModel(model) {
+    const root = document.documentElement
+    root.style.setProperty("--font-1-tone", String(Math.round(this.clampPercent(model.fontOne))))
+    root.style.setProperty("--font-1-alpha", (this.clampPercent(model.fontOneAlpha) / 100).toFixed(2))
+    root.style.setProperty("--font-2-tone", String(Math.round(this.clampPercent(model.fontTwo))))
+    root.style.setProperty("--font-2-alpha", (this.clampPercent(model.fontTwoAlpha) / 100).toFixed(2))
+    root.style.setProperty("--border-tone", String(Math.round(this.clampPercent(model.border))))
+    root.style.setProperty("--border-alpha", (this.clampPercent(model.borderAlpha) / 100).toFixed(2))
+  }
+
+  currentContentToneModelFromCss() {
+    return {
+      fontOne: this.clampPercent(this.readCurrentCssNumber("--font-1-tone", this.defaultContentModel.fontOne)),
+      fontOneAlpha: this.clampPercent(this.readCurrentCssNumber("--font-1-alpha", this.defaultContentModel.fontOneAlpha / 100) * 100),
+      fontTwo: this.clampPercent(this.readCurrentCssNumber("--font-2-tone", this.defaultContentModel.fontTwo)),
+      fontTwoAlpha: this.clampPercent(this.readCurrentCssNumber("--font-2-alpha", this.defaultContentModel.fontTwoAlpha / 100) * 100),
+      border: this.clampPercent(this.readCurrentCssNumber("--border-tone", this.defaultContentModel.border)),
+      borderAlpha: this.clampPercent(this.readCurrentCssNumber("--border-alpha", this.defaultContentModel.borderAlpha / 100) * 100)
+    }
   }
 
   isShellDefault(model) {

@@ -16,6 +16,8 @@ Rails.application.routes.draw do
     patch "timer_state", to: "timer#update_state"
     get "singular_note", to: "singular#note"
     get "singular_task_list", to: "singular#task_list"
+    get "singular_whiteboard", to: "singular#whiteboard"
+    patch "singular_whiteboard", to: "singular#update_whiteboard"
     get "all_notes",  to: "notes#index"
     get "all_tasks",  to: "task_lists#index"
   end

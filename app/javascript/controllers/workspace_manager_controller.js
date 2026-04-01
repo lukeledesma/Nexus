@@ -11,6 +11,7 @@ const ALL_BOUNDS_KEYS = [
   "nexus.contentWindow.timer.bounds",
   "nexus.contentWindow.singularNote.bounds",
   "nexus.contentWindow.singularTaskList.bounds",
+  "nexus.contentWindow.singularWhiteboard.bounds",
   "nexus.contentWindow.themeBuilder.bounds"
 ]
 
@@ -22,6 +23,7 @@ const WINDOW_BOUNDS_KEY_MAP = {
   "timer": "nexus.contentWindow.timer.bounds",
   "singular-note": "nexus.contentWindow.singularNote.bounds",
   "singular-task-list": "nexus.contentWindow.singularTaskList.bounds",
+  "singular-whiteboard": "nexus.contentWindow.singularWhiteboard.bounds",
   "theme-builder": "nexus.contentWindow.themeBuilder.bounds"
 }
 
@@ -258,6 +260,7 @@ export default class extends Controller {
     if (windowId === "timer") return document.querySelector("[data-content-window-app-key-value='timer']")
     if (windowId === "singular-note") return document.querySelector("[data-content-window-app-key-value='singular-note']")
     if (windowId === "singular-task-list") return document.querySelector("[data-content-window-app-key-value='singular-task-list']")
+    if (windowId === "singular-whiteboard") return document.querySelector("[data-content-window-app-key-value='singular-whiteboard']")
     if (windowId === "theme-builder") return document.querySelector("[data-content-window-app-key-value='theme-builder']")
     return null
   }

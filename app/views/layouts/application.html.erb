@@ -146,6 +146,32 @@
 
       <section class="content-window os-window is-hidden"
         data-controller="content-window"
+        data-content-window-app-key-value="singular-whiteboard"
+        data-content-window-app-url-value="/apps/singular_whiteboard"
+        data-content-window-storage-key-value="nexus.contentWindow.singularWhiteboard.bounds"
+        data-content-window-frame-id-value="singular-whiteboard-pane"
+        data-content-window-default-width-value="407"
+        data-content-window-default-height-value="407"
+        data-content-window-default-offset-x-value="74"
+        data-content-window-default-offset-y-value="-146"
+        aria-live="polite">
+        <div class="title-bar" data-action="mousedown->content-window#startDrag touchstart->content-window#startDrag"></div>
+        <button type="button" class="tools-close-btn content-window-close" data-action="click->content-window#close" aria-label="Close" title="Close">✕</button>
+        <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="window-content">
+          <turbo-frame id="singular-whiteboard-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
+        </div>
+      </section>
+
+      <section class="content-window os-window is-hidden"
+        data-controller="content-window"
         data-content-window-app-key-value="theme-builder"
         data-content-window-app-url-value="/apps/theme_builder"
         data-content-window-storage-key-value="nexus.contentWindow.themeBuilder.bounds"
@@ -230,9 +256,6 @@
 
           <section class="settings-interface hidden" data-settings-target="themesSection">
             <ul class="settings-themes-list" data-settings-target="themesList" aria-label="Saved themes"></ul>
-            <div class="settings-theme-add-row">
-              <button type="button" class="btn-add-task settings-theme-add-btn" data-action="click->settings#addTheme">Save Theme</button>
-            </div>
           </section>
         </section>
       </section>

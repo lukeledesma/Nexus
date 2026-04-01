@@ -15,6 +15,8 @@ class WorkspacePreferencesController < ApplicationController
 
   DEFAULT_THEME_ID = "default"
   DEFAULT_THEME_NAME = "Default"
+  CUSTOM_THEME_ID = "custom"
+  CUSTOM_THEME_NAME = "CUSTOM"
 
   DEFAULT_WINDOWS = {
     "db-health" => { "x" => 41, "y" => 6, "width" => 320, "height" => 235, "z" => 1501, "open" => true },
@@ -23,6 +25,7 @@ class WorkspacePreferencesController < ApplicationController
     "launcher" => { "x" => 376, "y" => 6, "width" => 320, "height" => 180, "z" => 1503, "open" => true },
     "singular-note" => { "x" => 711, "y" => 6, "width" => 407, "height" => 407, "z" => 1504, "open" => true },
     "singular-task-list" => { "x" => 747, "y" => 48, "width" => 407, "height" => 407, "z" => 1505, "open" => true },
+    "singular-whiteboard" => { "x" => 789, "y" => 78, "width" => 407, "height" => 407, "z" => 1509, "open" => false },
     "conversion-chart" => { "x" => 782, "y" => 88, "width" => 407, "height" => 407, "z" => 1506, "open" => true },
     "timer" => { "x" => 376, "y" => 196, "width" => 320, "height" => 250, "z" => 1507, "open" => true }
   }.freeze
@@ -32,6 +35,12 @@ class WorkspacePreferencesController < ApplicationController
     "saturation" => 0,
     "brightness" => 15,
     "transparency" => 0.15,
+    "font_1" => 89,
+    "font_1_alpha" => 100,
+    "font_2" => 63,
+    "font_2_alpha" => 100,
+    "border" => 20,
+    "border_alpha" => 100,
     "color_1_hue" => 240,
     "color_1_saturation" => 28,
     "color_1_brightness" => 14,
@@ -54,10 +63,19 @@ class WorkspacePreferencesController < ApplicationController
       return
     end
 
-    incoming_windows = normalize_windows_payload(params[:windows])
-
     state = read_state_data
+    themes = ensure_default_theme(read_themes_data)
+
+    incoming_windows = normalize_windows_payload(params[:windows])
     state["windows"] = normalize_rows_with_defaults((state["windows"] || {}).deep_merge(incoming_windows))
+
+    incoming_appearance = normalize_appearance_payload(params[:appearance])
+    if incoming_appearance.present?
+      current_appearance = active_theme_appearance(themes, state)
+      merged_appearance = normalize_appearance(current_appearance.merge(incoming_appearance))
+      state["active_theme_id"] = apply_or_clear_custom_theme!(themes, merged_appearance)
+      write_themes_data(themes)
+    end
 
     write_state_data(state)
     render_current_payload
@@ -99,7 +117,7 @@ class WorkspacePreferencesController < ApplicationController
 
   def apply_save_theme!(themes, state, payload)
     name = payload["name"].to_s.strip
-    name = next_theme_name(themes) if name.blank? || name.casecmp?(DEFAULT_THEME_NAME)
+    name = next_theme_name(themes) if name.blank? || name.casecmp?(DEFAULT_THEME_NAME) || name.casecmp?(CUSTOM_THEME_NAME)
 
     appearance_raw = payload["appearance"]
     appearance_hash = appearance_raw.respond_to?(:to_unsafe_h) ? appearance_raw.to_unsafe_h : appearance_raw.to_h
@@ -113,6 +131,7 @@ class WorkspacePreferencesController < ApplicationController
       "appearance" => appearance
     }
 
+    remove_custom_theme!(themes)
     state["active_theme_id"] = id
   end
 
@@ -146,6 +165,7 @@ class WorkspacePreferencesController < ApplicationController
     theme = themes.find { |item| item["id"] == theme_id }
     return if theme.blank?
 
+    remove_custom_theme!(themes)
     state["active_theme_id"] = theme["id"]
   end
 
@@ -168,27 +188,40 @@ class WorkspacePreferencesController < ApplicationController
     themes = ensure_default_theme(read_themes_data)
     active_theme_id = state["active_theme_id"].presence || DEFAULT_THEME_ID
     active_theme = themes.find { |theme| theme["id"] == active_theme_id }
+
+    if active_theme.blank?
+      active_theme_id = DEFAULT_THEME_ID
+      active_theme = themes.find { |theme| theme["id"] == DEFAULT_THEME_ID }
+    end
+
     current_appearance = normalize_appearance(active_theme&.dig("appearance") || DEFAULT_APPEARANCE)
-    active_theme_name = active_theme&.dig("name").presence || DEFAULT_THEME_NAME
+    is_custom_layout = active_theme_id == CUSTOM_THEME_ID
+    active_theme_name = if is_custom_layout
+      CUSTOM_THEME_NAME
+    else
+      active_theme&.dig("name").presence || DEFAULT_THEME_NAME
+    end
 
     render json: {
       "windows" => normalize_rows_with_defaults(state["windows"] || {}),
       "appearance" => current_appearance,
       "active_theme_id" => active_theme_id,
       "active_theme_name" => active_theme_name,
-      "is_custom_layout" => false,
+      "is_custom_layout" => is_custom_layout,
       "themes" => theme_summaries(themes)
     }
   end
 
   def theme_summaries(themes)
-    themes.map do |theme|
+    themes.reject { |theme| theme["id"] == CUSTOM_THEME_ID }.map do |theme|
       {
         "id" => theme["id"].to_s,
         "name" => theme["name"].to_s,
         "locked" => ActiveModel::Type::Boolean.new.cast(theme["locked"])
       }
-    end.sort_by { |theme| [theme["locked"] ? 0 : 1, theme["name"].downcase] }
+    end.sort_by do |theme|
+      [theme["locked"] ? 0 : 1, theme["name"].downcase]
+    end
   end
 
   def default_state
@@ -230,10 +263,16 @@ class WorkspacePreferencesController < ApplicationController
     name = raw["name"].to_s.strip.presence
     return nil if id.blank? || name.blank?
 
+    if id == CUSTOM_THEME_ID
+      name = CUSTOM_THEME_NAME
+    elsif name.casecmp?(CUSTOM_THEME_NAME)
+      return nil
+    end
+
     {
       "id" => id,
       "name" => name.first(64),
-      "locked" => ActiveModel::Type::Boolean.new.cast(raw["locked"]),
+      "locked" => id == CUSTOM_THEME_ID ? true : ActiveModel::Type::Boolean.new.cast(raw["locked"]),
       "appearance" => normalize_appearance(raw["appearance"] || {})
     }
   end
@@ -433,6 +472,12 @@ class WorkspacePreferencesController < ApplicationController
     normalized["saturation"] = clamp_integer(keyed["saturation"], 0, 100, DEFAULT_APPEARANCE["saturation"]) if keyed.key?("saturation")
     normalized["brightness"] = clamp_integer(keyed["brightness"], 0, 100, DEFAULT_APPEARANCE["brightness"]) if keyed.key?("brightness")
     normalized["transparency"] = clamp_float(keyed["transparency"], 0.15, 0.95, DEFAULT_APPEARANCE["transparency"]) if keyed.key?("transparency")
+    normalized["font_1"] = clamp_integer(keyed["font_1"], 0, 100, DEFAULT_APPEARANCE["font_1"]) if keyed.key?("font_1")
+    normalized["font_1_alpha"] = clamp_integer(keyed["font_1_alpha"], 0, 100, DEFAULT_APPEARANCE["font_1_alpha"]) if keyed.key?("font_1_alpha")
+    normalized["font_2"] = clamp_integer(keyed["font_2"], 0, 100, DEFAULT_APPEARANCE["font_2"]) if keyed.key?("font_2")
+    normalized["font_2_alpha"] = clamp_integer(keyed["font_2_alpha"], 0, 100, DEFAULT_APPEARANCE["font_2_alpha"]) if keyed.key?("font_2_alpha")
+    normalized["border"] = clamp_integer(keyed["border"], 0, 100, DEFAULT_APPEARANCE["border"]) if keyed.key?("border")
+    normalized["border_alpha"] = clamp_integer(keyed["border_alpha"], 0, 100, DEFAULT_APPEARANCE["border_alpha"]) if keyed.key?("border_alpha")
     normalized["color_1_hue"] = clamp_integer(keyed["color_1_hue"], 0, 360, DEFAULT_APPEARANCE["color_1_hue"]) if keyed.key?("color_1_hue")
     normalized["color_1_saturation"] = clamp_integer(keyed["color_1_saturation"], 0, 100, DEFAULT_APPEARANCE["color_1_saturation"]) if keyed.key?("color_1_saturation")
     normalized["color_1_brightness"] = clamp_integer(keyed["color_1_brightness"], 0, 100, DEFAULT_APPEARANCE["color_1_brightness"]) if keyed.key?("color_1_brightness")
@@ -452,6 +497,12 @@ class WorkspacePreferencesController < ApplicationController
       "saturation" => clamp_integer(input["saturation"], 0, 100, DEFAULT_APPEARANCE["saturation"]),
       "brightness" => clamp_integer(input["brightness"], 0, 100, DEFAULT_APPEARANCE["brightness"]),
       "transparency" => clamp_float(input["transparency"], 0.15, 0.95, DEFAULT_APPEARANCE["transparency"]),
+      "font_1" => clamp_integer(input["font_1"], 0, 100, DEFAULT_APPEARANCE["font_1"]),
+      "font_1_alpha" => clamp_integer(input["font_1_alpha"], 0, 100, DEFAULT_APPEARANCE["font_1_alpha"]),
+      "font_2" => clamp_integer(input["font_2"], 0, 100, DEFAULT_APPEARANCE["font_2"]),
+      "font_2_alpha" => clamp_integer(input["font_2_alpha"], 0, 100, DEFAULT_APPEARANCE["font_2_alpha"]),
+      "border" => clamp_integer(input["border"], 0, 100, DEFAULT_APPEARANCE["border"]),
+      "border_alpha" => clamp_integer(input["border_alpha"], 0, 100, DEFAULT_APPEARANCE["border_alpha"]),
       "color_1_hue" => clamp_integer(input["color_1_hue"], 0, 360, DEFAULT_APPEARANCE["color_1_hue"]),
       "color_1_saturation" => clamp_integer(input["color_1_saturation"], 0, 100, DEFAULT_APPEARANCE["color_1_saturation"]),
       "color_1_brightness" => clamp_integer(input["color_1_brightness"], 0, 100, DEFAULT_APPEARANCE["color_1_brightness"]),
@@ -555,6 +606,47 @@ class WorkspacePreferencesController < ApplicationController
     return "launcher" if %w[stationary tools launcher].include?(key)
 
     key
+  end
+
+  def active_theme_appearance(themes, state)
+    active_theme_id = state["active_theme_id"].presence || DEFAULT_THEME_ID
+    active_theme = themes.find { |theme| theme["id"] == active_theme_id }
+    normalize_appearance(active_theme&.dig("appearance") || DEFAULT_APPEARANCE)
+  end
+
+  def apply_or_clear_custom_theme!(themes, appearance)
+    matching_theme = themes.find do |theme|
+      theme["id"] != CUSTOM_THEME_ID &&
+        !appearance_changed?(appearance, theme["appearance"])
+    end
+
+    if matching_theme
+      remove_custom_theme!(themes)
+      return matching_theme["id"]
+    end
+
+    upsert_custom_theme!(themes, appearance)
+    CUSTOM_THEME_ID
+  end
+
+  def upsert_custom_theme!(themes, appearance)
+    custom_theme = themes.find { |theme| theme["id"] == CUSTOM_THEME_ID }
+    if custom_theme
+      custom_theme["name"] = CUSTOM_THEME_NAME
+      custom_theme["locked"] = true
+      custom_theme["appearance"] = normalize_appearance(appearance)
+    else
+      themes << {
+        "id" => CUSTOM_THEME_ID,
+        "name" => CUSTOM_THEME_NAME,
+        "locked" => true,
+        "appearance" => normalize_appearance(appearance)
+      }
+    end
+  end
+
+  def remove_custom_theme!(themes)
+    themes.reject! { |theme| theme["id"] == CUSTOM_THEME_ID }
   end
 
   def appearance_changed?(current, baseline)

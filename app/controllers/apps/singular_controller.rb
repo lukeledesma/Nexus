@@ -2,7 +2,7 @@
 
 module Apps
   class SingularController < BaseController
-    before_action :redirect_top_level_frame_requests, only: %i[note task_list]
+    before_action :redirect_top_level_frame_requests, only: %i[note task_list whiteboard]
     before_action :ensure_singular_items
 
     # GET /apps/singular_note
@@ -14,6 +14,28 @@ module Apps
     def task_list
       @task_list = @app_folder.items.find_by(item_type: "task_list")
       @tasks_for_view = normalize_tasks(@task_list.tasks) if @task_list
+    end
+
+    # GET /apps/singular_whiteboard
+    def whiteboard
+      @whiteboard = @app_folder.items.find_by(item_type: "whiteboard")
+      @stickies = parse_stickies(@whiteboard&.body)
+    end
+
+    # PATCH /apps/singular_whiteboard
+    def update_whiteboard
+      @whiteboard = @app_folder.items.find_by(item_type: "whiteboard")
+      return head :not_found unless @whiteboard
+
+      raw = params[:stickies]
+      stickies_json = raw.is_a?(String) ? raw : raw.to_json
+
+      if @whiteboard.update(body: stickies_json)
+        ItemStorageSyncLite.sync_all!
+        render json: { ok: true }
+      else
+        render json: { errors: @whiteboard.errors.full_messages }, status: :unprocessable_entity
+      end
     end
 
     private
@@ -48,6 +70,15 @@ module Apps
         item.tasks = []
       end
 
+      # Ensure Whiteboard item exists
+      Item.find_or_create_by!(folder_id: @app_folder.id, item_type: "whiteboard") do |item|
+        item.folder_id = @app_folder.id
+        item.name = "Whiteboard"
+        item.item_type = "whiteboard"
+        item.body = "[]"
+        item.tasks = []
+      end
+
       # Sync to disk to ensure workspace text files exist.
       # Rare cache-clear reload spikes can trigger transient file races; retry once.
       begin
@@ -59,6 +90,14 @@ module Apps
     rescue StandardError => e
       Rails.logger.error("[SingularController] ensure_singular_items failed: #{e.class}: #{e.message}")
       raise
+    end
+
+    def parse_stickies(body)
+      return [] if body.blank?
+
+      JSON.parse(body)
+    rescue JSON::ParserError
+      []
     end
 
     def normalize_tasks(value)

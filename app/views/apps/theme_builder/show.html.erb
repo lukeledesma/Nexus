@@ -1,16 +1,39 @@
 <% frame_id = params[:frame_id].presence || "app-pane" %>
 <turbo-frame id="<%= frame_id %>">
 <section class="app-surface app-surface--tool theme-builder-view" data-controller="theme-builder">
-  <header class="tool-window-header app-surface-header">
-    <h2 class="os-window-title tool-window-title">THEME BUILDER</h2>
+  <header class="app-surface-header tool-window-header os-window-header">
+    <h2 class="tool-window-title os-window-title">THEME BUILDER</h2>
   </header>
 
-  <p class="os-window-subtitle tool-window-subtitle" data-theme-builder-target="statusText">CUSTOM</p>
+  <div class="theme-builder-status-row">
+    <p class="tool-window-subtitle os-window-subtitle" data-theme-builder-target="statusText">CUSTOM</p>
+    <input
+      type="text"
+      class="settings-themes-item-rename-input theme-builder-name-input theme-builder-hidden"
+      data-theme-builder-target="nameInput"
+      data-action="blur->theme-builder#submitCustomThemeName keydown->theme-builder#handleNameInputKeydown"
+      placeholder="Theme..."
+      autocomplete="off"
+      spellcheck="false"
+      maxlength="64"
+      aria-label="Theme name"
+    >
+    <button
+      type="button"
+      class="settings-themes-item-action-btn settings-themes-item-rename-btn theme-builder-save-btn theme-builder-hidden"
+      data-theme-builder-target="saveButton"
+      data-action="click->theme-builder#beginSaveCustomTheme"
+      title="Save Theme"
+      aria-label="Save Theme"
+    >✎</button>
+  </div>
+
+  <div class="theme-builder-main-shell os-window-body-start">
 
   <section class="theme-builder-section">
     <h3 class="theme-builder-section-title">SHELL</h3>
 
-    <label class="settings-interface-label" for="theme-builder-window-hue">Hue</label>
+    <label class="settings-interface-label" for="theme-builder-window-hue">H</label>
     <div class="settings-interface-slider-row">
       <input
         id="theme-builder-window-hue"
@@ -27,7 +50,7 @@
       <output class="settings-interface-value" data-theme-builder-target="hueValue">180°</output>
     </div>
 
-    <label class="settings-interface-label" for="theme-builder-window-saturation">Saturation</label>
+    <label class="settings-interface-label" for="theme-builder-window-saturation">S</label>
     <div class="settings-interface-slider-row">
       <input
         id="theme-builder-window-saturation"
@@ -44,7 +67,7 @@
       <output class="settings-interface-value" data-theme-builder-target="saturationValue">0%</output>
     </div>
 
-    <label class="settings-interface-label" for="theme-builder-window-brightness">Brightness</label>
+    <label class="settings-interface-label" for="theme-builder-window-brightness">B</label>
     <div class="settings-interface-slider-row">
       <input
         id="theme-builder-window-brightness"
@@ -61,7 +84,7 @@
       <output class="settings-interface-value" data-theme-builder-target="brightnessValue">15%</output>
     </div>
 
-    <label class="settings-interface-label" for="theme-builder-window-transparency">Transparency</label>
+    <label class="settings-interface-label" for="theme-builder-window-transparency">T</label>
     <div class="settings-interface-slider-row">
       <input
         id="theme-builder-window-transparency"
@@ -82,7 +105,7 @@
   <section class="theme-builder-section">
     <h3 class="theme-builder-section-title">BACKGROUND</h3>
 
-    <label class="settings-interface-label" for="theme-builder-bg-1-hue">Color 1 Hue</label>
+    <label class="settings-interface-label" for="theme-builder-bg-1-hue">H1</label>
     <div class="settings-interface-slider-row">
       <input
         id="theme-builder-bg-1-hue"
@@ -99,7 +122,7 @@
       <output class="settings-interface-value" data-theme-builder-target="bgOneHueValue">240°</output>
     </div>
 
-    <label class="settings-interface-label" for="theme-builder-bg-1-saturation">Color 1 Saturation</label>
+    <label class="settings-interface-label" for="theme-builder-bg-1-saturation">S1</label>
     <div class="settings-interface-slider-row">
       <input
         id="theme-builder-bg-1-saturation"
@@ -116,7 +139,7 @@
       <output class="settings-interface-value" data-theme-builder-target="bgOneSaturationValue">28%</output>
     </div>
 
-    <label class="settings-interface-label" for="theme-builder-bg-1-brightness">Color 1 Brightness</label>
+    <label class="settings-interface-label" for="theme-builder-bg-1-brightness">B1</label>
     <div class="settings-interface-slider-row">
       <input
         id="theme-builder-bg-1-brightness"
@@ -133,7 +156,7 @@
       <output class="settings-interface-value" data-theme-builder-target="bgOneBrightnessValue">14%</output>
     </div>
 
-    <label class="settings-interface-label" for="theme-builder-bg-2-hue">Color 2 Hue</label>
+    <label class="settings-interface-label" for="theme-builder-bg-2-hue">H2</label>
     <div class="settings-interface-slider-row">
       <input
         id="theme-builder-bg-2-hue"
@@ -150,7 +173,7 @@
       <output class="settings-interface-value" data-theme-builder-target="bgTwoHueValue">213°</output>
     </div>
 
-    <label class="settings-interface-label" for="theme-builder-bg-2-saturation">Color 2 Saturation</label>
+    <label class="settings-interface-label" for="theme-builder-bg-2-saturation">S2</label>
     <div class="settings-interface-slider-row">
       <input
         id="theme-builder-bg-2-saturation"
@@ -167,7 +190,7 @@
       <output class="settings-interface-value" data-theme-builder-target="bgTwoSaturationValue">73%</output>
     </div>
 
-    <label class="settings-interface-label" for="theme-builder-bg-2-brightness">Color 2 Brightness</label>
+    <label class="settings-interface-label" for="theme-builder-bg-2-brightness">B2</label>
     <div class="settings-interface-slider-row">
       <input
         id="theme-builder-bg-2-brightness"
@@ -184,7 +207,7 @@
       <output class="settings-interface-value" data-theme-builder-target="bgTwoBrightnessValue">22%</output>
     </div>
 
-    <label class="settings-interface-label" for="theme-builder-bg-angle">Gradient Angle</label>
+    <label class="settings-interface-label" for="theme-builder-bg-angle">°</label>
     <div class="settings-interface-slider-row">
       <input
         id="theme-builder-bg-angle"
@@ -201,5 +224,112 @@
       <output class="settings-interface-value" data-theme-builder-target="bgAngleValue">135°</output>
     </div>
   </section>
+
+  <section class="theme-builder-section">
+    <h3 class="theme-builder-section-title">CONTENT</h3>
+
+    <label class="settings-interface-label" for="theme-builder-font-one">F1B</label>
+    <div class="settings-interface-slider-row">
+      <input
+        id="theme-builder-font-one"
+        type="range"
+        min="0"
+        max="100"
+        step="1"
+        value="89"
+        class="settings-interface-slider settings-interface-slider--mono"
+        data-theme-builder-target="fontOneSlider"
+        data-action="input->theme-builder#updateFontOne"
+        aria-label="Primary text brightness"
+      >
+      <output class="settings-interface-value" data-theme-builder-target="fontOneValue">89%</output>
+    </div>
+
+    <label class="settings-interface-label" for="theme-builder-font-one-transparency">F1T</label>
+    <div class="settings-interface-slider-row">
+      <input
+        id="theme-builder-font-one-transparency"
+        type="range"
+        min="0"
+        max="100"
+        step="1"
+        value="100"
+        class="settings-interface-slider settings-interface-slider--mono"
+        data-theme-builder-target="fontOneTransparencySlider"
+        data-action="input->theme-builder#updateFontOneTransparency"
+        aria-label="Primary text transparency"
+      >
+      <output class="settings-interface-value" data-theme-builder-target="fontOneTransparencyValue">100%</output>
+    </div>
+
+    <label class="settings-interface-label" for="theme-builder-font-two">F2B</label>
+    <div class="settings-interface-slider-row">
+      <input
+        id="theme-builder-font-two"
+        type="range"
+        min="0"
+        max="100"
+        step="1"
+        value="63"
+        class="settings-interface-slider settings-interface-slider--mono"
+        data-theme-builder-target="fontTwoSlider"
+        data-action="input->theme-builder#updateFontTwo"
+        aria-label="Muted text brightness"
+      >
+      <output class="settings-interface-value" data-theme-builder-target="fontTwoValue">63%</output>
+    </div>
+
+    <label class="settings-interface-label" for="theme-builder-font-two-transparency">F2T</label>
+    <div class="settings-interface-slider-row">
+      <input
+        id="theme-builder-font-two-transparency"
+        type="range"
+        min="0"
+        max="100"
+        step="1"
+        value="100"
+        class="settings-interface-slider settings-interface-slider--mono"
+        data-theme-builder-target="fontTwoTransparencySlider"
+        data-action="input->theme-builder#updateFontTwoTransparency"
+        aria-label="Muted text transparency"
+      >
+      <output class="settings-interface-value" data-theme-builder-target="fontTwoTransparencyValue">100%</output>
+    </div>
+
+    <label class="settings-interface-label" for="theme-builder-border">BB</label>
+    <div class="settings-interface-slider-row">
+      <input
+        id="theme-builder-border"
+        type="range"
+        min="0"
+        max="100"
+        step="1"
+        value="20"
+        class="settings-interface-slider settings-interface-slider--mono"
+        data-theme-builder-target="borderSlider"
+        data-action="input->theme-builder#updateBorder"
+        aria-label="Border brightness"
+      >
+      <output class="settings-interface-value" data-theme-builder-target="borderValue">20%</output>
+    </div>
+
+    <label class="settings-interface-label" for="theme-builder-border-transparency">BT</label>
+    <div class="settings-interface-slider-row">
+      <input
+        id="theme-builder-border-transparency"
+        type="range"
+        min="0"
+        max="100"
+        step="1"
+        value="100"
+        class="settings-interface-slider settings-interface-slider--mono"
+        data-theme-builder-target="borderTransparencySlider"
+        data-action="input->theme-builder#updateBorderTransparency"
+        aria-label="Border transparency"
+      >
+      <output class="settings-interface-value" data-theme-builder-target="borderTransparencyValue">100%</output>
+    </div>
+  </section>
+  </div>
 </section>
 </turbo-frame>
