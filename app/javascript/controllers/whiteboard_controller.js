@@ -119,6 +119,17 @@ export default class extends Controller {
     el.dataset.stickyHue = String(Number.isFinite(parseInt(hue, 10)) ? parseInt(hue, 10) : 45)
     this.applyStickyPosition(el)
 
+    const deleteBtn = document.createElement("button")
+    deleteBtn.classList.add("whiteboard-sticky-delete-btn")
+    deleteBtn.setAttribute("type", "button")
+    deleteBtn.setAttribute("aria-label", "Delete sticky note")
+    deleteBtn.textContent = "✕"
+    deleteBtn.addEventListener("click", (e) => {
+      e.stopPropagation()
+      this.deleteSticky(el)
+    })
+    el.appendChild(deleteBtn)
+
     const content = document.createElement("div")
     content.classList.add("whiteboard-sticky-content")
     content.setAttribute("contenteditable", "false")
@@ -210,7 +221,8 @@ export default class extends Controller {
       return
     }
 
-    const hue = parseInt(this.selectedSticky.dataset.stickyHue, 10) || 45
+    const raw = parseInt(this.selectedSticky.dataset.stickyHue, 10)
+    const hue = Number.isFinite(raw) ? raw : 45
     this.stickySelectionTarget.style.setProperty("--sticky-hue", String(hue))
     if (this.hasColorPopoverTarget) this.colorPopoverTarget.style.setProperty("--sticky-hue", String(hue))
     if (this.hasColorSliderTarget) this.colorSliderTarget.style.setProperty("--sticky-hue", String(hue))
@@ -262,6 +274,14 @@ export default class extends Controller {
       this.scheduleSave()
     }
     this.pendingStickyColorSave = false
+  }
+
+  deleteSticky(el) {
+    el.remove()
+    if (this.selectedSticky === el) {
+      this.clearStickySelection(false)
+    }
+    this.scheduleSave()
   }
 
   startEditSticky(el) {

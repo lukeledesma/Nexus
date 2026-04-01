@@ -3198,13 +3198,19 @@ input.connection-inline {
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.02);
   box-shadow: none;
-  min-width: 102px;
+  min-width: 160px;
 }
 
-.whiteboard-sticky-color-popover .whiteboard-sticky-color-slider {
+.whiteboard-sticky-color-slider-row {
+  display: flex;
+  align-items: center;
+  width: 150px;
+}
+
+.whiteboard-sticky-color-slider-row .whiteboard-sticky-color-slider {
+  width: 100%;
+  padding: 0;
   --slider-thumb-bg: hsla(var(--sticky-hue, 45), 92%, 55%, 1);
-  width: 90px;
-  min-width: 90px;
 }
 
 .whiteboard-action-btn--hidden {
@@ -3267,6 +3273,40 @@ input.connection-inline {
   user-select: text;
   pointer-events: auto;
   overflow-y: auto;
+}
+
+.whiteboard-sticky-delete-btn {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  width: 12px;
+  height: 12px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 2px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.6rem;
+  font-weight: bold;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  z-index: 10;
+  transition: color 0.12s ease;
+}
+
+.whiteboard-sticky:hover .whiteboard-sticky-delete-btn {
+  display: flex;
+}
+
+.whiteboard-sticky-delete-btn:hover {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.whiteboard-sticky.is-editing .whiteboard-sticky-delete-btn {
+  display: none !important;
 }
 
 .note-form-actions {
@@ -3596,7 +3636,7 @@ input.connection-inline {
   background-position: var(--slider-track-bg-position, 0 0);
   background-size: var(--slider-track-bg-size, 100% 100%);
   background-color: var(--slider-track-bg-color, transparent);
-  margin: 0 0.25rem;
+  margin: 0;
 }
 
 .settings-interface-slider::-moz-range-track {
@@ -3607,7 +3647,7 @@ input.connection-inline {
   background-size: var(--slider-track-bg-size, 100% 100%);
   background-color: var(--slider-track-bg-color, transparent);
   border: none;
-  margin: 0 0.25rem;
+  margin: 0;
 }
 
 .settings-interface-slider::-moz-range-progress {
@@ -3692,8 +3732,8 @@ input.connection-inline {
 
 .theme-builder-section {
   display: grid;
-  grid-template-columns: 7.2rem minmax(0, 1fr);
-  gap: 0.38rem 0.56rem;
+  grid-template-columns: 1.56rem minmax(0, 1fr);
+  gap: 0.38rem 0.28rem;
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 0.65rem;
