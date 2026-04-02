@@ -1,5 +1,4 @@
 import { Controller } from "@hotwired/stimulus"
-import { createOsWindowSizer } from "lib/os_window_sizing"
 
 export default class extends Controller {
   static targets = ["frame"]
@@ -12,7 +11,6 @@ export default class extends Controller {
 
   connect() {
     this.currentUrl = this.buildAppUrl()
-    this.isAutoSizedWindow = this.appKeyValue === "theme-builder"
     this.viewportMargin = 6
     this.dockLeftBoundary = 6
     this.bottomDockBoundary = this.viewportMargin
@@ -39,24 +37,12 @@ export default class extends Controller {
     window.addEventListener("app-window:toggle", this.boundToggleRequest)
     this.element.addEventListener("mousedown", () => this.bringToFront())
 
-    if (this.isAutoSizedWindow) {
-      this.windowSizer = createOsWindowSizer({
-        windowId: this.appKeyValue,
-        windowElement: this.element,
-        contentElement: this.element.querySelector(".window-content"),
-        viewportMargin: this.viewportMargin,
-        isWindowOpen: () => !this.element.classList.contains("is-hidden")
-      })
-      this.windowSizer.observeContent()
-    }
-
     this.restoreWindowBounds()
   }
 
   disconnect() {
     this.stopDrag()
     this.stopResize()
-    if (this.windowSizer) this.windowSizer.disconnect()
     window.removeEventListener("app-window:toggle", this.boundToggleRequest)
   }
 
@@ -77,8 +63,6 @@ export default class extends Controller {
   open() {
     this.ensureFrameLoaded()
     this.element.classList.remove("is-hidden")
-    if (this.isAutoSizedWindow) this.element.style.height = ""
-    if (this.windowSizer) this.windowSizer.syncOnOpen()
     this.bringToFront()
     this.emitWindowState(true)
   }
@@ -149,7 +133,6 @@ export default class extends Controller {
   }
 
   startResize(event) {
-    if (this.isAutoSizedWindow) return
     if (event.button !== undefined && event.button !== 0) return
     event.preventDefault()
     this.bringToFront()
@@ -307,11 +290,7 @@ export default class extends Controller {
     this.element.style.left = `${bounds.left}px`
     this.element.style.top = `${bounds.top}px`
     this.element.style.width = `${bounds.width}px`
-    if (!this.isAutoSizedWindow) {
-      this.element.style.height = `${bounds.height}px`
-    } else {
-      this.element.style.height = ""
-    }
+    this.element.style.height = `${bounds.height}px`
   }
 
   getEdgeFromHandle(handle) {
