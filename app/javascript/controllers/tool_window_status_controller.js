@@ -13,6 +13,8 @@ export default class extends Controller {
     this.boundSavedState = this.handleSavedState.bind(this)
     window.addEventListener("nexus:item-saved", this.boundSavedState)
 
+    if (!this.hasSubtitleTarget) return
+
     if (this.hasStaticTextValue) {
       this.subtitleTarget.textContent = this.staticTextValue
       return

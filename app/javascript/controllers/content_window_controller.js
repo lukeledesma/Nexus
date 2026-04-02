@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { createOsWindowSizer } from "lib/os_window_sizing"
 
 export default class extends Controller {
   static targets = ["frame"]
@@ -6,21 +7,26 @@ export default class extends Controller {
     appKey: String,
     appUrl: String,
     storageKey: String,
-    frameId: String,
-    defaultWidth: Number,
-    defaultHeight: Number,
-    defaultOffsetX: Number,
-    defaultOffsetY: Number
+    frameId: String
   }
 
   connect() {
     this.currentUrl = this.buildAppUrl()
+    this.isAutoSizedWindow = this.appKeyValue === "theme-builder"
     this.viewportMargin = 6
-    this.dockLeftBoundary = 41
-    this.windowWidth = this.hasDefaultWidthValue ? this.defaultWidthValue : 550
-    this.windowHeight = this.hasDefaultHeightValue ? this.defaultHeightValue : 480
-    this.minWindowWidth = 320
-    this.minWindowHeight = 320
+    this.dockLeftBoundary = 6
+    this.bottomDockBoundary = this.viewportMargin
+    const rect = this.element.getBoundingClientRect()
+    this.windowWidth = Math.round(rect.width || 550)
+    this.windowHeight = Math.round(rect.height || 480)
+    const minByAppKey = {
+      "singular-note": { width: 581, height: 500 },
+      "timer": { width: 320, height: 220 },
+      "conversion-chart": { width: 350, height: 295 }
+    }
+    const appMinimum = minByAppKey[this.appKeyValue] || { width: 320, height: 320 }
+    this.minWindowWidth = appMinimum.width
+    this.minWindowHeight = appMinimum.height
     this.activeDrag = null
     this.activeResize = null
 
@@ -33,12 +39,24 @@ export default class extends Controller {
     window.addEventListener("app-window:toggle", this.boundToggleRequest)
     this.element.addEventListener("mousedown", () => this.bringToFront())
 
+    if (this.isAutoSizedWindow) {
+      this.windowSizer = createOsWindowSizer({
+        windowId: this.appKeyValue,
+        windowElement: this.element,
+        contentElement: this.element.querySelector(".window-content"),
+        viewportMargin: this.viewportMargin,
+        isWindowOpen: () => !this.element.classList.contains("is-hidden")
+      })
+      this.windowSizer.observeContent()
+    }
+
     this.restoreWindowBounds()
   }
 
   disconnect() {
     this.stopDrag()
     this.stopResize()
+    if (this.windowSizer) this.windowSizer.disconnect()
     window.removeEventListener("app-window:toggle", this.boundToggleRequest)
   }
 
@@ -59,6 +77,8 @@ export default class extends Controller {
   open() {
     this.ensureFrameLoaded()
     this.element.classList.remove("is-hidden")
+    if (this.isAutoSizedWindow) this.element.style.height = ""
+    if (this.windowSizer) this.windowSizer.syncOnOpen()
     this.bringToFront()
     this.emitWindowState(true)
   }
@@ -110,7 +130,7 @@ export default class extends Controller {
     const vh = window.innerHeight
 
     const left = Math.min(Math.max(coords.x - this.activeDrag.offsetX, this.dockLeftBoundary), vw - margin - w)
-    const top = Math.min(Math.max(coords.y - this.activeDrag.offsetY, margin), vh - margin - h)
+    const top = Math.min(Math.max(coords.y - this.activeDrag.offsetY, margin), vh - this.bottomDockBoundary - h)
 
     this.element.style.left = `${left}px`
     this.element.style.top = `${top}px`
@@ -129,6 +149,7 @@ export default class extends Controller {
   }
 
   startResize(event) {
+    if (this.isAutoSizedWindow) return
     if (event.button !== undefined && event.button !== 0) return
     event.preventDefault()
     this.bringToFront()
@@ -194,7 +215,7 @@ export default class extends Controller {
     top = Math.max(margin, top)
 
     if (left + width > vw - margin) width = vw - margin - left
-    if (top + height > vh - margin) height = vh - margin - top
+    if (top + height > vh - this.bottomDockBoundary) height = vh - this.bottomDockBoundary - top
 
     this.element.style.left = `${left}px`
     this.element.style.top = `${top}px`
@@ -215,16 +236,14 @@ export default class extends Controller {
   }
 
   positionWindow() {
-    const offsetX = this.hasDefaultOffsetXValue ? this.defaultOffsetXValue : 0
-    const offsetY = this.hasDefaultOffsetYValue ? this.defaultOffsetYValue : 0
     const vw = window.innerWidth
     const vh = window.innerHeight
     const width = Math.max(this.minWindowWidth, Math.min(this.windowWidth, vw - 40))
     const height = Math.max(this.minWindowHeight, Math.min(this.windowHeight, vh - 40))
-    const centeredLeft = Math.round((vw - width) / 2) + offsetX
-    const centeredTop = Math.round((vh - height) / 2) + offsetY
+    const centeredLeft = Math.round((vw - width) / 2)
+    const centeredTop = Math.round((vh - height) / 2)
     const maxLeft = Math.max(this.dockLeftBoundary, vw - this.viewportMargin - width)
-    const maxTop = Math.max(this.viewportMargin, vh - this.viewportMargin - height)
+    const maxTop = Math.max(this.viewportMargin, vh - this.bottomDockBoundary - height)
     const left = Math.min(Math.max(centeredLeft, this.dockLeftBoundary), maxLeft)
     const top = Math.min(Math.max(centeredTop, this.viewportMargin), maxTop)
 
@@ -273,11 +292,11 @@ export default class extends Controller {
     const vh = window.innerHeight
     const margin = this.viewportMargin
     const maxWidth = Math.max(this.minWindowWidth, vw - this.dockLeftBoundary - margin)
-    const maxHeight = Math.max(this.minWindowHeight, vh - (margin * 2))
+    const maxHeight = Math.max(this.minWindowHeight, vh - (margin + this.bottomDockBoundary))
     const width = Math.min(Math.max(bounds.width, this.minWindowWidth), maxWidth)
     const height = Math.min(Math.max(bounds.height, this.minWindowHeight), maxHeight)
     const maxLeft = Math.max(this.dockLeftBoundary, vw - margin - width)
-    const maxTop = Math.max(margin, vh - margin - height)
+    const maxTop = Math.max(margin, vh - this.bottomDockBoundary - height)
     const left = Math.min(Math.max(bounds.left, this.dockLeftBoundary), maxLeft)
     const top = Math.min(Math.max(bounds.top, margin), maxTop)
 
@@ -288,7 +307,11 @@ export default class extends Controller {
     this.element.style.left = `${bounds.left}px`
     this.element.style.top = `${bounds.top}px`
     this.element.style.width = `${bounds.width}px`
-    this.element.style.height = `${bounds.height}px`
+    if (!this.isAutoSizedWindow) {
+      this.element.style.height = `${bounds.height}px`
+    } else {
+      this.element.style.height = ""
+    }
   }
 
   getEdgeFromHandle(handle) {

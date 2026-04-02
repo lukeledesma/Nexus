@@ -1,14 +1,15 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static targets = ["window", "notesSize", "tasksSize", "stamp"]
+  static targets = ["window", "tasksSize", "stamp"]
 
   connect() {
     this.windowWidth = 320
     this.minimumWindowHeight = 125
     this.windowHeight = 125
     this.viewportMargin = 6
-    this.dockLeftBoundary = 41
+    this.dockLeftBoundary = 6
+    this.bottomDockBoundary = this.viewportMargin
     this.activeDrag = null
     this.latestUpdateAt = null
 
@@ -132,9 +133,6 @@ export default class extends Controller {
       const organizer = payload?.organizer
       if (!organizer) return
 
-      if (this.hasNotesSizeTarget && organizer.note_size_bytes) {
-        this.notesSizeTarget.textContent = this.formatBytes(organizer.note_size_bytes)
-      }
       if (this.hasTasksSizeTarget && organizer.task_size_bytes) {
         this.tasksSizeTarget.textContent = this.formatBytes(organizer.task_size_bytes)
       }
@@ -178,7 +176,7 @@ export default class extends Controller {
     const width = this.windowTarget.offsetWidth
     const height = this.windowTarget.offsetHeight
     const maxLeft = window.innerWidth - width - margin
-    const maxTop = window.innerHeight - height - margin
+    const maxTop = window.innerHeight - height - this.bottomDockBoundary
 
     const left = Math.min(Math.max(coords.x - this.activeDrag.offsetX, this.dockLeftBoundary), Math.max(this.dockLeftBoundary, maxLeft))
     const top = Math.min(Math.max(coords.y - this.activeDrag.offsetY, margin), Math.max(margin, maxTop))
@@ -244,7 +242,7 @@ export default class extends Controller {
     const height = Math.min(this.windowHeight, Math.max(this.minimumWindowHeight, vh - 40))
     const desiredLeft = leftColumnLeft + leftColumnWidth + columnGap
     const left = Math.max(this.dockLeftBoundary, Math.min(desiredLeft, vw - this.viewportMargin - width))
-    const top = Math.max(this.viewportMargin, Math.min(defaultTop, vh - this.viewportMargin - height))
+    const top = Math.max(this.viewportMargin, Math.min(defaultTop, vh - this.bottomDockBoundary - height))
 
     this.windowTarget.style.width = `${width}px`
     this.windowTarget.style.height = `${height}px`

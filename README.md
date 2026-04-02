@@ -129,13 +129,11 @@ sudo systemctl restart puma
 - `app/models/folder.rb`
 - `app/models/item.rb`
 - `app/services/item_storage_sync_lite.rb`
-- `app/controllers/apps/notes_controller.rb`
 - `app/controllers/apps/task_lists_controller.rb`
 
 ## Key Frontend Files
 
 - `app/views/organizer/_sidebar.html.erb`
-- `app/views/apps/notes/show.html.erb`
 - `app/views/apps/task_lists/show.html.erb`
 - `app/javascript/controllers/`
 - `app/assets/stylesheets/application.css`

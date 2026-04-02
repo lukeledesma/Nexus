@@ -9,7 +9,8 @@ export default class extends Controller {
     this.settingsDockButton = this.element.querySelector(".app-dock-button--settings")
 
     this.viewportMarginPx = 6
-    this.dockLeftBoundary = 41
+    this.dockLeftBoundary = 6
+    this.bottomDockBoundary = this.viewportMarginPx
     this.defaultOrganizerWidth = 320
     this.defaultOrganizerHeight = 0
 
@@ -102,7 +103,7 @@ export default class extends Controller {
     const desiredTop = defaultTop + 125 + rowGap
 
     const launcherLeft = Math.max(this.dockLeftBoundary, Math.min(desiredLeft, vw - margin - launcherWidth))
-    const launcherTop = Math.max(margin, Math.min(desiredTop, vh - margin - windowHeight))
+    const launcherTop = Math.max(margin, Math.min(desiredTop, vh - this.bottomDockBoundary - windowHeight))
 
     this.launcherWindow.style.left = launcherLeft + "px"
     this.launcherWindow.style.top = launcherTop + "px"
@@ -191,7 +192,7 @@ export default class extends Controller {
     let newOrgTop = d.launcherStartTop + deltaY
 
     newOrgLeft = Math.max(this.dockLeftBoundary, Math.min(newOrgLeft, vw - margin - this.launcherWindow.offsetWidth))
-    newOrgTop = Math.max(margin, Math.min(newOrgTop, vh - margin - this.launcherWindow.offsetHeight))
+    newOrgTop = Math.max(margin, Math.min(newOrgTop, vh - this.bottomDockBoundary - this.launcherWindow.offsetHeight))
 
     this.launcherWindow.style.left = newOrgLeft + "px"
     this.launcherWindow.style.top = newOrgTop + "px"

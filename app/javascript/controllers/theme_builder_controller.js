@@ -86,6 +86,16 @@ export default class extends Controller {
     window.removeEventListener("workspace:theme-status", this.boundThemeStatus)
   }
 
+  toggleSection(event) {
+    const trigger = event.currentTarget
+    const section = trigger.closest(".theme-builder-section")
+    if (!section) return
+
+    section.classList.toggle("is-collapsed")
+    const isExpanded = !section.classList.contains("is-collapsed")
+    trigger.setAttribute("aria-expanded", isExpanded ? "true" : "false")
+  }
+
   async loadWorkspacePreferences() {
     try {
       const response = await fetch("/workspace_preferences", {
@@ -326,12 +336,20 @@ export default class extends Controller {
 
   handleThemeStatus(event) {
     const detail = event?.detail || {}
+    const nextIsCustomLayout = Boolean(detail?.is_custom_layout)
     if (Array.isArray(detail?.themes)) this.themes = detail.themes
     this.activeThemeId = String(detail?.active_theme_id || this.activeThemeId || "default")
 
+    // Prevent an in-flight slider debounce from rebroadcasting stale custom state
+    // after another controller has already applied a saved theme.
+    if (!nextIsCustomLayout && this.appearanceNotifyTimer) {
+      clearTimeout(this.appearanceNotifyTimer)
+      this.appearanceNotifyTimer = null
+    }
+
     if (!detail || !detail.appearance) {
       this.activeThemeName = String(detail?.active_theme_name || this.activeThemeName || "").trim()
-      this.isCustomLayout = Boolean(detail?.is_custom_layout)
+      this.isCustomLayout = nextIsCustomLayout
       this.cancelSaveCustomThemeName()
       return
     }
@@ -364,7 +382,7 @@ export default class extends Controller {
     }
 
     this.activeThemeName = String(detail?.active_theme_name || this.activeThemeName || "").trim()
-    this.isCustomLayout = Boolean(detail?.is_custom_layout)
+    this.isCustomLayout = nextIsCustomLayout
     this.activeThemeAppearanceSnapshot = this.normalizedAppearanceSnapshot(appearance)
 
     this.applyWindowShellModel(shellModel)

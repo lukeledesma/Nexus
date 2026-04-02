@@ -1,21 +1,27 @@
 <% frame_id = params[:frame_id].presence || "app-pane" %>
 <turbo-frame id="<%= frame_id %>">
-  <section class="app-surface app-surface--note app-surface--tool" data-controller="title-editor tool-window-status" data-tool-window-status-item-type-value="note" data-tool-window-status-updated-at-value="<%= @note.updated_at&.utc&.iso8601 %>">
+  <section class="app-surface app-surface--tool app-surface--quill-note"
+    data-controller="quill-note"
+    data-quill-note-initial-body-value="<%= @note&.body.to_s %>">
     <header class="app-surface-header tool-window-header os-window-header">
-      <h2 class="tool-window-title os-window-title">NOTES</h2>
+      <h2 class="tool-window-title os-window-title">NOTEPAD</h2>
     </header>
-    <p class="tool-window-subtitle os-window-subtitle" data-tool-window-status-target="subtitle">Notes Updated just now</p>
 
-    <%= form_with model: @note, url: apps_note_path(@note, frame_id: frame_id), method: :patch,
-          data: {
-            turbo_frame: frame_id,
-            controller: "autosave",
-            autosave_item_id_value: @note.id,
-            autosave_item_type_value: "note"
-          },
-          class: "note-form os-window-body-start" do |f| %>
-      <%= f.text_area :body, value: @note.body.to_s, name: "item[body]",
-            class: "note-body-input", placeholder: "Start writing…" %>
+    <%= form_with model: @note,
+      url: apps_singular_note_path(frame_id: frame_id),
+      method: :patch,
+      data: {
+        turbo_frame: frame_id,
+        controller: "autosave",
+        autosave_item_id_value: @note.id,
+        autosave_item_type_value: "note"
+      },
+      class: "quill-note-form os-window-body-start",
+      html: { autocomplete: "off" } do |f| %>
+      <%= f.hidden_field :body, value: @note.body.to_s, name: "item[body]", data: { quill_note_target: "bodyInput" } %>
+      <div class="quill-note-editor-shell">
+        <div class="quill-note-editor" data-quill-note-target="editor"></div>
+      </div>
     <% end %>
   </section>
 </turbo-frame>

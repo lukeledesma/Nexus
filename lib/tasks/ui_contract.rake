@@ -21,14 +21,12 @@ namespace :ui do
       "app/views/layouts/application.html.erb" => [
         "os-window-header",
         "os-window-title",
-        "os-window-subtitle",
         "os-window-controls",
         "os-window-body-start"
       ],
       "app/views/organizer/_sidebar.html.erb" => [
         "os-window-header",
         "os-window-title",
-        "os-window-subtitle",
         "os-window-controls",
         "os-window-body-start",
         "os-window-grid",
@@ -37,28 +35,19 @@ namespace :ui do
         "os-window-card-label",
         "os-window-card-value"
       ],
-      "app/views/apps/singular/note.html.erb" => [
-        "os-window-header",
-        "os-window-title",
-        "os-window-subtitle",
-        "os-window-body-start"
-      ],
       "app/views/apps/singular/task_list.html.erb" => [
         "os-window-header",
         "os-window-title",
-        "os-window-subtitle",
         "os-window-body-start"
       ],
       "app/views/apps/conversion_chart/show.html.erb" => [
         "os-window-header",
         "os-window-title",
-        "os-window-subtitle",
         "os-window-body-start"
       ],
       "app/views/apps/timer/show.html.erb" => [
         "os-window-header",
         "os-window-title",
-        "os-window-subtitle",
         "os-window-body-start"
       ]
     }

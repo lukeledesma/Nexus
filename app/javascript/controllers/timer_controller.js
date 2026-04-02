@@ -8,7 +8,7 @@ const PRESETS = {
 }
 
 export default class extends Controller {
-  static targets = ["subtitle", "startBtn", "hoursInput", "minutesInput", "secondsInput"]
+  static targets = ["startBtn", "hoursInput", "minutesInput", "secondsInput"]
   static values = { initialState: Object }
 
   connect() {

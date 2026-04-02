@@ -5,7 +5,6 @@ Rails.application.routes.draw do
 
   namespace :apps do
     resources :folders, only: %i[show create update destroy]
-    resources :notes, only: %i[show create update destroy]
     resources :task_lists, only: %i[show create update destroy]
     get "calculator", to: "calculator#show"
     get "settings", to: "settings#show"
@@ -15,10 +14,12 @@ Rails.application.routes.draw do
     get "timer_state", to: "timer#state"
     patch "timer_state", to: "timer#update_state"
     get "singular_note", to: "singular#note"
+    patch "singular_note", to: "singular#update_note"
     get "singular_task_list", to: "singular#task_list"
     get "singular_whiteboard", to: "singular#whiteboard"
     patch "singular_whiteboard", to: "singular#update_whiteboard"
-    get "all_notes",  to: "notes#index"
+    get "singular_excalidraw", to: "singular#excalidraw"
+    patch "singular_excalidraw", to: "singular#update_excalidraw"
     get "all_tasks",  to: "task_lists#index"
   end
 

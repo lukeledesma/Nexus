@@ -2,36 +2,42 @@
 <turbo-frame id="<%= frame_id %>">
 <section class="app-surface app-surface--tool theme-builder-view" data-controller="theme-builder">
   <header class="app-surface-header tool-window-header os-window-header">
-    <h2 class="tool-window-title os-window-title">THEME BUILDER</h2>
+    <div class="theme-builder-title-row">
+      <h2 class="tool-window-title os-window-title">THEME BUILDER</h2>
+      <p class="theme-builder-status-text" data-theme-builder-target="statusText">Theory</p>
+      <input
+        type="text"
+        class="settings-themes-item-rename-input theme-builder-name-input theme-builder-hidden"
+        data-theme-builder-target="nameInput"
+        data-action="blur->theme-builder#submitCustomThemeName keydown->theme-builder#handleNameInputKeydown"
+        placeholder="Theme..."
+        autocomplete="off"
+        spellcheck="false"
+        maxlength="64"
+        aria-label="Theme name"
+      >
+      <button
+        type="button"
+        class="settings-themes-item-action-btn settings-themes-item-rename-btn theme-builder-save-btn theme-builder-hidden"
+        data-theme-builder-target="saveButton"
+        data-action="click->theme-builder#beginSaveCustomTheme"
+        title="Save Theme"
+        aria-label="Save Theme"
+      >✎</button>
+    </div>
   </header>
-
-  <div class="theme-builder-status-row">
-    <p class="tool-window-subtitle os-window-subtitle" data-theme-builder-target="statusText">CUSTOM</p>
-    <input
-      type="text"
-      class="settings-themes-item-rename-input theme-builder-name-input theme-builder-hidden"
-      data-theme-builder-target="nameInput"
-      data-action="blur->theme-builder#submitCustomThemeName keydown->theme-builder#handleNameInputKeydown"
-      placeholder="Theme..."
-      autocomplete="off"
-      spellcheck="false"
-      maxlength="64"
-      aria-label="Theme name"
-    >
-    <button
-      type="button"
-      class="settings-themes-item-action-btn settings-themes-item-rename-btn theme-builder-save-btn theme-builder-hidden"
-      data-theme-builder-target="saveButton"
-      data-action="click->theme-builder#beginSaveCustomTheme"
-      title="Save Theme"
-      aria-label="Save Theme"
-    >✎</button>
-  </div>
 
   <div class="theme-builder-main-shell os-window-body-start">
 
-  <section class="theme-builder-section">
-    <h3 class="theme-builder-section-title">SHELL</h3>
+  <section class="theme-builder-section is-collapsed">
+    <button
+      type="button"
+      class="theme-builder-section-title"
+      data-action="click->theme-builder#toggleSection"
+      aria-expanded="false"
+    >SHELL</button>
+
+    <div class="theme-builder-section-body">
 
     <label class="settings-interface-label" for="theme-builder-window-hue">H</label>
     <div class="settings-interface-slider-row">
@@ -100,10 +106,18 @@
       >
       <output class="settings-interface-value" data-theme-builder-target="transparencyValue">15%</output>
     </div>
+    </div>
   </section>
 
-  <section class="theme-builder-section">
-    <h3 class="theme-builder-section-title">BACKGROUND</h3>
+  <section class="theme-builder-section is-collapsed">
+    <button
+      type="button"
+      class="theme-builder-section-title"
+      data-action="click->theme-builder#toggleSection"
+      aria-expanded="false"
+    >BACKGROUND</button>
+
+    <div class="theme-builder-section-body">
 
     <label class="settings-interface-label" for="theme-builder-bg-1-hue">H1</label>
     <div class="settings-interface-slider-row">
@@ -223,10 +237,18 @@
       >
       <output class="settings-interface-value" data-theme-builder-target="bgAngleValue">135°</output>
     </div>
+    </div>
   </section>
 
-  <section class="theme-builder-section">
-    <h3 class="theme-builder-section-title">CONTENT</h3>
+  <section class="theme-builder-section is-collapsed">
+    <button
+      type="button"
+      class="theme-builder-section-title"
+      data-action="click->theme-builder#toggleSection"
+      aria-expanded="false"
+    >CONTENT</button>
+
+    <div class="theme-builder-section-body">
 
     <label class="settings-interface-label" for="theme-builder-font-one">F1B</label>
     <div class="settings-interface-slider-row">
@@ -328,6 +350,7 @@
         aria-label="Border transparency"
       >
       <output class="settings-interface-value" data-theme-builder-target="borderTransparencyValue">100%</output>
+    </div>
     </div>
   </section>
   </div>

@@ -19,13 +19,14 @@ class WorkspacePreferencesController < ApplicationController
   CUSTOM_THEME_NAME = "CUSTOM"
 
   DEFAULT_WINDOWS = {
-    "db-health" => { "x" => 41, "y" => 6, "width" => 320, "height" => 235, "z" => 1501, "open" => true },
-    "settings" => { "x" => 41, "y" => 256, "width" => 320, "height" => 180, "z" => 1502, "open" => true },
-    "theme-builder" => { "x" => 41, "y" => 256, "width" => 760, "height" => 430, "z" => 1508, "open" => false },
+    "db-health" => { "x" => 6, "y" => 6, "width" => 320, "height" => 235, "z" => 1501, "open" => true },
+    "settings" => { "x" => 6, "y" => 256, "width" => 320, "height" => 180, "z" => 1502, "open" => true },
+    "theme-builder" => { "x" => 6, "y" => 256, "width" => 760, "height" => 430, "z" => 1508, "open" => false },
     "launcher" => { "x" => 376, "y" => 6, "width" => 320, "height" => 180, "z" => 1503, "open" => true },
-    "singular-note" => { "x" => 711, "y" => 6, "width" => 407, "height" => 407, "z" => 1504, "open" => true },
+    "singular-note" => { "x" => 711, "y" => 6, "width" => 560, "height" => 430, "z" => 1504, "open" => false },
     "singular-task-list" => { "x" => 747, "y" => 48, "width" => 407, "height" => 407, "z" => 1505, "open" => true },
     "singular-whiteboard" => { "x" => 789, "y" => 78, "width" => 407, "height" => 407, "z" => 1509, "open" => false },
+    "singular-excalidraw" => { "x" => 830, "y" => 120, "width" => 800, "height" => 600, "z" => 1510, "open" => false },
     "conversion-chart" => { "x" => 782, "y" => 88, "width" => 407, "height" => 407, "z" => 1506, "open" => true },
     "timer" => { "x" => 376, "y" => 196, "width" => 320, "height" => 250, "z" => 1507, "open" => true }
   }.freeze

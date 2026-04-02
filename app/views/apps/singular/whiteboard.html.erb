@@ -7,9 +7,8 @@
     data-whiteboard-stickies-value="<%= json_escape(@stickies.to_json) %>"
     data-whiteboard-save-url-value="<%= apps_singular_whiteboard_path %>">
     <header class="app-surface-header tool-window-header os-window-header">
-      <h2 class="tool-window-title os-window-title">WHITE BOARD</h2>
+      <h2 class="tool-window-title os-window-title">STICKY NOTES</h2>
     </header>
-    <p class="tool-window-subtitle os-window-subtitle">Blank space, ready for the next pass.</p>
 
     <div class="whiteboard-workspace os-window-body-start">
       <div class="whiteboard-content-shell app-content-shell" data-whiteboard-target="contentShell">
@@ -23,7 +22,13 @@
           <button type="button" class="whiteboard-action-btn whiteboard-action-btn--sticky-indicator whiteboard-action-btn--hidden" data-whiteboard-target="stickySelection" data-action="click->whiteboard#toggleStickyColorPopover" aria-hidden="true" tabindex="-1" title="Sticky color">&nbsp;</button>
           <div class="whiteboard-sticky-color-popover whiteboard-action-btn--hidden" data-whiteboard-target="colorPopover" aria-hidden="true">
             <div class="whiteboard-sticky-color-slider-row">
-              <input type="range" class="whiteboard-sticky-color-slider settings-interface-slider settings-interface-slider--hue" data-whiteboard-target="colorSlider" data-action="input->whiteboard#updateStickyColor" min="0" max="360" step="1" value="45" aria-label="Sticky color slider">
+              <input type="range" class="whiteboard-sticky-color-slider settings-interface-slider settings-interface-slider--hue" data-whiteboard-target="colorSlider" data-action="input->whiteboard#updateStickyColor" min="0" max="360" step="1" value="45" aria-label="Sticky hue slider">
+            </div>
+            <div class="whiteboard-sticky-color-slider-row">
+              <input type="range" class="whiteboard-sticky-color-slider settings-interface-slider settings-interface-slider--saturation" data-whiteboard-target="saturationSlider" data-action="input->whiteboard#updateStickySaturation" min="0" max="100" step="1" value="92" aria-label="Sticky saturation slider">
+            </div>
+            <div class="whiteboard-sticky-color-slider-row">
+              <input type="range" class="whiteboard-sticky-color-slider settings-interface-slider settings-interface-slider--brightness" data-whiteboard-target="brightnessSlider" data-action="input->whiteboard#updateStickyBrightness" min="0" max="100" step="1" value="68" aria-label="Sticky brightness slider">
             </div>
           </div>
         </div>

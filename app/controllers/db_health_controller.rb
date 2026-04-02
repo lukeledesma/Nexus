@@ -19,8 +19,8 @@ class DbHealthController < ApplicationController
       folders_count: Folder.where.not(name: "App").count,
       items_count: Item.count,
       users_count: User.count,
-      notes_count: Item.where(item_type: "note").count,
       task_lists_count: Item.where(item_type: "task_list").count,
+      whiteboards_count: Item.where(item_type: "whiteboard").count,
       max_folder_id: Folder.maximum(:id) || 0,
       item_id_total: Item.count
     }
@@ -99,24 +99,40 @@ class DbHealthController < ApplicationController
   end
 
   def organizer_metrics
-    note_updated_at = workspace_item_updated_at("Notes.txt")
     task_updated_at = workspace_item_updated_at("Tasks.txt")
-    note_size = workspace_item_size("Notes.txt")
+    whiteboard_updated_at = workspace_item_updated_at("Whiteboard.txt")
     task_size = workspace_item_size("Tasks.txt")
+    whiteboard_size = workspace_item_size("Whiteboard.txt")
+    note_size = singular_item_body_size("note")
+    excalidraw_size = singular_item_body_size("excalidraw")
 
     latest = [
-      { label: "Notes", updated_at: note_updated_at },
-      { label: "Tasks", updated_at: task_updated_at }
+      { label: "Tasks", updated_at: task_updated_at },
+      { label: "Whiteboard", updated_at: whiteboard_updated_at }
     ].select { |entry| entry[:updated_at].present? }
       .max_by { |entry| entry[:updated_at] }
 
     {
-      note_updated_at: note_updated_at&.utc&.iso8601,
       task_updated_at: task_updated_at&.utc&.iso8601,
-      note_size_bytes: note_size,
+      whiteboard_updated_at: whiteboard_updated_at&.utc&.iso8601,
       task_size_bytes: task_size,
+      note_size_bytes: note_size,
+      whiteboard_size_bytes: whiteboard_size,
+      excalidraw_size_bytes: excalidraw_size,
       last_updated: latest.present? ? { label: latest[:label], updated_at: latest[:updated_at].utc.iso8601 } : nil
     }
+  end
+
+  def singular_item_body_size(item_type)
+    app_folder = Folder.find_by(name: "App")
+    return nil unless app_folder
+
+    item = app_folder.items.find_by(item_type: item_type)
+    return nil unless item
+
+    item.body.to_s.bytesize
+  rescue StandardError
+    nil
   end
 
   def workspace_item_size(file_name)

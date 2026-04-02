@@ -69,7 +69,6 @@ Nexus_Dev/
 │       ├── layouts/application.html.erb
 │       ├── organizer/_sidebar.html.erb
 │       ├── apps/
-│       │   ├── notes/show.html.erb
 │       │   └── task_lists/show.html.erb
 │       └── items/
 │           ├── _new_folder_modal.html.erb
@@ -84,7 +83,7 @@ Nexus_Dev/
 │   ├── schema.rb
 │   └── migrate/
 ├── storage/
-│   └── workspace/            # Disk mirror of organizer state (Notes.nexus, Tasks.nexus, user folders)
+│   └── workspace/            # Disk mirror of organizer state (Tasks.txt, Whiteboard.txt, user folders)
 └── docs/
     ├── UI_GUIDE.md           # This app's UI behavior reference
     └── DEV_GUIDE.md          # This file
@@ -106,7 +105,7 @@ Nexus_Dev/
 
 ### Item
 - `name` (string)
-- `item_type` (string: `"note"` or `"task_list"`)
+- `item_type` (string: `"task_list"` or `"whiteboard"`)
 - `content` (text, JSON payload)
 - `belongs_to :folder`
 - `after_commit` → `ItemStorageSyncLite.sync`
@@ -226,8 +225,8 @@ Pattern:
 
 - Location: `app/services/item_storage_sync_lite.rb`
 - Root: `storage/workspace/`
-  - `Notes.nexus`: Singular note document (always present)
-  - `Tasks.nexus`: Singular task list document (always present)
+  - `Tasks.txt`: Singular task list document
+  - `Whiteboard.txt`: Singular whiteboard document
   - User folders as subdirectories (no items inside)
 - Triggered: `after_commit` on `Folder` and `Item` models.
 - Behavior: rebuilds folder directories and `.nexus` files from current DB state.
@@ -242,11 +241,8 @@ This is **app → disk** (one-directional). Disk does not write back to DB autom
 
 ```
 GET  /                          → documents#index (organizer shell)
-GET  /apps/notes/:id            → apps/notes#show
 GET  /apps/task_lists/:id       → apps/task_lists#show
-PATCH /apps/notes/:id           → apps/notes#update
 PATCH /apps/task_lists/:id      → apps/task_lists#update
-DELETE /apps/notes/:id          → apps/notes#destroy
 DELETE /apps/task_lists/:id     → apps/task_lists#destroy
 GET  /apps/folders/:id          → apps/folders#show
 POST /items                     → items#create

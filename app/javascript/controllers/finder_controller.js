@@ -114,8 +114,7 @@ export default class extends Controller {
       element.matches("#organizer") ||
       element.matches(".window-content") ||
       element.matches(".finder-app-frame") ||
-      element.matches(".conversion-table-wrapper") ||
-      element.matches(".note-body-input")
+      element.matches(".conversion-table-wrapper")
 
     if (!isTracked) return
 

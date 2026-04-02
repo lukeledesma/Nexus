@@ -2,7 +2,7 @@ import { Controller } from "@hotwired/stimulus"
 import { observeContent } from "lib/os_window_sizing"
 
 export default class extends Controller {
-  static targets = ["contentShell", "grid", "gridToggle", "stickySelection", "colorPopover", "colorSlider"]
+  static targets = ["contentShell", "grid", "gridToggle", "stickySelection", "colorPopover", "colorSlider", "saturationSlider", "brightnessSlider"]
 
   static values = {
     columns: { type: Number, default: 75 },
@@ -109,7 +109,7 @@ export default class extends Controller {
     this.scheduleSave()
   }
 
-  renderSticky({ col, row, cols, rows, text, hue }) {
+  renderSticky({ col, row, cols, rows, text, hue, saturation, brightness }) {
     const el = document.createElement("div")
     el.classList.add("whiteboard-sticky")
     el.dataset.stickyCol = String(col)
@@ -117,6 +117,8 @@ export default class extends Controller {
     el.dataset.stickyCols = String(cols)
     el.dataset.stickyRows = String(rows)
     el.dataset.stickyHue = String(Number.isFinite(parseInt(hue, 10)) ? parseInt(hue, 10) : 45)
+    el.dataset.stickySaturation = String(Number.isFinite(parseInt(saturation, 10)) ? parseInt(saturation, 10) : 92)
+    el.dataset.stickyBrightness = String(Number.isFinite(parseInt(brightness, 10)) ? parseInt(brightness, 10) : 68)
     this.applyStickyPosition(el)
 
     const deleteBtn = document.createElement("button")
@@ -216,18 +218,72 @@ export default class extends Controller {
 
     if (!hasSelection) {
       this.stickySelectionTarget.style.removeProperty("--sticky-hue")
+      this.stickySelectionTarget.style.removeProperty("--sticky-saturation")
+      this.stickySelectionTarget.style.removeProperty("--sticky-brightness")
+      this.stickySelectionTarget.style.removeProperty("--window-ui-hue")
+      this.stickySelectionTarget.style.removeProperty("--window-ui-saturation")
+      this.stickySelectionTarget.style.removeProperty("--window-ui-brightness")
       if (this.hasColorPopoverTarget) this.colorPopoverTarget.style.removeProperty("--sticky-hue")
+      if (this.hasColorPopoverTarget) this.colorPopoverTarget.style.removeProperty("--sticky-saturation")
+      if (this.hasColorPopoverTarget) this.colorPopoverTarget.style.removeProperty("--sticky-brightness")
+      if (this.hasColorPopoverTarget) this.colorPopoverTarget.style.removeProperty("--window-ui-hue")
+      if (this.hasColorPopoverTarget) this.colorPopoverTarget.style.removeProperty("--window-ui-saturation")
+      if (this.hasColorPopoverTarget) this.colorPopoverTarget.style.removeProperty("--window-ui-brightness")
       if (this.hasColorSliderTarget) this.colorSliderTarget.style.removeProperty("--sticky-hue")
+      if (this.hasColorSliderTarget) this.colorSliderTarget.style.removeProperty("--sticky-saturation")
+      if (this.hasColorSliderTarget) this.colorSliderTarget.style.removeProperty("--sticky-brightness")
+      if (this.hasColorSliderTarget) this.colorSliderTarget.style.removeProperty("--window-ui-hue")
+      if (this.hasColorSliderTarget) this.colorSliderTarget.style.removeProperty("--window-ui-saturation")
+      if (this.hasColorSliderTarget) this.colorSliderTarget.style.removeProperty("--window-ui-brightness")
+      if (this.hasSaturationSliderTarget) {
+        this.saturationSliderTarget.style.removeProperty("--sticky-hue")
+        this.saturationSliderTarget.style.removeProperty("--sticky-saturation")
+        this.saturationSliderTarget.style.removeProperty("--sticky-brightness")
+        this.saturationSliderTarget.style.removeProperty("--window-ui-hue")
+        this.saturationSliderTarget.style.removeProperty("--window-ui-saturation")
+        this.saturationSliderTarget.style.removeProperty("--window-ui-brightness")
+      }
+      if (this.hasBrightnessSliderTarget) {
+        this.brightnessSliderTarget.style.removeProperty("--sticky-hue")
+        this.brightnessSliderTarget.style.removeProperty("--sticky-saturation")
+        this.brightnessSliderTarget.style.removeProperty("--sticky-brightness")
+        this.brightnessSliderTarget.style.removeProperty("--window-ui-hue")
+        this.brightnessSliderTarget.style.removeProperty("--window-ui-saturation")
+        this.brightnessSliderTarget.style.removeProperty("--window-ui-brightness")
+      }
       return
     }
 
-    const raw = parseInt(this.selectedSticky.dataset.stickyHue, 10)
-    const hue = Number.isFinite(raw) ? raw : 45
-    this.stickySelectionTarget.style.setProperty("--sticky-hue", String(hue))
-    if (this.hasColorPopoverTarget) this.colorPopoverTarget.style.setProperty("--sticky-hue", String(hue))
-    if (this.hasColorSliderTarget) this.colorSliderTarget.style.setProperty("--sticky-hue", String(hue))
+    const rawHue = parseInt(this.selectedSticky.dataset.stickyHue, 10)
+    const hue = Number.isFinite(rawHue) ? rawHue : 45
+    const rawSaturation = parseInt(this.selectedSticky.dataset.stickySaturation, 10)
+    const saturation = Number.isFinite(rawSaturation) ? rawSaturation : 92
+    const rawBrightness = parseInt(this.selectedSticky.dataset.stickyBrightness, 10)
+    const brightness = Number.isFinite(rawBrightness) ? rawBrightness : 68
+
+    const syncColorVars = (el) => {
+      if (!el) return
+      el.style.setProperty("--sticky-hue", String(hue))
+      el.style.setProperty("--sticky-saturation", String(saturation))
+      el.style.setProperty("--sticky-brightness", String(brightness))
+      el.style.setProperty("--window-ui-hue", String(hue))
+      el.style.setProperty("--window-ui-saturation", `${saturation}%`)
+      el.style.setProperty("--window-ui-brightness", `${brightness}%`)
+    }
+
+    syncColorVars(this.stickySelectionTarget)
+    if (this.hasColorPopoverTarget) syncColorVars(this.colorPopoverTarget)
+    if (this.hasColorSliderTarget) syncColorVars(this.colorSliderTarget)
+    if (this.hasSaturationSliderTarget) syncColorVars(this.saturationSliderTarget)
+    if (this.hasBrightnessSliderTarget) syncColorVars(this.brightnessSliderTarget)
     if (this.hasColorSliderTarget) {
       this.colorSliderTarget.value = String(hue)
+    }
+    if (this.hasSaturationSliderTarget) {
+      this.saturationSliderTarget.value = String(saturation)
+    }
+    if (this.hasBrightnessSliderTarget) {
+      this.brightnessSliderTarget.value = String(brightness)
     }
   }
 
@@ -242,8 +298,16 @@ export default class extends Controller {
     }
 
     const hue = parseInt(this.selectedSticky.dataset.stickyHue, 10) || 45
+    const saturation = parseInt(this.selectedSticky.dataset.stickySaturation, 10) || 92
+    const brightness = parseInt(this.selectedSticky.dataset.stickyBrightness, 10) || 68
     if (this.hasColorSliderTarget) {
       this.colorSliderTarget.value = String(hue)
+    }
+    if (this.hasSaturationSliderTarget) {
+      this.saturationSliderTarget.value = String(saturation)
+    }
+    if (this.hasBrightnessSliderTarget) {
+      this.brightnessSliderTarget.value = String(brightness)
     }
     this.colorPopoverOpen = true
     this.colorPopoverTarget.classList.remove("whiteboard-action-btn--hidden")
@@ -256,6 +320,28 @@ export default class extends Controller {
     const raw = parseInt(event.target.value, 10)
     const hue = Number.isFinite(raw) ? Math.max(0, Math.min(raw, 360)) : 45
     this.selectedSticky.dataset.stickyHue = String(hue)
+    this.applyStickyPosition(this.selectedSticky)
+    this.syncStickySelectionButton()
+    this.pendingStickyColorSave = true
+  }
+
+  updateStickySaturation(event) {
+    if (!this.selectedSticky) return
+
+    const raw = parseInt(event.target.value, 10)
+    const saturation = Number.isFinite(raw) ? Math.max(0, Math.min(raw, 100)) : 92
+    this.selectedSticky.dataset.stickySaturation = String(saturation)
+    this.applyStickyPosition(this.selectedSticky)
+    this.syncStickySelectionButton()
+    this.pendingStickyColorSave = true
+  }
+
+  updateStickyBrightness(event) {
+    if (!this.selectedSticky) return
+
+    const raw = parseInt(event.target.value, 10)
+    const brightness = Number.isFinite(raw) ? Math.max(0, Math.min(raw, 100)) : 68
+    this.selectedSticky.dataset.stickyBrightness = String(brightness)
     this.applyStickyPosition(this.selectedSticky)
     this.syncStickySelectionButton()
     this.pendingStickyColorSave = true
@@ -318,6 +404,8 @@ export default class extends Controller {
     el.style.setProperty("--sticky-cols", el.dataset.stickyCols)
     el.style.setProperty("--sticky-rows", el.dataset.stickyRows)
     el.style.setProperty("--sticky-hue", el.dataset.stickyHue || "45")
+    el.style.setProperty("--sticky-saturation", el.dataset.stickySaturation || "92")
+    el.style.setProperty("--sticky-brightness", el.dataset.stickyBrightness || "68")
   }
 
   startStickyDrag(event, el) {
@@ -516,6 +604,8 @@ export default class extends Controller {
       cols: parseInt(el.dataset.stickyCols, 10) || 10,
       rows: parseInt(el.dataset.stickyRows, 10) || 10,
       hue: parseInt(el.dataset.stickyHue, 10) || 45,
+      saturation: parseInt(el.dataset.stickySaturation, 10) || 92,
+      brightness: parseInt(el.dataset.stickyBrightness, 10) || 68,
       text: el.querySelector(".whiteboard-sticky-content")?.innerText || ""
     }))
 

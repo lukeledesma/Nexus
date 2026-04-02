@@ -1,8 +1,8 @@
-# Represents a note or task_list inside a Folder.
+# Represents an app workspace item inside a Folder.
 class Item < ApplicationRecord
   belongs_to :folder
 
-  TYPES = %w[note task_list whiteboard].freeze
+  TYPES = %w[note task_list whiteboard excalidraw].freeze
 
   validates :name, presence: true
   validates :item_type, inclusion: { in: TYPES }
@@ -10,7 +10,6 @@ class Item < ApplicationRecord
   before_validation :default_tasks
   after_commit :sync_to_disk
 
-  scope :notes, -> { where(item_type: "note") }
   scope :task_lists, -> { where(item_type: "task_list") }
   scope :ordered, -> { order(Arel.sql("LOWER(name) ASC")) }
 

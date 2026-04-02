@@ -27,7 +27,7 @@
 
   <body class="<%= logged_in? ? "nexus-os" : "" %>" data-controller="window-manager">
     <% if logged_in? %>
-      <div id="desktop" class="desktop-layer"></div>
+      <div id="desktop" class="desktop-layer" data-controller="desktop-selection"></div>
       <div data-controller="workspace-manager" data-workspace-manager-url-value="/workspace_preferences" hidden></div>
 
       <div class="desktop-clock" data-controller="desktop-clock">
@@ -46,10 +46,6 @@
         data-content-window-app-url-value="/apps/timer"
         data-content-window-storage-key-value="nexus.contentWindow.timer.bounds"
         data-content-window-frame-id-value="timer-pane"
-        data-content-window-default-width-value="320"
-        data-content-window-default-height-value="250"
-        data-content-window-default-offset-x-value="0"
-        data-content-window-default-offset-y-value="-90"
         aria-live="polite">
         <div class="title-bar" data-action="mousedown->content-window#startDrag touchstart->content-window#startDrag"></div>
         <button type="button" class="tools-close-btn content-window-close" data-action="click->content-window#close" aria-label="Close" title="Close">✕</button>
@@ -72,10 +68,6 @@
         data-content-window-app-url-value="/apps/conversion_chart"
         data-content-window-storage-key-value="nexus.contentWindow.conversionChart.bounds"
         data-content-window-frame-id-value="conversion-chart-pane"
-        data-content-window-default-width-value="407"
-        data-content-window-default-height-value="407"
-        data-content-window-default-offset-x-value="67"
-        data-content-window-default-offset-y-value="-92"
         aria-live="polite">
         <div class="title-bar" data-action="mousedown->content-window#startDrag touchstart->content-window#startDrag"></div>
         <button type="button" class="tools-close-btn content-window-close" data-action="click->content-window#close" aria-label="Close" title="Close">✕</button>
@@ -98,10 +90,6 @@
         data-content-window-app-url-value="/apps/singular_note"
         data-content-window-storage-key-value="nexus.contentWindow.singularNote.bounds"
         data-content-window-frame-id-value="singular-note-pane"
-        data-content-window-default-width-value="407"
-        data-content-window-default-height-value="407"
-        data-content-window-default-offset-x-value="-4"
-        data-content-window-default-offset-y-value="-174"
         aria-live="polite">
         <div class="title-bar" data-action="mousedown->content-window#startDrag touchstart->content-window#startDrag"></div>
         <button type="button" class="tools-close-btn content-window-close" data-action="click->content-window#close" aria-label="Close" title="Close">✕</button>
@@ -124,10 +112,6 @@
         data-content-window-app-url-value="/apps/singular_task_list"
         data-content-window-storage-key-value="nexus.contentWindow.singularTaskList.bounds"
         data-content-window-frame-id-value="singular-task-list-pane"
-        data-content-window-default-width-value="407"
-        data-content-window-default-height-value="407"
-        data-content-window-default-offset-x-value="32"
-        data-content-window-default-offset-y-value="-132"
         aria-live="polite">
         <div class="title-bar" data-action="mousedown->content-window#startDrag touchstart->content-window#startDrag"></div>
         <button type="button" class="tools-close-btn content-window-close" data-action="click->content-window#close" aria-label="Close" title="Close">✕</button>
@@ -150,10 +134,6 @@
         data-content-window-app-url-value="/apps/singular_whiteboard"
         data-content-window-storage-key-value="nexus.contentWindow.singularWhiteboard.bounds"
         data-content-window-frame-id-value="singular-whiteboard-pane"
-        data-content-window-default-width-value="407"
-        data-content-window-default-height-value="407"
-        data-content-window-default-offset-x-value="74"
-        data-content-window-default-offset-y-value="-146"
         aria-live="polite">
         <div class="title-bar" data-action="mousedown->content-window#startDrag touchstart->content-window#startDrag"></div>
         <button type="button" class="tools-close-btn content-window-close" data-action="click->content-window#close" aria-label="Close" title="Close">✕</button>
@@ -172,14 +152,10 @@
 
       <section class="content-window os-window is-hidden"
         data-controller="content-window"
-        data-content-window-app-key-value="theme-builder"
-        data-content-window-app-url-value="/apps/theme_builder"
-        data-content-window-storage-key-value="nexus.contentWindow.themeBuilder.bounds"
-        data-content-window-frame-id-value="theme-builder-pane"
-        data-content-window-default-width-value="760"
-        data-content-window-default-height-value="430"
-        data-content-window-default-offset-x-value="-104"
-        data-content-window-default-offset-y-value="-132"
+        data-content-window-app-key-value="singular-excalidraw"
+        data-content-window-app-url-value="/apps/singular_excalidraw"
+        data-content-window-storage-key-value="nexus.contentWindow.singularExcalidraw.bounds"
+        data-content-window-frame-id-value="singular-excalidraw-pane"
         aria-live="polite">
         <div class="title-bar" data-action="mousedown->content-window#startDrag touchstart->content-window#startDrag"></div>
         <button type="button" class="tools-close-btn content-window-close" data-action="click->content-window#close" aria-label="Close" title="Close">✕</button>
@@ -191,6 +167,20 @@
         <div class="pane-resize-handle pane-resize-handle--top-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="window-content">
+          <turbo-frame id="singular-excalidraw-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
+        </div>
+      </section>
+
+      <section class="content-window content-window--auto-sized os-window is-hidden"
+        data-controller="content-window"
+        data-content-window-app-key-value="theme-builder"
+        data-content-window-app-url-value="/apps/theme_builder"
+        data-content-window-storage-key-value="nexus.contentWindow.themeBuilder.bounds"
+        data-content-window-frame-id-value="theme-builder-pane"
+        aria-live="polite">
+        <div class="title-bar" data-action="mousedown->content-window#startDrag touchstart->content-window#startDrag"></div>
+        <button type="button" class="tools-close-btn content-window-close" data-action="click->content-window#close" aria-label="Close" title="Close">✕</button>
         <div class="window-content">
           <turbo-frame id="theme-builder-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
         </div>
@@ -205,12 +195,9 @@
             </div>
             <div class="db-health-controls os-window-controls">
               <button type="button" class="db-health-back hidden" data-db-health-target="backButton" data-action="click->db-health#clearFocus" aria-label="Back" title="Back">←</button>
-              <button type="button" class="db-health-refresh" data-action="click->db-health#refresh" aria-label="Refresh" title="Refresh">↻</button>
               <button type="button" class="db-health-close" data-action="click->db-health#close" aria-label="Close" title="Close">✕</button>
             </div>
           </header>
-
-          <p class="db-health-stamp os-window-subtitle" data-db-health-target="stamp">Waiting for data...</p>
 
           <dl class="db-health-grid os-window-body-start" data-db-health-target="grid">
             <div class="db-health-card db-health-card--selectable" data-db-health-target="metricCard" data-db-health-focus-key="folders" data-action="click->db-health#focusMetric"><dt>Folders</dt><dd data-db-health-target="foldersCount">-</dd></div>
@@ -236,8 +223,6 @@
               <button type="button" class="settings-close" data-action="click->settings#close" aria-label="Close Settings" title="Close">✕</button>
             </div>
           </header>
-
-          <p class="settings-stamp os-window-subtitle" data-settings-target="stamp"><%= current_user&.email.presence || "Unknown user" %></p>
 
           <div class="settings-actions os-window-body-start os-window-grid os-window-grid--2" data-settings-target="actions">
             <button type="button" class="settings-action os-window-card settings-action--themes" data-action="click->settings#showThemes">

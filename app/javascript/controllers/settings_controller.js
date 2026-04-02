@@ -42,7 +42,8 @@ export default class extends Controller {
   connect() {
     this.windowWidth = 320
     this.viewportMargin = 6
-    this.dockLeftBoundary = 41
+    this.dockLeftBoundary = 6
+    this.bottomDockBoundary = this.viewportMargin
     this.activeDrag = null
     this.defaultTitle = "Settings"
     this.defaultStamp = this.hasStampTarget ? this.stampTarget.textContent : ""
@@ -117,6 +118,7 @@ export default class extends Controller {
   handleThemeStatus(event) {
     const detail = event?.detail || {}
     const previousActiveThemeId = this.activeThemeId
+    const previousCustomLayout = this.serverIsCustomLayout
     const previousThemesSignature = this.themes.map((theme) => `${theme.id}:${theme.name}:${theme.locked ? 1 : 0}`).join("|")
     const isCustomLayout = Boolean(detail?.is_custom_layout)
     this.serverIsCustomLayout = isCustomLayout
@@ -137,7 +139,9 @@ export default class extends Controller {
     this.refreshActionStatusBadges(false)
     if (this.currentView === "themes") {
       const currentThemesSignature = this.themes.map((theme) => `${theme.id}:${theme.name}:${theme.locked ? 1 : 0}`).join("|")
-      const shouldRender = previousActiveThemeId !== this.activeThemeId || previousThemesSignature !== currentThemesSignature
+      const shouldRender = previousActiveThemeId !== this.activeThemeId ||
+        previousThemesSignature !== currentThemesSignature ||
+        previousCustomLayout !== this.serverIsCustomLayout
       if (shouldRender) this.renderThemesList(false)
       return
     }
@@ -220,7 +224,7 @@ export default class extends Controller {
     const width = this.windowTarget.offsetWidth
     const height = this.windowTarget.offsetHeight
     const maxLeft = window.innerWidth - width - margin
-    const maxTop = window.innerHeight - height - margin
+    const maxTop = window.innerHeight - height - this.bottomDockBoundary
 
     const left = Math.min(Math.max(coords.x - this.activeDrag.offsetX, this.dockLeftBoundary), Math.max(this.dockLeftBoundary, maxLeft))
     const top = Math.min(Math.max(coords.y - this.activeDrag.offsetY, margin), Math.max(margin, maxTop))
@@ -251,7 +255,7 @@ export default class extends Controller {
     this.themesSectionTarget.classList.add("hidden")
     this.backButtonTarget.classList.remove("hidden")
     this.titleTarget.textContent = "Shell"
-    this.stampTarget.textContent = "Adjust desktop shell color and transparency."
+    if (this.hasStampTarget) this.stampTarget.textContent = "Adjust desktop shell color and transparency."
     this.snapWindowToActiveContent()
   }
 
@@ -265,7 +269,7 @@ export default class extends Controller {
     this.themesSectionTarget.classList.add("hidden")
     this.backButtonTarget.classList.remove("hidden")
     this.titleTarget.textContent = "Background"
-    this.stampTarget.textContent = "Adjust desktop gradient colors and angle."
+    if (this.hasStampTarget) this.stampTarget.textContent = "Adjust desktop gradient colors and angle."
     this.snapWindowToActiveContent()
   }
 
@@ -279,7 +283,7 @@ export default class extends Controller {
     this.themesSectionTarget.classList.remove("hidden")
     this.backButtonTarget.classList.remove("hidden")
     this.titleTarget.textContent = "Saved Themes"
-    this.stampTarget.textContent = "Select, rename, delete, and add layouts."
+    if (this.hasStampTarget) this.stampTarget.textContent = "Select, rename, delete, and add layouts."
     this.renderThemesList()
     this.snapWindowToActiveContent()
   }
@@ -598,7 +602,7 @@ export default class extends Controller {
         if (theme.id !== this.activeThemeId) {
           const confirmed = this.confirmThemeSwitch(theme.name)
           if (!confirmed) {
-            this.selectedThemeId = this.activeThemeId || this.selectedThemeId
+            this.selectedThemeId = this.resolveSelectableThemeId(this.activeThemeId)
             this.renderThemesList()
             return
           }
@@ -1284,7 +1288,7 @@ export default class extends Controller {
     const height = Math.max(1, Math.min(currentHeight || 1, Math.max(1, vh - 40)))
     const desiredTop = defaultTop + dbHealthHeight + rowGap
     const left = Math.max(leftColumnLeft, Math.min(leftColumnLeft, vw - this.viewportMargin - width))
-    const top = Math.max(this.viewportMargin, Math.min(desiredTop, vh - this.viewportMargin - height))
+    const top = Math.max(this.viewportMargin, Math.min(desiredTop, vh - this.bottomDockBoundary - height))
 
     this.windowTarget.style.width = `${width}px`
     this.windowTarget.style.left = `${left}px`

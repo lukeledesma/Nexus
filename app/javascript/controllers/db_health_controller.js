@@ -31,7 +31,8 @@ export default class extends Controller {
     this.defaultTitle = "DB Health"
     this.windowWidth = 320
     this.viewportMargin = 6
-    this.dockLeftBoundary = 41
+    this.dockLeftBoundary = 6
+    this.bottomDockBoundary = this.viewportMargin
     this.activeDrag = null
     this.boundDragMove = this.handleDragMove.bind(this)
     this.boundDragEnd = this.stopDrag.bind(this)
@@ -153,7 +154,7 @@ export default class extends Controller {
     let top = coords.y - this.activeDrag.offsetY
 
     left = Math.max(this.dockLeftBoundary, Math.min(left, vw - margin - width))
-    top = Math.max(margin, Math.min(top, vh - margin - height))
+    top = Math.max(margin, Math.min(top, vh - this.bottomDockBoundary - height))
 
     this.windowTarget.style.left = `${left}px`
     this.windowTarget.style.top = `${top}px`
@@ -219,7 +220,7 @@ export default class extends Controller {
     const currentHeight = Math.ceil(this.windowTarget.getBoundingClientRect().height)
     const height = Math.max(1, Math.min(currentHeight || 1, Math.max(1, vh - 40)))
     const left = Math.max(leftColumnLeft, Math.min(leftColumnLeft, vw - this.viewportMargin - width))
-    const top = Math.max(this.viewportMargin, Math.min(defaultTop, vh - this.viewportMargin - height))
+    const top = Math.max(this.viewportMargin, Math.min(defaultTop, vh - this.bottomDockBoundary - height))
 
     this.windowTarget.style.width = `${width}px`
     this.windowTarget.style.left = `${left}px`
@@ -255,10 +256,6 @@ export default class extends Controller {
     this.snapWindowToActiveContent()
   }
 
-  async refresh() {
-    await this.fetchAndRender()
-  }
-
   async fetchAndRender() {
     try {
       const response = await fetch(this.urlValue, {
@@ -273,7 +270,7 @@ export default class extends Controller {
       this.renderMetrics(payload)
       if (this.focusedMetricKey) this.renderFocusedDetails()
     } catch (error) {
-      this.stampTarget.textContent = `Health unavailable (${error.message})`
+      if (this.hasStampTarget) this.stampTarget.textContent = `Health unavailable (${error.message})`
     }
   }
 
@@ -282,7 +279,7 @@ export default class extends Controller {
     const workspace = payload.workspace || {}
     const database = payload.database || {}
 
-    this.stampTarget.textContent = `Updated ${this.formatTimestamp(payload.generated_at)}`
+    if (this.hasStampTarget) this.stampTarget.textContent = `Updated ${this.formatTimestamp(payload.generated_at)}`
     this.itemsCountTarget.textContent = this.formatNumber(records.items_count)
     this.foldersCountTarget.textContent = this.formatNumber(records.folders_count)
     this.maxItemIdTarget.textContent = this.formatNumber(records.item_id_total)

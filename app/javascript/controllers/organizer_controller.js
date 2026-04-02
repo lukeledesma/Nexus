@@ -2,7 +2,7 @@ import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
 
 export default class extends Controller {
-  static targets = ["newFolderForm", "newFolderInput", "stamp", "conversionPair", "notesSize", "tasksSize", "timerDisplay", "themeBuilderStatus"]
+  static targets = ["newFolderForm", "newFolderInput", "stamp", "conversionPair", "tasksSize", "notePadSize", "stickyNotesSize", "sketchpadSize", "timerDisplay", "themeBuilderStatus"]
 
   #conversionPairs = [
     { sae: '5/16"', metric: '8 mm' },
@@ -149,11 +149,17 @@ export default class extends Controller {
       const organizer = payload?.organizer
       if (!organizer) return
 
-      if (this.hasNotesSizeTarget && organizer.note_size_bytes) {
-        this.notesSizeTarget.textContent = this.formatBytes(organizer.note_size_bytes)
-      }
       if (this.hasTasksSizeTarget && organizer.task_size_bytes) {
         this.tasksSizeTarget.textContent = this.formatBytes(organizer.task_size_bytes)
+      }
+      if (this.hasNotePadSizeTarget && organizer.note_size_bytes) {
+        this.notePadSizeTarget.textContent = this.formatBytes(organizer.note_size_bytes)
+      }
+      if (this.hasStickyNotesSizeTarget && organizer.whiteboard_size_bytes) {
+        this.stickyNotesSizeTarget.textContent = this.formatBytes(organizer.whiteboard_size_bytes)
+      }
+      if (this.hasSketchpadSizeTarget && organizer.excalidraw_size_bytes) {
+        this.sketchpadSizeTarget.textContent = this.formatBytes(organizer.excalidraw_size_bytes)
       }
     } catch (_error) {
       // Keep launcher status non-blocking if metrics endpoint is unavailable.
@@ -235,8 +241,10 @@ export default class extends Controller {
   }
 
   labelForItemType(itemType) {
-    if (itemType === "note") return "Notes"
+    if (itemType === "note") return "Notepad"
     if (itemType === "task_list") return "Tasks"
+    if (itemType === "whiteboard") return "Sticky Notes"
+    if (itemType === "excalidraw") return "Sketchpad"
     return null
   }
 

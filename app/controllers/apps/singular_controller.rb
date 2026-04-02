@@ -2,12 +2,30 @@
 
 module Apps
   class SingularController < BaseController
-    before_action :redirect_top_level_frame_requests, only: %i[note task_list whiteboard]
+before_action :redirect_top_level_frame_requests, only: %i[note task_list whiteboard excalidraw]
     before_action :ensure_singular_items
 
     # GET /apps/singular_note
     def note
       @note = @app_folder.items.find_by(item_type: "note")
+    end
+
+    # PATCH /apps/singular_note
+    def update_note
+      @note = @app_folder.items.find_by(item_type: "note")
+      return head :not_found unless @note
+
+      if @note.update(note_params)
+        render json: {
+          ok: true,
+          id: @note.id,
+          item_type: @note.item_type,
+          name: @note.name,
+          updated_at: @note.updated_at&.utc&.iso8601
+        }
+      else
+        render json: { errors: @note.errors.full_messages }, status: :unprocessable_entity
+      end
     end
 
     # GET /apps/singular_task_list
@@ -35,6 +53,29 @@ module Apps
         render json: { ok: true }
       else
         render json: { errors: @whiteboard.errors.full_messages }, status: :unprocessable_entity
+      end
+    end
+
+    # GET /apps/singular_excalidraw
+    def excalidraw
+      @drawing = @app_folder.items.find_by(item_type: "excalidraw")
+    end
+
+    # PATCH /apps/singular_excalidraw
+    def update_excalidraw
+      @drawing = @app_folder.items.find_by(item_type: "excalidraw")
+      return head :not_found unless @drawing
+
+      if @drawing.update(excalidraw_params)
+        render json: {
+          ok: true,
+          id: @drawing.id,
+          item_type: @drawing.item_type,
+          name: @drawing.name,
+          updated_at: @drawing.updated_at&.utc&.iso8601
+        }
+      else
+        render json: { errors: @drawing.errors.full_messages }, status: :unprocessable_entity
       end
     end
 
@@ -79,6 +120,15 @@ module Apps
         item.tasks = []
       end
 
+      # Ensure Excalidraw item exists
+      Item.find_or_create_by!(folder_id: @app_folder.id, item_type: "excalidraw") do |item|
+        item.folder_id = @app_folder.id
+        item.name = "Excalidraw"
+        item.item_type = "excalidraw"
+        item.body = "{\"elements\":[],\"appState\":{},\"files\":{}}"
+        item.tasks = []
+      end
+
       # Sync to disk to ensure workspace text files exist.
       # Rare cache-clear reload spikes can trigger transient file races; retry once.
       begin
@@ -98,6 +148,10 @@ module Apps
       JSON.parse(body)
     rescue JSON::ParserError
       []
+    end
+
+    def excalidraw_params
+      params.require(:item).permit(:body)
     end
 
     def normalize_tasks(value)
@@ -139,6 +193,10 @@ module Apps
           }
         end
       end
+    end
+
+    def note_params
+      params.require(:item).permit(:body)
     end
   end
 end
