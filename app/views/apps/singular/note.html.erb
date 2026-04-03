@@ -3,10 +3,6 @@
   <section class="app-surface app-surface--tool app-surface--quill-note"
     data-controller="quill-note"
     data-quill-note-initial-body-value="<%= @note&.body.to_s %>">
-    <header class="app-surface-header tool-window-header os-window-header">
-      <h2 class="tool-window-title os-window-title">NOTEPAD</h2>
-    </header>
-
     <%= form_with model: @note,
       url: apps_singular_note_path(frame_id: frame_id),
       method: :patch,

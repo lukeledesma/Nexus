@@ -1,0 +1,10 @@
+<% frame_id = params[:frame_id].presence || "user-pane" %>
+<turbo-frame id="<%= frame_id %>">
+  <section class="app-surface app-surface--tool app-surface--finder app-surface--settings" aria-label="User">
+    <div class="finder-shell os-window-body-start">
+      <section class="finder-shell-pane finder-shell-pane--contents" aria-label="User content">
+        <%= render "apps/user/panel", frame_id: frame_id %>
+      </section>
+    </div>
+  </section>
+</turbo-frame>

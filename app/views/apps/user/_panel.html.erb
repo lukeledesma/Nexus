@@ -1,0 +1,144 @@
+<div class="settings-user-panel">
+  <% if flash[:notice].present? || flash[:alert].present? %>
+    <p class="settings-user-panel-flash <%= flash[:alert].present? ? "is-error" : "is-success" %>">
+      <%= flash[:alert].presence || flash[:notice] %>
+    </p>
+  <% end %>
+
+  <div class="settings-user-account-row" data-controller="user-security-modal">
+    <div class="settings-user-account-main">
+      <p class="settings-user-account-username"><%= current_user.username.presence || "No username set" %></p>
+      <p class="settings-user-account-email"><%= current_user.email %></p>
+    </div>
+    <div class="settings-user-account-actions">
+      <button
+        type="button"
+        class="settings-user-icon-btn"
+        title="Reset username"
+        aria-label="Open username reset"
+        data-action="click->user-security-modal#openUsernameModalWithConfirm"
+      >
+        <%= image_tag "id_card_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg", alt: "", class: "settings-user-icon" %>
+      </button>
+      <button
+        type="button"
+        class="settings-user-icon-btn"
+        title="Reset credentials"
+        aria-label="Open security reset"
+        data-action="click->user-security-modal#openCredentialsModalWithConfirm"
+      >
+        <%= image_tag "lock_reset_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg", alt: "", class: "settings-user-icon" %>
+      </button>
+
+      <%= form_with url: logout_path, method: :delete, local: true, data: { turbo: false }, class: "settings-user-logout-form" do %>
+        <button type="submit" class="settings-user-icon-btn" title="Log out" aria-label="Log out">
+          <%= image_tag "logout_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg", alt: "", class: "settings-user-icon" %>
+        </button>
+      <% end %>
+    </div>
+    <div class="settings-user-security-modal" data-user-security-modal-target="credentialsModal" aria-hidden="true">
+      <div class="settings-user-security-modal-card login-form-wrapper" role="dialog" aria-modal="true" aria-label="Update username and password">
+        <p class="settings-user-modal-email">
+          <%= current_user.username.present? ? "#{current_user.email} | #{current_user.username}" : current_user.email %>
+        </p>
+
+        <%= form_with url: apps_user_password_path, method: :patch, local: true, class: "login-form", data: { action: "submit->user-security-modal#submitCredentials", user_security_modal_target: "credentialsForm" } do |form| %>
+          <%= hidden_field_tag :frame_id, frame_id %>
+          <p class="settings-user-modal-inline-error" data-user-security-modal-target="credentialsInlineError" hidden></p>
+
+          <div class="form-group" data-user-security-modal-target="credentialsCurrentPasswordRow">
+            <div class="settings-password-input-wrap">
+              <%= form.password_field :current_password, id: "settings-user-current-password", class: "form-input settings-password-input", required: true, autocomplete: "current-password", placeholder: "Current password", data: { user_security_modal_target: "credentialsCurrentPasswordInput", action: "input->user-security-modal#autoHidePasswordVisibility blur->user-security-modal#hidePasswordOnBlur" } %>
+              <button
+                type="button"
+                class="settings-password-visibility-btn"
+                aria-label="Show current password"
+                data-password-target-id="settings-user-current-password"
+                data-visible-icon-path="<%= asset_path('visibility_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg') %>"
+                data-hidden-icon-path="<%= asset_path('visibility_off_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg') %>"
+                data-action="mousedown->user-security-modal#startPeekPassword mouseup->user-security-modal#endPeekPassword mouseleave->user-security-modal#endPeekPassword touchstart->user-security-modal#startPeekPassword touchend->user-security-modal#endPeekPassword touchcancel->user-security-modal#endPeekPassword"
+              >
+                <%= image_tag "visibility_off_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg", alt: "", class: "settings-password-visibility-icon" %>
+              </button>
+            </div>
+          </div>
+          <div class="form-group" data-user-security-modal-target="credentialsNewPasswordRow">
+            <div class="settings-password-input-wrap">
+              <%= form.password_field :password, id: "settings-user-new-password", class: "form-input settings-password-input", required: true, minlength: 8, autocomplete: "new-password", placeholder: "New password", data: { user_security_modal_target: "credentialsNewPasswordInput", action: "input->user-security-modal#autoHidePasswordVisibility blur->user-security-modal#hidePasswordOnBlur" } %>
+              <button
+                type="button"
+                class="settings-password-visibility-btn"
+                aria-label="Show new password"
+                data-password-target-id="settings-user-new-password"
+                data-visible-icon-path="<%= asset_path('visibility_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg') %>"
+                data-hidden-icon-path="<%= asset_path('visibility_off_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg') %>"
+                data-action="mousedown->user-security-modal#startPeekPassword mouseup->user-security-modal#endPeekPassword mouseleave->user-security-modal#endPeekPassword touchstart->user-security-modal#startPeekPassword touchend->user-security-modal#endPeekPassword touchcancel->user-security-modal#endPeekPassword"
+              >
+                <%= image_tag "visibility_off_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg", alt: "", class: "settings-password-visibility-icon" %>
+              </button>
+            </div>
+          </div>
+          <div class="form-group" data-user-security-modal-target="credentialsConfirmPasswordRow">
+            <div class="settings-password-input-wrap">
+              <%= form.password_field :password_confirmation, id: "settings-user-confirm-password", class: "form-input settings-password-input", required: true, minlength: 8, autocomplete: "new-password", placeholder: "Confirm new password", data: { user_security_modal_target: "credentialsConfirmPasswordInput", action: "input->user-security-modal#autoHidePasswordVisibility blur->user-security-modal#hidePasswordOnBlur" } %>
+              <button
+                type="button"
+                class="settings-password-visibility-btn"
+                aria-label="Show confirmation password"
+                data-password-target-id="settings-user-confirm-password"
+                data-visible-icon-path="<%= asset_path('visibility_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg') %>"
+                data-hidden-icon-path="<%= asset_path('visibility_off_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg') %>"
+                data-action="mousedown->user-security-modal#startPeekPassword mouseup->user-security-modal#endPeekPassword mouseleave->user-security-modal#endPeekPassword touchstart->user-security-modal#startPeekPassword touchend->user-security-modal#endPeekPassword touchcancel->user-security-modal#endPeekPassword"
+              >
+                <%= image_tag "visibility_off_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg", alt: "", class: "settings-password-visibility-icon" %>
+              </button>
+            </div>
+          </div>
+
+          <div class="settings-user-modal-actions">
+            <button type="button" class="settings-hub-secondary-btn" data-action="click->user-security-modal#closeCredentialsModal">Cancel</button>
+            <%= form.submit "Reset Password", class: "settings-hub-primary-btn" %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <div class="settings-user-security-modal" data-user-security-modal-target="usernameModal" aria-hidden="true">
+      <div class="settings-user-security-modal-card login-form-wrapper" role="dialog" aria-modal="true" aria-label="Update username">
+        <p class="settings-user-modal-email">
+          <%= current_user.username.present? ? "#{current_user.email} | #{current_user.username}" : current_user.email %>
+        </p>
+
+        <%= form_with url: apps_user_username_path, method: :patch, local: true, class: "login-form", data: { action: "submit->user-security-modal#submitUsername", user_security_modal_target: "usernameForm" } do |form| %>
+          <%= hidden_field_tag :frame_id, frame_id %>
+          <p class="settings-user-modal-inline-error" data-user-security-modal-target="usernameInlineError" hidden></p>
+
+          <div class="form-group" data-user-security-modal-target="usernameOnlyRow">
+            <%= form.text_field :username, value: nil, class: "form-input", maxlength: 32, autocomplete: "username", placeholder: "New username", data: { user_security_modal_target: "usernameOnlyInput" } %>
+          </div>
+          <div class="form-group" data-user-security-modal-target="usernamePasswordRow">
+            <div class="settings-password-input-wrap">
+              <%= form.password_field :current_password, id: "settings-user-username-password", class: "form-input settings-password-input", required: true, autocomplete: "current-password", placeholder: "Password", data: { user_security_modal_target: "usernamePasswordInput", action: "input->user-security-modal#autoHidePasswordVisibility blur->user-security-modal#hidePasswordOnBlur" } %>
+              <button
+                type="button"
+                class="settings-password-visibility-btn"
+                aria-label="Show password"
+                data-password-target-id="settings-user-username-password"
+                data-visible-icon-path="<%= asset_path('visibility_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg') %>"
+                data-hidden-icon-path="<%= asset_path('visibility_off_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg') %>"
+                data-action="mousedown->user-security-modal#startPeekPassword mouseup->user-security-modal#endPeekPassword mouseleave->user-security-modal#endPeekPassword touchstart->user-security-modal#startPeekPassword touchend->user-security-modal#endPeekPassword touchcancel->user-security-modal#endPeekPassword"
+              >
+                <%= image_tag "visibility_off_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg", alt: "", class: "settings-password-visibility-icon" %>
+              </button>
+            </div>
+          </div>
+
+          <div class="settings-user-modal-actions">
+            <button type="button" class="settings-hub-secondary-btn" data-action="click->user-security-modal#closeUsernameModal">Cancel</button>
+            <%= form.submit "Reset Username", class: "settings-hub-primary-btn" %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>

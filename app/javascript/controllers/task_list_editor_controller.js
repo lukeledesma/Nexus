@@ -1,4 +1,9 @@
 import { Controller } from "@hotwired/stimulus"
+import { materialSymbolSvg } from "lib/material_symbols"
+
+function taskToggleMarkup(checked) {
+  return checked ? materialSymbolSvg("check", "xs") : materialSymbolSvg("circle_outline", "xs")
+}
 
 export default class extends Controller {
   static targets = ["list", "payload"]
@@ -382,15 +387,15 @@ export default class extends Controller {
 
     row.innerHTML =
       '<div class="organizer-row-left row-left">' +
-        `<span class="task-toggle" role="button" tabindex="0" aria-label="Toggle task completion">${checked ? "✓" : "○"}</span>` +
+        `<span class="task-toggle" role="button" tabindex="0" aria-label="Toggle task completion">${taskToggleMarkup(checked)}</span>` +
         `<span class="task-item-text" data-role="task-text">${this.#escapeHtml(text)}</span>` +
       "</div>" +
       '<div class="organizer-row-right">' +
         '<span class="task-progress-bar" aria-hidden="true"><span class="task-progress-bar-fill"></span></span>' +
         '<span class="task-progress-label"></span>' +
-        '<span class="row-plus" title="Add subtask">+</span>' +
-        '<span class="item-action-btn" title="Rename">&#9998;</span>' +
-        '<span class="item-action-btn item-action-delete" title="Delete">&times;</span>' +
+        `<span class="row-plus" title="Add subtask">${materialSymbolSvg("add", "xs")}</span>` +
+        `<span class="item-action-btn" title="Rename">${materialSymbolSvg("edit", "xs")}</span>` +
+        `<span class="item-action-btn item-action-delete" title="Delete">${materialSymbolSvg("delete", "xs")}</span>` +
       "</div>"
 
     const subtaskRows = subtasks.map((subtask) => this.#buildSubtaskRow(subtask.text, subtask.checked))
@@ -415,12 +420,12 @@ export default class extends Controller {
 
     row.innerHTML =
       '<div class="organizer-row-left row-left">' +
-        `<span class="task-toggle" role="button" tabindex="0" aria-label="Toggle subtask completion">${checked ? "✓" : "○"}</span>` +
+        `<span class="task-toggle" role="button" tabindex="0" aria-label="Toggle subtask completion">${taskToggleMarkup(checked)}</span>` +
         `<span class="task-item-text task-item-text--subtask" data-role="task-text">${this.#escapeHtml(text)}</span>` +
       "</div>" +
       '<div class="organizer-row-right">' +
-        '<span class="item-action-btn" title="Rename">&#9998;</span>' +
-        '<span class="item-action-btn item-action-delete" title="Delete">&times;</span>' +
+        `<span class="item-action-btn" title="Rename">${materialSymbolSvg("edit", "xs")}</span>` +
+        `<span class="item-action-btn item-action-delete" title="Delete">${materialSymbolSvg("delete", "xs")}</span>` +
       "</div>"
 
     return row
@@ -456,7 +461,7 @@ export default class extends Controller {
 
       const mainChecked = mainRow.dataset.mainChecked === "true"
       const mainToggle = mainRow.querySelector(".task-toggle")
-      if (mainToggle) mainToggle.textContent = mainChecked ? "✓" : "○"
+      if (mainToggle) mainToggle.innerHTML = taskToggleMarkup(mainChecked)
 
       const fill = mainRow.querySelector(".task-progress-bar-fill")
       const label = mainRow.querySelector(".task-progress-label")
@@ -475,7 +480,7 @@ export default class extends Controller {
         subtask.classList.toggle("task-item-group--tail", index === subtaskCount - 1)
 
         const subToggle = subtask.querySelector(".task-toggle")
-        if (subToggle) subToggle.textContent = subtask.classList.contains("task-item-row--checked") ? "✓" : "○"
+        if (subToggle) subToggle.innerHTML = taskToggleMarkup(subtask.classList.contains("task-item-row--checked"))
       })
     })
 

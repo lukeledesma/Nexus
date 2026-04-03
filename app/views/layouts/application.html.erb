@@ -28,8 +28,6 @@
   <body class="<%= logged_in? ? "nexus-os" : "" %>" data-controller="window-manager">
     <% if logged_in? %>
       <div id="desktop" class="desktop-layer" data-controller="desktop-selection"></div>
-      <div data-controller="workspace-manager" data-workspace-manager-url-value="/workspace_preferences" hidden></div>
-
       <div class="desktop-clock" data-controller="desktop-clock">
         <span class="desktop-clock-display" data-desktop-clock-target="display"></span>
       </div>
@@ -42,13 +40,47 @@
 
       <section class="content-window os-window is-hidden"
         data-controller="content-window"
+        data-content-window-app-key-value="finder"
+        data-content-window-app-url-value="/apps/finder"
+        data-content-window-storage-key-value="nexus.contentWindow.finder.bounds"
+        data-content-window-frame-id-value="finder-pane"
+        aria-live="polite">
+        <header class="content-window-chrome finder-window-chrome">
+          <div class="finder-window-title-shell">
+            <h2 class="content-window-chrome-title">FINDER</h2>
+            <%= form_with url: apps_finder_create_folder_path, method: :post, html: { class: "finder-window-add-form", data: { turbo_frame: "finder-pane" } } do %>
+              <%= hidden_field_tag :frame_id, "finder-pane" %>
+              <button
+                type="submit"
+                class="finder-window-add-button"
+                aria-label="Create folder"
+                title="Create folder"
+              ><%= material_symbol_icon(:add, size: :sm) %></button>
+            <% end %>
+          </div>
+          <%= render "shared/content_window_close_button" %>
+        </header>
+        <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="window-content">
+          <turbo-frame id="finder-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
+        </div>
+      </section>
+
+      <section class="content-window os-window is-hidden"
+        data-controller="content-window"
         data-content-window-app-key-value="timer"
         data-content-window-app-url-value="/apps/timer"
         data-content-window-storage-key-value="nexus.contentWindow.timer.bounds"
         data-content-window-frame-id-value="timer-pane"
         aria-live="polite">
-        <div class="title-bar" data-action="mousedown->content-window#startDrag touchstart->content-window#startDrag"></div>
-        <button type="button" class="tools-close-btn content-window-close" data-action="click->content-window#close" aria-label="Close" title="Close">✕</button>
+        <%= render "shared/content_window_chrome", title: "TIMER" %>
         <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
@@ -69,8 +101,7 @@
         data-content-window-storage-key-value="nexus.contentWindow.conversionChart.bounds"
         data-content-window-frame-id-value="conversion-chart-pane"
         aria-live="polite">
-        <div class="title-bar" data-action="mousedown->content-window#startDrag touchstart->content-window#startDrag"></div>
-        <button type="button" class="tools-close-btn content-window-close" data-action="click->content-window#close" aria-label="Close" title="Close">✕</button>
+        <%= render "shared/content_window_chrome", title: "SAE/METRIC" %>
         <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
@@ -91,8 +122,7 @@
         data-content-window-storage-key-value="nexus.contentWindow.singularNote.bounds"
         data-content-window-frame-id-value="singular-note-pane"
         aria-live="polite">
-        <div class="title-bar" data-action="mousedown->content-window#startDrag touchstart->content-window#startDrag"></div>
-        <button type="button" class="tools-close-btn content-window-close" data-action="click->content-window#close" aria-label="Close" title="Close">✕</button>
+        <%= render "shared/content_window_chrome", title: "NOTEPAD" %>
         <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
@@ -113,8 +143,7 @@
         data-content-window-storage-key-value="nexus.contentWindow.singularTaskList.bounds"
         data-content-window-frame-id-value="singular-task-list-pane"
         aria-live="polite">
-        <div class="title-bar" data-action="mousedown->content-window#startDrag touchstart->content-window#startDrag"></div>
-        <button type="button" class="tools-close-btn content-window-close" data-action="click->content-window#close" aria-label="Close" title="Close">✕</button>
+        <%= render "shared/content_window_chrome", title: "TASKS" %>
         <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
@@ -135,8 +164,7 @@
         data-content-window-storage-key-value="nexus.contentWindow.singularWhiteboard.bounds"
         data-content-window-frame-id-value="singular-whiteboard-pane"
         aria-live="polite">
-        <div class="title-bar" data-action="mousedown->content-window#startDrag touchstart->content-window#startDrag"></div>
-        <button type="button" class="tools-close-btn content-window-close" data-action="click->content-window#close" aria-label="Close" title="Close">✕</button>
+        <%= render "shared/content_window_chrome", title: "STICKY NOTES" %>
         <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
@@ -157,8 +185,7 @@
         data-content-window-storage-key-value="nexus.contentWindow.singularExcalidraw.bounds"
         data-content-window-frame-id-value="singular-excalidraw-pane"
         aria-live="polite">
-        <div class="title-bar" data-action="mousedown->content-window#startDrag touchstart->content-window#startDrag"></div>
-        <button type="button" class="tools-close-btn content-window-close" data-action="click->content-window#close" aria-label="Close" title="Close">✕</button>
+        <%= render "shared/content_window_chrome", title: "SKETCHPAD" %>
         <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
@@ -172,77 +199,91 @@
         </div>
       </section>
 
-      <section class="content-window content-window--auto-sized os-window is-hidden"
+      <section class="content-window os-window is-hidden"
         data-controller="content-window"
-        data-content-window-app-key-value="theme-builder"
-        data-content-window-app-url-value="/apps/theme_builder"
-        data-content-window-storage-key-value="nexus.contentWindow.themeBuilder.bounds"
-        data-content-window-frame-id-value="theme-builder-pane"
+        data-content-window-app-key-value="theme-studio"
+        data-content-window-app-url-value="/apps/theme_studio"
+        data-content-window-storage-key-value="nexus.contentWindow.themeStudio.bounds"
+        data-content-window-frame-id-value="theme-studio-pane"
         aria-live="polite">
-        <div class="title-bar" data-action="mousedown->content-window#startDrag touchstart->content-window#startDrag"></div>
-        <button type="button" class="tools-close-btn content-window-close" data-action="click->content-window#close" aria-label="Close" title="Close">✕</button>
+        <header class="content-window-chrome theme-studio-window-chrome">
+          <div class="theme-studio-window-title-shell">
+            <h2 class="content-window-chrome-title">THEME STUDIO</h2>
+            <span class="theme-studio-window-title-separator" aria-hidden="true">|</span>
+            <span class="theme-studio-window-title-subtext" data-theme-studio-chrome="status">Default</span>
+            <input
+              type="text"
+              class="settings-themes-item-rename-input theme-builder-name-input theme-builder-hidden theme-studio-window-title-input"
+              data-theme-studio-chrome="name-input"
+              placeholder="Theme..."
+              autocomplete="off"
+              spellcheck="false"
+              maxlength="64"
+              aria-label="Theme name"
+            >
+            <button
+              type="button"
+              class="settings-themes-item-action-btn settings-themes-item-rename-btn theme-builder-save-btn theme-builder-hidden theme-studio-window-title-save"
+              data-theme-studio-chrome="save"
+              title="Save Theme"
+              aria-label="Save Theme"
+            ><%= material_symbol_icon(:save, size: :sm) %></button>
+          </div>
+          <%= render "shared/content_window_close_button" %>
+        </header>
+        <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="window-content">
-          <turbo-frame id="theme-builder-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
+          <turbo-frame id="theme-studio-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
         </div>
       </section>
 
-      <section class="db-health-window os-window is-hidden" data-controller="db-health" data-db-health-url-value="<%= db_health_path %>" data-db-health-target="window" aria-live="polite">
-          <section class="db-health-panel" data-db-health-target="panel">
-          <header class="db-health-header os-window-header" data-action="mousedown->db-health#startDrag touchstart->db-health#startDrag">
-            <div class="db-health-title-wrap">
-              <h3 class="os-window-title" data-db-health-target="title">DB Health</h3>
-              <span class="db-health-heartbeat" aria-hidden="true">♥</span>
-            </div>
-            <div class="db-health-controls os-window-controls">
-              <button type="button" class="db-health-back hidden" data-db-health-target="backButton" data-action="click->db-health#clearFocus" aria-label="Back" title="Back">←</button>
-              <button type="button" class="db-health-close" data-action="click->db-health#close" aria-label="Close" title="Close">✕</button>
-            </div>
-          </header>
-
-          <dl class="db-health-grid os-window-body-start" data-db-health-target="grid">
-            <div class="db-health-card db-health-card--selectable" data-db-health-target="metricCard" data-db-health-focus-key="folders" data-action="click->db-health#focusMetric"><dt>Folders</dt><dd data-db-health-target="foldersCount">-</dd></div>
-            <div class="db-health-card db-health-card--selectable" data-db-health-target="metricCard" data-db-health-focus-key="items" data-action="click->db-health#focusMetric"><dt>Items</dt><dd data-db-health-target="itemsCount">-</dd></div>
-            <div class="db-health-card db-health-card--selectable" data-db-health-target="metricCard" data-db-health-focus-key="item_id_total" data-action="click->db-health#focusMetric"><dt>Item IDs</dt><dd data-db-health-target="maxItemId">-</dd></div>
-            <div class="db-health-card db-health-card--selectable" data-db-health-target="metricCard" data-db-health-focus-key="workspace" data-action="click->db-health#focusMetric"><dt>Workspace Size</dt><dd data-db-health-target="workspaceSize">-</dd></div>
-            <div class="db-health-card db-health-card--selectable" data-db-health-target="metricCard" data-db-health-focus-key="users" data-action="click->db-health#focusMetric"><dt>Users</dt><dd data-db-health-target="usersCount">-</dd></div>
-            <div class="db-health-card db-health-card--selectable" data-db-health-target="metricCard" data-db-health-focus-key="db_size" data-action="click->db-health#focusMetric"><dt>DB Size</dt><dd data-db-health-target="dbSize">-</dd></div>
-          </dl>
-
-          <section class="db-health-detail os-window-body-start hidden" data-db-health-target="detailWrap">
-            <ul class="db-health-detail-list" data-db-health-target="detailList"></ul>
-          </section>
-          </section>
+      <section class="content-window os-window is-hidden"
+        data-controller="content-window"
+        data-content-window-app-key-value="settings"
+        data-content-window-app-url-value="/apps/settings"
+        data-content-window-storage-key-value="nexus.contentWindow.settings.bounds"
+        data-content-window-frame-id-value="settings-pane"
+        aria-live="polite">
+        <%= render "shared/content_window_chrome", title: "SETTINGS" %>
+        <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="window-content">
+          <turbo-frame id="settings-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
+        </div>
       </section>
 
-      <section class="settings-window os-window is-hidden" data-controller="settings" data-settings-target="window" aria-live="polite">
-        <section class="settings-panel">
-          <header class="settings-header os-window-header" data-action="mousedown->settings#startDrag touchstart->settings#startDrag">
-            <h3 class="os-window-title" data-settings-target="title">Settings</h3>
-            <div class="settings-controls os-window-controls">
-              <button type="button" class="settings-back hidden" data-settings-target="backButton" data-action="click->settings#showMain" aria-label="Back to Settings" title="Back">←</button>
-              <button type="button" class="settings-close" data-action="click->settings#close" aria-label="Close Settings" title="Close">✕</button>
-            </div>
-          </header>
-
-          <div class="settings-actions os-window-body-start os-window-grid os-window-grid--2" data-settings-target="actions">
-            <button type="button" class="settings-action os-window-card settings-action--themes" data-action="click->settings#showThemes">
-              <div class="os-window-card-content">
-                <dt class="os-window-card-label">THEMES</dt>
-                <dd class="os-window-card-value" data-settings-target="themeStatus">MANAGE</dd>
-              </div>
-            </button>
-            <%= button_to logout_path, method: :delete, class: "settings-action os-window-card settings-action--logout", form: { data: { turbo_confirm: "Are you sure you want to log out?" } } do %>
-              <div class="os-window-card-content">
-                <dt class="os-window-card-label">LOGOUT</dt>
-                <dd class="os-window-card-value">EXIT</dd>
-              </div>
-            <% end %>
-          </div>
-
-          <section class="settings-interface hidden" data-settings-target="themesSection">
-            <ul class="settings-themes-list" data-settings-target="themesList" aria-label="Saved themes"></ul>
-          </section>
-        </section>
+      <section class="content-window os-window is-hidden"
+        data-controller="content-window"
+        data-content-window-app-key-value="user"
+        data-content-window-app-url-value="/apps/user"
+        data-content-window-storage-key-value="nexus.contentWindow.user.bounds"
+        data-content-window-frame-id-value="user-pane"
+        aria-live="polite">
+        <%= render "shared/content_window_chrome", title: "USER" %>
+        <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="window-content">
+          <turbo-frame id="user-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
+        </div>
       </section>
 
     <% end %>

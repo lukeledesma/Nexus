@@ -1,10 +1,6 @@
 <% frame_id = params[:frame_id].presence || "app-pane" %>
 <turbo-frame id="<%= frame_id %>">
   <section class="app-surface app-surface--tool" data-controller="tool-window-status" data-tool-window-status-static-text-value="Conversion Table">
-    <header class="app-surface-header tool-window-header os-window-header">
-      <h2 class="tool-window-title os-window-title">SAE/METRIC</h2>
-    </header>
-
     <div class="conversion-chart-view os-window-body-start">
       <div class="conversion-grid">
         <section class="conversion-card conversion-card--standard">

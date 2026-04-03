@@ -80,9 +80,40 @@
   --window-bg: hsl(var(--window-bg-h) var(--window-bg-saturation) var(--window-bg-brightness) / var(--window-bg-alpha));
   --desktop-bg-color-1: hsl(var(--desktop-bg-1-hue) var(--desktop-bg-1-saturation) var(--desktop-bg-1-brightness));
   --desktop-bg-color-2: hsl(var(--desktop-bg-2-hue) var(--desktop-bg-2-saturation) var(--desktop-bg-2-brightness));
+
+  /* Default inset for page chrome (main window content, etc.); framed apps use .content-window rules */
+  --os-shell-content-padding: var(--os-window-padding);
 }
 
 * { box-sizing: border-box; }
+
+/* Material Symbols (SVG from app/assets/icons/material-symbol-*-24.svg, fill currentColor) */
+svg.material-icon {
+  display: block;
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+svg.material-icon--xs {
+  width: 0.9375rem;
+  height: 0.9375rem;
+}
+
+svg.material-icon--sm {
+  width: 1.0625rem;
+  height: 1.0625rem;
+}
+
+svg.material-icon--md {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+svg.material-icon--lg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
 
 .os-window-header {
   display: flex;
@@ -188,6 +219,155 @@
 .os-window-card-value--icon {
   line-height: 1;
   min-height: 1.05rem;
+}
+
+.organizer-tools-grid.os-window-grid {
+  gap: 0.22rem 0.4rem;
+}
+
+/* Launcher: always two equal columns, wrap rows; minmax(0,…) avoids overflow bugs */
+.organizer-tools-grid.organizer-tools-grid--launcher.os-window-grid--2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-flow: row;
+  align-content: start;
+  width: 100%;
+}
+
+.organizer-tools-grid.organizer-tools-grid--launcher.os-window-grid--2 > .launcher-tile-wrap {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.launcher-tile-wrap {
+  position: relative;
+  display: block;
+}
+
+/* Valid <dl> body: reset UA margins so label/icon stay inside the tile button */
+dl.launcher-tile-body {
+  margin: 0;
+  padding: 0;
+}
+
+dl.launcher-tile-body dd {
+  margin-inline-start: 0;
+}
+
+.os-window-card--launcher-tile.launcher-tile-main {
+  position: static;
+  height: auto;
+  min-height: calc(var(--os-standard-card-height) + 0.35rem);
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: 0.42rem 0.34rem;
+  width: 100%;
+}
+
+.os-window-card--launcher-tile .os-window-card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 0.22rem;
+  width: 100%;
+  min-height: 0;
+}
+
+.os-window-card--launcher-tile .os-window-card-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.03em;
+  line-height: 1.15;
+}
+
+.os-window-card--launcher-tile .os-window-card-value {
+  margin: 0;
+}
+
+.launcher-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin-top: 0;
+  padding-bottom: 0.12rem;
+  color: var(--text);
+}
+
+.launcher-card-icon svg.material-icon,
+.launcher-card-icon svg.material-icon--lg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.launcher-card-conversion {
+  margin: 0;
+  padding-bottom: 0.1rem;
+  color: var(--text);
+  font-size: 0.62rem;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.launcher-dock-pin-btn {
+  position: absolute;
+  top: 0.22rem;
+  right: 0.22rem;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.12rem;
+  margin: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 180ms ease, visibility 180ms ease, color 0.12s ease, background 0.12s ease;
+}
+
+.launcher-dock-pin-btn:hover,
+.launcher-dock-pin-btn:focus-visible {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.launcher-dock-pin-btn__glyph {
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.launcher-dock-pin-btn.is-pinned .launcher-dock-pin-btn__glyph--remove {
+  display: flex;
+}
+
+.launcher-dock-pin-btn:not(.is-pinned) .launcher-dock-pin-btn__glyph--add {
+  display: flex;
+}
+
+.launcher-dock-pin-btn svg.material-icon,
+.launcher-dock-pin-btn svg.material-icon--xs {
+  width: 0.92rem;
+  height: 0.92rem;
+}
+
+.launcher-tile-wrap:hover .launcher-dock-pin-btn,
+.launcher-tile-wrap:focus-within .launcher-dock-pin-btn {
+  opacity: 1;
+  visibility: visible;
 }
 
 .launcher-text-caret {
@@ -311,11 +491,17 @@
 }
 
 .db-health-heartbeat {
-  display: inline-block;
-  font-size: 0.88rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: rgba(255, 185, 198, 0.7);
   transform-origin: center;
   animation: db-heartbeat 1s ease-in-out infinite;
+}
+
+.db-health-heartbeat svg.material-icon {
+  width: 1rem;
+  height: 1rem;
 }
 
 .db-health-header:has(.db-health-back:not(.hidden)) .db-health-heartbeat {
@@ -334,6 +520,9 @@
 .settings-back,
 .settings-close,
 .tools-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   border-radius: 4px;
   background: transparent;
@@ -1092,14 +1281,6 @@ a:hover { text-decoration: underline; }
   font-size: 0.85rem;
 }
 
-.workspace-clock--toggle {
-  cursor: pointer;
-}
-
-.workspace-clock--toggle:hover {
-  color: var(--text);
-}
-
 .item-create-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -1487,28 +1668,6 @@ a:hover { text-decoration: underline; }
   padding-left: 0.55rem !important;
 }
 
-.task-reset-panel {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 0.75rem;
-}
-
-.task-reset-panel.hidden {
-  display: none;
-}
-
-.reset-days-grid {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 0.4rem;
-}
-
-.reset-day-button {
-  margin-right: 0;
-  padding: 0.3rem 0.45rem;
-}
-
 .workspace-header {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -1615,6 +1774,11 @@ input.connection-inline {
   font-size: 1.08rem;
   font-weight: 600;
   line-height: 1;
+}
+
+.btn-toolbar-icon svg.material-icon {
+  width: 1.2rem;
+  height: 1.2rem;
 }
 .workspace-form.workspace-locked .btn-add-row,
 .workspace-form.workspace-locked .btn-select-mode { display: none; }
@@ -1828,6 +1992,9 @@ input.connection-inline {
 .row-pencil {
   opacity: 0;
   pointer-events: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--border);
   background: var(--surface-raised);
   color: var(--text);
@@ -2242,6 +2409,19 @@ input.connection-inline {
   flex-grow: 0;
 }
 
+/*
+ * Launcher inner shell (#organizer): padding is the inset from the window chrome to the content.
+ * - Top + left + right: “standard” shell inset (same idea as --os-window-padding elsewhere).
+ * - Bottom: separate knob — only the gap below the user/settings row to the inner bottom edge.
+ * - gap: only the space between the last app row and the user/settings row (not the same as bottom inset).
+ */
+.organizer-panel--apps {
+  --launcher-shell-inset-top: 0.65rem;
+  --launcher-shell-inset-x: 0.65rem;
+  --launcher-footer-gap: 0.65rem;
+  --launcher-footer-bottom-inset: 0.65rem;
+}
+
 .organizer-panel-header {
   cursor: grab;
   user-select: none;
@@ -2632,7 +2812,7 @@ input.connection-inline {
 
 .pane-resize-handle {
   position: absolute;
-  z-index: 30;
+  z-index: 120;
   background: transparent;
 }
 
@@ -3119,7 +3299,7 @@ input.connection-inline {
   color: var(--text-muted);
   font-size: 0.78rem;
   line-height: 1;
-  padding: 0.15rem 0.28rem;
+  padding: 0.1rem 0.22rem;
   cursor: pointer;
   transition: color 0.12s ease, background 0.12s ease;
 }
@@ -3541,8 +3721,8 @@ input.connection-inline {
   position: absolute;
   top: 0.25rem;
   right: 0.25rem;
-  width: 12px;
-  height: 12px;
+  width: 18px;
+  height: 18px;
   display: none;
   align-items: center;
   justify-content: center;
@@ -3565,6 +3745,11 @@ input.connection-inline {
 
 .whiteboard-sticky-delete-btn:hover {
   color: rgba(255, 255, 255, 0.95);
+}
+
+.whiteboard-sticky-delete-btn svg.material-icon {
+  width: 0.75rem;
+  height: 0.75rem;
 }
 
 .whiteboard-sticky.is-editing .whiteboard-sticky-delete-btn {
@@ -3639,6 +3824,9 @@ input.connection-inline {
 }
 
 .btn-add-task {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -3648,6 +3836,10 @@ input.connection-inline {
   padding: 0.38rem 0.75rem;
   cursor: pointer;
   transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.btn-add-task__icon {
+  flex-shrink: 0;
 }
 
 .btn-add-task:hover {
@@ -3739,6 +3931,13 @@ input.connection-inline {
   opacity: 1;
   visibility: visible;
   transform: translateX(-50%) translateY(0);
+}
+
+body.nexus-os:has(#organizer-window:not(.is-hidden)) .app-dock-button[data-hover-label]:hover::after,
+body.nexus-os:has(#organizer-window:not(.is-hidden)) .app-dock-button[data-hover-label]:focus-visible::after {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-50%) translateY(4px);
 }
 
 .settings-window {
@@ -3992,13 +4191,14 @@ input.connection-inline {
   align-content: start;
 }
 
-.theme-builder-view .tool-window-header {
-  padding-right: 2rem;
+.theme-builder-view .tool-window-header,
+.theme-builder-view .theme-builder-toolbar {
+  padding-right: 0;
 }
 
 .theme-builder-title-row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: flex-start;
   gap: 0.34rem;
   flex-wrap: nowrap;
@@ -4021,16 +4221,10 @@ input.connection-inline {
   white-space: nowrap;
 }
 
-.theme-builder-status-text::before {
-  content: "-";
-  margin-right: 0.36rem;
-  color: var(--text-muted);
-}
-
 .theme-builder-save-btn {
   flex: 0 0 auto;
-  align-self: baseline;
-  transform: translateY(-2px);
+  align-self: center;
+  transform: none;
 }
 
 .theme-builder-name-input {
@@ -4046,12 +4240,13 @@ input.connection-inline {
 }
 
 .theme-builder-main-shell {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 0.6rem;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 0.35rem;
 }
 
+/* Studio rows: same connected-border rhythm as .settings-themes-list */
 .theme-builder-section {
   --task-text-control-height: 23.5px;
   display: grid;
@@ -4060,8 +4255,35 @@ input.connection-inline {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 0.5rem 0.7rem;
-  background: rgba(255, 255, 255, 0.02);
+  background: transparent;
   align-items: center;
+  align-content: start;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.theme-builder-section:has(+ .theme-builder-section) {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.theme-builder-section + .theme-builder-section {
+  margin-top: -1px;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.theme-builder-section:hover,
+.theme-builder-section:focus-within {
+  position: relative;
+  z-index: 1;
+  background: rgba(148, 163, 184, 0.05);
+  border-color: #3b82f6;
+}
+
+.theme-builder-section:not(.is-collapsed) {
+  position: relative;
+  z-index: 1;
+  border-color: #3b82f6;
 }
 
 .theme-builder-section-title {
@@ -4349,6 +4571,7 @@ input.connection-inline {
 
 .organizer-window.os-window {
   position: fixed;
+  z-index: 1720;
 }
 
 .content-window.os-window {
@@ -4361,6 +4584,8 @@ input.connection-inline {
   height: min(480px, calc(100vh - 2rem));
   z-index: 1500;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .content-window .window-content {
@@ -4368,7 +4593,7 @@ input.connection-inline {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1 1 auto;
   min-height: 0;
   background: transparent;
 }
@@ -4406,13 +4631,12 @@ input.connection-inline {
 }
 
 .content-window-close {
-  position: absolute;
-  top: 0.55rem;
-  right: 0.75rem;
-  z-index: 65;
+  position: static;
+  z-index: 130;
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
+  margin-left: auto;
 }
 
 .app-dock {
@@ -4426,6 +4650,114 @@ input.connection-inline {
   flex-direction: row;
   align-items: center;
   gap: 0.45rem;
+}
+
+/* Launcher footer: account + logout left, settings right */
+.launcher-footer-shell {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  width: 100%;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.launcher-footer-leading {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.38rem;
+  min-width: 0;
+  flex: 1 1 auto;
+  margin-right: 0.45rem;
+}
+
+.launcher-footer-leading .button_to {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+
+.launcher-footer-logout-form {
+  appearance: none;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.launcher-footer-logout-icon {
+  width: 0.92rem;
+  height: 0.92rem;
+  flex: 0 0 auto;
+  display: block;
+  pointer-events: none;
+}
+
+.launcher-footer-btn--logout {
+  pointer-events: none;
+}
+
+.launcher-footer-btn {
+  position: relative;
+  flex: 0 0 auto;
+  width: 1.2rem;
+  height: 1.2rem;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(228, 228, 231, 0.88);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.launcher-footer-btn:hover,
+.launcher-footer-btn:focus-visible {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.launcher-footer-btn svg.material-icon,
+.launcher-footer-btn svg.material-icon--sm {
+  width: 0.92rem;
+  height: 0.92rem;
+}
+
+.launcher-footer-account-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.launcher-footer-account-icon {
+  width: 0.95rem;
+  height: 0.95rem;
+  display: block;
+  pointer-events: none;
+}
+
+.app-placeholder-app-body {
+  flex: 1 1 auto;
+  min-height: 12rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+}
+
+.app-placeholder-copy {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-align: center;
 }
 
 .app-dock-button {
@@ -4447,6 +4779,11 @@ input.connection-inline {
   transition: background 140ms ease, color 140ms ease;
 }
 
+.app-dock-button svg.material-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
 .app-dock-button:hover,
 .app-dock-button:focus-visible {
   background: rgba(255, 255, 255, 0.08);
@@ -4456,37 +4793,17 @@ input.connection-inline {
   background: rgba(255, 255, 255, 0.08);
 }
 
-.app-dock-button--launcher {
-  font-size: 0.94rem;
-  padding-bottom: 1px;
-}
-
 .app-dock-button--launcher.is-active {
   color: rgba(134, 239, 172, 0.95);
 }
 
-.app-dock-button--db-health {
-  font-size: 0.86rem;
-}
-
-.app-dock-button--db-health.is-active {
-  color: rgba(255, 185, 198, 0.95);
-}
-
-.app-dock-button--settings {
-  font-size: 1.09rem;
-  padding-bottom: 2.5px;
-}
-
-.app-dock-button--settings.is-active {
-  color: rgba(186, 230, 253, 0.95);
+.app-dock-button--dock-app.is-active {
+  color: rgba(167, 243, 208, 0.95);
 }
 
 @media (max-width: 720px) {
   .app-dock {
     left: 50%;
-    top: auto;
-    bottom: 0.38rem;
     transform: translateX(-50%);
   }
 }
@@ -4495,7 +4812,7 @@ input.connection-inline {
 .window-content {
   width: 100%;
   height: 100%;
-  padding: 16px;
+  padding: var(--os-shell-content-padding);
   box-sizing: border-box;
   overflow: hidden;
   display: flex;
@@ -4503,21 +4820,485 @@ input.connection-inline {
   pointer-events: auto;
 }
 
-/* Title Bar (Minimal, invisible — cursor only) */
-.title-bar {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 22px;
-  cursor: grab;
-  z-index: 50;
+/* Shared content window chrome row */
+.content-window-chrome {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 2.7rem;
+  padding: 0.4rem 0.75rem 0.35rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.content-window-chrome-title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text);
+  line-height: 1;
+}
+
+.finder-window-chrome .finder-window-title-shell {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.finder-window-add-form {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
+.finder-window-add-button {
+  appearance: none;
+  border: none;
   background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  padding: 2px 4px;
+  transition: color 140ms ease, background 140ms ease;
+}
+
+.finder-window-add-button:hover,
+.finder-window-add-button:focus-visible {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.theme-studio-window-chrome .theme-studio-window-title-shell {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.theme-studio-window-title-separator {
+  color: var(--text-muted);
+  opacity: 0.8;
+  font-size: 0.68rem;
+  line-height: 1;
+}
+
+.theme-studio-window-title-subtext {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.theme-studio-window-title-input {
+  width: 8.5rem;
+}
+
+.theme-studio-window-title-save {
+  margin-left: 0.1rem;
+}
+
+/* Keep drag cursor neutral like macOS/Windows */
+.content-window .content-window-chrome {
+  cursor: default;
+}
+
+/* Settings hub (apps/settings inside content window) */
+.content-window[data-content-window-app-key-value="settings"] .window-content {
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.settings-hub {
+  min-height: min(100%, 520px);
+  padding: 0;
+}
+
+.app-surface--settings .finder-shell-pane--folders {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-sections-list {
+  flex: 1 1 auto;
+}
+
+.settings-user-panel {
+  min-height: min(100%, 520px);
+}
+
+.settings-user-account-row {
+  margin-top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.72rem 0.8rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.settings-user-account-main {
+  min-width: 0;
+}
+
+.settings-user-account-username {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+  text-align: left;
+}
+
+.settings-user-account-email {
+  margin: 0.25rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  word-break: break-all;
+}
+
+.settings-user-account-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.settings-user-icon-btn {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.settings-user-icon-btn:hover,
+.settings-user-icon-btn:focus-visible {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.settings-user-icon {
+  width: 1rem;
+  height: 1rem;
+  display: block;
+  opacity: 0.94;
+}
+
+.settings-user-security-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(3, 7, 18, 0.86);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.settings-user-security-modal.is-open {
+  display: flex;
+}
+
+.settings-user-security-modal-card {
+  width: 100%;
+  max-width: 420px;
+  text-align: left;
+  --settings-modal-gap: 1rem;
+}
+
+.settings-user-security-modal-card.login-form-wrapper {
+  padding: 1rem;
+}
+
+.settings-user-security-modal-card .app-title {
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+.settings-user-security-modal-card .login-subtitle {
+  margin: 0.2rem 0 0.45rem;
+}
+
+.settings-user-modal-email {
+  margin: 0 0 var(--settings-modal-gap);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+.settings-user-modal-inline-error {
+  margin: 0;
+  color: #fecaca;
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  border-radius: 6px;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.78rem;
+}
+
+.settings-user-security-modal-card .login-form {
+  gap: var(--settings-modal-gap);
+}
+
+.settings-user-security-modal .form-group.is-invalid .form-input {
+  border-color: rgba(248, 113, 113, 0.8);
+  box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.55) inset;
+  background: rgba(127, 29, 29, 0.15);
+}
+
+.settings-password-input-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.settings-password-input {
+  width: 100%;
+  padding-right: 2.35rem;
+}
+
+.settings-password-visibility-btn {
+  position: absolute;
+  top: 50%;
+  right: 0.5rem;
+  transform: translateY(-50%);
+  width: 1.55rem;
+  height: 1.55rem;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease, background 140ms ease, border-color 140ms ease;
+}
+
+.settings-password-input-wrap:hover .settings-password-visibility-btn,
+.settings-password-input-wrap:focus-within .settings-password-visibility-btn,
+.settings-password-input[type="text"] + .settings-password-visibility-btn {
+  opacity: 1;
   pointer-events: auto;
 }
 
-.title-bar:active {
-  cursor: grabbing;
+.settings-password-visibility-btn:hover,
+.settings-password-visibility-btn:focus-visible {
+  background: rgba(255, 255, 255, 0.13);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.settings-password-visibility-icon {
+  width: 0.9rem;
+  height: 0.9rem;
+  display: block;
+  opacity: 0.92;
+}
+
+.settings-user-modal-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0;
+}
+
+.settings-user-logout-form {
+  margin: 0;
+}
+
+.settings-user-panel-flash {
+  margin: 0.65rem 0 0.9rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(148, 163, 184, 0.08);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.settings-user-panel-flash.is-success {
+  border-color: rgba(74, 222, 128, 0.35);
+  background: rgba(74, 222, 128, 0.1);
+  color: rgba(187, 247, 208, 0.96);
+}
+
+.settings-user-panel-flash.is-error {
+  border-color: rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.1);
+  color: rgba(254, 202, 202, 0.96);
+}
+
+.settings-hub-layout {
+  display: grid;
+  grid-template-columns: minmax(200px, 32%) 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 640px) {
+  .settings-hub-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.settings-hub-section-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.settings-hub-section-title--spaced {
+  margin-top: 1.25rem;
+}
+
+.settings-hub-hint {
+  margin: 0 0 0.65rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.settings-hub-account-email {
+  margin: 0 0 0.75rem;
+  font-size: 0.82rem;
+  color: var(--text);
+  word-break: break-all;
+}
+
+.settings-hub-logout-btn {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.45rem 0.85rem;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.settings-hub-logout-btn:hover,
+.settings-hub-logout-btn:focus-visible {
+  background: rgba(248, 113, 113, 0.12);
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+.settings-hub-secondary-btn {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+  transition: color 140ms ease, background 140ms ease, border-color 140ms ease;
+}
+
+.settings-hub-secondary-btn:hover,
+.settings-hub-secondary-btn:focus-visible {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.settings-hub-themes-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.settings-hub-themes-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.settings-hub-active-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.settings-hub-active-name {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(186, 230, 253, 0.95);
+}
+
+.settings-hub-primary-btn {
+  appearance: none;
+  border: none;
+  border-radius: 8px;
+  background: rgba(125, 211, 252, 0.18);
+  color: rgba(224, 242, 254, 0.98);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.42rem 0.75rem;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+
+.settings-hub-primary-btn:hover,
+.settings-hub-primary-btn:focus-visible {
+  background: rgba(125, 211, 252, 0.28);
+}
+
+.settings-hub-themes-list {
+  margin: 0 0 1.25rem;
+}
+
+.settings-hub-appearance-studio {
+  margin-top: 0.15rem;
+}
+
+.theme-builder-toolbar {
+  min-height: var(--os-header-min-height);
+  margin-bottom: var(--os-header-gap);
+  padding: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 /* Resize Handles */
@@ -4600,7 +5381,7 @@ input.connection-inline {
 
 .organizer-window .window-content {
   padding: 0;
-  overflow: hidden;
+  overflow: visible;
   display: flex;
   flex-direction: column;
 }
@@ -4622,6 +5403,13 @@ input.connection-inline {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+}
+
+.organizer-window #organizer.organizer-panel--apps {
+  overflow: visible;
+  height: auto;
+  padding: var(--launcher-shell-inset-top) var(--launcher-shell-inset-x) var(--launcher-footer-bottom-inset);
+  gap: var(--launcher-footer-gap);
 }
 
 /* Organizer Header (Auth Menu at Top) */
@@ -5342,6 +6130,9 @@ input.connection-inline {
   font: inherit;
   font-size: 1.05rem;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0.3rem 0.4rem;
   border-radius: 4px;
   line-height: 1;
@@ -5353,4 +6144,316 @@ input.connection-inline {
 
 .timer-reset-btn:hover {
   color: var(--text);
+}
+
+.app-surface--finder {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding: 0;
+}
+
+.finder-shell {
+  position: relative;
+  pointer-events: auto;
+  display: grid;
+  grid-template-columns: minmax(190px, 31%) minmax(320px, 1fr);
+  gap: 0;
+  min-height: 0;
+  height: 100%;
+  border-top: none;
+}
+
+.finder-shell-pane {
+  min-height: 0;
+  height: 100%;
+}
+
+.finder-shell-pane--folders {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 12px 10px;
+  overflow: auto;
+}
+
+.finder-shell-pane--contents {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+  padding: 12px 12px 10px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.finder-pane-title {
+  margin: 0 0 8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.finder-pane-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.finder-pane-add-button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  padding: 2px 4px;
+  transition: color 140ms ease, background 140ms ease;
+}
+
+.finder-pane-add-button:hover,
+.finder-pane-add-button:focus-visible {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.finder-pane-header .finder-pane-title {
+  margin: 0;
+}
+
+.finder-pane-title--selected {
+  margin: 0;
+  letter-spacing: 0.08em;
+  color: var(--text);
+}
+
+.finder-folder-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.finder-folder-item {
+  position: relative;
+  border-radius: 8px;
+}
+
+.finder-folder-item.is-active .finder-folder-link {
+  background: rgba(186, 230, 253, 0.15);
+}
+
+.finder-folder-link {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  align-items: center;
+  gap: 9px;
+  border-radius: 8px;
+  padding: 7px 54px 7px 9px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.82rem;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.finder-folder-link:hover,
+.finder-folder-link:focus-visible {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.finder-folder-item.is-active .finder-folder-link {
+  color: rgba(224, 242, 254, 0.98);
+}
+
+.finder-folder-actions {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.finder-folder-item:hover .finder-folder-actions,
+.finder-folder-item:focus-within .finder-folder-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.finder-folder-name-input {
+  width: 100%;
+  font: inherit;
+  font-size: 0.82rem;
+  line-height: 1.2;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(125, 211, 252, 0.45);
+  border-radius: 6px;
+  padding: 3px 6px;
+  outline: none;
+}
+
+.finder-folder-name-input:focus {
+  border-color: rgba(125, 211, 252, 0.7);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.finder-folder-action {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.72rem;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border-radius: 4px;
+  transition: color 140ms ease, background 140ms ease;
+}
+
+.finder-folder-action:hover,
+.finder-folder-action:focus-visible {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.finder-folder-action--danger:hover,
+.finder-folder-action--danger:focus-visible {
+  color: #fda4af;
+}
+
+.finder-folder-icon {
+  width: 18px;
+  height: 18px;
+  color: rgba(125, 211, 252, 0.95);
+}
+
+.finder-folder-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.finder-folder-icon svg.material-icon,
+.finder-file-icon svg.material-icon {
+  width: 100%;
+  height: 100%;
+}
+
+.finder-folder-name {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.finder-contents-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 9px;
+  margin-bottom: 8px;
+}
+
+.finder-file-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  align-content: start;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+  padding: 2px 4px 2px 2px;
+}
+
+.finder-file-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 7px 8px;
+  color: var(--text);
+  text-decoration: none;
+  text-align: center;
+  transition: background 140ms ease;
+}
+
+.finder-file-card:hover,
+.finder-file-card:focus-visible {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.finder-file-icon {
+  width: 28px;
+  height: 28px;
+  color: rgba(196, 181, 253, 0.9);
+}
+
+.finder-file-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.finder-file-name {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-size: 0.75rem;
+}
+
+.finder-empty-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.finder-empty-wrap--content {
+  flex: 1;
+}
+
+.finder-empty-state {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+@media (max-width: 760px) {
+  .finder-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(140px, auto) 1fr;
+  }
+
+  .finder-shell-pane--folders {
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
 }

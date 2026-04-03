@@ -49,7 +49,7 @@ before_action :redirect_top_level_frame_requests, only: %i[note task_list whiteb
       stickies_json = raw.is_a?(String) ? raw : raw.to_json
 
       if @whiteboard.update(body: stickies_json)
-        ItemStorageSyncLite.sync_all!
+        ItemStorageSyncLite.sync_all!(username: current_user&.username)
         render json: { ok: true }
       else
         render json: { errors: @whiteboard.errors.full_messages }, status: :unprocessable_entity
@@ -132,10 +132,10 @@ before_action :redirect_top_level_frame_requests, only: %i[note task_list whiteb
       # Sync to disk to ensure workspace text files exist.
       # Rare cache-clear reload spikes can trigger transient file races; retry once.
       begin
-        ItemStorageSyncLite.sync_all!
+        ItemStorageSyncLite.sync_all!(username: current_user&.username)
       rescue Errno::ENOENT
         sleep 0.03
-        ItemStorageSyncLite.sync_all!
+        ItemStorageSyncLite.sync_all!(username: current_user&.username)
       end
     rescue StandardError => e
       Rails.logger.error("[SingularController] ensure_singular_items failed: #{e.class}: #{e.message}")

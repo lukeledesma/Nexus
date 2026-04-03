@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 import { observeContent } from "lib/os_window_sizing"
+import { materialSymbolSvg } from "lib/material_symbols"
 
 export default class extends Controller {
   static targets = ["contentShell", "grid", "gridToggle", "stickySelection", "colorPopover", "colorSlider", "saturationSlider", "brightnessSlider"]
@@ -125,7 +126,7 @@ export default class extends Controller {
     deleteBtn.classList.add("whiteboard-sticky-delete-btn")
     deleteBtn.setAttribute("type", "button")
     deleteBtn.setAttribute("aria-label", "Delete sticky note")
-    deleteBtn.textContent = "✕"
+    deleteBtn.innerHTML = materialSymbolSvg("close", "xs")
     deleteBtn.addEventListener("click", (e) => {
       e.stopPropagation()
       this.deleteSticky(el)

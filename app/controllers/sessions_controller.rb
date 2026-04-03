@@ -8,13 +8,15 @@ class SessionsController < ApplicationController
   end
 
   def create
-    user = User.find_by(email: params[:email].to_s.downcase.strip)
+    identifier = params[:identifier]
+    user = User.find_for_login(identifier)
 
     if user&.authenticate(params[:password].to_s)
       session[:user_id] = user.id
       redirect_to root_path
     else
-      @login_error = "Invalid email or password"
+      @login_error = "Invalid email/username or password"
+      @identifier = identifier.to_s
       render :new, status: :unprocessable_entity
     end
   end

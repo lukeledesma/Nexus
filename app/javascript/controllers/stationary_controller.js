@@ -26,8 +26,6 @@ export default class extends Controller {
     window.addEventListener("app-window:state", this.boundAppWindowState)
     this.windowTarget.addEventListener("mousedown", this.boundWindowInteraction)
 
-    this.loadFileSizes()
-    this.loadPersistedStamp()
     this.clearLauncherState()
   }
 
@@ -101,44 +99,6 @@ export default class extends Controller {
     if (this.latestUpdateAt && date <= this.latestUpdateAt) return
     this.latestUpdateAt = date
     this.stampTarget.textContent = `${label} Updated ${this.formatTimestamp(timestamp)}`
-  }
-
-  async loadPersistedStamp() {
-    if (!this.hasStampTarget) return
-    try {
-      const response = await fetch("/db_health", {
-        method: "GET",
-        headers: { Accept: "application/json" }
-      })
-      if (!response.ok) return
-      const payload = await response.json()
-      const lastUpdated = payload?.organizer?.last_updated
-      if (!lastUpdated?.label || !lastUpdated?.updated_at) return
-      this.applyStamp(lastUpdated.label, lastUpdated.updated_at)
-    } catch (_error) {
-      // non-blocking
-    }
-  }
-
-  // ── File sizes ─────────────────────────────────────────────────────────────
-
-  async loadFileSizes() {
-    try {
-      const response = await fetch("/db_health", {
-        method: "GET",
-        headers: { Accept: "application/json" }
-      })
-      if (!response.ok) return
-      const payload = await response.json()
-      const organizer = payload?.organizer
-      if (!organizer) return
-
-      if (this.hasTasksSizeTarget && organizer.task_size_bytes) {
-        this.tasksSizeTarget.textContent = this.formatBytes(organizer.task_size_bytes)
-      }
-    } catch (_error) {
-      // non-blocking
-    }
   }
 
   // ── Drag ───────────────────────────────────────────────────────────────────

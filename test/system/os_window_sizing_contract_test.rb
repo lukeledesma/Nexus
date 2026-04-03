@@ -67,56 +67,16 @@ class OsWindowSizingContractTest < ApplicationSystemTestCase
     assert_in_delta content_height, shrunk_height, 8, "expected launcher height to wrap organizer panel after content shrinks"
   end
 
-  test "settings remeasures on open and grows and shrinks with content" do
-    verify_os_window_contract(
-      button_selector: ".app-dock-button--settings",
-      window_selector: ".settings-window",
-      content_selector: ".settings-panel",
-      open_window: nil,
-      grow_content: lambda {
-        page.execute_script(<<~JS)
-          const panel = document.querySelector(".settings-panel")
-          if (!panel) return
-
-          panel.dataset.testPaddingBottom = panel.style.paddingBottom || ""
-          panel.style.paddingBottom = "140px"
-        JS
-      },
-      shrink_content: lambda {
-        page.execute_script(<<~JS)
-          const panel = document.querySelector(".settings-panel")
-          if (!panel) return
-          panel.style.paddingBottom = panel.dataset.testPaddingBottom || ""
-          delete panel.dataset.testPaddingBottom
-        JS
+  test "settings content window opens from app toggle" do
+    page.execute_script(<<~JS)
+      const el = document.querySelector("[data-content-window-app-key-value='settings']")
+      if (!el) return
+      if (el.classList.contains("is-hidden")) {
+        window.dispatchEvent(new CustomEvent("app-window:toggle", { detail: { appKey: "settings" } }))
       }
-    )
-  end
-
-  test "db health remeasures on open and grows and shrinks with content" do
-    verify_os_window_contract(
-      button_selector: ".app-dock-button--db-health",
-      window_selector: ".db-health-window",
-      content_selector: ".db-health-panel",
-      open_window: nil,
-      grow_content: lambda {
-        page.execute_script(<<~JS)
-          const panel = document.querySelector(".db-health-panel")
-          if (!panel) return
-
-          panel.dataset.testPaddingBottom = panel.style.paddingBottom || ""
-          panel.style.paddingBottom = "140px"
-        JS
-      },
-      shrink_content: lambda {
-        page.execute_script(<<~JS)
-          const panel = document.querySelector(".db-health-panel")
-          if (!panel) return
-          panel.style.paddingBottom = panel.dataset.testPaddingBottom || ""
-          delete panel.dataset.testPaddingBottom
-        JS
-      }
-    )
+    JS
+    wait_until { !window_hidden?("[data-content-window-app-key-value='settings']") }
+    assert_selector "[data-content-window-app-key-value='settings'] .content-window-chrome-title", text: "SETTINGS"
   end
 
   private
@@ -133,7 +93,7 @@ class OsWindowSizingContractTest < ApplicationSystemTestCase
 
     if open_window.respond_to?(:call)
       open_window.call
-    else
+    elsif button_selector.present?
       find(button_selector, visible: :all).click
     end
     wait_until { !window_hidden?(window_selector) }

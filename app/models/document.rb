@@ -33,6 +33,15 @@ class Document < ApplicationRecord
     false
   end
 
+  def user_workspace_root?
+    return false unless folder? && parent_id.nil?
+
+    value = title.to_s.strip.downcase
+    return false if value.blank?
+
+    User.where("LOWER(username) = ?", value).exists?
+  end
+
   def sync_create_to_disk
     return unless persisted?
     return if defined?(DocumentDiskLoader) && DocumentDiskLoader.syncing?
@@ -68,14 +77,19 @@ class Document < ApplicationRecord
       default_title = (content_type == "task_list" ? DEFAULT_TASK_LIST_TITLE : DEFAULT_NOTE_TITLE)
       self.title = (title.presence || default_title).to_s.strip
       self.tasks = normalize_tasks(tasks)
-      self.reset_days = normalize_reset_days(reset_days)
-      self.reset_mode = reset_days.present? ? "custom" : "none" if reset_mode.blank? || reset_mode == "custom"
 
       if content_type == "note"
         self.content = content.to_s if content.present?
         self.tasks = []
+        self.reset_days = normalize_reset_days(reset_days)
+        if reset_mode.blank? || reset_mode == "custom"
+          self.reset_mode = reset_days.present? ? "custom" : "none"
+        end
       elsif content_type == "task_list"
         self.content = nil if content.blank?
+        self.reset_days = []
+        self.reset_mode = "none"
+        self.last_reset_at = nil
       end
     end
   end

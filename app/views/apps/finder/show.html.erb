@@ -1,0 +1,60 @@
+<% frame_id = params[:frame_id].presence || "app-pane" %>
+<turbo-frame id="<%= frame_id %>">
+  <section class="app-surface app-surface--tool app-surface--finder" data-controller="finder-browser" data-finder-browser-frame-id-value="<%= frame_id %>">
+    <div class="finder-shell os-window-body-start">
+      <aside class="finder-shell-pane finder-shell-pane--folders" aria-label="Main folders">
+        <ul class="finder-folder-list">
+          <% @folders.each do |folder| %>
+            <% active = @selected_folder&.id == folder.id %>
+            <% auto_rename = params[:rename_folder_id].to_i == folder.id %>
+            <li
+              class="finder-folder-item<%= ' is-active' if active %>"
+              data-folder-id="<%= folder.id %>"
+              data-folder-name="<%= folder.title %>"
+              data-rename-url="<%= rename_document_path(folder) %>"
+              data-delete-url="<%= document_path(folder) %>"
+              data-auto-rename="<%= auto_rename ? 'true' : 'false' %>"
+            >
+              <%= link_to apps_finder_path(folder_id: folder.id, frame_id: frame_id), class: "finder-folder-link", aria: { label: "Open #{folder.title}" } do %>
+                <span class="finder-folder-icon" aria-hidden="true">
+                  <%= material_symbol_icon(:folder, size: :md) %>
+                </span>
+                <span class="finder-folder-name" data-folder-name-label><%= folder.title %></span>
+              <% end %>
+
+              <div class="finder-folder-actions" aria-hidden="true">
+                <button type="button" class="finder-folder-action" data-action="click->finder-browser#renameFolder" aria-label="Rename folder" title="Rename folder"><%= material_symbol_icon(:edit, size: :xs) %></button>
+                <button type="button" class="finder-folder-action finder-folder-action--danger" data-action="click->finder-browser#deleteFolder" aria-label="Delete folder" title="Delete folder"><%= material_symbol_icon(:close, size: :xs) %></button>
+              </div>
+            </li>
+          <% end %>
+        </ul>
+      </aside>
+
+      <section class="finder-shell-pane finder-shell-pane--contents" aria-label="Folder contents">
+        <% if @selected_folder %>
+          <% if @files.any? %>
+            <div class="finder-file-list" role="list" aria-label="Files in selected folder">
+              <% @files.each do |file| %>
+                <%= link_to document_path(file), class: "finder-file-card", role: "listitem" do %>
+                  <span class="finder-file-icon" aria-hidden="true">
+                    <%= material_symbol_icon(:file_document, size: :md) %>
+                  </span>
+                  <span class="finder-file-name"><%= file.title.presence || "Untitled" %></span>
+                <% end %>
+              <% end %>
+            </div>
+          <% else %>
+            <div class="finder-empty-wrap finder-empty-wrap--content">
+              <p class="finder-empty-state">Empty folder.</p>
+            </div>
+          <% end %>
+        <% else %>
+          <div class="finder-empty-wrap">
+            <p class="finder-empty-state">Empty folder.</p>
+          </div>
+        <% end %>
+      </section>
+    </div>
+  </section>
+</turbo-frame>

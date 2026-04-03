@@ -1,10 +1,6 @@
 <% frame_id = params[:frame_id].presence || "app-pane" %>
 <turbo-frame id="<%= frame_id %>">
   <section class="app-surface app-surface--tool app-surface--timer" data-controller="timer" data-timer-initial-state-value="<%= json_escape(@timer_state.to_json) %>">
-    <header class="app-surface-header tool-window-header os-window-header">
-      <h2 class="tool-window-title os-window-title">TIMER</h2>
-    </header>
-
     <div class="timer-view os-window-body-start">
       <div class="timer-tabs" role="tablist" aria-label="Timer modes">
         <button type="button" class="timer-tab-btn" data-tab="stopwatch" data-action="click->timer#selectTab" role="tab" aria-selected="false">Stopwatch</button>
@@ -56,7 +52,7 @@
 
       <div class="timer-controls">
         <button type="button" class="timer-start-btn" data-action="click->timer#toggle" data-timer-target="startBtn">START</button>
-        <button type="button" class="timer-reset-btn" data-action="click->timer#reset" aria-label="Reset current tab" title="Reset">↺</button>
+        <button type="button" class="timer-reset-btn" data-action="click->timer#reset" aria-label="Reset current tab" title="Reset"><%= material_symbol_icon(:refresh, size: :md) %></button>
       </div>
     </div>
   </section>

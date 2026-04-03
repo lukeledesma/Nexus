@@ -1,0 +1,11 @@
+<button
+  type="button"
+  class="launcher-dock-pin-btn"
+  data-dock-pin-key="<%= app_key %>"
+  data-action="click->organizer#toggleDockPin"
+  aria-label="Pin to dock"
+>
+  <%# Swapped: keep = pin (when unpinned), keep_off = unpin (when pinned) %>
+  <span class="launcher-dock-pin-btn__glyph launcher-dock-pin-btn__glyph--add" aria-hidden="true"><%= material_symbol_icon(:keep, size: :xs) %></span>
+  <span class="launcher-dock-pin-btn__glyph launcher-dock-pin-btn__glyph--remove" aria-hidden="true"><%= material_symbol_icon(:keep_off, size: :xs) %></span>
+</button>

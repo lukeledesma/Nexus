@@ -1,7 +1,8 @@
 import { Controller } from "@hotwired/stimulus"
+import { materialSymbolSvg } from "lib/material_symbols"
 
 export default class extends Controller {
-  static targets = ["title", "rows", "row", "tasksPayload", "status", "resetPanel", "resetDay", "lastResetAt", "editModalBackdrop", "editInput"]
+  static targets = ["title", "rows", "row", "tasksPayload", "status", "editModalBackdrop", "editInput"]
   static values = { debounce: { type: Number, default: 300 } }
 
   connect() {
@@ -13,8 +14,6 @@ export default class extends Controller {
     this.boundKeydown = this.handleKeydown.bind(this)
     this.boundRowClick = this.toggleRow.bind(this)
     this.tasks = this.readTasksFromDom()
-    this.resetDays = this.readResetDays()
-    this.syncResetButtons()
     this.setupRowClickListener()
     this.renderTasks()
     window.addEventListener("keydown", this.boundKeydown)
@@ -49,12 +48,6 @@ export default class extends Controller {
   }
 
   handleKeydown(event) {
-    if ((event.key === "Enter" || event.key === " ") && document.activeElement?.classList?.contains("workspace-clock--toggle")) {
-      event.preventDefault()
-      this.toggleResetSettings()
-      return
-    }
-
     if (event.key !== "Escape") return
     if (!this.hasEditModalBackdropTarget) return
     if (this.editModalBackdropTarget.classList.contains("hidden")) return
@@ -237,24 +230,6 @@ export default class extends Controller {
     }
   }
 
-  toggleResetSettings() {
-    this.resetPanelTarget.classList.toggle("hidden")
-  }
-
-  toggleResetDay(event) {
-    event.preventDefault()
-    const button = event.currentTarget
-    const day = Number(button.dataset.dayIndex)
-    if (!Number.isInteger(day)) return
-
-    if (this.resetDays.has(day)) this.resetDays.delete(day)
-    else this.resetDays.add(day)
-
-    this.syncResetButtons()
-    this.syncResetHiddenInputs()
-    this.queueSave()
-  }
-
   queueSave() {
     this.setStatus("Saving...")
     if (this.timer) clearTimeout(this.timer)
@@ -323,31 +298,6 @@ export default class extends Controller {
       }
       mainRow.style.removeProperty("--completion")
     }
-  }
-
-  readResetDays() {
-    return new Set(this.resetDayTargets.map((input) => Number(input.value)).filter((n) => Number.isInteger(n) && n >= 0 && n <= 6))
-  }
-
-  syncResetButtons() {
-    this.element.querySelectorAll(".reset-day-button").forEach((button) => {
-      const day = Number(button.dataset.dayIndex)
-      const active = this.resetDays.has(day)
-      button.classList.toggle("btn-primary", active)
-      button.classList.toggle("btn-secondary", !active)
-    })
-  }
-
-  syncResetHiddenInputs() {
-    this.resetDayTargets.forEach((input) => input.remove())
-    Array.from(this.resetDays).sort((a, b) => a - b).forEach((day) => {
-      const input = document.createElement("input")
-      input.type = "hidden"
-      input.name = "document[reset_days][]"
-      input.value = String(day)
-      input.dataset.taskListTarget = "resetDay"
-      this.element.appendChild(input)
-    })
   }
 
   renderTasks() {
@@ -421,14 +371,14 @@ export default class extends Controller {
     const addSubtask = document.createElement("button")
     addSubtask.type = "button"
     addSubtask.className = "row-plus"
-    addSubtask.textContent = "+"
+    addSubtask.innerHTML = materialSymbolSvg("add", "xs")
     addSubtask.dataset.action = "click->task-list#addSubtask"
     right.appendChild(addSubtask)
 
     const edit = document.createElement("button")
     edit.type = "button"
     edit.className = "row-pencil"
-    edit.textContent = "✎"
+    edit.innerHTML = materialSymbolSvg("edit", "xs")
     edit.dataset.action = "click->task-list#editRow"
     right.appendChild(edit)
 
@@ -460,7 +410,7 @@ export default class extends Controller {
     const edit = document.createElement("button")
     edit.type = "button"
     edit.className = "row-pencil"
-    edit.textContent = "✎"
+    edit.innerHTML = materialSymbolSvg("edit", "xs")
     edit.dataset.action = "click->task-list#editRow"
     right.appendChild(edit)
 
@@ -476,7 +426,6 @@ export default class extends Controller {
     }
 
     this.tasksPayloadTarget.value = JSON.stringify(this.tasks)
-    this.syncResetHiddenInputs()
 
     const form = this.element
     const body = new FormData(form)

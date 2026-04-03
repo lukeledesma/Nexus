@@ -1,18 +1,19 @@
 import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
+import { toggleDockPinKey, readDockPins, PINNABLE_APP_KEYS, DOCK_HOVER_LABELS } from "lib/dock_pins"
 
 export default class extends Controller {
-  static targets = ["newFolderForm", "newFolderInput", "stamp", "conversionPair", "tasksSize", "notePadSize", "stickyNotesSize", "sketchpadSize", "timerDisplay", "themeBuilderStatus"]
+  static targets = ["newFolderForm", "newFolderInput", "stamp", "conversionPair"]
 
   #conversionPairs = [
-    { sae: '5/16"', metric: '8 mm' },
-    { sae: '3/8"', metric: '10 mm' },
-    { sae: '7/16"', metric: '11 mm' },
-    { sae: '1/2"', metric: '13 mm' },
-    { sae: '9/16"', metric: '14 mm' },
-    { sae: '5/8"', metric: '16 mm' },
-    { sae: '11/16"', metric: '17 mm' },
-    { sae: '3/4"', metric: '19 mm' }
+    { sae: "5/16\"", metric: "8 mm" },
+    { sae: "3/8\"", metric: "10 mm" },
+    { sae: "7/16\"", metric: "11 mm" },
+    { sae: "1/2\"", metric: "13 mm" },
+    { sae: "9/16\"", metric: "14 mm" },
+    { sae: "5/8\"", metric: "16 mm" },
+    { sae: "11/16\"", metric: "17 mm" },
+    { sae: "3/4\"", metric: "19 mm" }
   ]
 
   #conversionIndex = 0
@@ -21,149 +22,41 @@ export default class extends Controller {
   connect() {
     this.boundSavedState = this.handleSavedState.bind(this)
     this.boundAppWindowState = this.handleAppWindowState.bind(this)
-    this.boundTimerState = this.handleTimerState.bind(this)
-    this.boundThemeStatus = this.handleThemeStatus.bind(this)
+    this.boundDockPinsChanged = this.applyDockPinsUi.bind(this)
     window.addEventListener("nexus:item-saved", this.boundSavedState)
     window.addEventListener("app-window:state", this.boundAppWindowState)
-    window.addEventListener("timer:state", this.boundTimerState)
-    window.addEventListener("workspace:theme-status", this.boundThemeStatus)
-    this.loadPersistedStamp()
-    this.loadFileSizes()
-    this.loadTimerDisplay()
-    this.loadThemeStatus()
+    window.addEventListener("dock-pins:changed", this.boundDockPinsChanged)
     this.startConversionCycle()
     this.clearLauncherState()
+    this.applyDockPinsUi()
   }
 
   disconnect() {
     window.removeEventListener("nexus:item-saved", this.boundSavedState)
     window.removeEventListener("app-window:state", this.boundAppWindowState)
-    window.removeEventListener("timer:state", this.boundTimerState)
-    window.removeEventListener("workspace:theme-status", this.boundThemeStatus)
+    window.removeEventListener("dock-pins:changed", this.boundDockPinsChanged)
     this.stopConversionCycle()
   }
 
-  toggleNewFolder(event) {
+  toggleDockPin(event) {
     event.stopPropagation()
-    const form = this.newFolderFormTarget
-    if (form.classList.contains("hidden")) {
-      form.classList.remove("hidden")
-      this.newFolderInputTarget.value = ""
-      this.newFolderInputTarget.focus()
-      this.newFolderInputTarget.select()
-    } else {
-      form.classList.add("hidden")
-      this.newFolderInputTarget.value = ""
-    }
-  }
-
-  newFolderKeydown(event) {
-    if (event.key === "Escape") {
-      event.preventDefault()
-      this.newFolderFormTarget.classList.add("hidden")
-      this.newFolderInputTarget.value = ""
-    }
-  }
-
-  async submitNewFolder(event) {
     event.preventDefault()
-    const form = event.currentTarget
-    const data = new FormData(form)
-    const resp = await fetch(form.action, {
-      method: "POST",
-      headers: { "Accept": "application/json", "X-CSRF-Token": this.#csrf() },
-      body: data
+    const key = event.currentTarget.dataset.dockPinKey
+    if (!key || !PINNABLE_APP_KEYS.has(key)) return
+    const pins = toggleDockPinKey(key)
+    window.dispatchEvent(new CustomEvent("dock-pins:changed", { detail: { pins } }))
+  }
+
+  applyDockPinsUi(event) {
+    const pins = new Set(event?.detail?.pins ?? readDockPins())
+    this.element.querySelectorAll("[data-dock-pin-key]").forEach((btn) => {
+      const key = btn.dataset.dockPinKey
+      if (!key) return
+      const pinned = pins.has(key)
+      btn.classList.toggle("is-pinned", pinned)
+      const name = DOCK_HOVER_LABELS[key] || key
+      btn.setAttribute("aria-label", pinned ? `Unpin ${name} from dock` : `Pin ${name} to dock`)
     })
-
-    if (!resp.ok) {
-      const json = await resp.json().catch(() => ({}))
-      alert(json.errors?.join(", ") || "Could not create folder.")
-      return
-    }
-
-    this.newFolderFormTarget.classList.add("hidden")
-    this.newFolderInputTarget.value = ""
-    Turbo.visit("/")
-  }
-
-  handleSavedState(event) {
-    if (!this.hasStampTarget) return
-
-    const itemType = event.detail?.itemType
-    const timestamp = event.detail?.timestamp
-    const label = this.labelForItemType(itemType)
-    if (!label) return
-
-    this.applyStamp(label, timestamp)
-  }
-
-  async loadPersistedStamp() {
-    if (!this.hasStampTarget) return
-
-    try {
-      const response = await fetch("/db_health", {
-        method: "GET",
-        headers: { Accept: "application/json" }
-      })
-      if (!response.ok) return
-
-      const payload = await response.json()
-      const lastUpdated = payload?.organizer?.last_updated
-      const label = lastUpdated?.label
-      const timestamp = lastUpdated?.updated_at
-      if (!label || !timestamp) return
-
-      this.applyStamp(label, timestamp)
-    } catch (_error) {
-      // Keep organizer status non-blocking if metrics endpoint is unavailable.
-    }
-  }
-
-  applyStamp(label, timestamp) {
-    const date = new Date(timestamp)
-    if (Number.isNaN(date.getTime())) return
-
-    if (this.latestUpdateAt && date <= this.latestUpdateAt) return
-    this.latestUpdateAt = date
-
-    this.stampTarget.textContent = `${label} Updated ${this.formatTimestamp(timestamp)}`
-  }
-
-  formatBytes(bytes) {
-    if (!bytes || bytes === 0) return "-"
-    const units = ["B", "KB", "MB", "GB"]
-    const index = Math.floor(Math.log(bytes) / Math.log(1024))
-    const value = (bytes / Math.pow(1024, index)).toFixed(0)
-    return `${value} ${units[index] || "B"}`
-  }
-
-  async loadFileSizes() {
-    try {
-      const response = await fetch("/db_health", {
-        method: "GET",
-        headers: { Accept: "application/json" }
-      })
-      if (!response.ok) return
-
-      const payload = await response.json()
-      const organizer = payload?.organizer
-      if (!organizer) return
-
-      if (this.hasTasksSizeTarget && organizer.task_size_bytes) {
-        this.tasksSizeTarget.textContent = this.formatBytes(organizer.task_size_bytes)
-      }
-      if (this.hasNotePadSizeTarget && organizer.note_size_bytes) {
-        this.notePadSizeTarget.textContent = this.formatBytes(organizer.note_size_bytes)
-      }
-      if (this.hasStickyNotesSizeTarget && organizer.whiteboard_size_bytes) {
-        this.stickyNotesSizeTarget.textContent = this.formatBytes(organizer.whiteboard_size_bytes)
-      }
-      if (this.hasSketchpadSizeTarget && organizer.excalidraw_size_bytes) {
-        this.sketchpadSizeTarget.textContent = this.formatBytes(organizer.excalidraw_size_bytes)
-      }
-    } catch (_error) {
-      // Keep launcher status non-blocking if metrics endpoint is unavailable.
-    }
   }
 
   startConversionCycle() {
@@ -190,54 +83,72 @@ export default class extends Controller {
     this.conversionPairTarget.textContent = `${pair.sae} | ${pair.metric}`
   }
 
-  loadTimerDisplay() {
-    if (!this.hasTimerDisplayTarget) return
-
-    try {
-      const persisted = window.localStorage.getItem("nexus.timer.launcherDisplay")
-      if (persisted) this.timerDisplayTarget.textContent = persisted
-    } catch (_error) {
-      // Keep launcher non-blocking if localStorage is unavailable.
+  toggleNewFolder(event) {
+    event.stopPropagation()
+    if (!this.hasNewFolderFormTarget) return
+    const form = this.newFolderFormTarget
+    if (form.classList.contains("hidden")) {
+      form.classList.remove("hidden")
+      if (this.hasNewFolderInputTarget) {
+        this.newFolderInputTarget.value = ""
+        this.newFolderInputTarget.focus()
+        this.newFolderInputTarget.select()
+      }
+    } else {
+      form.classList.add("hidden")
+      if (this.hasNewFolderInputTarget) this.newFolderInputTarget.value = ""
     }
   }
 
-  handleTimerState(event) {
-    if (!this.hasTimerDisplayTarget) return
-
-    const display = event.detail?.launcherDisplay
-    if (!display) return
-
-    this.timerDisplayTarget.textContent = display
-  }
-
-  async loadThemeStatus() {
-    if (!this.hasThemeBuilderStatusTarget) return
-
-    try {
-      const response = await fetch("/workspace_preferences", {
-        method: "GET",
-        headers: { Accept: "application/json" }
-      })
-      if (!response.ok) return
-
-      const payload = await response.json()
-      this.applyThemeStatus(payload)
-    } catch (_error) {
-      // Keep launcher non-blocking if workspace preferences are unavailable.
+  newFolderKeydown(event) {
+    if (event.key === "Escape") {
+      event.preventDefault()
+      if (this.hasNewFolderFormTarget) this.newFolderFormTarget.classList.add("hidden")
+      if (this.hasNewFolderInputTarget) this.newFolderInputTarget.value = ""
     }
   }
 
-  handleThemeStatus(event) {
-    const detail = event.detail || {}
-    this.applyThemeStatus(detail)
+  async submitNewFolder(event) {
+    event.preventDefault()
+    if (!this.hasNewFolderFormTarget) return
+    const form = event.currentTarget
+    const data = new FormData(form)
+    const resp = await fetch(form.action, {
+      method: "POST",
+      headers: { Accept: "application/json", "X-CSRF-Token": this.#csrf() },
+      body: data
+    })
+
+    if (!resp.ok) {
+      const json = await resp.json().catch(() => ({}))
+      alert(json.errors?.join(", ") || "Could not create folder.")
+      return
+    }
+
+    this.newFolderFormTarget.classList.add("hidden")
+    if (this.hasNewFolderInputTarget) this.newFolderInputTarget.value = ""
+    Turbo.visit("/")
   }
 
-  applyThemeStatus(payload) {
-    if (!this.hasThemeBuilderStatusTarget) return
+  handleSavedState(event) {
+    if (!this.hasStampTarget) return
 
-    const activeThemeName = String(payload?.active_theme_name || "CUSTOM").trim()
-    const isCustomLayout = Boolean(payload?.is_custom_layout)
-    this.themeBuilderStatusTarget.textContent = isCustomLayout ? "CUSTOM" : activeThemeName
+    const itemType = event.detail?.itemType
+    const timestamp = event.detail?.timestamp
+    const label = this.labelForItemType(itemType)
+    if (!label) return
+
+    this.applyStamp(label, timestamp)
+  }
+
+  applyStamp(label, timestamp) {
+    const date = new Date(timestamp)
+    if (Number.isNaN(date.getTime())) return
+
+    if (this.latestUpdateAt && date <= this.latestUpdateAt) return
+    this.latestUpdateAt = date
+
+    this.stampTarget.textContent = `${label} Updated ${this.formatTimestamp(timestamp)}`
   }
 
   labelForItemType(itemType) {
@@ -252,6 +163,7 @@ export default class extends Controller {
     const appKey = event.currentTarget.dataset.windowKey
     if (!appKey) return
     window.dispatchEvent(new CustomEvent("app-window:toggle", { detail: { appKey } }))
+    window.dispatchEvent(new CustomEvent("launcher:close"))
   }
 
   handleAppWindowState(event) {
@@ -259,6 +171,7 @@ export default class extends Controller {
   }
 
   updateLauncherState(appKey, isOpen) {
+    if (!appKey) return
     const button = this.element.querySelector(`[data-window-key="${appKey}"]`)
     if (!button) return
     button.classList.toggle("is-active", isOpen)

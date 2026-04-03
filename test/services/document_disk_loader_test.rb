@@ -41,4 +41,14 @@ class DocumentDiskLoaderTest < ActiveSupport::TestCase
     assert_equal 1, parsed[:tasks][0]["subtasks"].length
     assert_equal "Legacy subtask", parsed[:tasks][0]["subtasks"][0]["text"]
   end
+
+  test "purge removes missing folders and files" do
+    stale_folder = Document.create!(is_folder: true, title: "Stale Folder", storage_path: "stale-folder")
+    stale_file = Document.create!(is_folder: false, title: "Stale", content_type: "note", content: "x", storage_path: "stale.txt")
+
+    DocumentDiskLoader.send(:purge_missing_from_database!, [])
+
+    assert_not Document.exists?(stale_folder.id), "expected missing folders to be purged"
+    assert_not Document.exists?(stale_file.id), "expected missing files to still be purged"
+  end
 end

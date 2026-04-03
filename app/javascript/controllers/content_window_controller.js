@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { createOsWindowSizer } from "lib/os_window_sizing"
 
 export default class extends Controller {
   static targets = ["frame"]
@@ -11,6 +12,7 @@ export default class extends Controller {
 
   connect() {
     this.currentUrl = this.buildAppUrl()
+    this.isAutoSizedWindow = false
     this.viewportMargin = 6
     this.dockLeftBoundary = 6
     this.bottomDockBoundary = this.viewportMargin
@@ -20,7 +22,11 @@ export default class extends Controller {
     const minByAppKey = {
       "singular-note": { width: 581, height: 500 },
       "timer": { width: 320, height: 220 },
-      "conversion-chart": { width: 350, height: 295 }
+      "conversion-chart": { width: 350, height: 295 },
+      "finder": { width: 760, height: 460 },
+      "settings": { width: 400, height: 280 },
+      "user": { width: 320, height: 220 },
+      "theme-studio": { width: 520, height: 560 }
     }
     const appMinimum = minByAppKey[this.appKeyValue] || { width: 320, height: 320 }
     this.minWindowWidth = appMinimum.width
@@ -35,15 +41,41 @@ export default class extends Controller {
     this.boundToggleRequest = this.handleToggleRequest.bind(this)
 
     window.addEventListener("app-window:toggle", this.boundToggleRequest)
+    this.boundTitleShellPointerDown = this.onTitleShellPointerDown.bind(this)
+    this.element.addEventListener("mousedown", this.boundTitleShellPointerDown)
+    this.element.addEventListener("touchstart", this.boundTitleShellPointerDown, { passive: false })
     this.element.addEventListener("mousedown", () => this.bringToFront())
 
+    if (this.isAutoSizedWindow) {
+      this.windowSizer = createOsWindowSizer({
+        windowId: this.appKeyValue,
+        windowElement: this.element,
+        contentElement: this.element.querySelector(".window-content"),
+        viewportMargin: this.viewportMargin,
+        isWindowOpen: () => !this.element.classList.contains("is-hidden")
+      })
+      this.windowSizer.observeContent()
+    }
+
     this.restoreWindowBounds()
+    this.restoreOpenState()
   }
 
   disconnect() {
     this.stopDrag()
     this.stopResize()
+    if (this.windowSizer) this.windowSizer.disconnect()
     window.removeEventListener("app-window:toggle", this.boundToggleRequest)
+    this.element.removeEventListener("mousedown", this.boundTitleShellPointerDown)
+    this.element.removeEventListener("touchstart", this.boundTitleShellPointerDown)
+  }
+
+  onTitleShellPointerDown(event) {
+    if (!(event.target instanceof Element)) return
+    const target = event.target
+    if (target.closest(".content-window-close, button, a, input, textarea, select, [role='button']")) return
+    if (!target.closest(".content-window-chrome")) return
+    this.startDrag(event)
   }
 
   handleToggleRequest(event) {
@@ -63,11 +95,15 @@ export default class extends Controller {
   open() {
     this.ensureFrameLoaded()
     this.element.classList.remove("is-hidden")
+    if (this.isAutoSizedWindow) this.element.style.height = ""
+    if (this.windowSizer) this.windowSizer.syncOnOpen()
     this.bringToFront()
+    this.saveOpenState(true)
     this.emitWindowState(true)
   }
 
   close() {
+    this.saveOpenState(false)
     this.emitWindowState(false)
     this.element.classList.add("is-hidden")
   }
@@ -133,6 +169,7 @@ export default class extends Controller {
   }
 
   startResize(event) {
+    if (this.isAutoSizedWindow) return
     if (event.button !== undefined && event.button !== 0) return
     event.preventDefault()
     this.bringToFront()
@@ -270,6 +307,35 @@ export default class extends Controller {
     }
   }
 
+  openStateStorageKey() {
+    return `${this.storageKeyValue}.open`
+  }
+
+  readStoredOpenState() {
+    try {
+      const raw = window.localStorage.getItem(this.openStateStorageKey())
+      if (raw === "1") return true
+      if (raw === "0") return false
+      return null
+    } catch (_error) {
+      return null
+    }
+  }
+
+  saveOpenState(isOpen) {
+    try {
+      window.localStorage.setItem(this.openStateStorageKey(), isOpen ? "1" : "0")
+    } catch (_error) {
+      // non-blocking
+    }
+  }
+
+  restoreOpenState() {
+    const shouldOpen = this.readStoredOpenState()
+    if (shouldOpen !== true) return
+    this.open()
+  }
+
   clampBounds(bounds) {
     const vw = window.innerWidth
     const vh = window.innerHeight
@@ -290,7 +356,11 @@ export default class extends Controller {
     this.element.style.left = `${bounds.left}px`
     this.element.style.top = `${bounds.top}px`
     this.element.style.width = `${bounds.width}px`
-    this.element.style.height = `${bounds.height}px`
+    if (!this.isAutoSizedWindow) {
+      this.element.style.height = `${bounds.height}px`
+    } else {
+      this.element.style.height = ""
+    }
   }
 
   getEdgeFromHandle(handle) {
@@ -306,7 +376,6 @@ export default class extends Controller {
   }
 
   bringToFront() {
-    if (window.__nexusRestoringLayout) return
     const next = Number(window.__nexusDesktopZIndex || 1500) + 1
     window.__nexusDesktopZIndex = next
     this.element.style.zIndex = String(next)

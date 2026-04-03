@@ -4,23 +4,23 @@ export default class extends Controller {
   static targets = ["settingsToggle"]
 
   connect() {
-    this.boundSettingsState = this.handleSettingsState.bind(this)
-    window.addEventListener("settings:state", this.boundSettingsState)
+    this.boundAppWindowState = this.handleAppWindowState.bind(this)
+    window.addEventListener("app-window:state", this.boundAppWindowState)
     this.syncState(false)
   }
 
   disconnect() {
-    window.removeEventListener("settings:state", this.boundSettingsState)
+    window.removeEventListener("app-window:state", this.boundAppWindowState)
   }
 
   toggleSettings(event) {
     if (event) event.preventDefault()
-    window.dispatchEvent(new CustomEvent("settings:toggle"))
+    window.dispatchEvent(new CustomEvent("app-window:toggle", { detail: { appKey: "settings" } }))
   }
 
-  handleSettingsState(event) {
-    const isOpen = Boolean(event?.detail?.open)
-    this.syncState(isOpen)
+  handleAppWindowState(event) {
+    if (event?.detail?.appKey !== "settings") return
+    this.syncState(Boolean(event.detail.open))
   }
 
   syncState(isOpen) {

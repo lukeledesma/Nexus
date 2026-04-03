@@ -1,26 +1,4 @@
-<div class="app-dock" aria-label="Pinned apps">
-  <button
-    type="button"
-    class="app-dock-button app-dock-button--db-health"
-    data-action="click->window-manager#toggleDbHealth"
-    data-hover-label="DB Health"
-    aria-label="Open DB Health"
-    aria-pressed="false"
-  >
-    ♥
-  </button>
-
-  <button
-    type="button"
-    class="app-dock-button app-dock-button--settings"
-    data-action="click->window-manager#toggleSettings"
-    data-hover-label="Settings"
-    aria-label="Open Settings"
-    aria-pressed="false"
-  >
-    ⚙
-  </button>
-
+<div class="app-dock" id="app-dock" aria-label="Pinned apps">
   <button
     type="button"
     class="app-dock-button app-dock-button--launcher"
@@ -29,6 +7,20 @@
     aria-label="Open Launcher"
     aria-pressed="false"
   >
-    ☰
+    <%= material_symbol_icon(:apps, size: :md) %>
   </button>
 </div>
+
+<script type="application/json" id="nexus-dock-icon-html">
+<%= raw({
+  "finder" => material_symbol_icon(:folder, size: :md),
+  "singular-note" => material_symbol_icon(:notepad, size: :md),
+  "singular-task-list" => material_symbol_icon(:task_checklist, size: :md),
+  "singular-whiteboard" => material_symbol_icon(:sticky_note, size: :md),
+  "singular-excalidraw" => material_symbol_icon(:design_services, size: :md),
+  "conversion-chart" => material_symbol_icon(:swap_horizontal, size: :md),
+  "timer" => material_symbol_icon(:timer, size: :md),
+  "settings" => material_symbol_icon(:settings, size: :md),
+  "theme-studio" => material_symbol_icon(:tune, size: :md)
+}.to_json) %>
+</script>

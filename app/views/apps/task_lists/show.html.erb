@@ -28,7 +28,7 @@
 
           <li class="<%= main_classes.join(" ") %>" style="--completion: <%= completion %>;" data-role="main-task" data-main-checked="<%= task["checked"] ? "true" : "false" %>" data-collapsed="<%= total_subtasks.positive? ? "true" : "false" %>" data-has-subtasks="<%= total_subtasks.positive? ? "true" : "false" %>">
             <div class="organizer-row-left row-left">
-              <span class="task-toggle" role="button" tabindex="0" aria-label="Toggle task completion"><%= task["checked"] ? "✓" : "○" %></span>
+              <span class="task-toggle" role="button" tabindex="0" aria-label="Toggle task completion"><%= task["checked"] ? material_symbol_icon(:check, size: :xs) : material_symbol_icon(:circle_outline, size: :xs) %></span>
               <span class="task-item-text" data-role="task-text"><%= task["text"] %></span>
             </div>
             <div class="organizer-row-right">
@@ -36,9 +36,9 @@
               <% if total_subtasks.positive? %>
                 <span class="task-progress-label"><%= completed_subtasks %>/<%= total_subtasks %></span>
               <% end %>
-              <span class="row-plus" title="Add subtask">+</span>
-              <span class="item-action-btn" title="Rename">&#9998;</span>
-              <span class="item-action-btn item-action-delete" title="Delete">&times;</span>
+              <span class="row-plus" title="Add subtask"><%= material_symbol_icon(:add, size: :xs) %></span>
+              <span class="item-action-btn" title="Rename"><%= material_symbol_icon(:edit, size: :xs) %></span>
+              <span class="item-action-btn item-action-delete" title="Delete"><%= material_symbol_icon(:delete, size: :xs) %></span>
             </div>
           </li>
 
@@ -48,12 +48,12 @@
             <% sub_classes << "task-item-group--tail" if index == total_subtasks - 1 %>
             <li class="<%= sub_classes.join(" ") %>" data-role="subtask">
               <div class="organizer-row-left row-left">
-                <span class="task-toggle" role="button" tabindex="0" aria-label="Toggle subtask completion"><%= subtask["checked"] ? "✓" : "○" %></span>
+                <span class="task-toggle" role="button" tabindex="0" aria-label="Toggle subtask completion"><%= subtask["checked"] ? material_symbol_icon(:check, size: :xs) : material_symbol_icon(:circle_outline, size: :xs) %></span>
                 <span class="task-item-text task-item-text--subtask" data-role="task-text"><%= subtask["text"] %></span>
               </div>
               <div class="organizer-row-right">
-                <span class="item-action-btn" title="Rename">&#9998;</span>
-                <span class="item-action-btn item-action-delete" title="Delete">&times;</span>
+                <span class="item-action-btn" title="Rename"><%= material_symbol_icon(:edit, size: :xs) %></span>
+                <span class="item-action-btn item-action-delete" title="Delete"><%= material_symbol_icon(:delete, size: :xs) %></span>
               </div>
             </li>
           <% end %>
@@ -61,7 +61,7 @@
       </ul>
 
       <div class="task-list-add-row">
-        <button type="button" class="btn-add-task" data-action="click->task-list-editor#addTask">+ Add Task</button>
+        <button type="button" class="btn-add-task" data-action="click->task-list-editor#addTask"><%= material_symbol_icon(:add, size: :sm, html_class: "btn-add-task__icon") %><span class="btn-add-task__label">Add Task</span></button>
       </div>
     <% end %>
   </section>

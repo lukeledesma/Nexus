@@ -63,7 +63,6 @@ class DocumentsController < ApplicationController
   end
 
   def show
-    prepare_workspace
     render :edit
   end
 
@@ -72,8 +71,6 @@ class DocumentsController < ApplicationController
       redirect_to root_path, alert: "Open an item to edit."
       return
     end
-
-    prepare_workspace
   end
 
   def update
@@ -86,9 +83,6 @@ class DocumentsController < ApplicationController
 
     if @document.content_type == "task_list"
       @document.tasks = parse_tasks_payload
-      @document.reset_days = parse_reset_days
-      @document.reset_mode = @document.reset_days.any? ? "custom" : "none"
-      @document.last_reset_at = parse_last_reset_at
     else
       @document.content = params.dig(:document, :content).to_s
     end
@@ -158,6 +152,16 @@ class DocumentsController < ApplicationController
   end
 
   def destroy
+    if @document.user_workspace_root?
+      message = "User root folders are protected."
+      if request.xhr? || request.format.json?
+        render json: { error: message }, status: :forbidden
+      else
+        redirect_to root_path, alert: message
+      end
+      return
+    end
+
     @document.destroy
 
     if request.xhr? || request.format.json?
@@ -299,59 +303,4 @@ class DocumentsController < ApplicationController
     []
   end
 
-  def parse_reset_days
-    Array(params.dig(:document, :reset_days)).filter_map do |value|
-      day = value.to_i
-      day if day.between?(0, 6)
-    end.uniq.sort
-  end
-
-  def parse_last_reset_at
-    raw = params.dig(:document, :last_reset_at).to_s
-    return nil if raw.blank?
-
-    Time.zone.parse(raw)
-  rescue ArgumentError, TypeError
-    nil
-  end
-
-  def prepare_workspace
-    return unless @document.content_type == "task_list"
-
-    apply_due_reset!(@document)
-  end
-
-  def apply_due_reset!(document)
-    days = Array(document.reset_days).map(&:to_i)
-    return if days.empty?
-
-    now = Time.zone.now
-    today_index = now.wday
-    return unless days.include?(today_index)
-
-    today_reset_time = now.beginning_of_day + 7.hours
-    return if now < today_reset_time
-    return if document.last_reset_at.present? && document.last_reset_at >= today_reset_time
-
-    reset_tasks = Array(document.tasks).map do |task|
-      value = task.respond_to?(:to_h) ? task.to_h : {}
-      subtasks = Array(value["subtasks"]).filter_map do |subtask|
-        next unless subtask.respond_to?(:to_h)
-
-        subtask_value = subtask.to_h
-        { "text" => subtask_value["text"].to_s, "checked" => false }
-      end
-
-      {
-        "text" => value["text"].to_s,
-        "checked" => false,
-        "subtasks" => subtasks
-      }
-    end
-
-    document.update_columns(tasks: reset_tasks, last_reset_at: today_reset_time, updated_at: Time.current)
-    document.tasks = reset_tasks
-    document.last_reset_at = today_reset_time
-    DocumentStorageSyncLite.new(document).update
-  end
 end

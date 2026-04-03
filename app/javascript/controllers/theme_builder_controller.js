@@ -2,9 +2,6 @@ import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
   static targets = [
-    "statusText",
-    "saveButton",
-    "nameInput",
     "hueSlider",
     "hueValue",
     "saturationSlider",
@@ -74,7 +71,11 @@ export default class extends Controller {
     this.themes = []
     this.activeThemeAppearanceSnapshot = this.buildAppearancePayload(this.defaultShellModel, this.defaultBackgroundModel, this.defaultContentModel)
     this.boundThemeStatus = this.handleThemeStatus.bind(this)
+    this.boundChromeSaveClick = this.beginSaveCustomTheme.bind(this)
+    this.boundChromeNameBlur = this.submitCustomThemeName.bind(this)
+    this.boundChromeNameKeydown = this.handleNameInputKeydown.bind(this)
 
+    this.bindChromeControls()
     this.syncSliderThumbColors()
     this.loadWorkspacePreferences()
     window.addEventListener("workspace:theme-status", this.boundThemeStatus)
@@ -83,6 +84,7 @@ export default class extends Controller {
   disconnect() {
     if (this.appearanceNotifyTimer) clearTimeout(this.appearanceNotifyTimer)
     if (this.persistAppearanceTimer) clearTimeout(this.persistAppearanceTimer)
+    this.unbindChromeControls()
     window.removeEventListener("workspace:theme-status", this.boundThemeStatus)
   }
 
@@ -154,20 +156,25 @@ export default class extends Controller {
   beginSaveCustomTheme(event) {
     if (event) event.preventDefault()
     if (!this.isCustomLayout) return
-    if (!this.hasNameInputTarget) return
+    const nameInput = this.nameInputElement()
+    const statusText = this.statusTextElement()
+    const saveButton = this.saveButtonElement()
+    if (!nameInput) return
 
-    this.nameInputTarget.value = ""
-    this.nameInputTarget.classList.remove("theme-builder-hidden")
-    if (this.hasStatusTextTarget) this.statusTextTarget.classList.add("theme-builder-hidden")
-    if (this.hasSaveButtonTarget) this.saveButtonTarget.classList.add("theme-builder-hidden")
-    this.nameInputTarget.focus()
+    nameInput.value = ""
+    nameInput.classList.remove("theme-builder-hidden")
+    if (statusText) statusText.classList.add("theme-builder-hidden")
+    if (saveButton) saveButton.classList.add("theme-builder-hidden")
+    nameInput.focus()
   }
 
   async submitCustomThemeName(event) {
     if (event) event.preventDefault()
-    if (!this.hasNameInputTarget) return
+    const nameInput = this.nameInputElement()
+    const statusText = this.statusTextElement()
+    if (!nameInput) return
 
-    const name = this.nameInputTarget.value.trim().slice(0, 64)
+    const name = nameInput.value.trim().slice(0, 64)
     if (!name) {
       this.cancelSaveCustomThemeName()
       return
@@ -187,9 +194,9 @@ export default class extends Controller {
 
     const appliedAppearance = payload?.appearance || appearance
     this.activeThemeAppearanceSnapshot = this.normalizedAppearanceSnapshot(appliedAppearance)
-    this.nameInputTarget.classList.add("theme-builder-hidden")
-    this.nameInputTarget.value = ""
-    if (this.hasStatusTextTarget) this.statusTextTarget.classList.remove("theme-builder-hidden")
+    nameInput.classList.add("theme-builder-hidden")
+    nameInput.value = ""
+    if (statusText) statusText.classList.remove("theme-builder-hidden")
     this.broadcastThemeStatus(appliedAppearance, this.isCustomLayout, true)
   }
 
@@ -207,11 +214,13 @@ export default class extends Controller {
   }
 
   cancelSaveCustomThemeName() {
-    if (!this.hasNameInputTarget) return
+    const nameInput = this.nameInputElement()
+    const statusText = this.statusTextElement()
+    if (!nameInput) return
 
-    this.nameInputTarget.classList.add("theme-builder-hidden")
-    this.nameInputTarget.value = ""
-    if (this.hasStatusTextTarget) this.statusTextTarget.classList.remove("theme-builder-hidden")
+    nameInput.classList.add("theme-builder-hidden")
+    nameInput.value = ""
+    if (statusText) statusText.classList.remove("theme-builder-hidden")
     this.updateStatusUi()
   }
 
@@ -487,17 +496,57 @@ export default class extends Controller {
   }
 
   updateStatusUi() {
-    if (!this.isCustomLayout && this.hasNameInputTarget) {
-      this.nameInputTarget.classList.add("theme-builder-hidden")
-      this.nameInputTarget.value = ""
-      if (this.hasStatusTextTarget) this.statusTextTarget.classList.remove("theme-builder-hidden")
+    const nameInput = this.nameInputElement()
+    const statusText = this.statusTextElement()
+    const saveButton = this.saveButtonElement()
+
+    if (!this.isCustomLayout && nameInput) {
+      nameInput.classList.add("theme-builder-hidden")
+      nameInput.value = ""
+      if (statusText) statusText.classList.remove("theme-builder-hidden")
     }
 
     const statusValue = this.isCustomLayout ? "CUSTOM" : (this.activeThemeName || "Default")
-    if (this.hasStatusTextTarget) this.statusTextTarget.textContent = statusValue
-    if (this.hasSaveButtonTarget) {
-      this.saveButtonTarget.classList.toggle("theme-builder-hidden", !this.isCustomLayout || (this.hasNameInputTarget && !this.nameInputTarget.classList.contains("theme-builder-hidden")))
+    if (statusText) statusText.textContent = statusValue
+    if (saveButton) {
+      saveButton.classList.toggle("theme-builder-hidden", !this.isCustomLayout || (nameInput && !nameInput.classList.contains("theme-builder-hidden")))
     }
+  }
+
+  bindChromeControls() {
+    const saveButton = this.saveButtonElement()
+    const nameInput = this.nameInputElement()
+    if (saveButton) saveButton.addEventListener("click", this.boundChromeSaveClick)
+    if (nameInput) {
+      nameInput.addEventListener("blur", this.boundChromeNameBlur)
+      nameInput.addEventListener("keydown", this.boundChromeNameKeydown)
+    }
+  }
+
+  unbindChromeControls() {
+    const saveButton = this.saveButtonElement()
+    const nameInput = this.nameInputElement()
+    if (saveButton) saveButton.removeEventListener("click", this.boundChromeSaveClick)
+    if (nameInput) {
+      nameInput.removeEventListener("blur", this.boundChromeNameBlur)
+      nameInput.removeEventListener("keydown", this.boundChromeNameKeydown)
+    }
+  }
+
+  chromeRoot() {
+    return this.element.closest(".content-window")
+  }
+
+  statusTextElement() {
+    return this.chromeRoot()?.querySelector("[data-theme-studio-chrome='status']") || null
+  }
+
+  nameInputElement() {
+    return this.chromeRoot()?.querySelector("[data-theme-studio-chrome='name-input']") || null
+  }
+
+  saveButtonElement() {
+    return this.chromeRoot()?.querySelector("[data-theme-studio-chrome='save']") || null
   }
 
   currentShellModel() {

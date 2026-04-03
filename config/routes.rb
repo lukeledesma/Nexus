@@ -6,8 +6,14 @@ Rails.application.routes.draw do
   namespace :apps do
     resources :folders, only: %i[show create update destroy]
     resources :task_lists, only: %i[show create update destroy]
+    get "finder", to: "finder#show"
+    post "finder/create_folder", to: "finder#create_folder"
     get "calculator", to: "calculator#show"
     get "settings", to: "settings#show"
+    get "user", to: "user#show"
+    patch "user/username", to: "user#update_username", as: :user_username
+    patch "user/password", to: "user#update_password", as: :user_password
+    get "theme_studio", to: "theme_builder#show"
     get "theme_builder", to: "theme_builder#show"
     get "conversion_chart", to: "conversion_chart#show"
     get "timer", to: "timer#show"
@@ -30,12 +36,8 @@ Rails.application.routes.draw do
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
   # Can be used by load balancers and uptime monitors to verify that the app is live.
   get "up" => "rails/health#show", as: :rails_health_check
-  get "db_health", to: "db_health#show"
-
   get    "workspace_preferences", to: "workspace_preferences#show"
   patch  "workspace_preferences", to: "workspace_preferences#update"
-  delete "workspace_preferences", to: "workspace_preferences#destroy"
-
   # Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.erb)
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker

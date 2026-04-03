@@ -16,9 +16,13 @@ class ItemStorageSyncLite
       Rails.root.join("storage", "workspace")
     end
 
-    def sync_all!
-      new.sync_all!
+    def sync_all!(username: nil)
+      new(username: username).sync_all!
     end
+  end
+
+  def initialize(username: nil)
+    @username = username.to_s.strip
   end
 
   def sync_all!
@@ -29,10 +33,21 @@ class ItemStorageSyncLite
 
   private
 
-  def perform_sync_all!
-    FileUtils.mkdir_p(self.class.storage_root)
+  def scoped_storage_root
+    candidate = @username.presence || default_workspace_username
+    return self.class.storage_root.join("Embedded") if candidate.blank?
 
-    temp_root = Pathname.new(Dir.mktmpdir(".sync_tmp-", self.class.storage_root.to_s))
+    self.class.storage_root.join(candidate, "Embedded")
+  end
+
+  def default_workspace_username
+    @default_workspace_username ||= User.where.not(username: [nil, ""]).order(:id).pick(:username).to_s.strip.presence
+  end
+
+  def perform_sync_all!
+    FileUtils.mkdir_p(scoped_storage_root)
+
+    temp_root = Pathname.new(Dir.mktmpdir(".sync_tmp-", scoped_storage_root.to_s))
 
     # Write singular app files from the App folder at the root.
     app_folder = Folder.find_by(name: "App")
@@ -67,7 +82,7 @@ class ItemStorageSyncLite
   end
 
   def swap_storage(temp_root)
-    root = self.class.storage_root
+    root = scoped_storage_root
     active_temp_dirname = File.basename(temp_root.to_s)
 
     # Preserve workspace config files across Notes/Tasks rebuilds.

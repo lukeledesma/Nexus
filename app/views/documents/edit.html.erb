@@ -15,39 +15,19 @@
                              data: { task_list_target: "title", action: "input->task-list#queueSave" } %>
           </div>
           <div class="header-actions">
-            <button type="button" class="btn btn-toolbar btn-toolbar-icon" data-action="click->task-list#toggleResetSettings" aria-label="Toggle reset settings">⏲</button>
-            <button type="button" class="btn btn-toolbar btn-toolbar-icon" data-action="click->task-list#addTask" aria-label="Add row">+</button>
+            <button type="button" class="btn btn-toolbar btn-toolbar-icon" data-action="click->task-list#addTask" aria-label="Add row"><%= material_symbol_icon(:add, size: :md) %></button>
             <%= link_to "Back", root_path, class: "btn btn-toolbar" %>
           </div>
         </div>
         <p class="loaded-status" data-controller="clock">
           <span data-task-list-target="status">Saved</span>
-          <span class="workspace-clock workspace-clock--toggle"
+          <span class="workspace-clock"
                 data-clock-target="display"
-                data-action="click->task-list#toggleResetSettings"
-                role="button"
-                tabindex="0"
-                title="Toggle reset days"></span>
+                aria-hidden="true"></span>
         </p>
       </header>
 
-      <div class="task-reset-panel hidden" data-task-list-target="resetPanel">
-        <p class="folder-toolbar-hint">Reset completed tasks at 7:00 AM on selected days.</p>
-        <div class="reset-days-grid">
-          <% %w[Sun Mon Tue Wed Thu Fri Sat].each_with_index do |label, index| %>
-            <button type="button"
-                    class="btn btn-secondary reset-day-button"
-                    data-day-index="<%= index %>"
-                    data-action="click->task-list#toggleResetDay"><%= label %></button>
-          <% end %>
-        </div>
-      </div>
-
       <%= hidden_field_tag "document[tasks_payload]", @document.tasks.to_json, data: { task_list_target: "tasksPayload" } %>
-      <%= hidden_field_tag "document[last_reset_at]", @document.last_reset_at&.iso8601, data: { task_list_target: "lastResetAt" } %>
-      <% Array(@document.reset_days).each do |day| %>
-        <%= hidden_field_tag "document[reset_days][]", day, data: { task_list_target: "resetDay" } %>
-      <% end %>
 
       <div class="task-list-shell">
         <div class="task-list-rows" data-task-list-target="rows">
@@ -63,8 +43,8 @@
                 <span class="task-item-text"><%= text.presence || "Untitled Task" %></span>
               </div>
               <div class="row-right">
-                <button type="button" class="row-plus" data-action="click->task-list#addSubtask">+</button>
-                <button type="button" class="row-pencil" data-action="click->task-list#editRow">✎</button>
+                <button type="button" class="row-plus" data-action="click->task-list#addSubtask"><%= material_symbol_icon(:add, size: :xs) %></button>
+                <button type="button" class="row-pencil" data-action="click->task-list#editRow"><%= material_symbol_icon(:edit, size: :xs) %></button>
               </div>
             </div>
 
@@ -80,7 +60,7 @@
                   <span class="task-item-text task-item-text--subtask"><%= subtask_text.presence || "Untitled Subtask" %></span>
                 </div>
                 <div class="row-right">
-                  <button type="button" class="row-pencil" data-action="click->task-list#editRow">✎</button>
+                  <button type="button" class="row-pencil" data-action="click->task-list#editRow"><%= material_symbol_icon(:edit, size: :xs) %></button>
                 </div>
               </div>
             <% end %>

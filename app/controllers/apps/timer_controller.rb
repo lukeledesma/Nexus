@@ -5,7 +5,7 @@ require "time"
 
 module Apps
   class TimerController < BaseController
-    TIMER_FILE = Rails.root.join("storage", "workspace", "Timer.txt").freeze
+    STORAGE_ROOT = Rails.root.join("storage", "workspace").freeze
     DEFAULT_SECONDS = 0
     ALLOWED_MODES = %w[timer stopwatch].freeze
 
@@ -26,6 +26,12 @@ module Apps
     end
 
     private
+
+    def timer_file
+      username = current_user&.username.to_s.strip
+      base_dir = username.present? ? STORAGE_ROOT.join(username, "Embedded") : STORAGE_ROOT.join("Embedded")
+      base_dir.join("Timer.txt")
+    end
 
     def normalize_state_payload(raw)
       mode = raw[:mode].to_s
@@ -60,7 +66,7 @@ module Apps
 
     def read_state
       ensure_timer_file
-      raw = File.read(TIMER_FILE)
+      raw = File.read(timer_file)
       parse_workspace_timer_text(raw)
     rescue StandardError => e
       Rails.logger.error("Timer state parse error: #{e.message}")
@@ -68,13 +74,13 @@ module Apps
     end
 
     def write_state(state)
-      FileUtils.mkdir_p(TIMER_FILE.dirname)
+      FileUtils.mkdir_p(timer_file.dirname)
       content = format_workspace_timer_text(state)
       
       # Atomic write: write to temp file, then rename
-      temp_file = Pathname.new("#{TIMER_FILE}.tmp")
+      temp_file = Pathname.new("#{timer_file}.tmp")
       File.write(temp_file, content)
-      File.rename(temp_file, TIMER_FILE)
+      File.rename(temp_file, timer_file)
     rescue StandardError => e
       Rails.logger.error("Timer state write error: #{e.message}")
       # Clean up temp file if it exists
@@ -83,7 +89,7 @@ module Apps
     end
 
     def ensure_timer_file
-      return if File.exist?(TIMER_FILE)
+      return if File.exist?(timer_file)
 
       write_state(default_state)
     end

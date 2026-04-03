@@ -3,10 +3,6 @@
   <section class="app-surface app-surface--tool app-surface--excalidraw"
     data-controller="excalidraw-canvas"
     data-excalidraw-canvas-initial-state-value="<%= json_escape(@drawing&.body.to_s) %>">
-    <header class="app-surface-header tool-window-header os-window-header">
-      <h2 class="tool-window-title os-window-title">SKETCHPAD</h2>
-    </header>
-
     <%= form_with model: @drawing,
       url: apps_singular_excalidraw_path(frame_id: frame_id),
       method: :patch,
