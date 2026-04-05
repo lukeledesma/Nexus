@@ -28,13 +28,13 @@ export default class extends Controller {
 
   openCredentialsModalWithConfirm(event) {
     event.preventDefault()
-    if (!window.confirm("Are you sure?")) return
+    if (!window.confirm("Are you sure you want to reset your password?")) return
     this.openModal(this.credentialsModalTarget)
   }
 
   openUsernameModalWithConfirm(event) {
     event.preventDefault()
-    if (!window.confirm("Are you sure?")) return
+    if (!window.confirm("Are you sure you want to reset your username?")) return
     this.openModal(this.usernameModalTarget)
   }
 
@@ -52,15 +52,52 @@ export default class extends Controller {
     this.closeModal(this.usernameModalTarget)
   }
 
+  backdropCloseCredentials(event) {
+    if (event.target !== event.currentTarget) return
+    this.closeCredentialsModal(event)
+  }
+
+  backdropCloseUsername(event) {
+    if (event.target !== event.currentTarget) return
+    this.closeUsernameModal(event)
+  }
+
   openModal(modal) {
     if (!modal) return
-    modal.classList.add("is-open")
+    this.syncFrameIdFromSettingsPanel()
+    this.syncModalMetaFromPanel()
+    modal.hidden = false
+    modal.classList.add("is-visible")
     modal.setAttribute("aria-hidden", "false")
+  }
+
+  syncFrameIdFromSettingsPanel() {
+    const el = document.querySelector("[data-settings-user-frame-id]")
+    const fid = el?.dataset?.settingsUserFrameId
+    if (!fid) return
+    ;[this.credentialsFormTarget, this.usernameFormTarget].forEach((form) => {
+      if (!form) return
+      const input = form.querySelector('input[name="frame_id"]')
+      if (input) input.value = fid
+    })
+  }
+
+  /** Modals live in layout; panel updates via Turbo — refresh header line when opening. */
+  syncModalMetaFromPanel() {
+    const el = document.querySelector("[data-settings-user-email]")
+    if (!el) return
+    const email = (el.dataset.settingsUserEmail || "").trim()
+    const username = (el.dataset.settingsUserUsername || "").trim()
+    const line = username.length > 0 ? `${email} | ${username}` : email
+    document.querySelectorAll(".settings-user-modal-email.nexus-modal-meta").forEach((node) => {
+      node.textContent = line
+    })
   }
 
   closeModal(modal) {
     if (!modal) return
-    modal.classList.remove("is-open")
+    modal.hidden = true
+    modal.classList.remove("is-visible")
     modal.setAttribute("aria-hidden", "true")
   }
 
@@ -138,7 +175,7 @@ export default class extends Controller {
 
   applyCredentialServerErrors(payload) {
     const code = payload?.code
-    const message = payload?.message || "Unable to update credentials."
+    const message = payload?.message || "Unable to update password."
     this.showInlineError(this.credentialsInlineErrorTarget, message)
 
     if (code === "current_password_incorrect") {

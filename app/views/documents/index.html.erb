@@ -1,4 +1,4 @@
-<div class="app-dock" id="app-dock" aria-label="Pinned apps">
+<div class="app-dock" id="app-dock" aria-label="Dock">
   <button
     type="button"
     class="app-dock-button app-dock-button--launcher"
@@ -9,6 +9,10 @@
   >
     <%= material_symbol_icon(:apps, size: :md) %>
   </button>
+  <div class="app-dock-divider" id="app-dock-launcher-divider" role="separator" aria-hidden="true"></div>
+  <div class="app-dock-group app-dock-group--pinned" id="app-dock-pinned"></div>
+  <div class="app-dock-divider" id="app-dock-running-divider" role="separator" aria-hidden="true" hidden></div>
+  <div class="app-dock-group app-dock-group--running" id="app-dock-running"></div>
 </div>
 
 <script type="application/json" id="nexus-dock-icon-html">
@@ -16,10 +20,7 @@
   "finder" => material_symbol_icon(:folder, size: :md),
   "singular-note" => material_symbol_icon(:notepad, size: :md),
   "singular-task-list" => material_symbol_icon(:task_checklist, size: :md),
-  "singular-whiteboard" => material_symbol_icon(:sticky_note, size: :md),
-  "singular-excalidraw" => material_symbol_icon(:design_services, size: :md),
-  "conversion-chart" => material_symbol_icon(:swap_horizontal, size: :md),
-  "timer" => material_symbol_icon(:timer, size: :md),
+  "singular-sticky-notes" => material_symbol_icon(:sticky_note, size: :md),
   "settings" => material_symbol_icon(:settings, size: :md),
   "theme-studio" => material_symbol_icon(:tune, size: :md)
 }.to_json) %>

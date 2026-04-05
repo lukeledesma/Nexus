@@ -113,8 +113,7 @@ export default class extends Controller {
     const isTracked =
       element.matches("#organizer") ||
       element.matches(".window-content") ||
-      element.matches(".finder-app-frame") ||
-      element.matches(".conversion-table-wrapper")
+      element.matches(".finder-app-frame")
 
     if (!isTracked) return
 

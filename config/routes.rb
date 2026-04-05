@@ -7,6 +7,8 @@ Rails.application.routes.draw do
     resources :folders, only: %i[show create update destroy]
     resources :task_lists, only: %i[show create update destroy]
     get "finder", to: "finder#show"
+    get "finder/folders", to: "finder#folders_json"
+    get "finder/folder_files", to: "finder#folder_files"
     post "finder/create_folder", to: "finder#create_folder"
     get "calculator", to: "calculator#show"
     get "settings", to: "settings#show"
@@ -15,17 +17,12 @@ Rails.application.routes.draw do
     patch "user/password", to: "user#update_password", as: :user_password
     get "theme_studio", to: "theme_builder#show"
     get "theme_builder", to: "theme_builder#show"
-    get "conversion_chart", to: "conversion_chart#show"
-    get "timer", to: "timer#show"
-    get "timer_state", to: "timer#state"
-    patch "timer_state", to: "timer#update_state"
     get "singular_note", to: "singular#note"
     patch "singular_note", to: "singular#update_note"
     get "singular_task_list", to: "singular#task_list"
-    get "singular_whiteboard", to: "singular#whiteboard"
-    patch "singular_whiteboard", to: "singular#update_whiteboard"
-    get "singular_excalidraw", to: "singular#excalidraw"
-    patch "singular_excalidraw", to: "singular#update_excalidraw"
+    get "singular_sticky_notes", to: "singular#sticky_notes"
+    patch "singular_sticky_notes", to: "singular#update_sticky_notes"
+    post "singular/save_file", to: "singular#save_file"
     get "all_tasks",  to: "task_lists#index"
   end
 

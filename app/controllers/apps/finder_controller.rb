@@ -7,8 +7,44 @@ module Apps
       render layout: false if turbo_frame_request?
     end
 
+    def folders_json
+      folders = FinderListedFolders.user_folders(current_user)
+      render json: { folders: folders.map { |f| { id: f.id, title: f.title } } }
+    end
+
+    def folder_files
+      return render json: { error: "folder_id required" }, status: :bad_request if params[:folder_id].blank?
+
+      folder_id = params[:folder_id].to_i
+      folders = FinderListedFolders.user_folders(current_user).to_a
+      folder = folders.find { |f| f.id == folder_id }
+      unless folder
+        return render json: { error: "Folder not found" }, status: :not_found
+      end
+
+      files = folder.children.files.order(Arel.sql("LOWER(title) ASC"))
+      render json: {
+        files: files.map do |f|
+          {
+            id: f.id,
+            display_title: helpers.finder_document_display_title(f.title),
+            content_type: f.content_type,
+            icon_html: helpers.material_symbol_icon(
+              helpers.finder_file_icon_for_content_type(f.content_type),
+              size: :xs
+            ).to_s
+          }
+        end
+      }
+    end
+
     def create_folder
-      folder = Document.new(is_folder: true, parent: documents_root_folder, title: next_folder_name)
+      parent = FinderListedFolders.finder_folder_for(current_user)
+      unless parent
+        return render json: { error: "Workspace not ready." }, status: :unprocessable_entity
+      end
+
+      folder = Document.new(is_folder: true, parent: parent, title: next_folder_name)
 
       unless folder.save
         if request.xhr? || request.format.json?
@@ -38,18 +74,18 @@ module Apps
     private
 
     def load_browser_data
-      @folders = documents_root_folder.children.folders.includes(:children).order(Arel.sql("LOWER(title) ASC"))
+      @folders = FinderListedFolders.user_folders(current_user).to_a
       @selected_folder = if params[:folder_id].present?
         @folders.find { |folder| folder.id == params[:folder_id].to_i }
-      else
-        @folders.first
       end
+      @selected_folder ||= @folders.first
       @files = @selected_folder ? @selected_folder.children.files.order(Arel.sql("LOWER(title) ASC")) : []
     end
 
     def next_folder_name
+      parent = FinderListedFolders.finder_folder_for(current_user)
+      names = parent ? parent.children.folders.pluck(:title).map(&:to_s) : []
       base = "Untitled Folder"
-      names = documents_root_folder.children.folders.pluck(:title).map(&:to_s)
       return base unless names.include?(base)
 
       nums = names
@@ -67,21 +103,6 @@ module Apps
       end
 
       "#{base} #{expected}"
-    end
-
-    def user_root_folder
-      name = current_user.username.to_s.strip
-      name = current_user.email.to_s.strip if name.blank?
-      folder = Document.folders.where(parent_id: nil).where("LOWER(title) = ?", name.downcase).first
-      folder ||= Document.create!(is_folder: true, title: name)
-      folder
-    end
-
-    def documents_root_folder
-      root = user_root_folder
-      folder = root.children.folders.where("LOWER(title) = ?", "documents").first
-      folder ||= root.children.create!(is_folder: true, title: "Documents")
-      folder
     end
 
     def frame_params

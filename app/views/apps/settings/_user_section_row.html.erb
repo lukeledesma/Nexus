@@ -1,0 +1,9 @@
+<%# locals: item:, frame_id:, active: %>
+<li class="finder-folder-item<%= " is-active" if active %>">
+  <%= link_to apps_settings_path(section: item[:key], frame_id: frame_id), class: "finder-folder-link", aria: { label: "Open #{item[:label]} settings" } do %>
+    <span class="finder-folder-icon" aria-hidden="true">
+      <%= material_symbol_icon(:account_circle, size: :md) %>
+    </span>
+    <span class="finder-folder-name"><%= item[:label] %></span>
+  <% end %>
+</li>

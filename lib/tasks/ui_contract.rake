@@ -40,14 +40,7 @@ namespace :ui do
         "os-window-title",
         "os-window-body-start"
       ],
-      "app/views/apps/conversion_chart/show.html.erb" => [
-        "os-window-header",
-        "os-window-title",
-        "os-window-body-start"
-      ],
-      "app/views/apps/timer/show.html.erb" => [
-        "os-window-header",
-        "os-window-title",
+      "app/views/apps/singular/sticky_notes.html.erb" => [
         "os-window-body-start"
       ]
     }

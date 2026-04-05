@@ -43,7 +43,7 @@ class TaskListEditorBehaviorTest < ApplicationSystemTestCase
 
     assert_text "Existing Task"
 
-    click_on "+ Add Task"
+    click_button "Add task"
     new_main_input = find(".task-item-row--main .task-edit-input", visible: :all)
     new_main_input.set("")
     new_main_input.send_keys(:enter)

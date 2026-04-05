@@ -2,8 +2,13 @@ import { Controller } from "@hotwired/stimulus"
 import { observeContent } from "lib/os_window_sizing"
 import { materialSymbolSvg } from "lib/material_symbols"
 
+/** New sticky: 9 spectrum hues × 3 soft saturations × 3 light brightness tiers (pastel-friendly). */
+const STICKY_SPAWN_HUES = [0, 40, 80, 120, 160, 200, 240, 280, 320]
+const STICKY_SPAWN_SATURATIONS = [34, 44, 54]
+const STICKY_SPAWN_BRIGHTNESSES = [72, 77, 83]
+
 export default class extends Controller {
-  static targets = ["contentShell", "grid", "gridToggle", "stickySelection", "colorPopover", "colorSlider", "saturationSlider", "brightnessSlider"]
+  static targets = ["contentShell", "canvas", "grid", "gridToggle", "gridIconOn", "gridIconOff", "stickyColorAnchor", "stickySelection", "colorPopover", "colorSlider", "saturationSlider", "brightnessSlider", "minimap", "minimapViewport"]
 
   static values = {
     columns: { type: Number, default: 75 },
@@ -22,35 +27,43 @@ export default class extends Controller {
     this.selectedSticky = null
     this.colorPopoverOpen = false
     this.pendingStickyColorSave = false
+    this.zoomValue = 1
+    this.panX = 0
+    this.panY = 0
+    this.activeCanvasPan = null
+    this._minimapHideTimer = null
+    this.boundCanvasPanMove = (e) => this.handleCanvasPanMove(e)
+    this.boundCanvasPanEnd = () => this.stopCanvasPan()
     this.boundWindowResize = this.queueSync.bind(this)
     this.boundContentShellMouseDown = (event) => this.handleContentShellPointerDown(event)
     this.boundContentShellTouchStart = (event) => this.handleContentShellPointerDown(event)
     this.boundDocumentPointerDown = (event) => this.handleDocumentPointerDown(event)
+    this.boundRequestSave = (event) => this.handleRequestSave(event)
+    document.addEventListener("nexus:request-save", this.boundRequestSave)
 
-    this.gridObserver = observeContent("singular-whiteboard", this.contentShellTarget, () => {
-      console.log("[whiteboard] content shell resized via observer")
+    this.gridObserver = observeContent("singular-sticky-notes", this.contentShellTarget, () => {
+      console.log("[sticky-notes] content shell resized via observer")
       this.queueSync()
     })
 
     window.addEventListener("resize", this.boundWindowResize)
     this.contentShellTarget.addEventListener("mousedown", this.boundContentShellMouseDown)
-    this.contentShellTarget.addEventListener("touchstart", this.boundContentShellTouchStart, { passive: true })
+    this.contentShellTarget.addEventListener("touchstart", this.boundContentShellTouchStart, { passive: false })
     document.addEventListener("mousedown", this.boundDocumentPointerDown)
     document.addEventListener("touchstart", this.boundDocumentPointerDown, { passive: true })
 
     // Load grid visibility state from localStorage, default to visible.
     const gridVisible = this.loadGridState() !== false
     if (gridVisible) {
-      this.gridTarget.classList.remove("whiteboard-grid--hidden")
+      this.gridTarget.classList.remove("sticky-notes-grid--hidden")
     } else {
-      this.gridTarget.classList.add("whiteboard-grid--hidden")
+      this.gridTarget.classList.add("sticky-notes-grid--hidden")
     }
-    if (this.hasGridToggleTarget) {
-      this.gridToggleTarget.setAttribute("aria-pressed", String(gridVisible))
-    }
+    this.syncGridToggleUi()
 
     this.renderGrid()
     this.syncStickySelectionButton()
+    this.applyViewportTransform()
     this.queueSync()
 
     // Render any previously saved stickies after the first grid metrics sync
@@ -60,9 +73,16 @@ export default class extends Controller {
   }
 
   disconnect() {
+    document.removeEventListener("nexus:request-save", this.boundRequestSave)
     if (this.gridObserver) this.gridObserver.disconnect()
     if (this.syncFrame) window.cancelAnimationFrame(this.syncFrame)
     if (this.saveTimer) clearTimeout(this.saveTimer)
+    this.stopCanvasPan()
+    if (this._minimapHideTimer) {
+      clearTimeout(this._minimapHideTimer)
+      this._minimapHideTimer = null
+    }
+    this.hideMinimap({ immediate: true })
     window.removeEventListener("resize", this.boundWindowResize)
     this.contentShellTarget.removeEventListener("mousedown", this.boundContentShellMouseDown)
     this.contentShellTarget.removeEventListener("touchstart", this.boundContentShellTouchStart)
@@ -70,20 +90,42 @@ export default class extends Controller {
     document.removeEventListener("touchstart", this.boundDocumentPointerDown)
   }
 
+  handleRequestSave(event) {
+    const frame = this.element.closest("turbo-frame")
+    if (!frame || event.detail?.frameId !== frame.id) return
+    if (this.saveTimer) {
+      clearTimeout(this.saveTimer)
+      this.saveTimer = null
+    }
+    this.saveToServer()
+  }
+
   // ── Grid toggle ─────────────────────────────────────────────────────────────
 
   toggleGrid() {
-    const isVisible = !this.gridTarget.classList.contains("whiteboard-grid--hidden")
-    this.gridTarget.classList.toggle("whiteboard-grid--hidden", isVisible)
-    if (this.hasGridToggleTarget) {
-      this.gridToggleTarget.setAttribute("aria-pressed", String(!isVisible))
-    }
+    const isVisible = !this.gridTarget.classList.contains("sticky-notes-grid--hidden")
+    this.gridTarget.classList.toggle("sticky-notes-grid--hidden", isVisible)
+    this.syncGridToggleUi()
     this.saveGridState(!isVisible)
+  }
+
+  syncGridToggleUi() {
+    const gridVisible = !this.gridTarget.classList.contains("sticky-notes-grid--hidden")
+    if (this.hasGridIconOnTarget && this.hasGridIconOffTarget) {
+      // Full grid icon when grid is off (prompts "Show Grid"); slashed when on ("Hide Grid").
+      this.gridIconOnTarget.hidden = gridVisible
+      this.gridIconOffTarget.hidden = !gridVisible
+    }
+    if (this.hasGridToggleTarget) {
+      const label = gridVisible ? "Hide Grid" : "Show Grid"
+      this.gridToggleTarget.setAttribute("aria-label", label)
+      this.gridToggleTarget.setAttribute("title", label)
+    }
   }
 
   loadGridState() {
     try {
-      const stored = localStorage.getItem("whiteboard-grid-visible")
+      const stored = localStorage.getItem("sticky-notes-grid-visible")
       return stored === null ? true : JSON.parse(stored)
     } catch (e) {
       return true
@@ -92,7 +134,7 @@ export default class extends Controller {
 
   saveGridState(isVisible) {
     try {
-      localStorage.setItem("whiteboard-grid-visible", JSON.stringify(isVisible))
+      localStorage.setItem("sticky-notes-grid-visible", JSON.stringify(isVisible))
     } catch (e) {
       // Silently fail if localStorage is unavailable
     }
@@ -101,18 +143,82 @@ export default class extends Controller {
   // ── Sticky notes ─────────────────────────────────────────────────────────────
 
   addSticky() {
-    const defaultCols = 10
-    const defaultRows = 10
-    const col = Math.max(0, Math.floor((this.columnsValue - defaultCols) / 2))
-    const row = Math.max(0, Math.floor((this.rowsValue - defaultRows) / 2))
+    const maxW = Math.min(20, Math.max(1, this.columnsValue))
+    const maxH = Math.min(20, Math.max(1, this.rowsValue))
+    const minW = Math.min(6, maxW)
+    const minH = Math.min(6, maxH)
 
-    this.renderSticky({ col, row, cols: defaultCols, rows: defaultRows, text: "" })
+    const maxSide = Math.min(20, maxW, maxH)
+    const minSide = Math.min(6, maxSide)
+    const side = this.randomInt(minSide, maxSide)
+    let cols = Math.min(maxW, Math.max(minW, side))
+    let rows = Math.min(maxH, Math.max(minH, side + this.randomInt(-1, 1)))
+    if (Math.abs(cols - rows) > 2) {
+      const m = Math.round((cols + rows) / 2)
+      cols = Math.min(maxW, Math.max(minW, m))
+      rows = Math.min(maxH, Math.max(minH, m))
+    }
+
+    const maxCol = Math.max(0, this.columnsValue - cols)
+    const maxRow = Math.max(0, this.rowsValue - rows)
+    const col = this.pickRandomEvenCentered(maxCol)
+    const row = this.pickRandomEvenCentered(maxRow)
+
+    const hue = STICKY_SPAWN_HUES[this.randomInt(0, STICKY_SPAWN_HUES.length - 1)]
+    const saturation = STICKY_SPAWN_SATURATIONS[this.randomInt(0, STICKY_SPAWN_SATURATIONS.length - 1)]
+    const brightness = STICKY_SPAWN_BRIGHTNESSES[this.randomInt(0, STICKY_SPAWN_BRIGHTNESSES.length - 1)]
+
+    const el = this.renderSticky({ col, row, cols, rows, text: "", hue, saturation, brightness })
+    this.selectSticky(el)
     this.scheduleSave()
+  }
+
+  randomInt(min, max) {
+    const lo = Math.min(min, max)
+    const hi = Math.max(min, max)
+    return lo + Math.floor(Math.random() * (hi - lo + 1))
+  }
+
+  /** Random even index in [0, maxInclusive] for 2-cell grid alignment. */
+  pickRandomEven(maxInclusive) {
+    if (maxInclusive <= 0) return 0
+    const evens = []
+    for (let i = 0; i <= maxInclusive; i += 2) evens.push(i)
+    return evens[this.randomInt(0, evens.length - 1)]
+  }
+
+  /** Random even col/row biased toward the center (not edge-to-edge — ~±18% of span from center). */
+  pickRandomEvenCentered(maxInclusive) {
+    if (maxInclusive <= 0) return 0
+    let min = 0
+    let max = maxInclusive
+    if (maxInclusive > 4) {
+      const c = maxInclusive / 2
+      const span = maxInclusive * 0.18
+      min = Math.max(0, Math.floor(c - span))
+      max = Math.min(maxInclusive, Math.ceil(c + span))
+      if (min > max) {
+        min = 0
+        max = maxInclusive
+      }
+    }
+    return this.pickRandomEvenInRange(min, max)
+  }
+
+  pickRandomEvenInRange(minIn, maxIn) {
+    const min = Math.min(minIn, maxIn)
+    const max = Math.max(minIn, maxIn)
+    const evens = []
+    for (let i = min; i <= max; i += 1) {
+      if (i % 2 === 0) evens.push(i)
+    }
+    if (evens.length === 0) return this.pickRandomEven(max)
+    return evens[this.randomInt(0, evens.length - 1)]
   }
 
   renderSticky({ col, row, cols, rows, text, hue, saturation, brightness }) {
     const el = document.createElement("div")
-    el.classList.add("whiteboard-sticky")
+    el.classList.add("sticky-notes-sticky")
     el.dataset.stickyCol = String(col)
     el.dataset.stickyRow = String(row)
     el.dataset.stickyCols = String(cols)
@@ -123,7 +229,7 @@ export default class extends Controller {
     this.applyStickyPosition(el)
 
     const deleteBtn = document.createElement("button")
-    deleteBtn.classList.add("whiteboard-sticky-delete-btn")
+    deleteBtn.classList.add("sticky-notes-sticky-delete-btn")
     deleteBtn.setAttribute("type", "button")
     deleteBtn.setAttribute("aria-label", "Delete sticky note")
     deleteBtn.innerHTML = materialSymbolSvg("close", "xs")
@@ -134,13 +240,14 @@ export default class extends Controller {
     el.appendChild(deleteBtn)
 
     const content = document.createElement("div")
-    content.classList.add("whiteboard-sticky-content")
+    content.classList.add("sticky-notes-sticky-content")
     content.setAttribute("contenteditable", "false")
     content.setAttribute("spellcheck", "false")
     if (text) content.textContent = text
     el.appendChild(content)
 
-    this.contentShellTarget.appendChild(el)
+    const host = this.hasCanvasTarget ? this.canvasTarget : this.contentShellTarget
+    host.appendChild(el)
     this.bringToFront(el)
 
     el.addEventListener("mousedown", (e) => {
@@ -168,18 +275,22 @@ export default class extends Controller {
       this.selectSticky(el)
       this.startEditSticky(el)
     })
+
+    return el
   }
 
   handleContentShellPointerDown(event) {
-    if (event.target.closest(".whiteboard-sticky")) return
+    if (event.target.closest(".sticky-notes-sticky")) return
     this.clearStickySelection(true)
+    if (event.button !== undefined && event.button !== 0) return
+    this.startCanvasPan(event)
   }
 
   handleDocumentPointerDown(event) {
     if (!this.colorPopoverOpen) return
 
     const target = event.target
-    if (this.hasStickySelectionTarget && this.stickySelectionTarget.contains(target)) return
+    if (this.hasStickyColorAnchorTarget && this.stickyColorAnchorTarget.contains(target)) return
     if (this.hasColorPopoverTarget && this.colorPopoverTarget.contains(target)) return
 
     this.closeStickyColorPopover(true)
@@ -210,12 +321,15 @@ export default class extends Controller {
   }
 
   syncStickySelectionButton() {
-    if (!this.hasStickySelectionTarget) return
-
     const hasSelection = Boolean(this.selectedSticky)
-    this.stickySelectionTarget.classList.toggle("whiteboard-action-btn--hidden", !hasSelection)
-    this.stickySelectionTarget.setAttribute("aria-hidden", String(!hasSelection))
-    this.stickySelectionTarget.tabIndex = hasSelection ? 0 : -1
+
+    if (this.hasStickyColorAnchorTarget) {
+      this.stickyColorAnchorTarget.classList.toggle("sticky-notes-action-btn--hidden", !hasSelection)
+    }
+    if (this.hasStickySelectionTarget) {
+      this.stickySelectionTarget.setAttribute("aria-hidden", String(!hasSelection))
+      this.stickySelectionTarget.tabIndex = hasSelection ? 0 : -1
+    }
 
     if (!hasSelection) {
       this.stickySelectionTarget.style.removeProperty("--sticky-hue")
@@ -311,7 +425,7 @@ export default class extends Controller {
       this.brightnessSliderTarget.value = String(brightness)
     }
     this.colorPopoverOpen = true
-    this.colorPopoverTarget.classList.remove("whiteboard-action-btn--hidden")
+    this.colorPopoverTarget.classList.remove("sticky-notes-action-btn--hidden")
     this.colorPopoverTarget.setAttribute("aria-hidden", "false")
   }
 
@@ -353,7 +467,7 @@ export default class extends Controller {
 
     this.colorPopoverOpen = false
     if (this.hasColorPopoverTarget) {
-      this.colorPopoverTarget.classList.add("whiteboard-action-btn--hidden")
+      this.colorPopoverTarget.classList.add("sticky-notes-action-btn--hidden")
       this.colorPopoverTarget.setAttribute("aria-hidden", "true")
     }
 
@@ -372,7 +486,7 @@ export default class extends Controller {
   }
 
   startEditSticky(el) {
-    const content = el.querySelector(".whiteboard-sticky-content")
+    const content = el.querySelector(".sticky-notes-sticky-content")
     if (!content) return
 
     el.classList.add("is-editing")
@@ -412,12 +526,10 @@ export default class extends Controller {
   startStickyDrag(event, el) {
     if (event.button !== undefined && event.button !== 0) return
     event.preventDefault()
+    this.stopCanvasPan()
     this.bringToFront(el)
 
     const coords = this.getEventCoords(event)
-    const shellRect = this.contentShellTarget.getBoundingClientRect()
-    const cellW = shellRect.width / this.columnsValue
-    const cellH = shellRect.height / this.rowsValue
 
     this.activeStickyDrag = {
       el,
@@ -427,8 +539,6 @@ export default class extends Controller {
       startRow: parseInt(el.dataset.stickyRow, 10) || 0,
       cols: parseInt(el.dataset.stickyCols, 10) || 10,
       rows: parseInt(el.dataset.stickyRows, 10) || 10,
-      cellW,
-      cellH,
       dragStarted: false
     }
 
@@ -444,7 +554,7 @@ export default class extends Controller {
     if (!this.activeStickyDrag) return
     if (event.touches) event.preventDefault()
 
-    const { el, startMouseX, startMouseY, startCol, startRow, cols, rows, cellW, cellH } = this.activeStickyDrag
+    const { el, startMouseX, startMouseY, startCol, startRow, cols, rows } = this.activeStickyDrag
     const coords = this.getEventCoords(event)
     const dx = coords.x - startMouseX
     const dy = coords.y - startMouseY
@@ -455,8 +565,14 @@ export default class extends Controller {
       el.classList.add("is-dragging")
     }
 
-    const newCol = Math.round(startCol + dx / cellW)
-    const newRow = Math.round(startRow + dy / cellH)
+    const shellRect = this.contentShellTarget.getBoundingClientRect()
+    const z = this.zoomValue
+    const cellW = (shellRect.width / this.columnsValue) * z
+    const cellH = (shellRect.height / this.rowsValue) * z
+    const rawCol = startCol + dx / cellW
+    const rawRow = startRow + dy / cellH
+    const newCol = this.snapStickyGridDual(rawCol)
+    const newRow = this.snapStickyGridDual(rawRow)
 
     el.dataset.stickyCol = String(Math.max(0, Math.min(newCol, this.columnsValue - cols)))
     el.dataset.stickyRow = String(Math.max(0, Math.min(newRow, this.rowsValue - rows)))
@@ -500,12 +616,10 @@ export default class extends Controller {
   startStickyResize(event, el, edgeInfo) {
     if (event.button !== undefined && event.button !== 0) return
     event.preventDefault()
+    this.stopCanvasPan()
     this.bringToFront(el)
 
     const coords = this.getEventCoords(event)
-    const shellRect = this.contentShellTarget.getBoundingClientRect()
-    const cellW = shellRect.width / this.columnsValue
-    const cellH = shellRect.height / this.rowsValue
 
     this.activeStickyResize = {
       el,
@@ -515,8 +629,6 @@ export default class extends Controller {
       startRows: parseInt(el.dataset.stickyRows, 10) || 10,
       startCol: parseInt(el.dataset.stickyCol, 10) || 0,
       startRow: parseInt(el.dataset.stickyRow, 10) || 0,
-      cellW,
-      cellH,
       isLeft: edgeInfo.isLeft,
       isRight: edgeInfo.isRight,
       isTop: edgeInfo.isTop,
@@ -537,10 +649,15 @@ export default class extends Controller {
     if (!this.activeStickyResize) return
     if (event.touches) event.preventDefault()
 
-    const { el, startMouseX, startMouseY, startCols, startRows, startCol, startRow, cellW, cellH, isLeft, isRight, isTop, isBottom } = this.activeStickyResize
+    const { el, startMouseX, startMouseY, startCols, startRows, startCol, startRow, isLeft, isRight, isTop, isBottom } = this.activeStickyResize
     const coords = this.getEventCoords(event)
     const dx = coords.x - startMouseX
     const dy = coords.y - startMouseY
+
+    const shellRect = this.contentShellTarget.getBoundingClientRect()
+    const z = this.zoomValue
+    const cellW = (shellRect.width / this.columnsValue) * z
+    const cellH = (shellRect.height / this.rowsValue) * z
 
     let newCol = startCol
     let newRow = startRow
@@ -595,10 +712,13 @@ export default class extends Controller {
   }
 
   saveToServer() {
-    if (!this.hasSaveUrlValue || !this.saveUrlValue) return
+    if (!this.hasSaveUrlValue || !this.saveUrlValue) return Promise.resolve()
+
+    const frame = this.element.closest("turbo-frame")
+    const frameId = frame?.id
 
     const stickies = Array.from(
-      this.contentShellTarget.querySelectorAll(".whiteboard-sticky")
+      this.contentShellTarget.querySelectorAll(".sticky-notes-sticky")
     ).map(el => ({
       col: parseInt(el.dataset.stickyCol, 10) || 0,
       row: parseInt(el.dataset.stickyRow, 10) || 0,
@@ -607,18 +727,32 @@ export default class extends Controller {
       hue: parseInt(el.dataset.stickyHue, 10) || 45,
       saturation: parseInt(el.dataset.stickySaturation, 10) || 92,
       brightness: parseInt(el.dataset.stickyBrightness, 10) || 68,
-      text: el.querySelector(".whiteboard-sticky-content")?.innerText || ""
+      text: el.querySelector(".sticky-notes-sticky-content")?.innerText || ""
     }))
 
     const csrfToken = document.querySelector("meta[name='csrf-token']")?.content || ""
-    fetch(this.saveUrlValue, {
+    return fetch(this.saveUrlValue, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
         "X-CSRF-Token": csrfToken
       },
       body: JSON.stringify({ stickies: JSON.stringify(stickies) })
-    }).catch(() => {})
+    })
+      .then(async (res) => {
+        if (!res.ok) return
+        const json = await res.json().catch(() => ({}))
+        const ts = (json.updated_at || "").toString().trim() || new Date().toISOString()
+        window.dispatchEvent(
+          new CustomEvent("nexus:item-saved", {
+            detail: { itemType: json.item_type || "stickynotes", timestamp: ts }
+          })
+        )
+        document.dispatchEvent(
+          new CustomEvent("nexus:sticky-save-complete", { bubbles: true, detail: { frameId } })
+        )
+      })
+      .catch(() => {})
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -633,6 +767,150 @@ export default class extends Controller {
       return { x: event.touches[0].clientX, y: event.touches[0].clientY }
     }
     return { x: event.clientX, y: event.clientY }
+  }
+
+  /** Snap sticky origin to 2×2 cell grid (even col/row indices). */
+  snapStickyGridDual(value) {
+    return Math.round(value / 2) * 2
+  }
+
+  // ── Viewport zoom / pan ─────────────────────────────────────────────────────
+
+  zoomIn() {
+    this.zoomValue = Math.min(2.5, Math.round((this.zoomValue + 0.25) * 100) / 100)
+    this.clampPan()
+    this.applyViewportTransform()
+    this.queueSync()
+    this.showMinimap()
+    this.scheduleMinimapHide(1100)
+  }
+
+  zoomOut() {
+    const next = Math.max(1, Math.round((this.zoomValue - 0.25) * 100) / 100)
+    if (next === this.zoomValue) return
+    this.zoomValue = next
+    this.clampPan()
+    this.applyViewportTransform()
+    this.queueSync()
+    this.showMinimap()
+    this.scheduleMinimapHide(1100)
+  }
+
+  clampPan() {
+    const shell = this.contentShellTarget.getBoundingClientRect()
+    const z = Math.max(this.zoomValue, 0.01)
+    const W = shell.width
+    const H = shell.height
+    const scaledW = W * z
+    const scaledH = H * z
+    const maxPanX = Math.min(0, W - scaledW)
+    const maxPanY = Math.min(0, H - scaledH)
+    this.panX = Math.max(maxPanX, Math.min(0, this.panX))
+    this.panY = Math.max(maxPanY, Math.min(0, this.panY))
+  }
+
+  applyViewportTransform() {
+    if (this.hasCanvasTarget) {
+      this.canvasTarget.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.zoomValue})`
+      this.canvasTarget.style.transformOrigin = "0 0"
+    }
+    this.updateMinimap()
+  }
+
+  showMinimap() {
+    if (this._minimapHideTimer) {
+      clearTimeout(this._minimapHideTimer)
+      this._minimapHideTimer = null
+    }
+    if (this.hasMinimapTarget) {
+      this.minimapTarget.classList.add("sticky-notes-minimap--visible")
+      this.minimapTarget.setAttribute("aria-hidden", "false")
+    }
+  }
+
+  scheduleMinimapHide(delayMs = 850) {
+    if (this._minimapHideTimer) clearTimeout(this._minimapHideTimer)
+    this._minimapHideTimer = setTimeout(() => {
+      this._minimapHideTimer = null
+      this.hideMinimap()
+    }, delayMs)
+  }
+
+  hideMinimap({ immediate = false } = {}) {
+    if (!this.hasMinimapTarget) return
+    if (immediate) this.minimapTarget.classList.add("sticky-notes-minimap--no-transition")
+    this.minimapTarget.classList.remove("sticky-notes-minimap--visible")
+    this.minimapTarget.setAttribute("aria-hidden", "true")
+    if (immediate) {
+      requestAnimationFrame(() => this.minimapTarget.classList.remove("sticky-notes-minimap--no-transition"))
+    }
+  }
+
+  updateMinimap() {
+    if (!this.hasMinimapViewportTarget || !this.hasContentShellTarget) return
+    const shell = this.contentShellTarget.getBoundingClientRect()
+    const W = shell.width
+    const H = shell.height
+    if (W <= 0 || H <= 0) return
+    const z = Math.max(this.zoomValue, 0.01)
+    const vw = Math.min(1, 1 / z)
+    const vh = Math.min(1, 1 / z)
+    let left = (-this.panX / z) / W
+    let top = (-this.panY / z) / H
+    left = Math.max(0, Math.min(1 - vw, left))
+    top = Math.max(0, Math.min(1 - vh, top))
+    const vp = this.minimapViewportTarget
+    vp.style.left = `${left * 100}%`
+    vp.style.top = `${top * 100}%`
+    vp.style.width = `${Math.min(1 - left, vw) * 100}%`
+    vp.style.height = `${Math.min(1 - top, vh) * 100}%`
+  }
+
+  startCanvasPan(event) {
+    if (this.activeCanvasPan) return
+    const coords = this.getEventCoords(event)
+    this.activeCanvasPan = {
+      startX: coords.x,
+      startY: coords.y,
+      startPanX: this.panX,
+      startPanY: this.panY,
+      moved: false
+    }
+    document.addEventListener("mousemove", this.boundCanvasPanMove)
+    document.addEventListener("mouseup", this.boundCanvasPanEnd)
+    document.addEventListener("touchmove", this.boundCanvasPanMove, { passive: false })
+    document.addEventListener("touchend", this.boundCanvasPanEnd)
+    if (event.cancelable) event.preventDefault()
+    this.contentShellTarget.classList.add("sticky-notes-content-shell--pan-armed")
+  }
+
+  handleCanvasPanMove(event) {
+    if (!this.activeCanvasPan) return
+    if (event.touches) event.preventDefault()
+    const coords = this.getEventCoords(event)
+    const dx = coords.x - this.activeCanvasPan.startX
+    const dy = coords.y - this.activeCanvasPan.startY
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+      if (!this.activeCanvasPan.moved) this.showMinimap()
+      this.activeCanvasPan.moved = true
+      this.contentShellTarget.classList.add("sticky-notes-content-shell--is-panning")
+    }
+    this.panX = this.activeCanvasPan.startPanX + dx
+    this.panY = this.activeCanvasPan.startPanY + dy
+    this.clampPan()
+    this.applyViewportTransform()
+  }
+
+  stopCanvasPan() {
+    if (!this.activeCanvasPan) return
+    const panMoved = this.activeCanvasPan.moved
+    this.activeCanvasPan = null
+    document.removeEventListener("mousemove", this.boundCanvasPanMove)
+    document.removeEventListener("mouseup", this.boundCanvasPanEnd)
+    document.removeEventListener("touchmove", this.boundCanvasPanMove)
+    document.removeEventListener("touchend", this.boundCanvasPanEnd)
+    this.contentShellTarget.classList.remove("sticky-notes-content-shell--pan-armed", "sticky-notes-content-shell--is-panning")
+    if (panMoved) this.scheduleMinimapHide(750)
   }
 
   renderGrid() {
@@ -651,8 +929,8 @@ export default class extends Controller {
     }
 
     this.gridTarget.innerHTML = `
-      <svg class="whiteboard-grid-svg" viewBox="0 0 ${columns} ${rows}" preserveAspectRatio="none" aria-hidden="true">
-        <g class="whiteboard-grid-lines">
+      <svg class="sticky-notes-grid-svg" viewBox="0 0 ${columns} ${rows}" preserveAspectRatio="none" aria-hidden="true">
+        <g class="sticky-notes-grid-lines">
           ${vertical.join("")}
           ${horizontal.join("")}
         </g>
@@ -665,7 +943,7 @@ export default class extends Controller {
   queueSync() {
     if (this.syncQueued) return
 
-    console.log("[whiteboard] queueSync called")
+    console.log("[sticky-notes] queueSync called")
     this.syncQueued = true
     this.syncFrame = window.requestAnimationFrame(() => {
       this.syncQueued = false
@@ -685,31 +963,37 @@ export default class extends Controller {
     const cellHeight = height > 0 ? height / rows : 0
     const columnPercent = 100 / columns
     const rowPercent = 100 / rows
-    const fontSize = Math.max(cellHeight * 0.65, 10)
 
-    console.log("[whiteboard] syncGridMetrics: width=%d, height=%d, cellHeight=%d, fontSize=%d", width, height, cellHeight, fontSize)
+    const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+    const noteBodyMinPx = rootPx * 0.92
+    const scaled = cellHeight * 0.72
+    const maxFit = cellHeight * 0.88
+    let fontSize = Math.min(Math.max(scaled, noteBodyMinPx), maxFit)
+    if (!Number.isFinite(fontSize) || fontSize <= 0) fontSize = noteBodyMinPx
+    fontSize *= 1.22
 
-    // Published on contentShellTarget so stickies (siblings of .whiteboard-grid) inherit them.
-    this.contentShellTarget.style.setProperty("--whiteboard-grid-cell-width", `${cellWidth}px`)
-    this.contentShellTarget.style.setProperty("--whiteboard-grid-cell-height", `${cellHeight}px`)
-    this.contentShellTarget.style.setProperty("--whiteboard-grid-columns", String(columns))
-    this.contentShellTarget.style.setProperty("--whiteboard-grid-rows", String(rows))
-    this.contentShellTarget.style.setProperty("--whiteboard-grid-col-percent", `${columnPercent}%`)
-    this.contentShellTarget.style.setProperty("--whiteboard-grid-row-percent", `${rowPercent}%`)
-    this.contentShellTarget.style.setProperty("--whiteboard-sticky-font-size", `${fontSize}px`)
+    // Published on contentShellTarget so stickies (siblings of .sticky-notes-grid) inherit them.
+    this.contentShellTarget.style.setProperty("--sticky-notes-grid-cell-width", `${cellWidth}px`)
+    this.contentShellTarget.style.setProperty("--sticky-notes-grid-cell-height", `${cellHeight}px`)
+    this.contentShellTarget.style.setProperty("--sticky-notes-grid-columns", String(columns))
+    this.contentShellTarget.style.setProperty("--sticky-notes-grid-rows", String(rows))
+    this.contentShellTarget.style.setProperty("--sticky-notes-grid-col-percent", `${columnPercent}%`)
+    this.contentShellTarget.style.setProperty("--sticky-notes-grid-row-percent", `${rowPercent}%`)
+    this.contentShellTarget.style.setProperty("--sticky-notes-sticky-font-size", `${fontSize}px`)
 
     // Also directly apply font size to all existing sticky content elements
-    const stickyContents = this.contentShellTarget.querySelectorAll(".whiteboard-sticky-content")
-    console.log("[whiteboard] updating %d sticky content elements with fontSize=%dpx", stickyContents.length, fontSize)
+    const stickyContents = this.contentShellTarget.querySelectorAll(".sticky-notes-sticky-content")
     stickyContents.forEach(el => {
       el.style.fontSize = `${fontSize}px`
     })
 
-    this.gridTarget.style.setProperty("--whiteboard-grid-columns", String(columns))
-    this.gridTarget.style.setProperty("--whiteboard-grid-rows", String(rows))
-    this.gridTarget.style.setProperty("--whiteboard-grid-col-percent", `${columnPercent}%`)
-    this.gridTarget.style.setProperty("--whiteboard-grid-row-percent", `${rowPercent}%`)
-    this.gridTarget.style.setProperty("--whiteboard-grid-cell-width", `${cellWidth}px`)
-    this.gridTarget.style.setProperty("--whiteboard-grid-cell-height", `${cellHeight}px`)
+    this.gridTarget.style.setProperty("--sticky-notes-grid-columns", String(columns))
+    this.gridTarget.style.setProperty("--sticky-notes-grid-rows", String(rows))
+    this.gridTarget.style.setProperty("--sticky-notes-grid-col-percent", `${columnPercent}%`)
+    this.gridTarget.style.setProperty("--sticky-notes-grid-row-percent", `${rowPercent}%`)
+    this.gridTarget.style.setProperty("--sticky-notes-grid-cell-width", `${cellWidth}px`)
+    this.gridTarget.style.setProperty("--sticky-notes-grid-cell-height", `${cellHeight}px`)
+
+    this.updateMinimap()
   }
 }

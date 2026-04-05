@@ -4,6 +4,7 @@
     class="app-surface app-surface--tool app-surface--finder app-surface--settings"
     data-controller="settings-section"
     data-settings-section-current-value="<%= @active_settings_section %>"
+    data-settings-section-explicit-value="<%= params[:section].present? %>"
     data-settings-section-frame-id-value="<%= frame_id %>"
     data-settings-section-base-url-value="<%= apps_settings_path %>"
     aria-label="Settings"
@@ -13,12 +14,16 @@
         <ul class="finder-folder-list settings-sections-list">
           <% @settings_sections.each do |item| %>
             <% active = @active_settings_section == item[:key] %>
-            <li class="finder-folder-item<%= ' is-active' if active %>">
-              <%= link_to apps_settings_path(section: item[:key], frame_id: frame_id), class: "finder-folder-link", aria: { label: "Open #{item[:label]} settings" } do %>
-                <span class="finder-folder-icon" aria-hidden="true"><%= material_symbol_icon(item[:icon], size: :md) %></span>
-                <span class="finder-folder-name"><%= item[:label] %></span>
-              <% end %>
-            </li>
+            <% if item[:key] == "user" %>
+              <%= render "apps/settings/user_section_row", item: item, frame_id: frame_id, active: active %>
+            <% else %>
+              <li class="finder-folder-item<%= " is-active" if active %>">
+                <%= link_to apps_settings_path(section: item[:key], frame_id: frame_id), class: "finder-folder-link", aria: { label: "Open #{item[:label]} settings" } do %>
+                  <span class="finder-folder-icon" aria-hidden="true"><%= material_symbol_icon(item[:icon], size: :md) %></span>
+                  <span class="finder-folder-name"><%= item[:label] %></span>
+                <% end %>
+              </li>
+            <% end %>
           <% end %>
         </ul>
       </aside>
@@ -28,7 +33,7 @@
           <%= render "apps/user/panel", frame_id: frame_id %>
         <% else %>
           <div class="settings-hub" data-controller="settings-hub" data-settings-hub-workspace-url-value="<%= workspace_preferences_path %>">
-            <ul class="settings-themes-list settings-hub-themes-list" data-settings-hub-target="themesList"></ul>
+            <ul class="finder-file-list settings-themes-list settings-hub-themes-list" role="list" aria-label="Saved themes" data-settings-hub-target="themesList"></ul>
           </div>
         <% end %>
       </section>

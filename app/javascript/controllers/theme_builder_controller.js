@@ -31,11 +31,7 @@ export default class extends Controller {
     "fontTwoSlider",
     "fontTwoValue",
     "fontTwoTransparencySlider",
-    "fontTwoTransparencyValue",
-    "borderSlider",
-    "borderValue",
-    "borderTransparencySlider",
-    "borderTransparencyValue"
+    "fontTwoTransparencyValue"
   ]
 
   connect() {
@@ -58,9 +54,7 @@ export default class extends Controller {
       fontOne: 89,
       fontOneAlpha: 100,
       fontTwo: 63,
-      fontTwoAlpha: 100,
-      border: 20,
-      borderAlpha: 100
+      fontTwoAlpha: 100
     }
 
     this.appearanceNotifyTimer = null
@@ -130,9 +124,7 @@ export default class extends Controller {
         fontOne: this.clampPercent(Number.isFinite(Number(appearance.font_1)) ? appearance.font_1 : this.defaultContentModel.fontOne),
         fontOneAlpha: this.clampPercent(Number.isFinite(Number(appearance.font_1_alpha)) ? appearance.font_1_alpha : this.defaultContentModel.fontOneAlpha),
         fontTwo: this.clampPercent(Number.isFinite(Number(appearance.font_2)) ? appearance.font_2 : this.defaultContentModel.fontTwo),
-        fontTwoAlpha: this.clampPercent(Number.isFinite(Number(appearance.font_2_alpha)) ? appearance.font_2_alpha : this.defaultContentModel.fontTwoAlpha),
-        border: this.clampPercent(Number.isFinite(Number(appearance.border)) ? appearance.border : this.defaultContentModel.border),
-        borderAlpha: this.clampPercent(Number.isFinite(Number(appearance.border_alpha)) ? appearance.border_alpha : this.defaultContentModel.borderAlpha)
+        fontTwoAlpha: this.clampPercent(Number.isFinite(Number(appearance.font_2_alpha)) ? appearance.font_2_alpha : this.defaultContentModel.fontTwoAlpha)
       }
 
       this.themes = Array.isArray(payload?.themes) ? payload.themes : []
@@ -315,13 +307,6 @@ export default class extends Controller {
     this.queueNotifyAppearanceChange()
   }
 
-  updateBorder() {
-    this.borderValueTarget.textContent = `${this.clampPercent(this.borderSliderTarget.value)}%`
-    this.applyContentToneModel(this.currentContentModel())
-    this.syncSliderThumbColors()
-    this.queueNotifyAppearanceChange()
-  }
-
   updateFontOneTransparency() {
     this.fontOneTransparencyValueTarget.textContent = `${this.clampPercent(this.fontOneTransparencySliderTarget.value)}%`
     this.applyContentToneModel(this.currentContentModel())
@@ -331,13 +316,6 @@ export default class extends Controller {
 
   updateFontTwoTransparency() {
     this.fontTwoTransparencyValueTarget.textContent = `${this.clampPercent(this.fontTwoTransparencySliderTarget.value)}%`
-    this.applyContentToneModel(this.currentContentModel())
-    this.syncSliderThumbColors()
-    this.queueNotifyAppearanceChange()
-  }
-
-  updateBorderTransparency() {
-    this.borderTransparencyValueTarget.textContent = `${this.clampPercent(this.borderTransparencySliderTarget.value)}%`
     this.applyContentToneModel(this.currentContentModel())
     this.syncSliderThumbColors()
     this.queueNotifyAppearanceChange()
@@ -385,9 +363,7 @@ export default class extends Controller {
       fontOne: this.clampPercent(Number.isFinite(Number(appearance.font_1)) ? appearance.font_1 : this.defaultContentModel.fontOne),
       fontOneAlpha: this.clampPercent(Number.isFinite(Number(appearance.font_1_alpha)) ? appearance.font_1_alpha : this.defaultContentModel.fontOneAlpha),
       fontTwo: this.clampPercent(Number.isFinite(Number(appearance.font_2)) ? appearance.font_2 : this.defaultContentModel.fontTwo),
-      fontTwoAlpha: this.clampPercent(Number.isFinite(Number(appearance.font_2_alpha)) ? appearance.font_2_alpha : this.defaultContentModel.fontTwoAlpha),
-      border: this.clampPercent(Number.isFinite(Number(appearance.border)) ? appearance.border : this.defaultContentModel.border),
-      borderAlpha: this.clampPercent(Number.isFinite(Number(appearance.border_alpha)) ? appearance.border_alpha : this.defaultContentModel.borderAlpha)
+      fontTwoAlpha: this.clampPercent(Number.isFinite(Number(appearance.font_2_alpha)) ? appearance.font_2_alpha : this.defaultContentModel.fontTwoAlpha)
     }
 
     this.activeThemeName = String(detail?.active_theme_name || this.activeThemeName || "").trim()
@@ -443,8 +419,6 @@ export default class extends Controller {
     this.fontOneTransparencySliderTarget.style.setProperty("--slider-thumb-bg", `hsl(0 0% ${this.clampPercent(content.fontOne)}% / ${this.clampPercent(content.fontOneAlpha)}%)`)
     this.fontTwoSliderTarget.style.setProperty("--slider-thumb-bg", `hsl(0 0% ${this.clampPercent(content.fontTwo)}%)`)
     this.fontTwoTransparencySliderTarget.style.setProperty("--slider-thumb-bg", `hsl(0 0% ${this.clampPercent(content.fontTwo)}% / ${this.clampPercent(content.fontTwoAlpha)}%)`)
-    this.borderSliderTarget.style.setProperty("--slider-thumb-bg", `hsl(0 0% ${this.clampPercent(content.border)}%)`)
-    this.borderTransparencySliderTarget.style.setProperty("--slider-thumb-bg", `hsl(0 0% ${this.clampPercent(content.border)}% / ${this.clampPercent(content.borderAlpha)}%)`)
   }
 
   queueNotifyAppearanceChange() {
@@ -575,9 +549,7 @@ export default class extends Controller {
       fontOne: this.clampPercent(this.fontOneSliderTarget.value),
       fontOneAlpha: this.clampPercent(this.fontOneTransparencySliderTarget.value),
       fontTwo: this.clampPercent(this.fontTwoSliderTarget.value),
-      fontTwoAlpha: this.clampPercent(this.fontTwoTransparencySliderTarget.value),
-      border: this.clampPercent(this.borderSliderTarget.value),
-      borderAlpha: this.clampPercent(this.borderTransparencySliderTarget.value)
+      fontTwoAlpha: this.clampPercent(this.fontTwoTransparencySliderTarget.value)
     }
   }
 
@@ -629,11 +601,6 @@ export default class extends Controller {
     this.fontTwoValueTarget.textContent = `${model.fontTwo}%`
     this.fontTwoTransparencySliderTarget.value = String(model.fontTwoAlpha)
     this.fontTwoTransparencyValueTarget.textContent = `${model.fontTwoAlpha}%`
-
-    this.borderSliderTarget.value = String(model.border)
-    this.borderValueTarget.textContent = `${model.border}%`
-    this.borderTransparencySliderTarget.value = String(model.borderAlpha)
-    this.borderTransparencyValueTarget.textContent = `${model.borderAlpha}%`
   }
 
   applyWindowShellModel(model) {
@@ -662,8 +629,6 @@ export default class extends Controller {
     document.documentElement.style.setProperty("--font-1-alpha", (this.clampPercent(model.fontOneAlpha) / 100).toFixed(2))
     document.documentElement.style.setProperty("--font-2-tone", String(this.clampPercent(model.fontTwo)))
     document.documentElement.style.setProperty("--font-2-alpha", (this.clampPercent(model.fontTwoAlpha) / 100).toFixed(2))
-    document.documentElement.style.setProperty("--border-tone", String(this.clampPercent(model.border)))
-    document.documentElement.style.setProperty("--border-alpha", (this.clampPercent(model.borderAlpha) / 100).toFixed(2))
   }
 
   buildAppearancePayload(shellModel, backgroundModel, contentModel) {
@@ -682,9 +647,7 @@ export default class extends Controller {
       font_1: Math.round(contentModel.fontOne),
       font_1_alpha: Math.round(contentModel.fontOneAlpha),
       font_2: Math.round(contentModel.fontTwo),
-      font_2_alpha: Math.round(contentModel.fontTwoAlpha),
-      border: Math.round(contentModel.border),
-      border_alpha: Math.round(contentModel.borderAlpha)
+      font_2_alpha: Math.round(contentModel.fontTwoAlpha)
     }
   }
 
@@ -731,9 +694,7 @@ export default class extends Controller {
       fontOne: this.clampPercent(Number.isFinite(Number(appearance.font_1)) ? appearance.font_1 : this.defaultContentModel.fontOne),
       fontOneAlpha: this.clampPercent(Number.isFinite(Number(appearance.font_1_alpha)) ? appearance.font_1_alpha : this.defaultContentModel.fontOneAlpha),
       fontTwo: this.clampPercent(Number.isFinite(Number(appearance.font_2)) ? appearance.font_2 : this.defaultContentModel.fontTwo),
-      fontTwoAlpha: this.clampPercent(Number.isFinite(Number(appearance.font_2_alpha)) ? appearance.font_2_alpha : this.defaultContentModel.fontTwoAlpha),
-      border: this.clampPercent(Number.isFinite(Number(appearance.border)) ? appearance.border : this.defaultContentModel.border),
-      borderAlpha: this.clampPercent(Number.isFinite(Number(appearance.border_alpha)) ? appearance.border_alpha : this.defaultContentModel.borderAlpha)
+      fontTwoAlpha: this.clampPercent(Number.isFinite(Number(appearance.font_2_alpha)) ? appearance.font_2_alpha : this.defaultContentModel.fontTwoAlpha)
     }
 
     return this.buildAppearancePayload(shellModel, backgroundModel, contentModel)

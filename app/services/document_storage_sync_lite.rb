@@ -227,21 +227,53 @@ class DocumentStorageSyncLite
   end
 
   def item_file_contents
-    @document.content_type == "task_list" ? task_list_contents : note_contents
+    case @document.content_type.to_s
+    when "task_list"
+      unified_task_list_contents
+    when "stickynotes"
+      unified_stickynotes_contents
+    else
+      unified_note_contents
+    end
   end
 
-  def note_contents
-    [
-      "# NEXUS_NOTE",
-      "# title: #{@document.title}",
-      "# created_at: #{iso8601_or_nil(@document.created_at)}",
-      "# updated_at: #{iso8601_or_nil(@document.updated_at)}",
-      "",
-      @document.content.to_s
-    ].join("\n")
+  def unified_note_contents
+    header = NexusFileFormat.unified_header_lines(
+      kind: NexusFileFormat::KIND_NOTE,
+      title: @document.title,
+      document_id: @document.id,
+      created_at: @document.created_at,
+      updated_at: @document.updated_at
+    )
+    (header + [@document.content.to_s]).join("\n")
   end
 
-  def task_list_contents
+  def unified_stickynotes_contents
+    header = NexusFileFormat.unified_header_lines(
+      kind: NexusFileFormat::KIND_STICKYNOTES,
+      title: @document.title,
+      document_id: @document.id,
+      created_at: @document.created_at,
+      updated_at: @document.updated_at
+    )
+    (header + [@document.content.to_s]).join("\n")
+  end
+
+  def unified_task_list_contents
+    extra = {
+      "reset_mode" => @document.reset_mode.to_s,
+      "reset_days" => "[#{Array(@document.reset_days).map(&:to_i).join(",")}]",
+      "last_reset_at" => iso8601_or_nil(@document.last_reset_at)
+    }
+    header = NexusFileFormat.unified_header_lines(
+      kind: NexusFileFormat::KIND_TASK_LIST,
+      title: @document.title,
+      document_id: @document.id,
+      created_at: @document.created_at,
+      updated_at: @document.updated_at,
+      extra: extra
+    )
+
     task_groups = Array(@document.tasks).map do |task|
       value = task.respond_to?(:to_h) ? task.to_h : {}
       text = value["text"].to_s.strip
@@ -264,15 +296,7 @@ class DocumentStorageSyncLite
       index < task_groups.length - 1 ? (group + [""]) : group
     end
 
-    [
-      "# NEXUS_TASK_LIST",
-      "# title: #{@document.title}",
-      "# reset_mode: #{@document.reset_mode}",
-      "# reset_days: [#{Array(@document.reset_days).map(&:to_i).join(",")}]",
-      "# last_reset_at: #{iso8601_or_nil(@document.last_reset_at)}",
-      "",
-      *task_lines
-    ].join("\n")
+    (header + task_lines).join("\n")
   end
 
   def iso8601_or_nil(value)

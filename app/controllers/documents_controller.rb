@@ -131,6 +131,16 @@ class DocumentsController < ApplicationController
   end
 
   def rename
+    if @document.user_workspace_root?
+      render json: { error: "User root folders cannot be renamed." }, status: :forbidden
+      return
+    end
+
+    if @document.protected_workspace_structure?
+      render json: { error: "This folder cannot be renamed." }, status: :forbidden
+      return
+    end
+
     name = params[:name].to_s.strip
     if name.blank?
       render json: { error: "Name cannot be blank" }, status: :unprocessable_entity
@@ -154,6 +164,16 @@ class DocumentsController < ApplicationController
   def destroy
     if @document.user_workspace_root?
       message = "User root folders are protected."
+      if request.xhr? || request.format.json?
+        render json: { error: message }, status: :forbidden
+      else
+        redirect_to root_path, alert: message
+      end
+      return
+    end
+
+    if @document.protected_workspace_structure?
+      message = "This folder is part of the workspace layout and cannot be deleted."
       if request.xhr? || request.format.json?
         render json: { error: message }, status: :forbidden
       else

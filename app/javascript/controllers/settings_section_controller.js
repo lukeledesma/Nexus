@@ -5,27 +5,36 @@ const VALID_SECTIONS = new Set(["saved_themes", "user"])
 export default class extends Controller {
   static values = {
     current: String,
+    explicit: Boolean,
     frameId: String,
     baseUrl: String
   }
 
   connect() {
     const current = this.currentValue.toString().trim()
-    if (VALID_SECTIONS.has(current)) this.writeStoredSection(current)
+    if (!VALID_SECTIONS.has(current)) return
 
     const stored = this.readStoredSection()
-    if (!stored || stored === current || !VALID_SECTIONS.has(stored)) return
+    const explicit = this.explicitValue === true
+    const canRestore = !explicit && stored && VALID_SECTIONS.has(stored) && stored !== current
 
-    const frameId = this.frameIdValue.toString().trim()
-    const baseUrl = this.baseUrlValue.toString().trim()
-    if (!frameId || !baseUrl) return
+    if (canRestore) {
+      const frameId = this.frameIdValue.toString().trim()
+      const baseUrl = this.baseUrlValue.toString().trim()
+      if (frameId && baseUrl) {
+        const nextUrl = new URL(baseUrl, window.location.origin)
+        nextUrl.searchParams.set("section", stored)
+        nextUrl.searchParams.set("frame_id", frameId)
 
-    const nextUrl = new URL(baseUrl, window.location.origin)
-    nextUrl.searchParams.set("section", stored)
-    nextUrl.searchParams.set("frame_id", frameId)
+        const frame = document.getElementById(frameId)
+        if (frame && frame.tagName === "TURBO-FRAME") {
+          frame.src = `${nextUrl.pathname}${nextUrl.search}`
+          return
+        }
+      }
+    }
 
-    const frame = document.getElementById(frameId)
-    if (frame && frame.tagName === "TURBO-FRAME") frame.src = `${nextUrl.pathname}${nextUrl.search}`
+    this.writeStoredSection(current)
   }
 
   storageKey() {

@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 import { materialSymbolSvg } from "lib/material_symbols"
+import { NEXUS_CLICKABLE_ROW_MAIN_CLASS } from "lib/nexus_ui"
 
 export default class extends Controller {
   static targets = ["themesList", "activeThemeLabel"]
@@ -20,9 +21,7 @@ export default class extends Controller {
       fontOne: 89,
       fontOneAlpha: 100,
       fontTwo: 63,
-      fontTwoAlpha: 100,
-      border: 20,
-      borderAlpha: 100
+      fontTwoAlpha: 100
     }
 
     this.themes = []
@@ -109,15 +108,75 @@ export default class extends Controller {
 
     sortedThemes.forEach((theme) => {
       const li = document.createElement("li")
-      li.className = "settings-themes-item"
-      if (theme.id === this.selectedThemeId) li.classList.add("is-active")
+      li.setAttribute("role", "listitem")
+      li.className =
+        "settings-themes-item finder-file-item organizer-row finder-file-row nexus-standard-row finder-file-row--no-leading-icon"
+      if (theme.id === this.selectedThemeId) {
+        li.classList.add("is-active", "is-selected")
+      }
       if (theme.locked) li.classList.add("is-locked")
 
-      const button = document.createElement("button")
-      button.type = "button"
-      button.className = "settings-themes-item-btn"
-      button.textContent = theme.name
-      button.addEventListener("click", async () => {
+      const left = document.createElement("div")
+      left.className = `organizer-row-left finder-file-row-main nexus-standard-row__main ${NEXUS_CLICKABLE_ROW_MAIN_CLASS}`
+
+      const nameBtn = document.createElement("button")
+      nameBtn.type = "button"
+      nameBtn.className = "settings-themes-item-btn"
+
+      const nameLabel = document.createElement("span")
+      nameLabel.className = "finder-file-name"
+      nameLabel.textContent = theme.name
+      nameBtn.appendChild(nameLabel)
+
+      if (theme.id === this.activeThemeId || theme.locked) {
+        const meta = document.createElement("span")
+        meta.className = "settings-themes-item-meta"
+        const labels = []
+        if (theme.locked) labels.push("Default")
+        if (theme.id === this.activeThemeId) labels.push("Active")
+        meta.textContent = `(${labels.join(" • ")})`
+        nameBtn.appendChild(meta)
+      }
+
+      left.appendChild(nameBtn)
+      li.appendChild(left)
+
+      if (!theme.locked) {
+        const actionsContainer = document.createElement("div")
+        actionsContainer.className = "organizer-row-right settings-themes-item-actions"
+
+        const renameBtn = document.createElement("button")
+        renameBtn.type = "button"
+        renameBtn.className = "item-action-btn settings-themes-item-rename-btn"
+        renameBtn.title = "Rename"
+        renameBtn.setAttribute("aria-label", "Rename theme")
+        renameBtn.innerHTML = materialSymbolSvg("edit", "xs")
+        renameBtn.addEventListener("click", (e) => {
+          e.stopPropagation()
+          this.startInlineRename(li, theme)
+        })
+
+        const deleteBtn = document.createElement("button")
+        deleteBtn.type = "button"
+        deleteBtn.className = "item-action-btn item-action-delete settings-themes-item-delete-btn"
+        deleteBtn.title = "Delete"
+        deleteBtn.setAttribute("aria-label", "Delete theme")
+        deleteBtn.innerHTML = materialSymbolSvg("delete", "xs")
+        deleteBtn.addEventListener("click", (e) => {
+          e.stopPropagation()
+          this.selectedThemeId = theme.id
+          this.deleteTheme()
+        })
+
+        actionsContainer.appendChild(renameBtn)
+        actionsContainer.appendChild(deleteBtn)
+        li.appendChild(actionsContainer)
+      }
+
+      li.addEventListener("click", async (e) => {
+        if (e.target.closest(".item-action-btn")) return
+        if (li.classList.contains("is-renaming")) return
+
         this.selectedThemeId = theme.id
 
         if (theme.id !== this.activeThemeId) {
@@ -134,48 +193,6 @@ export default class extends Controller {
         this.renderThemesList(false)
       })
 
-      if (theme.id === this.activeThemeId || theme.locked) {
-        const meta = document.createElement("span")
-        meta.className = "settings-themes-item-meta"
-        const labels = []
-        if (theme.locked) labels.push("Default")
-        if (theme.id === this.activeThemeId) labels.push("Active")
-        meta.textContent = `(${labels.join(" • ")})`
-        button.appendChild(meta)
-      }
-
-      li.appendChild(button)
-
-      if (!theme.locked) {
-        const actionsContainer = document.createElement("div")
-        actionsContainer.className = "settings-themes-item-actions"
-
-        const renameBtn = document.createElement("button")
-        renameBtn.type = "button"
-        renameBtn.className = "settings-themes-item-action-btn settings-themes-item-rename-btn"
-        renameBtn.title = "Rename"
-        renameBtn.innerHTML = materialSymbolSvg("edit", "xs")
-        renameBtn.addEventListener("click", (e) => {
-          e.stopPropagation()
-          this.startInlineRename(li, theme)
-        })
-
-        const deleteBtn = document.createElement("button")
-        deleteBtn.type = "button"
-        deleteBtn.className = "settings-themes-item-action-btn settings-themes-item-delete-btn"
-        deleteBtn.title = "Delete"
-        deleteBtn.innerHTML = materialSymbolSvg("delete", "xs")
-        deleteBtn.addEventListener("click", (e) => {
-          e.stopPropagation()
-          this.selectedThemeId = theme.id
-          this.deleteTheme()
-        })
-
-        actionsContainer.appendChild(renameBtn)
-        actionsContainer.appendChild(deleteBtn)
-        li.appendChild(actionsContainer)
-      }
-
       this.themesListTarget.appendChild(li)
     })
 
@@ -186,6 +203,7 @@ export default class extends Controller {
     li.classList.add("is-renaming")
     this.selectedThemeId = theme.id
 
+    const left = li.querySelector(".organizer-row-left")
     const button = li.querySelector(".settings-themes-item-btn")
     if (button) button.remove()
 
@@ -224,7 +242,8 @@ export default class extends Controller {
       }
     })
 
-    li.insertBefore(input, li.querySelector(".settings-themes-item-actions"))
+    if (left) left.appendChild(input)
+    else li.insertBefore(input, li.querySelector(".settings-themes-item-actions"))
     input.focus()
     input.select()
   }
@@ -321,9 +340,7 @@ export default class extends Controller {
       fontOne: this.clampPercent(Number.isFinite(Number(a.font_1)) ? a.font_1 : dCt.fontOne),
       fontOneAlpha: this.clampPercent(Number.isFinite(Number(a.font_1_alpha)) ? a.font_1_alpha : dCt.fontOneAlpha),
       fontTwo: this.clampPercent(Number.isFinite(Number(a.font_2)) ? a.font_2 : dCt.fontTwo),
-      fontTwoAlpha: this.clampPercent(Number.isFinite(Number(a.font_2_alpha)) ? a.font_2_alpha : dCt.fontTwoAlpha),
-      border: this.clampPercent(Number.isFinite(Number(a.border)) ? a.border : dCt.border),
-      borderAlpha: this.clampPercent(Number.isFinite(Number(a.border_alpha)) ? a.border_alpha : dCt.borderAlpha)
+      fontTwoAlpha: this.clampPercent(Number.isFinite(Number(a.font_2_alpha)) ? a.font_2_alpha : dCt.fontTwoAlpha)
     }
 
     this.applyWindowShellModel(shellModel)
@@ -361,8 +378,6 @@ export default class extends Controller {
     root.style.setProperty("--font-1-alpha", (this.clampPercent(model.fontOneAlpha) / 100).toFixed(2))
     root.style.setProperty("--font-2-tone", String(Math.round(this.clampPercent(model.fontTwo))))
     root.style.setProperty("--font-2-alpha", (this.clampPercent(model.fontTwoAlpha) / 100).toFixed(2))
-    root.style.setProperty("--border-tone", String(Math.round(this.clampPercent(model.border))))
-    root.style.setProperty("--border-alpha", (this.clampPercent(model.borderAlpha) / 100).toFixed(2))
   }
 
   buildAppearancePayload(shellModel, backgroundModel, contentModel) {
@@ -381,9 +396,7 @@ export default class extends Controller {
       font_1: Math.round(contentModel.fontOne),
       font_1_alpha: Math.round(contentModel.fontOneAlpha),
       font_2: Math.round(contentModel.fontTwo),
-      font_2_alpha: Math.round(contentModel.fontTwoAlpha),
-      border: Math.round(contentModel.border),
-      border_alpha: Math.round(contentModel.borderAlpha)
+      font_2_alpha: Math.round(contentModel.fontTwoAlpha)
     }
   }
 
@@ -413,9 +426,7 @@ export default class extends Controller {
       fontOne: this.clampPercent(Number.isFinite(Number(a.font_1)) ? a.font_1 : dCt.fontOne),
       fontOneAlpha: this.clampPercent(Number.isFinite(Number(a.font_1_alpha)) ? a.font_1_alpha : dCt.fontOneAlpha),
       fontTwo: this.clampPercent(Number.isFinite(Number(a.font_2)) ? a.font_2 : dCt.fontTwo),
-      fontTwoAlpha: this.clampPercent(Number.isFinite(Number(a.font_2_alpha)) ? a.font_2_alpha : dCt.fontTwoAlpha),
-      border: this.clampPercent(Number.isFinite(Number(a.border)) ? a.border : dCt.border),
-      borderAlpha: this.clampPercent(Number.isFinite(Number(a.border_alpha)) ? a.border_alpha : dCt.borderAlpha)
+      fontTwoAlpha: this.clampPercent(Number.isFinite(Number(a.font_2_alpha)) ? a.font_2_alpha : dCt.fontTwoAlpha)
     }
 
     return this.buildAppearancePayload(shellModel, backgroundModel, contentModel)

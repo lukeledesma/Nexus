@@ -1,5 +1,5 @@
 <% frame_id = params[:frame_id].presence || "app-pane" %>
-<turbo-frame id="<%= frame_id %>">
+<turbo-frame id="<%= frame_id %>" data-singular-draft-root>
   <section class="app-surface app-surface--tool" data-controller="title-editor task-list-editor tool-window-status" data-tool-window-status-item-type-value="task_list" data-tool-window-status-updated-at-value="<%= @task_list.updated_at&.utc&.iso8601 %>">
     <%= form_with model: @task_list, url: apps_task_list_path(@task_list, frame_id: frame_id), method: :patch,
           data: {
@@ -16,13 +16,13 @@
           <% total_subtasks = subtasks.length %>
           <% completed_subtasks = subtasks.count { |sub| sub["checked"] } %>
           <% completion = total_subtasks.positive? ? (completed_subtasks.to_f / total_subtasks.to_f) : (task["checked"] ? 1.0 : 0.0) %>
-          <% main_classes = ["task-item-row", "task-item-row--main", "organizer-row"] %>
+          <% main_classes = ["task-item-row", "task-item-row--main", "organizer-row", "nexus-standard-row"] %>
           <% main_classes << "task-item-row--checked" if total_subtasks.positive? && completion >= 1.0 %>
           <% main_classes << "task-item-group--head" if total_subtasks.positive? %>
 
           <li class="<%= main_classes.join(" ") %>" style="--completion: <%= completion %>;" data-role="main-task" data-main-checked="<%= task["checked"] ? "true" : "false" %>" data-collapsed="<%= total_subtasks.positive? ? "true" : "false" %>" data-has-subtasks="<%= total_subtasks.positive? ? "true" : "false" %>">
-            <div class="organizer-row-left row-left">
-              <span class="task-toggle" role="button" tabindex="0" aria-label="Toggle task completion"><%= task["checked"] ? material_symbol_icon(:check, size: :xs) : material_symbol_icon(:circle_outline, size: :xs) %></span>
+            <div class="organizer-row-left nexus-standard-row__main <%= nexus_clickable_row_main_class %>">
+              <span class="nexus-standard-row__leading"><span class="task-toggle" role="button" tabindex="0" aria-label="Toggle task completion"><%= task["checked"] ? material_symbol_icon(:check, size: :xs) : material_symbol_icon(:circle_outline, size: :xs) %></span></span>
               <span class="task-item-text" data-role="task-text"><%= task["text"] %></span>
             </div>
             <div class="organizer-row-right">
@@ -37,12 +37,12 @@
           </li>
 
           <% subtasks.each_with_index do |subtask, index| %>
-            <% sub_classes = ["task-item-row", "task-item-row--subtask", "organizer-row", "task-item-group--child"] %>
+            <% sub_classes = ["task-item-row", "task-item-row--subtask", "organizer-row", "nexus-standard-row", "task-item-group--child"] %>
             <% sub_classes << "task-item-row--checked" if subtask["checked"] %>
             <% sub_classes << "task-item-group--tail" if index == total_subtasks - 1 %>
             <li class="<%= sub_classes.join(" ") %>" data-role="subtask">
-              <div class="organizer-row-left row-left">
-                <span class="task-toggle" role="button" tabindex="0" aria-label="Toggle subtask completion"><%= subtask["checked"] ? material_symbol_icon(:check, size: :xs) : material_symbol_icon(:circle_outline, size: :xs) %></span>
+              <div class="organizer-row-left nexus-standard-row__main <%= nexus_clickable_row_main_class %>">
+                <span class="nexus-standard-row__leading"><span class="task-toggle" role="button" tabindex="0" aria-label="Toggle subtask completion"><%= subtask["checked"] ? material_symbol_icon(:check, size: :xs) : material_symbol_icon(:circle_outline, size: :xs) %></span></span>
                 <span class="task-item-text task-item-text--subtask" data-role="task-text"><%= subtask["text"] %></span>
               </div>
               <div class="organizer-row-right">
@@ -53,10 +53,6 @@
           <% end %>
         <% end %>
       </ul>
-
-      <div class="task-list-add-row">
-        <button type="button" class="btn-add-task" data-action="click->task-list-editor#addTask"><%= material_symbol_icon(:add, size: :sm, html_class: "btn-add-task__icon") %><span class="btn-add-task__label">Add Task</span></button>
-      </div>
     <% end %>
   </section>
 </turbo-frame>

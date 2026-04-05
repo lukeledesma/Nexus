@@ -34,7 +34,7 @@ bin/rake ui:contract
 
 What it does:
 - Verifies shared OS/app window UI contract tokens and classes exist in the stylesheet
-- Verifies DB Health, Settings, Launcher, Tasks, Whiteboard, SAE/METRIC, TIMER, and Theme Builder use the required shared contract classes
+- Verifies DB Health, Settings, Launcher, Tasks, Sticky Notes, and Theme Builder use the required shared contract classes
 - Fails if legacy organizer-specific visual card classes reappear in ERB views
 - Prints `UI contract check passed` on success
 

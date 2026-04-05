@@ -2,7 +2,7 @@
 <turbo-frame id="<%= frame_id %>">
   <section class="app-surface app-surface--tool app-surface--finder" data-controller="finder-browser" data-finder-browser-frame-id-value="<%= frame_id %>">
     <div class="finder-shell os-window-body-start">
-      <aside class="finder-shell-pane finder-shell-pane--folders" aria-label="Main folders">
+      <aside class="finder-shell-pane finder-shell-pane--folders" aria-label="Folders">
         <ul class="finder-folder-list">
           <% @folders.each do |folder| %>
             <% active = @selected_folder&.id == folder.id %>
@@ -14,6 +14,7 @@
               data-rename-url="<%= rename_document_path(folder) %>"
               data-delete-url="<%= document_path(folder) %>"
               data-auto-rename="<%= auto_rename ? 'true' : 'false' %>"
+              data-system-folder="false"
             >
               <%= link_to apps_finder_path(folder_id: folder.id, frame_id: frame_id), class: "finder-folder-link", aria: { label: "Open #{folder.title}" } do %>
                 <span class="finder-folder-icon" aria-hidden="true">
@@ -23,27 +24,61 @@
               <% end %>
 
               <div class="finder-folder-actions" aria-hidden="true">
-                <button type="button" class="finder-folder-action" data-action="click->finder-browser#renameFolder" aria-label="Rename folder" title="Rename folder"><%= material_symbol_icon(:edit, size: :xs) %></button>
-                <button type="button" class="finder-folder-action finder-folder-action--danger" data-action="click->finder-browser#deleteFolder" aria-label="Delete folder" title="Delete folder"><%= material_symbol_icon(:close, size: :xs) %></button>
+                <button type="button" class="finder-folder-action item-action-btn" data-action="click->finder-browser#renameFolder" aria-label="Rename folder" title="Rename folder"><%= material_symbol_icon(:edit, size: :xs) %></button>
+                <button type="button" class="finder-folder-action item-action-btn item-action-delete" data-action="click->finder-browser#deleteFolder" aria-label="Delete folder" title="Delete folder"><%= material_symbol_icon(:delete, size: :xs) %></button>
               </div>
             </li>
           <% end %>
         </ul>
+        <% if @folders.empty? %>
+          <p class="finder-folder-list-empty">No folders yet. Use + next to FINDER above.</p>
+        <% end %>
       </aside>
 
       <section class="finder-shell-pane finder-shell-pane--contents" aria-label="Folder contents">
         <% if @selected_folder %>
           <% if @files.any? %>
-            <div class="finder-file-list" role="list" aria-label="Files in selected folder">
+            <ul class="finder-file-list" role="list" aria-label="Files in selected folder">
               <% @files.each do |file| %>
-                <%= link_to document_path(file), class: "finder-file-card", role: "listitem" do %>
-                  <span class="finder-file-icon" aria-hidden="true">
-                    <%= material_symbol_icon(:file_document, size: :md) %>
-                  </span>
-                  <span class="finder-file-name"><%= file.title.presence || "Untitled" %></span>
-                <% end %>
+                <% display_name = finder_document_display_title(file.title) %>
+                <li
+                  class="finder-file-item organizer-row finder-file-row nexus-standard-row"
+                  role="listitem"
+                  tabindex="0"
+                  data-document-id="<%= file.id %>"
+                  data-document-title="<%= display_name %>"
+                  data-content-type="<%= file.content_type %>"
+                  data-file-name="<%= file.title %>"
+                  data-rename-url="<%= rename_document_path(file) %>"
+                  data-delete-url="<%= document_path(file) %>"
+                  data-action="click->finder-browser#onFinderFileRowClick keydown->finder-browser#onFinderFileRowKeydown"
+                  aria-label="Open <%= display_name %> in app"
+                >
+                  <div class="organizer-row-left finder-file-row-main <%= nexus_clickable_row_main_class %>">
+                    <span class="finder-file-icon finder-file-icon--row" aria-hidden="true">
+                      <%= material_symbol_icon(finder_file_icon_for_content_type(file.content_type), size: :md) %>
+                    </span>
+                    <span class="finder-file-name" data-finder-file-name-label><%= display_name %></span>
+                  </div>
+                  <div class="organizer-row-right">
+                    <button
+                      type="button"
+                      class="item-action-btn"
+                      data-action="click->finder-browser#renameFile"
+                      aria-label="Rename <%= display_name %>"
+                      title="Rename"
+                    ><%= material_symbol_icon(:edit, size: :xs) %></button>
+                    <button
+                      type="button"
+                      class="item-action-btn item-action-delete"
+                      data-action="click->finder-browser#deleteFile"
+                      aria-label="Delete <%= display_name %>"
+                      title="Delete"
+                    ><%= material_symbol_icon(:delete, size: :xs) %></button>
+                  </div>
+                </li>
               <% end %>
-            </div>
+            </ul>
           <% else %>
             <div class="finder-empty-wrap finder-empty-wrap--content">
               <p class="finder-empty-state">Empty folder.</p>
@@ -51,7 +86,7 @@
           <% end %>
         <% else %>
           <div class="finder-empty-wrap">
-            <p class="finder-empty-state">Empty folder.</p>
+            <p class="finder-empty-state">Use + next to FINDER to create a folder.</p>
           </div>
         <% end %>
       </section>

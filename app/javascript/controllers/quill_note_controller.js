@@ -6,7 +6,7 @@ const QUILL_STYLE_HREF = "https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.sn
 let quillScriptPromise = null
 
 export default class extends Controller {
-  static targets = ["editor", "bodyInput"]
+  static targets = ["editor", "bodyInput", "initialBodyTemplate"]
   static values = {
     initialBody: { type: String, default: "" }
   }
@@ -15,6 +15,8 @@ export default class extends Controller {
     this.quill = null
     this.syncTimer = null
     this.isHydrating = true
+    this.boundRequestSave = this.handleRequestSave.bind(this)
+    document.addEventListener("nexus:request-save", this.boundRequestSave)
 
     if (!this.hasEditorTarget || !this.hasBodyInputTarget) return
 
@@ -38,7 +40,7 @@ export default class extends Controller {
       }
     })
 
-    const startingHtml = this.decodeEscapedHtml((this.initialBodyValue || this.bodyInputTarget.value || "").toString())
+    const startingHtml = this.resolveStartingHtml()
     if (startingHtml.length > 0) {
       this.quill.clipboard.dangerouslyPasteHTML(startingHtml)
     }
@@ -52,10 +54,27 @@ export default class extends Controller {
   }
 
   disconnect() {
+    document.removeEventListener("nexus:request-save", this.boundRequestSave)
     if (this.syncTimer) {
       clearTimeout(this.syncTimer)
       this.syncTimer = null
     }
+  }
+
+  handleRequestSave(event) {
+    const frame = this.element.closest("turbo-frame")
+    if (!frame || event.detail?.frameId !== frame.id) return
+    if (this.syncTimer) {
+      clearTimeout(this.syncTimer)
+      this.syncTimer = null
+    }
+    this.flushBodyToHidden()
+  }
+
+  flushBodyToHidden() {
+    if (!this.quill || !this.hasBodyInputTarget) return
+    const html = this.quill.root.innerHTML
+    this.bodyInputTarget.value = html === "<p><br></p>" ? "" : html
   }
 
   queueSync() {
@@ -67,13 +86,17 @@ export default class extends Controller {
   }
 
   syncHiddenBody() {
-    if (!this.quill || !this.hasBodyInputTarget) return
-
-    const html = this.quill.root.innerHTML
-    this.bodyInputTarget.value = html === "<p><br></p>" ? "" : html
-
+    this.flushBodyToHidden()
     const form = this.element.querySelector("form")
     if (form) form.dispatchEvent(new CustomEvent("autosave:trigger", { bubbles: true }))
+  }
+
+  resolveStartingHtml() {
+    if (this.hasInitialBodyTemplateTarget) {
+      const raw = this.initialBodyTemplateTarget.innerHTML
+      if (raw && raw.trim().length > 0) return raw
+    }
+    return this.decodeEscapedHtml((this.initialBodyValue || this.bodyInputTarget.value || "").toString())
   }
 
   decodeEscapedHtml(value) {

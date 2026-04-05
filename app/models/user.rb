@@ -3,6 +3,7 @@ class User < ApplicationRecord
 
   before_validation :normalize_login_fields
   after_create_commit :provision_workspace_root_folder
+  after_update_commit :sync_workspace_after_username_change
 
   USERNAME_FORMAT = /\A[a-zA-Z0-9](?:[a-zA-Z0-9._-]*[a-zA-Z0-9])?\z/
 
@@ -43,10 +44,31 @@ class User < ApplicationRecord
   end
 
   def ensure_workspace_children!(root_folder)
-    %w[Documents Embedded].each do |child_name|
-      next if root_folder.children.folders.where("LOWER(title) = ?", child_name.downcase).exists?
-
-      root_folder.children.create!(is_folder: true, title: child_name)
+    unless root_folder.children.folders.where("LOWER(title) = ?", "embedded").exists?
+      root_folder.children.create!(is_folder: true, title: "Embedded")
     end
+
+    finder = root_folder.children.folders.where("LOWER(title) = ?", "finder").first
+    finder ||= root_folder.children.create!(is_folder: true, title: "Finder")
+
+    %w[Desktop Documents].each do |child_name|
+      next if finder.children.folders.where("LOWER(title) = ?", child_name.downcase).exists?
+
+      finder.children.create!(is_folder: true, title: child_name)
+    end
+  end
+
+  def sync_workspace_after_username_change
+    return unless previous_changes.key?("username")
+
+    from, to = previous_changes["username"]
+    from = from.to_s.strip
+    to = to.to_s.strip
+
+    if from.present? && to.present?
+      WorkspaceUserFolderRename.call(from: from, to: to)
+    end
+
+    provision_workspace_root_folder if to.present?
   end
 end

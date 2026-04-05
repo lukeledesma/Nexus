@@ -1,0 +1,48 @@
+<% frame_id = params[:frame_id].presence || "app-pane" %>
+<turbo-frame id="<%= frame_id %>" data-singular-draft-root>
+  <section class="app-surface app-surface--tool app-surface--sticky-notes"
+    data-controller="sticky-notes"
+    data-sticky-notes-columns-value="75"
+    data-sticky-notes-rows-value="75"
+    data-sticky-notes-stickies-value="<%= json_escape(@stickies.to_json) %>"
+    data-sticky-notes-save-url-value="<%= apps_singular_sticky_notes_path %>">
+    <div class="sticky-notes-workspace os-window-body-start">
+      <div class="sticky-notes-content-shell app-content-shell" data-sticky-notes-target="contentShell">
+        <div class="sticky-notes-canvas" data-sticky-notes-target="canvas">
+          <div class="sticky-notes-grid" data-sticky-notes-target="grid" aria-hidden="true"></div>
+        </div>
+        <div class="sticky-notes-minimap" data-sticky-notes-target="minimap" aria-hidden="true">
+          <div class="sticky-notes-minimap__inner">
+            <div class="sticky-notes-minimap__viewport" data-sticky-notes-target="minimapViewport"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sticky-notes-action-shell" aria-label="Sticky notes actions">
+        <button type="button" class="sticky-notes-action-btn" data-sticky-notes-target="gridToggle" data-action="click->sticky-notes#toggleGrid" aria-label="Hide Grid" title="Hide Grid">
+          <span data-sticky-notes-target="gridIconOn" class="sticky-notes-grid-toggle-icon" hidden><%= material_symbol_icon(:grid_on, size: :md) %></span>
+          <span data-sticky-notes-target="gridIconOff" class="sticky-notes-grid-toggle-icon"><%= material_symbol_icon(:grid_off, size: :md) %></span>
+        </button>
+        <button type="button" class="sticky-notes-action-btn" data-action="click->sticky-notes#addSticky" aria-label="Add sticky note" title="Add sticky note"><%= material_symbol_icon(:sticky_note, size: :md) %></button>
+        <div class="sticky-notes-sticky-color-anchor sticky-notes-action-btn--hidden" data-sticky-notes-target="stickyColorAnchor">
+          <button type="button" class="sticky-notes-action-btn sticky-notes-action-btn--sticky-indicator" data-sticky-notes-target="stickySelection" data-action="click->sticky-notes#toggleStickyColorPopover" aria-hidden="true" tabindex="-1" title="Sticky color">&nbsp;</button>
+          <div class="sticky-notes-sticky-color-popover sticky-notes-action-btn--hidden" data-sticky-notes-target="colorPopover" aria-hidden="true">
+            <div class="sticky-notes-sticky-color-slider-row">
+              <input type="range" class="sticky-notes-sticky-color-slider settings-interface-slider settings-interface-slider--hue" data-sticky-notes-target="colorSlider" data-action="input->sticky-notes#updateStickyColor" min="0" max="360" step="1" value="45" aria-label="Sticky hue slider">
+            </div>
+            <div class="sticky-notes-sticky-color-slider-row">
+              <input type="range" class="sticky-notes-sticky-color-slider settings-interface-slider settings-interface-slider--saturation" data-sticky-notes-target="saturationSlider" data-action="input->sticky-notes#updateStickySaturation" min="0" max="100" step="1" value="92" aria-label="Sticky saturation slider">
+            </div>
+            <div class="sticky-notes-sticky-color-slider-row">
+              <input type="range" class="sticky-notes-sticky-color-slider settings-interface-slider settings-interface-slider--brightness" data-sticky-notes-target="brightnessSlider" data-action="input->sticky-notes#updateStickyBrightness" min="0" max="100" step="1" value="68" aria-label="Sticky brightness slider">
+            </div>
+          </div>
+        </div>
+        <div class="sticky-notes-zoom-stack" aria-label="Zoom">
+          <button type="button" class="sticky-notes-action-btn sticky-notes-zoom-btn" data-action="click->sticky-notes#zoomIn" aria-label="Zoom in" title="Zoom in"><%= material_symbol_icon(:add, size: :xs) %></button>
+          <button type="button" class="sticky-notes-action-btn sticky-notes-zoom-btn" data-action="click->sticky-notes#zoomOut" aria-label="Zoom out" title="Zoom out"><%= material_symbol_icon(:remove, size: :xs) %></button>
+        </div>
+      </div>
+    </div>
+  </section>
+</turbo-frame>

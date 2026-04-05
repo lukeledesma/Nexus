@@ -1,6 +1,24 @@
 import { Controller } from "@hotwired/stimulus"
 import { createOsWindowSizer } from "lib/os_window_sizing"
-import { readDockPins, DOCK_HOVER_LABELS } from "lib/dock_pins"
+import {
+  readDockPins,
+  writeDockPins,
+  DOCK_HOVER_LABELS,
+  DOCK_APP_KEY_ORDER,
+  PINNABLE_APP_KEYS,
+  readDockRunningOrder,
+  writeDockRunningOrder,
+  mergeOpenRunningOrder
+} from "lib/dock_pins"
+import {
+  captureDockButtonRects,
+  flipDockZoneFromPrevRects,
+  captureDockFullLayoutRects,
+  flipDockFullLayout,
+  flipDockSingleElement
+} from "lib/dock_flip"
+
+const DOCK_DRAG_THRESHOLD_PX = 8
 
 export default class extends Controller {
   connect() {
@@ -8,6 +26,7 @@ export default class extends Controller {
     this.dockElement = document.getElementById("app-dock")
     this.launcherDockButton = this.dockElement?.querySelector(".app-dock-button--launcher")
     this.dockAppOpen = {}
+    this.foregroundAppKey = null
 
     this.viewportMarginPx = 6
     this.bottomDockBoundary = this.viewportMarginPx
@@ -21,12 +40,16 @@ export default class extends Controller {
     this.boundDockPinsChanged = this.onDockPinsChanged.bind(this)
     this.boundDockClick = this.onDockClick.bind(this)
     this.boundOutsidePointer = this.onOutsidePointerDown.bind(this)
+    this.boundDockPointerDown = this.onDockPointerDown.bind(this)
+    this.boundDockPointerMove = this.onDockPointerMove.bind(this)
+    this.boundDockPointerUp = this.onDockPointerUp.bind(this)
 
     this.initializeWindows()
     this.applyWorkspaceThemeOnBoot()
 
-    this.renderDockPinnedApps()
+    this.renderDockApps()
     this.dockElement?.addEventListener("click", this.boundDockClick)
+    this.dockElement?.addEventListener("pointerdown", this.boundDockPointerDown, true)
 
     this.launcherSizer = createOsWindowSizer({
       windowId: "launcher",
@@ -51,7 +74,9 @@ export default class extends Controller {
   }
 
   disconnect() {
+    this.endDockPointerTracking(true)
     this.dockElement?.removeEventListener("click", this.boundDockClick)
+    this.dockElement?.removeEventListener("pointerdown", this.boundDockPointerDown, true)
     document.removeEventListener("pointerdown", this.boundOutsidePointer, true)
     window.removeEventListener("app-window:state", this.boundAppWindowState)
     window.removeEventListener("launcher:toggle", this.boundLauncherToggle)
@@ -79,38 +104,128 @@ export default class extends Controller {
     return this._dockIconHtml
   }
 
-  renderDockPinnedApps() {
+  /**
+   * Which app windows are visible — source of truth is the DOM (avoids missing
+   * app-window:state when child controllers connect before window-manager).
+   */
+  syncDockOpenStateFromDom() {
+    for (const key of DOCK_APP_KEY_ORDER) {
+      this.dockAppOpen[key] = false
+    }
+    document.querySelectorAll("section.content-window.os-window").forEach((el) => {
+      const key = el.getAttribute("data-content-window-app-key-value")
+      if (!key || !DOCK_APP_KEY_ORDER.includes(key)) return
+      this.dockAppOpen[key] = !el.classList.contains("is-hidden")
+    })
+  }
+
+  renderDockApps() {
     const dock = this.dockElement
     if (!dock) return
-    dock.querySelectorAll("[data-dock-app-key]").forEach((el) => el.remove())
+    const pinnedEl = document.getElementById("app-dock-pinned")
+    const runningEl = document.getElementById("app-dock-running")
+    const dividerEl = document.getElementById("app-dock-running-divider")
+    if (!pinnedEl || !runningEl || !dividerEl) return
+
+    const prevLauncherBtn = dock.querySelector(".app-dock-button--launcher")
+    const prevLauncherBtnRect = prevLauncherBtn?.getBoundingClientRect()
+    const prevPinnedRects = captureDockButtonRects(pinnedEl)
+    const prevRunningRects = captureDockButtonRects(runningEl)
+    const launcherDividerEl = document.getElementById("app-dock-launcher-divider")
+    const prevLb = launcherDividerEl?.getBoundingClientRect()
+    const prevLauncherDividerRect =
+      prevLb && prevLb.width > 0.5 && prevLb.height > 0.5 ? prevLb : null
+    const prevDividerRect = dividerEl.hidden ? null : dividerEl.getBoundingClientRect()
+
+    this.syncDockOpenStateFromDom()
+
+    this.foregroundAppKey = this.computeForegroundAppKeyFromDom()
+
+    pinnedEl.innerHTML = ""
+    runningEl.innerHTML = ""
+
     this.refreshLauncherDockButtonRef()
     const launcherBtn = dock.querySelector(".app-dock-button--launcher")
     if (!launcherBtn) return
 
     const icons = this.readDockIconHtmlMap()
     const pins = readDockPins()
-    let anchor = launcherBtn
+    const pinsSet = new Set(pins)
+
     for (const key of pins) {
       const html = icons[key]
       if (!html) continue
-      const btn = document.createElement("button")
-      btn.type = "button"
-      btn.className = "app-dock-button app-dock-button--dock-app"
-      btn.dataset.dockAppKey = key
-      const label = DOCK_HOVER_LABELS[key] || key
-      btn.setAttribute("data-hover-label", label)
-      btn.setAttribute("aria-label", `Open ${label}`)
-      btn.setAttribute("aria-pressed", "false")
-      btn.innerHTML = html
-      anchor.insertAdjacentElement("afterend", btn)
-      anchor = btn
-      const open = Boolean(this.dockAppOpen[key])
-      this.updateDockAppButtonState(btn, open)
+      const btn = this.createDockAppButton(key, html, "pinned")
+      pinnedEl.appendChild(btn)
     }
+
+    const openUnpinnedKeys = DOCK_APP_KEY_ORDER.filter(
+      (k) => this.dockAppOpen[k] && !pinsSet.has(k)
+    )
+    const storedRunningOrder = readDockRunningOrder()
+    const mergedRunningOrder = mergeOpenRunningOrder(storedRunningOrder, openUnpinnedKeys)
+    if (JSON.stringify(mergedRunningOrder) !== JSON.stringify(storedRunningOrder)) {
+      writeDockRunningOrder(mergedRunningOrder)
+    }
+
+    let runningCount = 0
+    for (const key of mergedRunningOrder) {
+      if (!this.dockAppOpen[key] || pinsSet.has(key)) continue
+      const html = icons[key]
+      if (!html) continue
+      const btn = this.createDockAppButton(key, html, "running")
+      runningEl.appendChild(btn)
+      runningCount++
+    }
+
+    dividerEl.hidden = runningCount === 0
+
+    runningEl.classList.toggle("app-dock-group--running-empty", runningCount === 0)
+
+    flipDockZoneFromPrevRects(prevPinnedRects, pinnedEl)
+    flipDockZoneFromPrevRects(prevRunningRects, runningEl)
+    /* Anchor before launcher/divider FLIP so getBoundingClientRect isn’t skewed by transform. */
     this.anchorLauncherToDock()
+    if (
+      launcherBtn &&
+      prevLauncherBtnRect &&
+      prevLauncherBtnRect.width > 0.5 &&
+      prevLauncherBtnRect.height > 0.5
+    ) {
+      flipDockSingleElement(prevLauncherBtnRect, launcherBtn)
+    }
+    if (launcherDividerEl && prevLauncherDividerRect) {
+      const nextLb = launcherDividerEl.getBoundingClientRect()
+      if (nextLb.width > 0.5 && nextLb.height > 0.5) {
+        flipDockSingleElement(prevLauncherDividerRect, launcherDividerEl)
+      }
+    }
+    if (prevDividerRect && !dividerEl.hidden) {
+      flipDockSingleElement(prevDividerRect, dividerEl)
+    }
+  }
+
+  createDockAppButton(key, html, region) {
+    const btn = document.createElement("button")
+    btn.type = "button"
+    btn.className = "app-dock-button app-dock-button--dock-app"
+    if (region === "running") btn.classList.add("app-dock-button--running")
+    btn.dataset.dockAppKey = key
+    btn.dataset.dockAppRegion = region
+    const label = DOCK_HOVER_LABELS[key] || key
+    btn.setAttribute("data-hover-label", label)
+    btn.setAttribute("aria-pressed", "false")
+    btn.innerHTML = html
+    this.updateDockAppButtonState(btn, Boolean(this.dockAppOpen[key]), key === this.foregroundAppKey)
+    return btn
   }
 
   onDockClick(event) {
+    if (performance.now() < (this._dockSuppressClickUntil || 0)) {
+      event.preventDefault()
+      event.stopPropagation()
+      return
+    }
     const btn = event.target.closest?.("[data-dock-app-key]")
     if (!btn || !this.dockElement?.contains(btn)) return
     event.preventDefault()
@@ -119,13 +234,346 @@ export default class extends Controller {
     this.emitDockAppToggle(key)
   }
 
+  pointInDockStrip(clientX, clientY) {
+    const dock = this.dockElement
+    if (!dock) return false
+    const r = dock.getBoundingClientRect()
+    return clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom
+  }
+
+  /**
+   * Pinned strip rect for drag hit-testing. Empty `#app-dock-pinned` uses `display: contents`
+   * so it has no layout box — synthesize the strip between launcher and running.
+   */
+  dockPinnedZoneRectForPointer(pinnedEl, launcherBtn, dock) {
+    if (pinnedEl.querySelector("[data-dock-app-key]")) return pinnedEl.getBoundingClientRect()
+    const lb = launcherBtn.getBoundingClientRect()
+    const ld = document.getElementById("app-dock-launcher-divider")
+    const ldBox = ld?.getBoundingClientRect()
+    const left = ldBox && ldBox.width > 0.5 ? ldBox.right : lb.right
+    const rd = document.getElementById("app-dock-running-divider")
+    const rdBox = rd && !rd.hidden ? rd.getBoundingClientRect() : null
+    const runningEl = document.getElementById("app-dock-running")
+    let right = dock.getBoundingClientRect().right
+    if (rdBox && rdBox.width > 0.5) right = Math.min(right, rdBox.left)
+    else if (runningEl?.querySelector("[data-dock-app-key]")) {
+      right = Math.min(right, runningEl.getBoundingClientRect().left)
+    }
+    const h = Math.max(lb.height, 28)
+    return new DOMRect(left, lb.top, Math.max(8, right - left), h)
+  }
+
+  /**
+   * Running strip rect when the zone uses `display: contents` and has no icons yet.
+   */
+  dockRunningZoneRectForPointer(runningEl, launcherBtn, dock) {
+    if (runningEl.querySelector("[data-dock-app-key]")) return runningEl.getBoundingClientRect()
+    const dr = dock.getBoundingClientRect()
+    const rd = document.getElementById("app-dock-running-divider")
+    const rdBox = rd && !rd.hidden ? rd.getBoundingClientRect() : null
+    const pinnedEl = document.getElementById("app-dock-pinned")
+    let left = dr.left
+    if (rdBox && rdBox.width > 0.5) left = rdBox.right
+    else if (pinnedEl?.querySelector("[data-dock-app-key]")) {
+      left = pinnedEl.getBoundingClientRect().right
+    } else {
+      const lb = launcherBtn.getBoundingClientRect()
+      const ld = document.getElementById("app-dock-launcher-divider")
+      const ldBox = ld?.getBoundingClientRect()
+      left = ldBox && ldBox.width > 0.5 ? ldBox.right : lb.right
+    }
+    const h = Math.max(dr.height, 28)
+    return new DOMRect(left, dr.top, Math.max(8, dr.right - left), h)
+  }
+
+  dockInsertIndexForPointer(zoneEl, clientX, excludeBtn) {
+    if (!zoneEl) return 0
+    const buttons = [...zoneEl.querySelectorAll("[data-dock-app-key]")].filter((b) =>
+      excludeBtn ? b !== excludeBtn : true
+    )
+    let idx = 0
+    for (const b of buttons) {
+      const br = b.getBoundingClientRect()
+      if (clientX < br.left + br.width / 2) break
+      idx++
+    }
+    return idx
+  }
+
+  syncDockDividerVisibility() {
+    const runningEl = document.getElementById("app-dock-running")
+    const dividerEl = document.getElementById("app-dock-running-divider")
+    if (!runningEl || !dividerEl) return
+    const n = runningEl.querySelectorAll("[data-dock-app-key]").length
+    const draggingFromRunning =
+      this._dockPtr?.active === true && this._dockPtr.region === "running"
+    dividerEl.hidden = n === 0 && !draggingFromRunning
+  }
+
+  dockReorderZoneWithFlip(zoneEl, sourceBtn, insertIndex) {
+    if (!zoneEl || !sourceBtn) return
+    const dock = this.dockElement
+    if (!dock) return
+    this.syncDockDividerVisibility()
+    const prev = captureDockFullLayoutRects(dock)
+    const siblings = [...zoneEl.querySelectorAll("[data-dock-app-key]")].filter((b) => b !== sourceBtn)
+    const ref = insertIndex >= siblings.length ? null : siblings[insertIndex]
+    zoneEl.insertBefore(sourceBtn, ref)
+    this.syncDockDividerVisibility()
+    flipDockFullLayout(prev)
+  }
+
+  dockMoveButtonToZoneWithFlip(sourceBtn, targetZone, insertIndex) {
+    if (!sourceBtn || !targetZone) return
+    const dock = this.dockElement
+    if (!dock) return
+    this.syncDockDividerVisibility()
+    const prev = captureDockFullLayoutRects(dock)
+    const siblings = [...targetZone.querySelectorAll("[data-dock-app-key]")].filter((b) => b !== sourceBtn)
+    const ref = insertIndex >= siblings.length ? null : siblings[insertIndex]
+    targetZone.insertBefore(sourceBtn, ref)
+    this.syncDockDividerVisibility()
+    flipDockFullLayout(prev)
+  }
+
+  positionDockFloat(ptr, clientX, clientY) {
+    if (!ptr?.floatEl) return
+    const s = 25
+    ptr.floatEl.style.left = `${Math.round(clientX - s / 2)}px`
+    ptr.floatEl.style.top = `${Math.round(clientY - s / 2)}px`
+  }
+
+  endDockPointerTracking(forceRerender) {
+    document.removeEventListener("pointermove", this.boundDockPointerMove)
+    document.removeEventListener("pointerup", this.boundDockPointerUp)
+    document.removeEventListener("pointercancel", this.boundDockPointerUp)
+    this.dockElement?.classList.remove("app-dock--drag-active")
+    const ptr = this._dockPtr
+    if (!ptr) return
+    ptr.floatEl?.remove()
+    ptr.btn?.classList?.remove("app-dock-button--dock-ghost-source", "app-dock-button--dock-ghost-outside")
+    this._dockPtr = null
+    if (forceRerender) this.renderDockApps()
+  }
+
+  onDockPointerDown(event) {
+    if (event.button !== 0) return
+    const btn = event.target.closest?.("[data-dock-app-key][data-dock-app-region]")
+    if (!btn || !this.dockElement?.contains(btn)) return
+
+    this._dockPtr = {
+      btn,
+      key: btn.dataset.dockAppKey,
+      region: btn.dataset.dockAppRegion,
+      startX: event.clientX,
+      startY: event.clientY,
+      pointerId: event.pointerId,
+      active: false,
+      floatEl: null,
+      previewSig: null
+    }
+
+    document.addEventListener("pointermove", this.boundDockPointerMove)
+    document.addEventListener("pointerup", this.boundDockPointerUp)
+    document.addEventListener("pointercancel", this.boundDockPointerUp)
+  }
+
+  onDockPointerMove(event) {
+    const ptr = this._dockPtr
+    if (!ptr) return
+
+    const dx = event.clientX - ptr.startX
+    const dy = event.clientY - ptr.startY
+    const dist = Math.hypot(dx, dy)
+
+    if (!ptr.active) {
+      if (dist < DOCK_DRAG_THRESHOLD_PX) return
+      ptr.active = true
+      this.dockElement?.classList.add("app-dock--drag-active")
+      this._dockSuppressClickUntil = performance.now() + 700
+      ptr.floatEl = document.createElement("div")
+      ptr.floatEl.className = "dock-drag-float"
+      ptr.floatEl.innerHTML = ptr.btn.innerHTML
+      document.body.appendChild(ptr.floatEl)
+      ptr.btn.classList.add("app-dock-button--dock-ghost-source")
+      try {
+        ptr.btn.setPointerCapture(event.pointerId)
+      } catch (_) {}
+      this.positionDockFloat(ptr, event.clientX, event.clientY)
+    }
+
+    if (!ptr.active) return
+    if (event.cancelable) event.preventDefault()
+    this.positionDockFloat(ptr, event.clientX, event.clientY)
+
+    const dock = this.dockElement
+    const pinnedEl = document.getElementById("app-dock-pinned")
+    const runningEl = document.getElementById("app-dock-running")
+    const launcherBtn = dock?.querySelector(".app-dock-button--launcher")
+    if (!pinnedEl || !runningEl || !launcherBtn) return
+
+    const lr = launcherBtn.getBoundingClientRect()
+    if (
+      lr &&
+      event.clientX >= lr.left &&
+      event.clientX <= lr.right &&
+      event.clientY >= lr.top &&
+      event.clientY <= lr.bottom
+    ) {
+      ptr.previewSig = null
+      ptr.btn.classList.add("app-dock-button--dock-ghost-outside")
+      return
+    }
+
+    const inDock = this.pointInDockStrip(event.clientX, event.clientY)
+    if (!inDock) {
+      ptr.previewSig = null
+      ptr.btn.classList.add("app-dock-button--dock-ghost-outside")
+      return
+    }
+
+    const pad = 5
+    const pr = this.dockPinnedZoneRectForPointer(pinnedEl, launcherBtn, dock)
+    const rr = this.dockRunningZoneRectForPointer(runningEl, launcherBtn, dock)
+    let inPinned =
+      event.clientX >= pr.left - pad &&
+      event.clientX <= pr.right + pad &&
+      event.clientY >= pr.top - pad &&
+      event.clientY <= pr.bottom + pad
+    let inRunning =
+      event.clientX >= rr.left - pad &&
+      event.clientX <= rr.right + pad &&
+      event.clientY >= rr.top - pad &&
+      event.clientY <= rr.bottom + pad
+
+    let hoverPinned = inPinned
+    let hoverRunning = inRunning
+    if (inDock && !inPinned && !inRunning) {
+      const dr = dock.getBoundingClientRect()
+      let mid
+      if (rr.left >= pr.right - 2) {
+        mid = (pr.right + rr.left) / 2
+      } else {
+        mid = lr.right + (dr.right - lr.right) / 2
+      }
+      hoverPinned = event.clientX < mid
+      hoverRunning = event.clientX >= mid
+    }
+
+    const domZone = ptr.btn.closest("#app-dock-pinned")
+      ? "pinned"
+      : ptr.btn.closest("#app-dock-running")
+        ? "running"
+        : null
+
+    ptr.btn.classList.remove("app-dock-button--dock-ghost-outside")
+
+    const runPreview = (sig, fn) => {
+      if (ptr.previewSig === sig) return
+      ptr.previewSig = sig
+      fn()
+    }
+
+    if (hoverPinned && domZone === "pinned") {
+      const idx = this.dockInsertIndexForPointer(pinnedEl, event.clientX, ptr.btn)
+      runPreview(`rp:${idx}`, () => this.dockReorderZoneWithFlip(pinnedEl, ptr.btn, idx))
+      return
+    }
+
+    if (hoverRunning && domZone === "running") {
+      const idx = this.dockInsertIndexForPointer(runningEl, event.clientX, ptr.btn)
+      runPreview(`rr:${idx}`, () => this.dockReorderZoneWithFlip(runningEl, ptr.btn, idx))
+      return
+    }
+
+    if (hoverRunning && domZone === "pinned") {
+      const idx = this.dockInsertIndexForPointer(runningEl, event.clientX, null)
+      runPreview(`tr:${idx}`, () => this.dockMoveButtonToZoneWithFlip(ptr.btn, runningEl, idx))
+      return
+    }
+
+    if (hoverPinned && domZone === "running") {
+      const idx = this.dockInsertIndexForPointer(pinnedEl, event.clientX, null)
+      runPreview(`tp:${idx}`, () => this.dockMoveButtonToZoneWithFlip(ptr.btn, pinnedEl, idx))
+      return
+    }
+
+    ptr.previewSig = null
+    ptr.btn.classList.add("app-dock-button--dock-ghost-outside")
+  }
+
+  onDockPointerUp(event) {
+    this.dockElement?.classList.remove("app-dock--drag-active")
+    const ptr = this._dockPtr
+    if (!ptr) return
+
+    try {
+      ptr.btn?.releasePointerCapture?.(event.pointerId)
+    } catch (_) {}
+
+    document.removeEventListener("pointermove", this.boundDockPointerMove)
+    document.removeEventListener("pointerup", this.boundDockPointerUp)
+    document.removeEventListener("pointercancel", this.boundDockPointerUp)
+
+    if (!ptr.active) {
+      this._dockPtr = null
+      return
+    }
+
+    ptr.floatEl?.remove()
+    ptr.floatEl = null
+    ptr.btn.classList.remove("app-dock-button--dock-ghost-source", "app-dock-button--dock-ghost-outside")
+    if (typeof ptr.btn.blur === "function") ptr.btn.blur()
+
+    const pinnedEl = document.getElementById("app-dock-pinned")
+    const runningEl = document.getElementById("app-dock-running")
+    const inDock = this.pointInDockStrip(event.clientX, event.clientY)
+
+    if (!pinnedEl || !runningEl) {
+      this._dockPtr = null
+      this.renderDockApps()
+      return
+    }
+
+    if (!inDock) {
+      this.syncDockOpenStateFromDom()
+      const key = ptr.key
+      if (
+        ptr.region === "pinned" &&
+        key &&
+        PINNABLE_APP_KEYS.has(key) &&
+        !this.dockAppOpen[key]
+      ) {
+        const nextPins = readDockPins().filter((k) => k !== key)
+        writeDockPins(nextPins)
+        window.dispatchEvent(new CustomEvent("dock-pins:changed", { detail: { pins: readDockPins() } }))
+      }
+      this._dockPtr = null
+      this.renderDockApps()
+      return
+    }
+
+    const pinKeys = [...pinnedEl.querySelectorAll("[data-dock-app-key]")]
+      .map((b) => b.dataset.dockAppKey)
+      .filter((k) => PINNABLE_APP_KEYS.has(k))
+    const runKeys = [...runningEl.querySelectorAll("[data-dock-app-key]")]
+      .map((b) => b.dataset.dockAppKey)
+      .filter((k) => PINNABLE_APP_KEYS.has(k))
+
+    writeDockPins(pinKeys)
+    writeDockRunningOrder(runKeys)
+    window.dispatchEvent(new CustomEvent("dock-pins:changed", { detail: { pins: readDockPins() } }))
+
+    this._dockPtr = null
+    this.renderDockApps()
+  }
+
   emitDockAppToggle(key) {
     window.dispatchEvent(new CustomEvent("app-window:toggle", { detail: { appKey: key } }))
   }
 
   onDockPinsChanged() {
-    this.renderDockPinnedApps()
-    this.anchorLauncherToDock()
+    this.renderDockApps()
   }
 
   onOutsidePointerDown(event) {
@@ -137,12 +585,35 @@ export default class extends Controller {
     this.closeLauncher()
   }
 
-  updateDockAppButtonState(btn, isOpen) {
+  updateDockAppButtonState(btn, isOpen, isForeground) {
     btn.classList.toggle("is-active", isOpen)
     btn.setAttribute("aria-pressed", isOpen ? "true" : "false")
     const key = btn.dataset.dockAppKey
     const label = DOCK_HOVER_LABELS[key] || key
-    btn.setAttribute("aria-label", isOpen ? `Hide ${label}` : `Open ${label}`)
+    if (!isOpen) {
+      btn.setAttribute("aria-label", `Open ${label}`)
+    } else if (isForeground) {
+      btn.setAttribute("aria-label", `Close ${label}`)
+    } else {
+      btn.setAttribute("aria-label", `Bring ${label} to front`)
+    }
+  }
+
+  computeForegroundAppKeyFromDom() {
+    let maxZ = -Infinity
+    let topKey = null
+    document.querySelectorAll("section.content-window.os-window:not(.is-hidden)").forEach((el) => {
+      const key = el.getAttribute("data-content-window-app-key-value")
+      if (!key) return
+      const zRaw = el.style.zIndex || window.getComputedStyle(el).zIndex
+      const z = Number.parseInt(zRaw, 10)
+      const zc = Number.isFinite(z) ? z : 0
+      if (zc >= maxZ) {
+        maxZ = zc
+        topKey = key
+      }
+    })
+    return topKey
   }
 
   handleLauncherCloseRequest() {
@@ -157,12 +628,8 @@ export default class extends Controller {
     if (isHidden) { this.openLauncher() } else { this.closeLauncher() }
   }
 
-  handleAppWindowState(event) {
-    const key = event?.detail?.appKey
-    if (!key) return
-    this.dockAppOpen[key] = Boolean(event.detail.open)
-    const btn = this.dockElement?.querySelector(`[data-dock-app-key="${key}"]`)
-    if (btn) this.updateDockAppButtonState(btn, this.dockAppOpen[key])
+  handleAppWindowState(_event) {
+    this.renderDockApps()
   }
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -298,8 +765,6 @@ export default class extends Controller {
     const font1Alpha = this.clampInt(appearance.font_1_alpha, 0, 100, 100)
     const font2 = this.clampInt(appearance.font_2, 0, 100, 63)
     const font2Alpha = this.clampInt(appearance.font_2_alpha, 0, 100, 100)
-    const border = this.clampInt(appearance.border, 0, 100, 20)
-    const borderAlpha = this.clampInt(appearance.border_alpha, 0, 100, 100)
 
     root.style.setProperty("--window-bg-h", String(hue))
     root.style.setProperty("--window-bg-saturation", `${saturation}%`)
@@ -319,8 +784,6 @@ export default class extends Controller {
     root.style.setProperty("--font-1-alpha", (font1Alpha / 100).toFixed(2))
     root.style.setProperty("--font-2-tone", String(font2))
     root.style.setProperty("--font-2-alpha", (font2Alpha / 100).toFixed(2))
-    root.style.setProperty("--border-tone", String(border))
-    root.style.setProperty("--border-alpha", (borderAlpha / 100).toFixed(2))
   }
 
   clampInt(value, min, max, fallback) {

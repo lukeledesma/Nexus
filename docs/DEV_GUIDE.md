@@ -83,7 +83,7 @@ Nexus_Dev/
 │   ├── schema.rb
 │   └── migrate/
 ├── storage/
-│   └── workspace/            # Disk mirror of organizer state (Tasks.txt, Whiteboard.txt, user folders)
+│   └── workspace/            # Disk mirror of organizer state (Tasks.txt, stickynotes.txt, user folders)
 └── docs/
     ├── UI_GUIDE.md           # This app's UI behavior reference
     └── DEV_GUIDE.md          # This file
@@ -105,8 +105,9 @@ Nexus_Dev/
 
 ### Item
 - `name` (string)
-- `item_type` (string: `"task_list"` or `"whiteboard"`)
-- `content` (text, JSON payload)
+- `item_type` (string: one of `"note"`, `"task_list"`, `"stickynotes"`)
+- `body` (text; note HTML, task list / sticky JSON as stored)
+- `tasks` (jsonb; used for task lists)
 - `belongs_to :folder`
 - `after_commit` → `ItemStorageSyncLite.sync`
 
@@ -226,7 +227,7 @@ Pattern:
 - Location: `app/services/item_storage_sync_lite.rb`
 - Root: `storage/workspace/`
   - `Tasks.txt`: Singular task list document
-  - `Whiteboard.txt`: Singular whiteboard document
+  - `stickynotes.txt`: Sticky Notes canvas data (JSON array)
   - User folders as subdirectories (no items inside)
 - Triggered: `after_commit` on `Folder` and `Item` models.
 - Behavior: rebuilds folder directories and `.nexus` files from current DB state.

@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 import { materialSymbolSvg } from "lib/material_symbols"
+import { NEXUS_CLICKABLE_ROW_MAIN_CLASS } from "lib/nexus_ui"
 
 function taskToggleMarkup(checked) {
   return checked ? materialSymbolSvg("check", "xs") : materialSymbolSvg("circle_outline", "xs")
@@ -10,16 +11,37 @@ export default class extends Controller {
 
   connect() {
     this.boundWindowState = this.handleWindowState.bind(this)
+    this.boundRequestSave = this.handleRequestSave.bind(this)
+    this.boundTaskListAddFromChrome = this.handleTaskListAddFromChrome.bind(this)
     window.addEventListener("app-window:state", this.boundWindowState)
+    window.addEventListener("nexus:task-list-add-task", this.boundTaskListAddFromChrome)
+    document.addEventListener("nexus:request-save", this.boundRequestSave)
     this.#refreshAll()
   }
 
   disconnect() {
+    document.removeEventListener("nexus:request-save", this.boundRequestSave)
+    window.removeEventListener("nexus:task-list-add-task", this.boundTaskListAddFromChrome)
     if (this.autosaveTimer) {
       window.clearTimeout(this.autosaveTimer)
       this.autosaveTimer = null
     }
     window.removeEventListener("app-window:state", this.boundWindowState)
+  }
+
+  handleTaskListAddFromChrome(event) {
+    const frame = this.element.closest("turbo-frame")
+    const id = event.detail?.frameId
+    if (id && frame && frame.id !== id) return
+    if (!this.hasListTarget) return
+    this.addTask({ preventDefault() {} })
+  }
+
+  handleRequestSave(event) {
+    const frame = this.element.closest("turbo-frame")
+    if (!frame || event.detail?.frameId !== frame.id) return
+    this.#commitActiveEditIfAny()
+    this.#refreshAll()
   }
 
   handleWindowState(event) {
@@ -381,13 +403,15 @@ export default class extends Controller {
 
   #buildMainTaskRow(text, checked, subtasks) {
     const row = document.createElement("li")
-    row.className = "task-item-row task-item-row--main organizer-row"
+    row.className = "task-item-row task-item-row--main organizer-row nexus-standard-row"
     row.dataset.mainChecked = checked ? "true" : "false"
     row.dataset.hasSubtasks = subtasks.length > 0 ? "true" : "false"
 
     row.innerHTML =
-      '<div class="organizer-row-left row-left">' +
-        `<span class="task-toggle" role="button" tabindex="0" aria-label="Toggle task completion">${taskToggleMarkup(checked)}</span>` +
+      `<div class="organizer-row-left nexus-standard-row__main ${NEXUS_CLICKABLE_ROW_MAIN_CLASS}">` +
+        '<span class="nexus-standard-row__leading">' +
+          `<span class="task-toggle" role="button" tabindex="0" aria-label="Toggle task completion">${taskToggleMarkup(checked)}</span>` +
+        "</span>" +
         `<span class="task-item-text" data-role="task-text">${this.#escapeHtml(text)}</span>` +
       "</div>" +
       '<div class="organizer-row-right">' +
@@ -415,12 +439,14 @@ export default class extends Controller {
 
   #buildSubtaskRow(text, checked) {
     const row = document.createElement("li")
-    row.className = "task-item-row task-item-row--subtask organizer-row task-item-group--child"
+    row.className = "task-item-row task-item-row--subtask organizer-row nexus-standard-row task-item-group--child"
     if (checked) row.classList.add("task-item-row--checked")
 
     row.innerHTML =
-      '<div class="organizer-row-left row-left">' +
-        `<span class="task-toggle" role="button" tabindex="0" aria-label="Toggle subtask completion">${taskToggleMarkup(checked)}</span>` +
+      `<div class="organizer-row-left nexus-standard-row__main ${NEXUS_CLICKABLE_ROW_MAIN_CLASS}">` +
+        '<span class="nexus-standard-row__leading">' +
+          `<span class="task-toggle" role="button" tabindex="0" aria-label="Toggle subtask completion">${taskToggleMarkup(checked)}</span>` +
+        "</span>" +
         `<span class="task-item-text task-item-text--subtask" data-role="task-text">${this.#escapeHtml(text)}</span>` +
       "</div>" +
       '<div class="organizer-row-right">' +

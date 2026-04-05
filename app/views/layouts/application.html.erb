@@ -25,7 +25,7 @@
     <%= javascript_importmap_tags %>
   </head>
 
-  <body class="<%= logged_in? ? "nexus-os" : "" %>" data-controller="window-manager">
+  <body class="<%= logged_in? ? "nexus-os" : "" %>" data-controller="window-manager workspace-draft-tracker user-security-modal">
     <% if logged_in? %>
       <div id="desktop" class="desktop-layer" data-controller="desktop-selection"></div>
       <div class="desktop-clock" data-controller="desktop-clock">
@@ -39,27 +39,14 @@
       </section>
 
       <section class="content-window os-window is-hidden"
-        data-controller="content-window"
+        data-controller="content-window finder-toolbar"
+        data-finder-toolbar-frame-id-value="finder-pane"
         data-content-window-app-key-value="finder"
         data-content-window-app-url-value="/apps/finder"
         data-content-window-storage-key-value="nexus.contentWindow.finder.bounds"
         data-content-window-frame-id-value="finder-pane"
         aria-live="polite">
-        <header class="content-window-chrome finder-window-chrome">
-          <div class="finder-window-title-shell">
-            <h2 class="content-window-chrome-title">FINDER</h2>
-            <%= form_with url: apps_finder_create_folder_path, method: :post, html: { class: "finder-window-add-form", data: { turbo_frame: "finder-pane" } } do %>
-              <%= hidden_field_tag :frame_id, "finder-pane" %>
-              <button
-                type="submit"
-                class="finder-window-add-button"
-                aria-label="Create folder"
-                title="Create folder"
-              ><%= material_symbol_icon(:add, size: :sm) %></button>
-            <% end %>
-          </div>
-          <%= render "shared/content_window_close_button" %>
-        </header>
+        <%= render "shared/content_window_chrome", title: "FINDER", show_finder_new_folder: true %>
         <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
@@ -75,54 +62,12 @@
 
       <section class="content-window os-window is-hidden"
         data-controller="content-window"
-        data-content-window-app-key-value="timer"
-        data-content-window-app-url-value="/apps/timer"
-        data-content-window-storage-key-value="nexus.contentWindow.timer.bounds"
-        data-content-window-frame-id-value="timer-pane"
-        aria-live="polite">
-        <%= render "shared/content_window_chrome", title: "TIMER" %>
-        <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="window-content">
-          <turbo-frame id="timer-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
-        </div>
-      </section>
-
-      <section class="content-window os-window is-hidden"
-        data-controller="content-window"
-        data-content-window-app-key-value="conversion-chart"
-        data-content-window-app-url-value="/apps/conversion_chart"
-        data-content-window-storage-key-value="nexus.contentWindow.conversionChart.bounds"
-        data-content-window-frame-id-value="conversion-chart-pane"
-        aria-live="polite">
-        <%= render "shared/content_window_chrome", title: "SAE/METRIC" %>
-        <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="window-content">
-          <turbo-frame id="conversion-chart-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
-        </div>
-      </section>
-
-      <section class="content-window os-window is-hidden"
-        data-controller="content-window"
         data-content-window-app-key-value="singular-note"
         data-content-window-app-url-value="/apps/singular_note"
         data-content-window-storage-key-value="nexus.contentWindow.singularNote.bounds"
         data-content-window-frame-id-value="singular-note-pane"
         aria-live="polite">
-        <%= render "shared/content_window_chrome", title: "NOTEPAD" %>
+        <%= render "shared/content_window_chrome", title: "NOTEPAD", show_save: true, open_file_badge: true %>
         <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
@@ -143,7 +88,7 @@
         data-content-window-storage-key-value="nexus.contentWindow.singularTaskList.bounds"
         data-content-window-frame-id-value="singular-task-list-pane"
         aria-live="polite">
-        <%= render "shared/content_window_chrome", title: "TASKS" %>
+        <%= render "shared/content_window_chrome", title: "TASKS", show_save: true, open_file_badge: true, show_task_list_add: true %>
         <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
@@ -159,12 +104,12 @@
 
       <section class="content-window os-window is-hidden"
         data-controller="content-window"
-        data-content-window-app-key-value="singular-whiteboard"
-        data-content-window-app-url-value="/apps/singular_whiteboard"
-        data-content-window-storage-key-value="nexus.contentWindow.singularWhiteboard.bounds"
-        data-content-window-frame-id-value="singular-whiteboard-pane"
+        data-content-window-app-key-value="singular-sticky-notes"
+        data-content-window-app-url-value="/apps/singular_sticky_notes"
+        data-content-window-storage-key-value="nexus.contentWindow.singularStickyNotes.bounds"
+        data-content-window-frame-id-value="singular-sticky-notes-pane"
         aria-live="polite">
-        <%= render "shared/content_window_chrome", title: "STICKY NOTES" %>
+        <%= render "shared/content_window_chrome", title: "STICKY NOTES", show_save: true, open_file_badge: true %>
         <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
@@ -174,28 +119,7 @@
         <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="window-content">
-          <turbo-frame id="singular-whiteboard-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
-        </div>
-      </section>
-
-      <section class="content-window os-window is-hidden"
-        data-controller="content-window"
-        data-content-window-app-key-value="singular-excalidraw"
-        data-content-window-app-url-value="/apps/singular_excalidraw"
-        data-content-window-storage-key-value="nexus.contentWindow.singularExcalidraw.bounds"
-        data-content-window-frame-id-value="singular-excalidraw-pane"
-        aria-live="polite">
-        <%= render "shared/content_window_chrome", title: "SKETCHPAD" %>
-        <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="window-content">
-          <turbo-frame id="singular-excalidraw-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
+          <turbo-frame id="singular-sticky-notes-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
         </div>
       </section>
 
@@ -285,6 +209,12 @@
           <turbo-frame id="user-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
         </div>
       </section>
+
+      <%= render "shared/app_save_dialog", frame_id: "singular-note-pane", default_filename: "Notes" %>
+      <%= render "shared/app_save_dialog", frame_id: "singular-task-list-pane", default_filename: "Tasks" %>
+      <%= render "shared/app_save_dialog", frame_id: "singular-sticky-notes-pane", default_filename: "Sticky notes" %>
+
+      <%= render "apps/user/security_modals", frame_id: "settings-pane" %>
 
     <% end %>
 

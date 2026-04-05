@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { animateCollapse } from "lib/organizer_animations"
 
 export default class extends Controller {
   static targets = ["doc", "folderDropdown", "itemCreatorBackdrop"]
@@ -212,7 +213,7 @@ export default class extends Controller {
     }
 
     if (row.classList?.contains("plc-file-row")) {
-      this.animateCollapse(row).then(() => {
+      animateCollapse(row).then(() => {
         if (row.isConnected) row.remove()
         if (parentFileList) {
           const remaining = parentFileList.querySelectorAll(".plc-file-row[data-doc-kind='file']")
@@ -365,34 +366,6 @@ export default class extends Controller {
       parent.replaceChild(p, this.element)
     }
     wrapper.addEventListener("animationend", showEmpty, { once: true })
-  }
-
-  animateCollapse(element) {
-    return new Promise((resolve) => {
-      if (!element || !element.isConnected) {
-        resolve()
-        return
-      }
-
-      const currentHeight = element.offsetHeight
-      element.style.height = `${currentHeight}px`
-      element.style.overflow = "hidden"
-      // Force style flush so transition starts from the current rendered height.
-      void element.offsetHeight
-      element.classList.add("collapsing")
-
-      const finalize = () => {
-        element.removeEventListener("transitionend", onDone)
-        element.removeEventListener("animationend", onDone)
-        clearTimeout(timeoutId)
-        resolve()
-      }
-
-      const onDone = () => finalize()
-      const timeoutId = setTimeout(finalize, 220)
-      element.addEventListener("transitionend", onDone, { once: true })
-      element.addEventListener("animationend", onDone, { once: true })
-    })
   }
 
   syncExpandedFolders() {

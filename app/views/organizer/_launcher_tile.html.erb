@@ -1,4 +1,4 @@
-<%# locals: window_key, pin_key, label, handler, icon (optional for :conversion) %>
+<%# locals: window_key, pin_key, label, icon %>
 <%# Wrapper div avoids nested <button> (pin + launch), which breaks the DOM in browsers. %>
 <div class="launcher-tile-wrap">
   <button
@@ -10,11 +10,7 @@
   >
     <dl class="os-window-card-content launcher-tile-body">
       <dt class="os-window-card-label"><%= label %></dt>
-      <% if handler.to_sym == :conversion %>
-        <dd class="os-window-card-value launcher-card-conversion" data-organizer-target="conversionPair">—</dd>
-      <% else %>
-        <dd class="os-window-card-value os-window-card-value--icon launcher-card-icon" aria-hidden="true"><%= material_symbol_icon(icon, size: :lg) %></dd>
-      <% end %>
+      <dd class="os-window-card-value os-window-card-value--icon launcher-card-icon" aria-hidden="true"><%= material_symbol_icon(icon, size: :lg) %></dd>
     </dl>
   </button>
   <%= render "organizer/launcher_dock_pin_button", app_key: pin_key %>

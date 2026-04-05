@@ -3,21 +3,7 @@ import { Turbo } from "@hotwired/turbo-rails"
 import { toggleDockPinKey, readDockPins, PINNABLE_APP_KEYS, DOCK_HOVER_LABELS } from "lib/dock_pins"
 
 export default class extends Controller {
-  static targets = ["newFolderForm", "newFolderInput", "stamp", "conversionPair"]
-
-  #conversionPairs = [
-    { sae: "5/16\"", metric: "8 mm" },
-    { sae: "3/8\"", metric: "10 mm" },
-    { sae: "7/16\"", metric: "11 mm" },
-    { sae: "1/2\"", metric: "13 mm" },
-    { sae: "9/16\"", metric: "14 mm" },
-    { sae: "5/8\"", metric: "16 mm" },
-    { sae: "11/16\"", metric: "17 mm" },
-    { sae: "3/4\"", metric: "19 mm" }
-  ]
-
-  #conversionIndex = 0
-  #conversionInterval = null
+  static targets = ["newFolderForm", "newFolderInput", "stamp"]
 
   connect() {
     this.boundSavedState = this.handleSavedState.bind(this)
@@ -26,7 +12,6 @@ export default class extends Controller {
     window.addEventListener("nexus:item-saved", this.boundSavedState)
     window.addEventListener("app-window:state", this.boundAppWindowState)
     window.addEventListener("dock-pins:changed", this.boundDockPinsChanged)
-    this.startConversionCycle()
     this.clearLauncherState()
     this.applyDockPinsUi()
   }
@@ -35,7 +20,6 @@ export default class extends Controller {
     window.removeEventListener("nexus:item-saved", this.boundSavedState)
     window.removeEventListener("app-window:state", this.boundAppWindowState)
     window.removeEventListener("dock-pins:changed", this.boundDockPinsChanged)
-    this.stopConversionCycle()
   }
 
   toggleDockPin(event) {
@@ -57,30 +41,6 @@ export default class extends Controller {
       const name = DOCK_HOVER_LABELS[key] || key
       btn.setAttribute("aria-label", pinned ? `Unpin ${name} from dock` : `Pin ${name} to dock`)
     })
-  }
-
-  startConversionCycle() {
-    if (!this.hasConversionPairTarget) return
-    this.updateConversionDisplay()
-    this.#conversionInterval = setInterval(() => this.cycleConversion(), 2000)
-  }
-
-  stopConversionCycle() {
-    if (this.#conversionInterval) {
-      clearInterval(this.#conversionInterval)
-      this.#conversionInterval = null
-    }
-  }
-
-  cycleConversion() {
-    this.#conversionIndex = (this.#conversionIndex + 1) % this.#conversionPairs.length
-    this.updateConversionDisplay()
-  }
-
-  updateConversionDisplay() {
-    if (!this.hasConversionPairTarget) return
-    const pair = this.#conversionPairs[this.#conversionIndex]
-    this.conversionPairTarget.textContent = `${pair.sae} | ${pair.metric}`
   }
 
   toggleNewFolder(event) {
@@ -154,8 +114,7 @@ export default class extends Controller {
   labelForItemType(itemType) {
     if (itemType === "note") return "Notepad"
     if (itemType === "task_list") return "Tasks"
-    if (itemType === "whiteboard") return "Sticky Notes"
-    if (itemType === "excalidraw") return "Sketchpad"
+    if (itemType === "stickynotes") return "Sticky Notes"
     return null
   }
 

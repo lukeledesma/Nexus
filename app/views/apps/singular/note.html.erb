@@ -1,8 +1,10 @@
 <% frame_id = params[:frame_id].presence || "app-pane" %>
-<turbo-frame id="<%= frame_id %>">
+<turbo-frame id="<%= frame_id %>" data-singular-draft-root>
   <section class="app-surface app-surface--tool app-surface--quill-note"
     data-controller="quill-note"
-    data-quill-note-initial-body-value="<%= @note&.body.to_s %>">
+    data-quill-note-initial-body-value="">
+    <%# Hidden HTML source — avoids broken data-attribute values for rich text (quotes, length). %>
+    <div class="quill-note-initial-html-source" data-quill-note-target="initialBodyTemplate" hidden aria-hidden="true"><%== @note&.body.to_s %></div>
     <%= form_with model: @note,
       url: apps_singular_note_path(frame_id: frame_id),
       method: :patch,

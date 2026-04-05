@@ -1,4 +1,44 @@
-<header class="content-window-chrome">
-  <h2 class="content-window-chrome-title"><%= title %></h2>
+<% show_save = local_assigns.fetch(:show_save, false) %>
+<% open_file_badge = local_assigns.fetch(:open_file_badge, false) %>
+<% show_finder_new_folder = local_assigns.fetch(:show_finder_new_folder, false) %>
+<% show_task_list_add = local_assigns.fetch(:show_task_list_add, false) %>
+<% chrome_toolbar = show_finder_new_folder || show_task_list_add %>
+<header class="content-window-chrome<%= " content-window-chrome--with-save" if show_save %><%= " content-window-chrome--with-open-file" if open_file_badge %><%= " content-window-chrome--with-finder-toolbar" if chrome_toolbar %>">
+  <% if open_file_badge %>
+    <div class="content-window-title-shell">
+      <h2 class="content-window-chrome-title"><%= title %></h2>
+      <span class="content-window-open-file-separator" data-nexus-open-file-separator hidden aria-hidden="true">|</span>
+      <span class="content-window-open-file-name" data-nexus-open-file-name hidden></span>
+    </div>
+  <% else %>
+    <h2 class="content-window-chrome-title"><%= title %></h2>
+  <% end %>
+  <% if show_finder_new_folder %>
+    <button
+      type="button"
+      class="content-window-new-folder-btn settings-themes-item-action-btn theme-builder-save-btn"
+      data-action="click->finder-toolbar#createFolder"
+      title="New folder"
+      aria-label="New folder"
+    ><%= material_symbol_icon(:add, size: :xs) %></button>
+  <% end %>
+  <% if show_task_list_add %>
+    <button
+      type="button"
+      class="content-window-new-folder-btn settings-themes-item-action-btn theme-builder-save-btn"
+      data-action="click->content-window#emitTaskListAddTask"
+      title="Add task"
+      aria-label="Add task"
+    ><%= material_symbol_icon(:add, size: :xs) %></button>
+  <% end %>
+  <% if show_save %>
+    <button
+      type="button"
+      class="content-window-save-btn settings-themes-item-action-btn theme-builder-save-btn"
+      data-action="click->content-window#openSaveDialog"
+      title="Save"
+      aria-label="Save"
+    ><%= material_symbol_icon(:save, size: :sm) %></button>
+  <% end %>
   <%= render "shared/content_window_close_button" %>
 </header>

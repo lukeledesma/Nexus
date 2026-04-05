@@ -24,8 +24,6 @@ class WorkspacePreferencesController < ApplicationController
     "font_1_alpha" => 100,
     "font_2" => 63,
     "font_2_alpha" => 100,
-    "border" => 20,
-    "border_alpha" => 100,
     "color_1_hue" => 240,
     "color_1_saturation" => 28,
     "color_1_brightness" => 14,
@@ -334,8 +332,6 @@ class WorkspacePreferencesController < ApplicationController
     normalized["font_1_alpha"] = clamp_integer(keyed["font_1_alpha"], 0, 100, DEFAULT_APPEARANCE["font_1_alpha"]) if keyed.key?("font_1_alpha")
     normalized["font_2"] = clamp_integer(keyed["font_2"], 0, 100, DEFAULT_APPEARANCE["font_2"]) if keyed.key?("font_2")
     normalized["font_2_alpha"] = clamp_integer(keyed["font_2_alpha"], 0, 100, DEFAULT_APPEARANCE["font_2_alpha"]) if keyed.key?("font_2_alpha")
-    normalized["border"] = clamp_integer(keyed["border"], 0, 100, DEFAULT_APPEARANCE["border"]) if keyed.key?("border")
-    normalized["border_alpha"] = clamp_integer(keyed["border_alpha"], 0, 100, DEFAULT_APPEARANCE["border_alpha"]) if keyed.key?("border_alpha")
     normalized["color_1_hue"] = clamp_integer(keyed["color_1_hue"], 0, 360, DEFAULT_APPEARANCE["color_1_hue"]) if keyed.key?("color_1_hue")
     normalized["color_1_saturation"] = clamp_integer(keyed["color_1_saturation"], 0, 100, DEFAULT_APPEARANCE["color_1_saturation"]) if keyed.key?("color_1_saturation")
     normalized["color_1_brightness"] = clamp_integer(keyed["color_1_brightness"], 0, 100, DEFAULT_APPEARANCE["color_1_brightness"]) if keyed.key?("color_1_brightness")
@@ -359,8 +355,6 @@ class WorkspacePreferencesController < ApplicationController
       "font_1_alpha" => clamp_integer(input["font_1_alpha"], 0, 100, DEFAULT_APPEARANCE["font_1_alpha"]),
       "font_2" => clamp_integer(input["font_2"], 0, 100, DEFAULT_APPEARANCE["font_2"]),
       "font_2_alpha" => clamp_integer(input["font_2_alpha"], 0, 100, DEFAULT_APPEARANCE["font_2_alpha"]),
-      "border" => clamp_integer(input["border"], 0, 100, DEFAULT_APPEARANCE["border"]),
-      "border_alpha" => clamp_integer(input["border_alpha"], 0, 100, DEFAULT_APPEARANCE["border_alpha"]),
       "color_1_hue" => clamp_integer(input["color_1_hue"], 0, 360, DEFAULT_APPEARANCE["color_1_hue"]),
       "color_1_saturation" => clamp_integer(input["color_1_saturation"], 0, 100, DEFAULT_APPEARANCE["color_1_saturation"]),
       "color_1_brightness" => clamp_integer(input["color_1_brightness"], 0, 100, DEFAULT_APPEARANCE["color_1_brightness"]),

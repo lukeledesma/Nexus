@@ -1,6 +1,8 @@
 import { Controller } from "@hotwired/stimulus"
 import { createOsWindowSizer } from "lib/os_window_sizing"
 
+const DESKTOP_WINDOW_LAYERS_KEY = "nexus.desktop.windowLayers"
+
 export default class extends Controller {
   static targets = ["frame"]
   static values = {
@@ -11,7 +13,7 @@ export default class extends Controller {
   }
 
   connect() {
-    this.currentUrl = this.buildAppUrl()
+    this.currentUrl = this.buildAppUrl({ blank: false })
     this.isAutoSizedWindow = false
     this.viewportMargin = 6
     this.dockLeftBoundary = 6
@@ -19,12 +21,13 @@ export default class extends Controller {
     const rect = this.element.getBoundingClientRect()
     this.windowWidth = Math.round(rect.width || 550)
     this.windowHeight = Math.round(rect.height || 480)
+    /* Finder shell + Settings (same two-pane layout) share a minimum so rows don’t collapse. */
+    const finderLikeMin = { width: 760, height: 460 }
     const minByAppKey = {
       "singular-note": { width: 581, height: 500 },
-      "timer": { width: 320, height: 220 },
-      "conversion-chart": { width: 350, height: 295 },
-      "finder": { width: 760, height: 460 },
-      "settings": { width: 400, height: 280 },
+      "singular-sticky-notes": { width: 520, height: 420 },
+      "finder": finderLikeMin,
+      "settings": finderLikeMin,
       "user": { width: 320, height: 220 },
       "theme-studio": { width: 520, height: 560 }
     }
@@ -41,6 +44,10 @@ export default class extends Controller {
     this.boundToggleRequest = this.handleToggleRequest.bind(this)
 
     window.addEventListener("app-window:toggle", this.boundToggleRequest)
+    this.boundOpenRequest = this.handleOpenRequest.bind(this)
+    window.addEventListener("app-window:open", this.boundOpenRequest)
+    this.boundSingularSaved = this.onSingularDiskSaved.bind(this)
+    window.addEventListener("nexus:singular-disk-saved", this.boundSingularSaved)
     this.boundTitleShellPointerDown = this.onTitleShellPointerDown.bind(this)
     this.element.addEventListener("mousedown", this.boundTitleShellPointerDown)
     this.element.addEventListener("touchstart", this.boundTitleShellPointerDown, { passive: false })
@@ -57,6 +64,8 @@ export default class extends Controller {
       this.windowSizer.observeContent()
     }
 
+    this.restoreWindowZIndex()
+    this.syncDesktopZIndexFloor()
     this.restoreWindowBounds()
     this.restoreOpenState()
   }
@@ -66,6 +75,8 @@ export default class extends Controller {
     this.stopResize()
     if (this.windowSizer) this.windowSizer.disconnect()
     window.removeEventListener("app-window:toggle", this.boundToggleRequest)
+    window.removeEventListener("app-window:open", this.boundOpenRequest)
+    window.removeEventListener("nexus:singular-disk-saved", this.boundSingularSaved)
     this.element.removeEventListener("mousedown", this.boundTitleShellPointerDown)
     this.element.removeEventListener("touchstart", this.boundTitleShellPointerDown)
   }
@@ -83,29 +94,177 @@ export default class extends Controller {
     this.toggle()
   }
 
+  /** Open (or focus) this window and optionally load a Finder document into the frame. */
+  handleOpenRequest(event) {
+    const { appKey, documentId, documentTitle } = event.detail || {}
+    if (appKey !== this.appKeyValue) return
+
+    if (documentId) {
+      const url = new URL(this.appUrlValue, window.location.origin)
+      url.searchParams.set("frame_id", this.frameIdValue)
+      url.searchParams.set("document_id", String(documentId))
+      url.searchParams.delete("blank")
+      this.currentUrl = `${url.pathname}${url.search}`
+      this.syncOpenFileBadge(documentTitle)
+    } else {
+      this.currentUrl = this.buildAppUrl({ blank: this.isSingularApp() })
+      this.clearOpenFileBadge()
+    }
+
+    if (this.hasFrameTarget) {
+      const mustHardReload =
+        Boolean(documentId) ||
+        (this.isSingularApp() && this.currentUrl.includes("blank=1"))
+      if (mustHardReload) {
+        this.frameTarget.removeAttribute("src")
+        void this.frameTarget.offsetWidth
+      }
+      this.frameTarget.src = this.currentUrl
+    }
+
+    if (this.element.classList.contains("is-hidden")) {
+      this.open()
+    } else {
+      this.bringToFront()
+    }
+  }
+
+  syncOpenFileBadge(title) {
+    const sep = this.element.querySelector("[data-nexus-open-file-separator]")
+    const nameEl = this.element.querySelector("[data-nexus-open-file-name]")
+    if (!sep || !nameEl) return
+    const t = (title || "").trim()
+    if (!t) {
+      sep.hidden = true
+      nameEl.hidden = true
+      nameEl.textContent = ""
+      nameEl.removeAttribute("title")
+      return
+    }
+    sep.hidden = false
+    nameEl.hidden = false
+    nameEl.textContent = t
+    nameEl.setAttribute("title", t)
+  }
+
+  clearOpenFileBadge() {
+    this.syncOpenFileBadge("")
+  }
+
+  onSingularDiskSaved(event) {
+    const { frameId, title } = event.detail || {}
+    if (frameId !== this.frameIdValue) return
+    const t = (title || "").trim()
+    if (!t) return
+    this.syncOpenFileBadge(t)
+  }
+
+  /** Opens the viewport-centered Save dialog (sibling controllers under body). */
+  openSaveDialog(event) {
+    if (event) event.preventDefault()
+    const el = document.querySelector(
+      `[data-controller~="app-save-dialog"][data-app-save-dialog-frame-id-value="${this.frameIdValue}"]`
+    )
+    if (!el) return
+    const dialog = this.application.getControllerForElementAndIdentifier(el, "app-save-dialog")
+    dialog?.open(event)
+  }
+
+  readStoredLayers() {
+    try {
+      const raw = window.localStorage.getItem(DESKTOP_WINDOW_LAYERS_KEY)
+      if (!raw) return null
+      const o = JSON.parse(raw)
+      return typeof o === "object" && o !== null ? o : null
+    } catch (_error) {
+      return null
+    }
+  }
+
+  restoreWindowZIndex() {
+    const layers = this.readStoredLayers()
+    const z = layers?.[this.appKeyValue]
+    if (Number.isFinite(z) && z > 0) {
+      this.element.style.zIndex = String(Math.round(z))
+    }
+  }
+
+  persistWindowLayer(z) {
+    try {
+      const layers = this.readStoredLayers() || {}
+      layers[this.appKeyValue] = z
+      window.localStorage.setItem(DESKTOP_WINDOW_LAYERS_KEY, JSON.stringify(layers))
+    } catch (_error) {
+      // non-blocking
+    }
+  }
+
+  syncDesktopZIndexFloor() {
+    const zRaw = this.element.style.zIndex || window.getComputedStyle(this.element).zIndex
+    const n = Number.parseInt(zRaw, 10)
+    if (Number.isFinite(n)) {
+      window.__nexusDesktopZIndex = Math.max(window.__nexusDesktopZIndex || 1500, n)
+    }
+  }
+
   toggle() {
     if (this.element.classList.contains("is-hidden")) {
+      this.currentUrl = this.buildAppUrl({ blank: this.isSingularApp() })
+      try {
+        if (this.isSingularApp() && this.hasFrameIdValue) {
+          window.sessionStorage.removeItem(`nexus.singularLinkedDocument.${this.frameIdValue}`)
+        }
+      } catch (_) {}
+      this.clearOpenFileBadge()
+      if (this.isSingularApp() && this.hasFrameTarget) {
+        this.frameTarget.removeAttribute("src")
+        void this.frameTarget.offsetWidth
+      }
       this.open()
       return
     }
 
-    this.close()
+    if (this.isForegroundContentWindow()) {
+      this.close()
+    } else {
+      this.bringToFront()
+    }
   }
 
-  open() {
+  /** True when this window has the highest z-index among visible app windows (dock: second click closes). */
+  isForegroundContentWindow() {
+    if (this.element.classList.contains("is-hidden")) return false
+    let maxZ = -Infinity
+    let topEl = null
+    document.querySelectorAll("section.content-window.os-window:not(.is-hidden)").forEach((el) => {
+      const zRaw = el.style.zIndex || window.getComputedStyle(el).zIndex
+      const z = Number.parseInt(zRaw, 10)
+      const zc = Number.isFinite(z) ? z : 0
+      if (zc >= maxZ) {
+        maxZ = zc
+        topEl = el
+      }
+    })
+    return topEl === this.element
+  }
+
+  open(options = {}) {
+    const fromRestore = Boolean(options.fromRestore)
     this.ensureFrameLoaded()
     this.element.classList.remove("is-hidden")
     if (this.isAutoSizedWindow) this.element.style.height = ""
     if (this.windowSizer) this.windowSizer.syncOnOpen()
-    this.bringToFront()
+    if (!fromRestore) {
+      this.bringToFront()
+    }
     this.saveOpenState(true)
     this.emitWindowState(true)
   }
 
   close() {
     this.saveOpenState(false)
-    this.emitWindowState(false)
     this.element.classList.add("is-hidden")
+    this.emitWindowState(false)
   }
 
   ensureFrameLoaded() {
@@ -114,9 +273,19 @@ export default class extends Controller {
     this.frameTarget.src = this.currentUrl
   }
 
-  buildAppUrl() {
+  isSingularApp() {
+    return ["singular-note", "singular-task-list", "singular-sticky-notes"].includes(this.appKeyValue)
+  }
+
+  buildAppUrl(options = {}) {
     const url = new URL(this.appUrlValue, window.location.origin)
     if (this.hasFrameIdValue) url.searchParams.set("frame_id", this.frameIdValue)
+    if (this.isSingularApp() && options.blank === true) {
+      url.searchParams.set("blank", "1")
+      url.searchParams.delete("document_id")
+    } else {
+      url.searchParams.delete("blank")
+    }
     return `${url.pathname}${url.search}`
   }
 
@@ -333,7 +502,7 @@ export default class extends Controller {
   restoreOpenState() {
     const shouldOpen = this.readStoredOpenState()
     if (shouldOpen !== true) return
-    this.open()
+    this.open({ fromRestore: true })
   }
 
   clampBounds(bounds) {
@@ -379,12 +548,23 @@ export default class extends Controller {
     const next = Number(window.__nexusDesktopZIndex || 1500) + 1
     window.__nexusDesktopZIndex = next
     this.element.style.zIndex = String(next)
+    this.persistWindowLayer(next)
     this.emitWindowState(!this.element.classList.contains("is-hidden"))
   }
 
   getCoords(event) {
     if (event.touches) return { x: event.touches[0].clientX, y: event.touches[0].clientY }
     return { x: event.clientX, y: event.clientY }
+  }
+
+  emitTaskListAddTask(event) {
+    if (event) event.preventDefault()
+    if (this.appKeyValue !== "singular-task-list") return
+    window.dispatchEvent(
+      new CustomEvent("nexus:task-list-add-task", {
+        detail: { frameId: this.hasFrameIdValue ? this.frameIdValue : "singular-task-list-pane" }
+      })
+    )
   }
 
   emitWindowState(isOpen) {

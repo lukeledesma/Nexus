@@ -167,12 +167,86 @@ class DocumentDiskLoader
       lines = text.split("\n", -1)
       marker = lines.first.to_s.strip
 
-      case marker
-      when "# NEXUS_TASK_LIST"
+      if marker == NexusFileFormat::FIRST_LINE
+        parse_unified_file(lines)
+      elsif marker == "# NEXUS_TASK_LIST"
         parse_task_list(lines)
       else
         parse_note(lines)
       end
+    end
+
+    def parse_unified_file(lines)
+      metadata, body = extract_unified_metadata_and_body(lines)
+      kind = metadata["kind"].to_s
+
+      case kind
+      when NexusFileFormat::KIND_NOTE
+        parse_note_from_unified(metadata, body)
+      when NexusFileFormat::KIND_TASK_LIST
+        build_task_list_attributes(metadata, body)
+      when NexusFileFormat::KIND_STICKYNOTES
+        parse_stickynotes_from_unified(metadata, body)
+      else
+        parse_note(lines)
+      end
+    end
+
+    def extract_unified_metadata_and_body(lines)
+      metadata = {}
+      body_start = lines.length
+
+      lines.each_with_index do |line, index|
+        stripped = line.to_s.strip
+        if index.zero?
+          next if stripped == NexusFileFormat::FIRST_LINE
+
+          break
+        end
+
+        if stripped.start_with?("# ")
+          key, value = stripped.delete_prefix("# ").split(":", 2)
+          metadata[key.to_s.strip] = value.to_s.strip
+          next
+        end
+
+        if stripped.empty?
+          body_start = index + 1
+          break
+        end
+
+        body_start = index
+        break
+      end
+
+      body = lines[body_start..]&.join("\n").to_s
+      [metadata, body]
+    end
+
+    def parse_note_from_unified(metadata, body)
+      {
+        content_type: "note",
+        content: body,
+        tasks: [],
+        reset_mode: "none",
+        reset_days: [],
+        last_reset_at: nil,
+        created_at: parse_time(metadata["created_at"]),
+        updated_at: parse_time(metadata["updated_at"])
+      }
+    end
+
+    def parse_stickynotes_from_unified(metadata, body)
+      {
+        content_type: "stickynotes",
+        content: body,
+        tasks: [],
+        reset_mode: "none",
+        reset_days: [],
+        last_reset_at: nil,
+        created_at: parse_time(metadata["created_at"]),
+        updated_at: parse_time(metadata["updated_at"])
+      }
     end
 
     def parse_note(lines)
@@ -191,6 +265,10 @@ class DocumentDiskLoader
 
     def parse_task_list(lines)
       metadata, body = extract_metadata_and_body(lines)
+      build_task_list_attributes(metadata, body)
+    end
+
+    def build_task_list_attributes(metadata, body)
       tasks = []
       current_main_task = nil
       new_group = true

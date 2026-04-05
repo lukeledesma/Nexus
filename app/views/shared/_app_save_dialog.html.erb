@@ -1,0 +1,94 @@
+<%# locals: frame_id:, default_filename: %>
+<% default_filename = local_assigns.fetch(:default_filename, "Untitled") %>
+<div
+  class="app-save-dialog-layer"
+  data-controller="app-save-dialog"
+  data-app-save-dialog-frame-id-value="<%= frame_id %>"
+  data-app-save-dialog-default-filename-value="<%= default_filename %>"
+  data-app-save-dialog-target="layer"
+  hidden
+>
+  <div
+    class="app-save-dialog-backdrop"
+    data-action="click->app-save-dialog#backdropClick"
+    aria-hidden="true"
+  ></div>
+  <div
+    class="app-save-dialog-shell"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="app-save-dialog-heading-<%= frame_id %>"
+  >
+    <div class="app-save-dialog">
+      <aside class="app-save-dialog__sidebar app-save-dialog__sidebar--finder" aria-label="Folders">
+        <div class="finder-folder-list-header">
+          <span class="finder-folder-list-heading">Folders</span>
+          <button
+            type="button"
+            class="finder-folder-add-btn"
+            data-action="click->app-save-dialog#createFolder"
+            title="New folder"
+            aria-label="New folder"
+          ><%= material_symbol_icon(:add, size: :xs) %></button>
+        </div>
+        <ul
+          class="finder-folder-list app-save-dialog__finder-list"
+          data-app-save-dialog-target="folderList"
+          data-action="click->app-save-dialog#folderListClick"
+        >
+          <% finder_sidebar_folders.each do |folder| %>
+            <li class="finder-folder-item" data-folder-id="<%= folder.id %>">
+              <button
+                type="button"
+                class="finder-folder-link finder-folder-link--button"
+                data-folder-id="<%= folder.id %>"
+                aria-label="Save to <%= folder.title %>"
+              >
+                <span class="finder-folder-icon" aria-hidden="true"><%= material_symbol_icon(:folder, size: :md) %></span>
+                <span class="finder-folder-name"><%= folder.title %></span>
+              </button>
+            </li>
+          <% end %>
+        </ul>
+        <% if finder_sidebar_folders.empty? %>
+          <p class="finder-folder-list-empty" data-app-save-dialog-target="folderEmptyHint">No folders yet.</p>
+        <% end %>
+        <template data-app-save-dialog-target="folderRowTemplate">
+          <li class="finder-folder-item" data-folder-id="">
+            <button type="button" class="finder-folder-link finder-folder-link--button" data-folder-id="" aria-label="">
+              <span class="finder-folder-icon" aria-hidden="true"><%= material_symbol_icon(:folder, size: :md) %></span>
+              <span class="finder-folder-name"></span>
+            </button>
+          </li>
+        </template>
+      </aside>
+      <div class="app-save-dialog__body">
+        <div class="app-save-dialog__filename-row app-save-dialog__filename-row--header">
+          <label class="app-save-dialog__filename-label" id="app-save-dialog-heading-<%= frame_id %>" for="app-save-filename-<%= frame_id %>">Save As:</label>
+          <input
+            id="app-save-filename-<%= frame_id %>"
+            type="text"
+            class="app-save-dialog__filename-input"
+            autocomplete="off"
+            spellcheck="false"
+            data-app-save-dialog-target="filenameInput"
+            data-action="keydown->app-save-dialog#filenameKeydown"
+          />
+        </div>
+        <div class="app-save-dialog__browser app-save-dialog__mini-finder" role="region" aria-label="Files in selected folder">
+          <ul
+            class="app-save-dialog__file-list finder-file-list"
+            data-app-save-dialog-target="fileList"
+            data-action="click->app-save-dialog#fileRowClick keydown->app-save-dialog#fileRowKeydown"
+            role="list"
+          ></ul>
+          <p class="app-save-dialog__file-empty" data-app-save-dialog-target="fileEmptyHint" hidden>No files in this folder.</p>
+        </div>
+        <footer class="app-save-dialog__footer">
+          <button type="button" class="app-save-dialog__btn app-save-dialog__btn--secondary" data-action="click->app-save-dialog#cancel">Cancel</button>
+          <button type="button" class="app-save-dialog__btn app-save-dialog__btn--primary" data-action="click->app-save-dialog#confirmSave">Save</button>
+        </footer>
+      </div>
+    </div>
+  </div>
+</div>

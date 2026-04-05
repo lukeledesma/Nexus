@@ -58,14 +58,14 @@ class ItemStorageSyncLite
         task_content = task_list ? item_contents(task_list) : empty_task_list_contents
         File.write(temp_root.join("Tasks.txt"), task_content)
 
-        # Write Whiteboard (or empty placeholder if it doesn't exist)
-        whiteboard = app_folder.items.find_by(item_type: "whiteboard")
-        whiteboard_content = whiteboard ? item_contents(whiteboard) : empty_whiteboard_contents
-        File.write(temp_root.join("Whiteboard.txt"), whiteboard_content)
+        # Sticky Notes (or empty placeholder if it doesn't exist)
+        stickies = app_folder.items.find_by(item_type: "stickynotes")
+        stickies_content = stickies ? item_contents(stickies) : empty_stickynotes_contents
+        File.write(temp_root.join("stickynotes.txt"), stickies_content)
       else
         # Create empty placeholders if App folder doesn't exist yet
         File.write(temp_root.join("Tasks.txt"), empty_task_list_contents)
-        File.write(temp_root.join("Whiteboard.txt"), empty_whiteboard_contents)
+        File.write(temp_root.join("stickynotes.txt"), empty_stickynotes_contents)
       end
 
     # Write user folders as subdirectories (without items inside them)
@@ -141,14 +141,14 @@ class ItemStorageSyncLite
 
   def item_contents(item)
     return task_list_contents(item) if item.item_type == "task_list"
-    return whiteboard_contents(item) if item.item_type == "whiteboard"
+    return stickynotes_contents(item) if item.item_type == "stickynotes"
 
     ""
   end
 
-  def whiteboard_contents(item)
+  def stickynotes_contents(item)
     [
-      "# NEXUS_WHITEBOARD",
+      "# NEXUS_STICKY_NOTES",
       "# name: #{item.name}",
       "# item_id: #{item.id}",
       "# updated_at: #{iso8601_or_nil(item.updated_at)}",
@@ -157,10 +157,10 @@ class ItemStorageSyncLite
     ].join("\n")
   end
 
-  def empty_whiteboard_contents
+  def empty_stickynotes_contents
     [
-      "# NEXUS_WHITEBOARD",
-      "# name: Whiteboard",
+      "# NEXUS_STICKY_NOTES",
+      "# name: Sticky Notes",
       "# item_id: ",
       "# updated_at: null",
       "",
