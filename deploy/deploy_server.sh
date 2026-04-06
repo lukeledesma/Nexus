@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # deploy_server.sh — Deploy this app to production (laptop origin should be github.com/lukeledesma/Nexus).
-# Usage: ./deploy/deploy_server.sh [--rsync] [--branch BRANCH] [--dry-run]
+# Usage: ./deploy/deploy_server.sh [--rsync] [--branch BRANCH] [--dry-run] [--purge-runtime]
 
 set -euo pipefail
 
@@ -19,6 +19,7 @@ REMOTE_RUBY="${NEXUS_DEPLOY_RUBY:-/home/$REMOTE_USER/.rbenv/versions/3.2.3/bin}"
 BRANCH="${BRANCH:-main}"
 USE_RSYNC=false
 DRY_RUN=false
+PURGE_RUNTIME=false
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
 info()    { echo -e "${CYAN}[server]${NC} $*"; }
@@ -33,13 +34,21 @@ while [[ $# -gt 0 ]]; do
     --rsync)    USE_RSYNC=true ;;
     --branch)   shift; BRANCH="$1" ;;
     --dry-run)  DRY_RUN=true ;;
+    --purge-runtime) PURGE_RUNTIME=true ;;
     -h|--help)
-      echo "Usage: $0 [--rsync] [--branch BRANCH] [--dry-run]"
+      echo "Usage: $0 [--rsync] [--branch BRANCH] [--dry-run] [--purge-runtime]"
       exit 0 ;;
     *) die "Unknown option: $1" ;;
   esac
   shift
 done
+
+if [[ "$PURGE_RUNTIME" == true ]]; then
+  CLEAN_CMD="git clean -ffdx"
+else
+  # Keep user/runtime workspace files between deploys while fully cleaning code artifacts.
+  CLEAN_CMD="git clean -ffdx -e storage/workspace/ -e storage/contracts/"
+fi
 
 SSH_CMD="ssh -i $SSH_KEY -o ConnectTimeout=10"
 
@@ -106,7 +115,7 @@ cd $REMOTE_APP
 git config --global --add safe.directory $REMOTE_APP 2>/dev/null || true
 git fetch origin
 git reset --hard origin/$BRANCH
-git clean -ffdx
+$CLEAN_CMD
 EOF
 )
   FULL_CMD="$PULL_CMD

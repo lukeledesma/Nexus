@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # deploy.sh — Push to GitHub (Nexus) and deploy to production server.
-# Usage: ./deploy.sh [--rsync] [--branch BRANCH] [--dry-run]
+# Usage: ./deploy.sh [--rsync] [--branch BRANCH] [--dry-run] [--purge-runtime]
 #
 # Modes:
 #   default  — SSH in, git pull origin main, bundle install, assets:precompile, restart puma
@@ -21,6 +21,7 @@ REMOTE_RUBY="${NEXUS_DEPLOY_RUBY:-/home/$REMOTE_USER/.rbenv/versions/3.2.3/bin}"
 BRANCH="${BRANCH:-main}"
 USE_RSYNC=false
 DRY_RUN=false
+PURGE_RUNTIME=false
 
 # ── Colour helpers ─────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
@@ -37,13 +38,21 @@ while [[ $# -gt 0 ]]; do
     --rsync)     USE_RSYNC=true ;;
     --branch)    shift; BRANCH="$1" ;;
     --dry-run)   DRY_RUN=true ;;
+    --purge-runtime) PURGE_RUNTIME=true ;;
     -h|--help)
-      echo "Usage: $0 [--rsync] [--branch BRANCH] [--dry-run]"
+      echo "Usage: $0 [--rsync] [--branch BRANCH] [--dry-run] [--purge-runtime]"
       exit 0 ;;
     *) die "Unknown option: $1" ;;
   esac
   shift
 done
+
+if [[ "$PURGE_RUNTIME" == true ]]; then
+  CLEAN_CMD="git clean -ffdx"
+else
+  # Keep user/runtime workspace files between deploys while fully cleaning code artifacts.
+  CLEAN_CMD="git clean -ffdx -e storage/workspace/ -e storage/contracts/"
+fi
 
 SSH_CMD="ssh -i $SSH_KEY -o ConnectTimeout=10"
 
@@ -83,7 +92,7 @@ cd $REMOTE_APP
 git config --global --add safe.directory $REMOTE_APP 2>/dev/null || true
 git fetch origin
 git reset --hard origin/$BRANCH
-git clean -fd
+$CLEAN_CMD
 DEPLOY_COMMIT=\$(git rev-parse --short HEAD)
 echo "DEPLOY_COMMIT=\$DEPLOY_COMMIT"
 bundle config set --local without 'development test'
