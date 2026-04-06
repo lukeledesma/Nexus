@@ -44,7 +44,7 @@ class DocumentDiskLoaderTest < ActiveSupport::TestCase
 
   test "purge removes missing folders and files" do
     stale_folder = Document.create!(is_folder: true, title: "Stale Folder", storage_path: "stale-folder")
-    stale_file = Document.create!(is_folder: false, title: "Stale", content_type: "note", content: "x", storage_path: "stale.txt")
+    stale_file = Document.create!(is_folder: false, title: "Stale", content_type: "note", content: "<p>x</p>", storage_path: "stale.rtf")
 
     DocumentDiskLoader.send(:purge_missing_from_database!, [])
 

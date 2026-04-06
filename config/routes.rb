@@ -15,8 +15,6 @@ Rails.application.routes.draw do
     get "user", to: "user#show"
     patch "user/username", to: "user#update_username", as: :user_username
     patch "user/password", to: "user#update_password", as: :user_password
-    get "theme_studio", to: "theme_builder#show"
-    get "theme_builder", to: "theme_builder#show"
     get "singular_note", to: "singular#note"
     patch "singular_note", to: "singular#update_note"
     get "singular_task_list", to: "singular#task_list"

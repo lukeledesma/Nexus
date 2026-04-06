@@ -581,7 +581,8 @@ export default class extends Controller {
     const t = event.target
     if (typeof t.closest !== "function") return
     if (t.closest("#organizer-window")) return
-    if (t.closest("#app-dock")) return
+    /* Dock app clicks/drags are outside the launcher; only the launcher icon may toggle without closing first. */
+    if (t.closest(".app-dock-button--launcher")) return
     this.closeLauncher()
   }
 

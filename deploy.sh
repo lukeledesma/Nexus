@@ -9,11 +9,12 @@
 set -euo pipefail
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-REMOTE_HOST="172.232.163.176"
-REMOTE_USER="luke"
-SSH_KEY="$HOME/.ssh/id_ed25519"
-REMOTE_APP="/home/luke/apps/nexus"
-REMOTE_RUBY="/home/luke/.rbenv/versions/3.2.3/bin"
+# Set NEXUS_DEPLOY_HOST (and optionally NEXUS_DEPLOY_USER, NEXUS_DEPLOY_APP, NEXUS_DEPLOY_RUBY, NEXUS_DEPLOY_SSH_KEY) before running.
+REMOTE_HOST="${NEXUS_DEPLOY_HOST:-}"
+REMOTE_USER="${NEXUS_DEPLOY_USER:-deploy}"
+SSH_KEY="${NEXUS_DEPLOY_SSH_KEY:-$HOME/.ssh/id_ed25519}"
+REMOTE_APP="${NEXUS_DEPLOY_APP:-/home/$REMOTE_USER/apps/nexus}"
+REMOTE_RUBY="${NEXUS_DEPLOY_RUBY:-/home/$REMOTE_USER/.rbenv/versions/3.2.3/bin}"
 BRANCH="${BRANCH:-main}"
 USE_RSYNC=false
 DRY_RUN=false
@@ -27,6 +28,8 @@ info()    { echo -e "${CYAN}[deploy]${NC} $*"; }
 success() { echo -e "${GREEN}[deploy]${NC} $*"; }
 warn()    { echo -e "${YELLOW}[deploy]${NC} $*"; }
 die()     { echo -e "${RED}[deploy] ERROR:${NC} $*" >&2; exit 1; }
+
+[[ -n "$REMOTE_HOST" ]] || die "Set NEXUS_DEPLOY_HOST to your server hostname or IP (see docs/COMMANDS.md)."
 
 # ── Argument parsing ───────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do

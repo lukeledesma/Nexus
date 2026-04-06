@@ -14,6 +14,7 @@ export default class extends Controller {
 
   connect() {
     this.currentUrl = this.buildAppUrl({ blank: false })
+    this.restoreLinkedSingularUrlAndBadge()
     this.isAutoSizedWindow = false
     this.viewportMargin = 6
     this.dockLeftBoundary = 6
@@ -29,7 +30,6 @@ export default class extends Controller {
       "finder": finderLikeMin,
       "settings": finderLikeMin,
       "user": { width: 320, height: 220 },
-      "theme-studio": { width: 520, height: 560 }
     }
     const appMinimum = minByAppKey[this.appKeyValue] || { width: 320, height: 320 }
     this.minWindowWidth = appMinimum.width
@@ -106,6 +106,9 @@ export default class extends Controller {
       url.searchParams.delete("blank")
       this.currentUrl = `${url.pathname}${url.search}`
       this.syncOpenFileBadge(documentTitle)
+      const titled = (documentTitle || "").trim()
+      if (titled) this.persistSingularOpenTitle(titled)
+      else this.clearSingularOpenTitleStorage()
     } else {
       this.currentUrl = this.buildAppUrl({ blank: this.isSingularApp() })
       this.clearOpenFileBadge()
@@ -149,6 +152,69 @@ export default class extends Controller {
 
   clearOpenFileBadge() {
     this.syncOpenFileBadge("")
+    if (this.isSingularApp() && this.hasFrameIdValue) this.clearSingularOpenTitleStorage()
+  }
+
+  singularLinkedDocumentStorageKey() {
+    return this.hasFrameIdValue ? `nexus.singularLinkedDocument.${this.frameIdValue}` : null
+  }
+
+  singularOpenTitleStorageKey() {
+    return this.hasFrameIdValue ? `nexus.singularOpenTitle.${this.frameIdValue}` : null
+  }
+
+  persistSingularOpenTitle(title) {
+    const key = this.singularOpenTitleStorageKey()
+    if (!key) return
+    const t = (title || "").trim()
+    if (!t) return
+    try {
+      window.sessionStorage.setItem(key, t)
+    } catch (_error) {
+      // non-blocking
+    }
+  }
+
+  clearSingularOpenTitleStorage() {
+    const key = this.singularOpenTitleStorageKey()
+    if (!key) return
+    try {
+      window.sessionStorage.removeItem(key)
+    } catch (_error) {
+      // non-blocking
+    }
+  }
+
+  /** After reload, reattach document_id to the iframe URL and title chrome from sessionStorage. */
+  restoreLinkedSingularUrlAndBadge() {
+    if (!this.isSingularApp() || !this.hasFrameIdValue) return
+    const docKey = this.singularLinkedDocumentStorageKey()
+    if (!docKey) return
+    let linkedId = null
+    try {
+      linkedId = window.sessionStorage.getItem(docKey)
+    } catch (_error) {
+      return
+    }
+    if (!linkedId) return
+
+    const url = new URL(this.appUrlValue, window.location.origin)
+    url.searchParams.set("frame_id", this.frameIdValue)
+    url.searchParams.set("document_id", String(linkedId))
+    url.searchParams.delete("blank")
+    this.currentUrl = `${url.pathname}${url.search}`
+
+    const titleKey = this.singularOpenTitleStorageKey()
+    let openTitle = ""
+    if (titleKey) {
+      try {
+        openTitle = window.sessionStorage.getItem(titleKey) || ""
+      } catch (_error) {
+        // ignore
+      }
+    }
+    const t = openTitle.trim()
+    if (t) this.syncOpenFileBadge(t)
   }
 
   onSingularDiskSaved(event) {
@@ -156,6 +222,7 @@ export default class extends Controller {
     if (frameId !== this.frameIdValue) return
     const t = (title || "").trim()
     if (!t) return
+    this.persistSingularOpenTitle(t)
     this.syncOpenFileBadge(t)
   }
 

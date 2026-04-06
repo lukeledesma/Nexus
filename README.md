@@ -2,12 +2,10 @@
 
 Nexus is a Rails application for folder-based notes and task lists with filesystem-aware storage synchronization.
 
-This repository is the local source of truth for development and deployment.
+Documentation:
 
-Primary paths:
-- Local repo: `/Users/luke/Projects/WEBSITE/Nexus_Dev`
-- Command shortcuts: `/Users/luke/Projects/WEBSITE/docs/COMMANDS.md`
-- Deploy scripts: `/Users/luke/Projects/WEBSITE/deploy/`
+- Command shortcuts: `docs/COMMANDS.md`
+- Deploy scripts: `deploy/`
 - Technical docs: `docs/UI_GUIDE.md` and `docs/DEV_GUIDE.md`
 
 ## What Nexus Optimizes For
@@ -44,10 +42,9 @@ bin/rails db:create
 bin/rails db:migrate
 ```
 
-Run server:
+Run server from the repo root:
 
 ```bash
-cd /Users/luke/Projects/WEBSITE/Nexus_Dev
 bin/rails server
 ```
 
@@ -66,20 +63,28 @@ bin/rails test
 ## Environment Variables
 
 Production DB config uses:
+
 - `NEXUS_DATABASE_PASSWORD`
 - `NEXUS_DB_NAME` (default: `alchemy_production` — legacy DB name on server)
 - `NEXUS_DB_USER` (default: `alchemy` — legacy DB user on server)
 
+Deploy scripts (see `docs/COMMANDS.md`):
+
+- `NEXUS_DEPLOY_HOST` (required)
+- `NEXUS_DEPLOY_USER`, `NEXUS_DEPLOY_APP`, `NEXUS_DEPLOY_RUBY`, `NEXUS_DEPLOY_SSH_KEY` (optional)
+
 Rails credentials:
+
 - `RAILS_MASTER_KEY` must match `config/master.key`
 
 ## Operations (Production)
 
-Deploy from the cleaned workflow:
+Deploy:
 
 ```bash
-/Users/luke/Projects/WEBSITE/deploy/deploy_github.sh
-/Users/luke/Projects/WEBSITE/deploy/deploy_server.sh
+./deploy/deploy_github.sh
+export NEXUS_DEPLOY_HOST=your.server.hostname.or.ip
+./deploy/deploy_server.sh
 ```
 
 Health:
@@ -88,15 +93,15 @@ Health:
 sudo systemctl status puma
 sudo systemctl status nginx
 curl -I http://127.0.0.1
-curl -I http://172.232.163.176
+curl -I https://nxs.tools/
 ```
 
-Logs:
+Logs (paths depend on your server layout):
 
 ```bash
 sudo journalctl -u puma -n 120 --no-pager
 sudo tail -n 120 /var/log/nginx/error.log
-tail -n 120 /home/luke/apps/nexus/log/puma.log
+tail -n 120 /path/to/app/log/puma.log
 ```
 
 Assets check:
@@ -107,11 +112,11 @@ echo "$ASSET"
 curl -I "http://127.0.0.1$ASSET"
 ```
 
-If assets are missing:
+If assets are missing (adjust paths and Ruby to your server):
 
 ```bash
-cd /home/luke/apps/nexus
-export PATH="/home/luke/.rbenv/versions/3.2.3/bin:$PATH"
+cd /path/to/app
+export PATH="/path/to/ruby/bin:$PATH"
 SECRET_KEY_BASE_DUMMY=1 RAILS_ENV=production bundle exec rails assets:clobber
 SECRET_KEY_BASE_DUMMY=1 RAILS_ENV=production bundle exec rails assets:precompile
 sudo systemctl restart puma
@@ -141,8 +146,8 @@ sudo systemctl restart puma
 ## Development Standard
 
 When changing behavior:
+
 1. Keep backend and frontend changes cohesive.
 2. Preserve clear failure modes with useful logs.
-3. Update docs and command references in `/Users/luke/Projects/WEBSITE/docs`.
+3. Update docs under `docs/` when commands or deployment assumptions change.
 4. Validate create/edit/delete and asset delivery in production-like mode.
-5. Treat `Nexus_Dev` as the only app root.

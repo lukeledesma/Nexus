@@ -89,7 +89,7 @@ class SingularSaveToDocument
 
   def basename_from_filename(name)
     base = File.basename(name.to_s.strip)
-    base = base.sub(/\.(txt|nexus)\z/i, "")
+    base = base.sub(/\.(txt|nexus|rtf)\z/i, "")
     base.strip.presence
   end
 end

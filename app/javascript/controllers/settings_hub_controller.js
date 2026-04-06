@@ -4,7 +4,7 @@ import { NEXUS_CLICKABLE_ROW_MAIN_CLASS } from "lib/nexus_ui"
 
 export default class extends Controller {
   static targets = ["themesList", "activeThemeLabel"]
-  static values = { workspaceUrl: String }
+  static values = { workspaceUrl: String, settingsUrl: String }
 
   connect() {
     this.defaultShellModel = { hue: 180, saturation: 0, brightness: 15, alpha: 0.15 }
@@ -34,6 +34,8 @@ export default class extends Controller {
     )
     this.serverIsCustomLayout = false
     this.currentLiveAppearance = null
+    this._lastRenderedThemesSignature = null
+    this._lastRenderedCustomLayout = null
 
     this.boundThemeStatus = this.handleThemeStatus.bind(this)
     window.addEventListener("workspace:theme-status", this.boundThemeStatus)
@@ -64,12 +66,17 @@ export default class extends Controller {
     this.selectedThemeId = this.resolveSelectableThemeId(this.selectedThemeId)
     this.refreshActionStatusBadges(false)
 
-    const currentThemesSignature = this.themes.map((t) => `${t.id}:${t.name}:${t.locked ? 1 : 0}`).join("|")
-    const shouldRender =
-      previousActiveThemeId !== this.activeThemeId ||
-      previousThemesSignature !== currentThemesSignature ||
-      previousCustomLayout !== this.serverIsCustomLayout
-    if (shouldRender) this.renderThemesList(false)
+    const currentThemesSignature = this.themesListSignature()
+    const structureChanged =
+      previousThemesSignature !== currentThemesSignature || previousCustomLayout !== this.serverIsCustomLayout
+
+    if (!structureChanged && this.themesListTarget?.children?.length) {
+      this.patchThemesListVisuals()
+      this.refreshActionStatusBadges(false)
+      return
+    }
+
+    this.renderThemesList(false)
   }
 
   async loadPreferences() {
@@ -95,8 +102,59 @@ export default class extends Controller {
     }
   }
 
+  themesListSignature() {
+    return this.themes.map((t) => `${t.id}:${t.name}:${t.locked ? 1 : 0}`).join("|")
+  }
+
+  canPatchThemesListInPlace() {
+    if (!this.hasThemesListTarget || this.themesListTarget.children.length === 0) return false
+    if (this._lastRenderedThemesSignature == null) return false
+    if (this.themesListSignature() !== this._lastRenderedThemesSignature) return false
+    if (Boolean(this.serverIsCustomLayout) !== Boolean(this._lastRenderedCustomLayout)) return false
+    if (this.themesListTarget.querySelector(".settings-themes-item.is-renaming")) return false
+    /* Inline rename/save swaps the label for an input; if we patch without a full rebuild, the stray input stays (e.g. Escape removes .is-renaming first). */
+    if (this.themesListTarget.querySelector(".settings-themes-item-rename-input")) return false
+
+    const unsavedEl = this.themesListTarget.querySelector("[data-unsaved-custom-theme]")
+    if (Boolean(unsavedEl) !== Boolean(this.serverIsCustomLayout)) return false
+
+    const themeRows = this.themesListTarget.querySelectorAll("li[data-settings-theme-id]")
+    return themeRows.length === this.themes.length
+  }
+
+  patchThemesListVisuals() {
+    if (!this.hasThemesListTarget) return
+    this.themesListTarget.querySelectorAll("li[data-settings-theme-id]").forEach((li) => {
+      const id = li.dataset.settingsThemeId
+      const selected = id === this.selectedThemeId && !this.serverIsCustomLayout
+      li.classList.toggle("is-active", selected)
+      li.classList.toggle("is-selected", selected)
+
+      const nameBtn = li.querySelector(".settings-themes-item-btn")
+      if (!nameBtn) return
+      let meta = nameBtn.querySelector(".settings-themes-item-meta")
+      const showActive = id === this.activeThemeId && !this.serverIsCustomLayout
+      if (showActive) {
+        if (!meta) {
+          meta = document.createElement("span")
+          meta.className = "settings-themes-item-meta"
+          meta.textContent = "(Active)"
+          nameBtn.appendChild(meta)
+        }
+      } else if (meta) {
+        meta.remove()
+      }
+    })
+  }
+
   renderThemesList(shouldBroadcast = true) {
     if (!this.hasThemesListTarget) return
+
+    if (this.canPatchThemesListInPlace()) {
+      this.patchThemesListVisuals()
+      this.refreshActionStatusBadges(shouldBroadcast)
+      return
+    }
 
     const sortedThemes = [...this.themes].sort((a, b) => {
       if (a.locked && !b.locked) return -1
@@ -104,14 +162,21 @@ export default class extends Controller {
       return a.name.localeCompare(b.name)
     })
 
+    const scrollSnap = this.captureThemesListScrollParents()
+
     this.themesListTarget.innerHTML = ""
+
+    if (this.serverIsCustomLayout) {
+      this.themesListTarget.appendChild(this.buildUnsavedCustomThemeRow())
+    }
 
     sortedThemes.forEach((theme) => {
       const li = document.createElement("li")
       li.setAttribute("role", "listitem")
+      li.dataset.settingsThemeId = theme.id
       li.className =
         "settings-themes-item finder-file-item organizer-row finder-file-row nexus-standard-row finder-file-row--no-leading-icon"
-      if (theme.id === this.selectedThemeId) {
+      if (theme.id === this.selectedThemeId && !this.serverIsCustomLayout) {
         li.classList.add("is-active", "is-selected")
       }
       if (theme.locked) li.classList.add("is-locked")
@@ -128,13 +193,10 @@ export default class extends Controller {
       nameLabel.textContent = theme.name
       nameBtn.appendChild(nameLabel)
 
-      if (theme.id === this.activeThemeId || theme.locked) {
+      if (theme.id === this.activeThemeId && !this.serverIsCustomLayout) {
         const meta = document.createElement("span")
         meta.className = "settings-themes-item-meta"
-        const labels = []
-        if (theme.locked) labels.push("Default")
-        if (theme.id === this.activeThemeId) labels.push("Active")
-        meta.textContent = `(${labels.join(" • ")})`
+        meta.textContent = "(Active)"
         nameBtn.appendChild(meta)
       }
 
@@ -196,7 +258,224 @@ export default class extends Controller {
       this.themesListTarget.appendChild(li)
     })
 
+    this._lastRenderedThemesSignature = this.themesListSignature()
+    this._lastRenderedCustomLayout = this.serverIsCustomLayout
+
     this.refreshActionStatusBadges(shouldBroadcast)
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => this.restoreThemesListScrollParents(scrollSnap))
+    })
+  }
+
+  /**
+   * Rebuilding the list clears nodes and resets scroll on overflow ancestors.
+   * Snapshot scrollTop/scrollLeft on every scrollable parent so we can restore after render.
+   */
+  captureThemesListScrollParents() {
+    if (!this.hasThemesListTarget) return []
+    const snap = []
+    const seen = new Set()
+    const push = (el) => {
+      if (!el || seen.has(el)) return
+      seen.add(el)
+      snap.push({ el, top: el.scrollTop, left: el.scrollLeft })
+    }
+
+    let node = this.themesListTarget
+    while (node && node !== document.documentElement) {
+      const style = window.getComputedStyle(node)
+      const oy = style.overflowY
+      const ox = style.overflowX
+      const canScrollY =
+        (oy === "auto" || oy === "scroll" || oy === "overlay") &&
+        (node.scrollHeight > node.clientHeight + 1 || node.scrollTop > 0)
+      const canScrollX =
+        (ox === "auto" || ox === "scroll" || ox === "overlay") &&
+        (node.scrollWidth > node.clientWidth + 1 || node.scrollLeft > 0)
+      if (canScrollY || canScrollX) push(node)
+      node = node.parentElement
+    }
+
+    const root = document.scrollingElement
+    if (
+      root &&
+      !seen.has(root) &&
+      (root.scrollHeight > root.clientHeight + 1 ||
+        root.scrollWidth > root.clientWidth + 1 ||
+        root.scrollTop > 0 ||
+        root.scrollLeft > 0)
+    ) {
+      push(root)
+    }
+
+    return snap
+  }
+
+  restoreThemesListScrollParents(snap) {
+    if (!Array.isArray(snap) || snap.length === 0) return
+    for (let i = snap.length - 1; i >= 0; i--) {
+      const { el, top, left } = snap[i]
+      try {
+        if (el && el.isConnected) {
+          el.scrollTop = top
+          el.scrollLeft = left
+        }
+      } catch (_err) {
+        /* non-blocking */
+      }
+    }
+  }
+
+  buildUnsavedCustomThemeRow() {
+    const li = document.createElement("li")
+    li.setAttribute("role", "listitem")
+    li.className =
+      "settings-themes-item settings-themes-unsaved-row finder-file-item organizer-row finder-file-row nexus-standard-row finder-file-row--no-leading-icon"
+    li.dataset.unsavedCustomTheme = "true"
+
+    const left = document.createElement("div")
+    left.className = "organizer-row-left finder-file-row-main nexus-standard-row__main settings-themes-unsaved-row-main"
+
+    const nameBtn = document.createElement("button")
+    nameBtn.type = "button"
+    nameBtn.className = "settings-themes-item-btn"
+
+    const nameLabel = document.createElement("span")
+    nameLabel.className = "finder-file-name"
+    nameLabel.textContent = "Unsaved Theme"
+    nameBtn.appendChild(nameLabel)
+
+    left.appendChild(nameBtn)
+    li.appendChild(left)
+
+    const actionsContainer = document.createElement("div")
+    actionsContainer.className = "organizer-row-right settings-themes-item-actions"
+
+    const saveBtn = document.createElement("button")
+    saveBtn.type = "button"
+    saveBtn.className = "item-action-btn settings-themes-item-unsaved-save-btn"
+    saveBtn.title = "Save As"
+    saveBtn.setAttribute("aria-label", "Save As")
+    saveBtn.innerHTML = materialSymbolSvg("save", "xs")
+    saveBtn.addEventListener("click", (e) => {
+      e.stopPropagation()
+      this.beginUnsavedThemeInlineSave(li)
+    })
+
+    const studioBtn = document.createElement("button")
+    studioBtn.type = "button"
+    studioBtn.className = "item-action-btn settings-themes-item-unsaved-studio-btn"
+    studioBtn.title = "Open Theme Studio"
+    studioBtn.setAttribute("aria-label", "Open Theme Studio")
+    studioBtn.innerHTML = materialSymbolSvg("tune", "xs")
+    studioBtn.addEventListener("click", (e) => {
+      e.stopPropagation()
+      this.openThemeStudio({ beginSave: false })
+    })
+
+    actionsContainer.appendChild(saveBtn)
+    actionsContainer.appendChild(studioBtn)
+    li.appendChild(actionsContainer)
+
+    return li
+  }
+
+  beginUnsavedThemeInlineSave(li) {
+    if (!li || li.dataset.unsavedCustomTheme !== "true" || li.classList.contains("is-renaming")) return
+
+    li.classList.add("is-renaming")
+    const left = li.querySelector(".organizer-row-left")
+    const button = li.querySelector(".settings-themes-item-btn")
+    if (button) button.remove()
+
+    const input = document.createElement("input")
+    input.type = "text"
+    input.className = "settings-themes-item-rename-input"
+    input.placeholder = "Theme name…"
+    input.maxLength = 64
+    input.autocomplete = "off"
+    input.spellcheck = "false"
+    input.setAttribute("aria-label", "New theme name")
+
+    let settled = false
+    const finish = async (submit) => {
+      if (settled) return
+      settled = true
+
+      if (!submit) {
+        li.classList.remove("is-renaming")
+        this.renderThemesList(false)
+        return
+      }
+
+      const name = input.value.trim().slice(0, 64)
+      if (!name) {
+        li.classList.remove("is-renaming")
+        this.renderThemesList(false)
+        return
+      }
+
+      const payload = await this.submitThemeAction({
+        action: "save",
+        name,
+        appearance: this.currentAppearanceSnapshot()
+      })
+      if (!payload) {
+        settled = false
+        li.classList.remove("is-renaming")
+        this.renderThemesList(false)
+        return
+      }
+
+      this.refreshThemesFromPayload(payload)
+      if (payload?.appearance) this.applyAppearanceSnapshot(payload.appearance)
+      li.classList.remove("is-renaming")
+      this.renderThemesList(true)
+    }
+
+    input.addEventListener("blur", () => {
+      finish(true)
+    })
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault()
+        input.blur()
+      }
+      if (e.key === "Escape") {
+        e.preventDefault()
+        finish(false)
+      }
+    })
+
+    if (left) left.appendChild(input)
+    else li.insertBefore(input, li.querySelector(".settings-themes-item-actions"))
+    input.focus()
+  }
+
+  openThemeStudio({ beginSave = false } = {}) {
+    try {
+      if (beginSave) {
+        sessionStorage.setItem("nexus.themeStudio.beginSaveOnShow", "1")
+      } else {
+        sessionStorage.removeItem("nexus.themeStudio.beginSaveOnShow")
+      }
+    } catch (_err) {
+      /* non-blocking */
+    }
+
+    const frame = this.element.closest("turbo-frame")
+    const base = (this.settingsUrlValue || "/apps/settings").toString().trim() || "/apps/settings"
+    const url = new URL(base, window.location.origin)
+    url.searchParams.set("section", "theme_studio")
+    if (frame?.id) url.searchParams.set("frame_id", frame.id)
+
+    if (frame?.tagName === "TURBO-FRAME") {
+      frame.src = `${url.pathname}${url.search}`
+      return
+    }
+
+    window.location.assign(`${url.pathname}${url.search}`)
   }
 
   startInlineRename(li, theme) {
@@ -267,7 +546,7 @@ export default class extends Controller {
   confirmThemeSwitch(themeName) {
     if (!this.serverIsCustomLayout) return true
     return window.confirm(
-      `Apply theme "${themeName}" now? Unsaved custom changes in the studio will be lost unless you save them first.`
+      `Applying theme '${themeName}' will replace your current unsaved theme.`
     )
   }
 
@@ -306,6 +585,9 @@ export default class extends Controller {
   refreshThemesFromPayload(payload) {
     this.themes = Array.isArray(payload?.themes) ? payload.themes : []
     this.activeThemeId = payload?.active_theme_id || this.activeThemeId
+    if (typeof payload?.is_custom_layout === "boolean") {
+      this.serverIsCustomLayout = payload.is_custom_layout
+    }
     if (payload?.appearance) {
       const snapshot = this.normalizedAppearanceSnapshot(payload.appearance)
       this.activeThemeAppearanceSnapshot = snapshot

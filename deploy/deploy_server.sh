@@ -7,11 +7,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOCAL_REPO="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-REMOTE_HOST="172.232.163.176"
-REMOTE_USER="luke"
-SSH_KEY="$HOME/.ssh/id_ed25519"
-REMOTE_APP="/home/luke/apps/nexus"
-REMOTE_RUBY="/home/luke/.rbenv/versions/3.2.3/bin"
+# Set NEXUS_DEPLOY_HOST (and optionally NEXUS_DEPLOY_USER, NEXUS_DEPLOY_APP, NEXUS_DEPLOY_RUBY, NEXUS_DEPLOY_SSH_KEY) before running.
+REMOTE_HOST="${NEXUS_DEPLOY_HOST:-}"
+REMOTE_USER="${NEXUS_DEPLOY_USER:-deploy}"
+SSH_KEY="${NEXUS_DEPLOY_SSH_KEY:-$HOME/.ssh/id_ed25519}"
+REMOTE_APP="${NEXUS_DEPLOY_APP:-/home/$REMOTE_USER/apps/nexus}"
+REMOTE_RUBY="${NEXUS_DEPLOY_RUBY:-/home/$REMOTE_USER/.rbenv/versions/3.2.3/bin}"
 BRANCH="${BRANCH:-main}"
 USE_RSYNC=false
 DRY_RUN=false
@@ -21,6 +22,8 @@ info()    { echo -e "${CYAN}[server]${NC} $*"; }
 success() { echo -e "${GREEN}[server]${NC} $*"; }
 warn()    { echo -e "${YELLOW}[server]${NC} $*"; }
 die()     { echo -e "${RED}[server] ERROR:${NC} $*" >&2; exit 1; }
+
+[[ -n "$REMOTE_HOST" ]] || die "Set NEXUS_DEPLOY_HOST to your server hostname or IP (see docs/COMMANDS.md)."
 
 while [[ $# -gt 0 ]]; do
   case "$1" in

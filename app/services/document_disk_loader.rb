@@ -151,19 +151,22 @@ class DocumentDiskLoader
     end
 
     def supported_file_extension?(path)
-      path.end_with?(".nexus") || path.end_with?(".txt")
+      path.end_with?(".nexus") || path.end_with?(".txt") || path.end_with?(".rtf")
     end
 
     def basename_without_supported_extension(path)
       base = File.basename(path)
       return File.basename(base, ".nexus") if base.end_with?(".nexus")
       return File.basename(base, ".txt") if base.end_with?(".txt")
+      return File.basename(base, ".rtf") if base.end_with?(".rtf")
 
       base
     end
 
     def parse_nexus_file(path)
       text = File.read(path)
+      return parse_note_rtf_file(text) if path.to_s.end_with?(".rtf")
+
       lines = text.split("\n", -1)
       marker = lines.first.to_s.strip
 
@@ -233,6 +236,19 @@ class DocumentDiskLoader
         last_reset_at: nil,
         created_at: parse_time(metadata["created_at"]),
         updated_at: parse_time(metadata["updated_at"])
+      }
+    end
+
+    def parse_note_rtf_file(text)
+      {
+        content_type: "note",
+        content: NoteRtfConverter.rtf_to_html(text),
+        tasks: [],
+        reset_mode: "none",
+        reset_days: [],
+        last_reset_at: nil,
+        created_at: nil,
+        updated_at: nil
       }
     end
 

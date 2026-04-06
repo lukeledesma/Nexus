@@ -31,7 +31,9 @@
           <% end %>
         </ul>
         <% if @folders.empty? %>
-          <p class="finder-folder-list-empty">No folders yet. Use + next to FINDER above.</p>
+          <div class="finder-empty-wrap finder-empty-wrap--folders finder-folder-list-empty">
+            <p class="finder-empty-state">No folders yet.</p>
+          </div>
         <% end %>
       </aside>
 
@@ -86,7 +88,7 @@
           <% end %>
         <% else %>
           <div class="finder-empty-wrap">
-            <p class="finder-empty-state">Use + next to FINDER to create a folder.</p>
+            <p class="finder-empty-state">No folders to select.</p>
           </div>
         <% end %>
       </section>

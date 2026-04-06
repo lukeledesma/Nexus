@@ -11,10 +11,9 @@ This is the primary AI context document for future development sessions.
 
 - **App name**: Nexus
 - **Stack**: Rails 8.1, PostgreSQL, Puma, Nginx, Stimulus JS
-- **Local repo**: `/Users/luke/Projects/WEBSITE/Nexus_Dev`
-- **GitHub**: `https://github.com/lukeledesma/Nexus` (branch: `main`)
-- **Production server**: `luke@172.232.163.176`, app at `/home/luke/apps/nexus`
-- **Ruby**: `3.2.3` (rbenv), path: `/home/luke/.rbenv/versions/3.2.3/bin`
+- **Public site**: `https://nxs.tools/`
+- **Ruby**: `3.2.3` (typical: rbenv under the deploy user on the server)
+- **Deploy**: set `NEXUS_DEPLOY_HOST` and optional variables (see `docs/COMMANDS.md`); do not commit hostnames or SSH identities into the repo
 
 ---
 
@@ -262,16 +261,17 @@ DELETE /logout                  → sessions#destroy
 
 **Step 1 — Push to GitHub:**
 ```bash
-/Users/luke/Projects/WEBSITE/deploy/deploy_github.sh
+./deploy/deploy_github.sh
 ```
 Stages all changes, prompts for commit message, pushes to `main`.
 
 **Step 2 — Deploy to server:**
 ```bash
-/Users/luke/Projects/WEBSITE/deploy/deploy_server.sh
+export NEXUS_DEPLOY_HOST=your.server.hostname.or.ip
+./deploy/deploy_server.sh
 ```
 Does:
-1. SSH to `luke@172.232.163.176`
+1. SSH to `$NEXUS_DEPLOY_USER@$NEXUS_DEPLOY_HOST` (defaults in `deploy/deploy_server.sh`)
 2. `git fetch && git reset --hard origin/main`
 3. `bundle install` (production only)
 4. `SECRET_KEY_BASE_DUMMY=1 RAILS_ENV=production rails assets:precompile`
@@ -281,8 +281,8 @@ Does:
 8. Prints commit, puma status, nginx status.
 
 ### Server State
-- Ruby: rbenv at `/home/luke/.rbenv/versions/3.2.3/bin`
-- App: `/home/luke/apps/nexus`
+- Ruby: typically rbenv under the deploy user (see `NEXUS_DEPLOY_RUBY`)
+- App path: configurable via `NEXUS_DEPLOY_APP`
 - Puma: systemd service `puma.service` with `RAILS_ENV=production`, `RAILS_MASTER_KEY`, `NEXUS_DATABASE_PASSWORD`
 - DB: PostgreSQL, user `alchemy`, database `alchemy_production` (legacy names, still in use)
 - Nginx: `/etc/nginx/sites-enabled/alchemy` → proxies to `127.0.0.1:3000`
@@ -298,11 +298,10 @@ Does:
 ## 10. Local Development
 
 ```bash
-cd /Users/luke/Projects/WEBSITE/Nexus_Dev
 bin/rails server
 ```
 
-App available at `http://localhost:3000`.
+(App available at `http://localhost:3000` — run from the repository root.)
 
 ---
 

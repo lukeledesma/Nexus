@@ -16,17 +16,16 @@ module ApplicationHelper
       { window_key: "singular-task-list", pin_key: "singular-task-list", label: "TASKS", icon: :task_checklist },
       { window_key: "singular-sticky-notes", pin_key: "singular-sticky-notes", label: "STICKY NOTES", icon: :sticky_note },
       { window_key: "finder", pin_key: "finder", label: "FINDER", icon: :folder },
-      { window_key: "settings", pin_key: "settings", label: "SETTINGS", icon: :settings },
-      { window_key: "theme-studio", pin_key: "theme-studio", label: "THEME STUDIO", icon: :tune }
+      { window_key: "settings", pin_key: "settings", label: "SETTINGS", icon: :settings }
     ].freeze
   end
 
-  # Finder / title bar: show names without .txt/.nexus (on-disk type is implicit).
+  # Finder / title bar: show names without .txt/.rtf/.nexus (on-disk type is implicit).
   def finder_document_display_title(title)
     s = title.to_s.strip
     return "Untitled" if s.blank?
 
-    s.sub(/\.(txt|nexus)\z/i, "").strip.presence || "Untitled"
+    s.sub(/\.(txt|nexus|rtf)\z/i, "").strip.presence || "Untitled"
   end
 
   def finder_file_icon_for_content_type(content_type)

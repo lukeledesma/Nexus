@@ -28,15 +28,32 @@
         </ul>
       </aside>
 
-      <section class="finder-shell-pane finder-shell-pane--contents" aria-label="Settings content">
-        <% if @active_settings_section == "user" %>
+      <% if @active_settings_section == "user" %>
+        <section class="finder-shell-pane finder-shell-pane--contents" aria-label="Settings content">
           <%= render "apps/user/panel", frame_id: frame_id %>
-        <% else %>
-          <div class="settings-hub" data-controller="settings-hub" data-settings-hub-workspace-url-value="<%= workspace_preferences_path %>">
+        </section>
+      <% elsif @active_settings_section == "saved_themes" %>
+        <section class="finder-shell-pane finder-shell-pane--contents" aria-label="Saved themes">
+          <div
+            class="settings-hub"
+            data-controller="settings-hub"
+            data-settings-hub-workspace-url-value="<%= workspace_preferences_path %>"
+            data-settings-hub-settings-url-value="<%= apps_settings_path %>"
+          >
             <ul class="finder-file-list settings-themes-list settings-hub-themes-list" role="list" aria-label="Saved themes" data-settings-hub-target="themesList"></ul>
           </div>
-        <% end %>
-      </section>
+        </section>
+      <% else %>
+        <section
+          class="finder-shell-pane finder-shell-pane--contents settings-pane-theme-studio"
+          aria-label="Theme studio"
+          data-theme-builder-chrome-root
+        >
+          <div class="settings-theme-studio-body">
+            <%= render "apps/theme_builder/studio" %>
+          </div>
+        </section>
+      <% end %>
     </div>
   </section>
 </turbo-frame>

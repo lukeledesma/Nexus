@@ -11,8 +11,7 @@ export const PINNABLE_APP_KEYS = new Set([
   "singular-task-list",
   "singular-sticky-notes",
   "finder",
-  "settings",
-  "theme-studio"
+  "settings"
 ])
 
 /** Stable order for dock running-app icons (matches ApplicationHelper#launcher_grid_entries). */
@@ -21,8 +20,7 @@ export const DOCK_APP_KEY_ORDER = [
   "singular-task-list",
   "singular-sticky-notes",
   "finder",
-  "settings",
-  "theme-studio"
+  "settings"
 ]
 
 export function readDockPins() {
@@ -35,12 +33,13 @@ export function readDockPins() {
     const out = []
     for (const k of parsed) {
       if (typeof k !== "string") continue
-      const normalizedKey = k === "theme-builder" ? "theme-studio" : k
+      if (k === "theme-studio" || k === "theme-builder") continue
+      const normalizedKey = k
       if (seen.has(normalizedKey) || !PINNABLE_APP_KEYS.has(normalizedKey)) continue
       seen.add(normalizedKey)
       out.push(normalizedKey)
     }
-    return out
+    return out.length ? out : [...DEFAULT_DOCK_PINS]
   } catch (_) {
     return [...DEFAULT_DOCK_PINS]
   }
@@ -158,6 +157,5 @@ export const DOCK_HOVER_LABELS = {
   "singular-note": "Notepad",
   "singular-task-list": "Tasks",
   "singular-sticky-notes": "Sticky Notes",
-  settings: "Settings",
-  "theme-studio": "Theme Studio"
+  settings: "Settings"
 }

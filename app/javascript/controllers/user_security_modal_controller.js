@@ -101,6 +101,19 @@ export default class extends Controller {
     modal.setAttribute("aria-hidden", "true")
   }
 
+  /** Reads JSON from fetch; non-JSON bodies (e.g. HTML error page) get a usable message for the modal. */
+  async parseJsonResponseBody(response) {
+    const text = await response.text()
+    if (!text?.trim()) return {}
+    try {
+      return JSON.parse(text)
+    } catch {
+      return {
+        message: `Something went wrong (${response.status}). Try refreshing the page, then try again.`
+      }
+    }
+  }
+
   async submitCredentials(event) {
     event.preventDefault()
     if (!this.hasCredentialsFormTarget) return
@@ -118,6 +131,7 @@ export default class extends Controller {
     const csrfToken = document.querySelector("meta[name='csrf-token']")?.content || ""
     const response = await fetch(this.credentialsFormTarget.action, {
       method: "PATCH",
+      credentials: "same-origin",
       headers: {
         Accept: "application/json",
         "X-CSRF-Token": csrfToken
@@ -125,12 +139,7 @@ export default class extends Controller {
       body: new FormData(this.credentialsFormTarget)
     })
 
-    let payload = {}
-    try {
-      payload = await response.json()
-    } catch (_error) {
-      payload = {}
-    }
+    const payload = await this.parseJsonResponseBody(response)
 
     if (response.ok && payload?.ok) {
       this.closeCredentialsModal()
@@ -150,6 +159,7 @@ export default class extends Controller {
     const csrfToken = document.querySelector("meta[name='csrf-token']")?.content || ""
     const response = await fetch(this.usernameFormTarget.action, {
       method: "PATCH",
+      credentials: "same-origin",
       headers: {
         Accept: "application/json",
         "X-CSRF-Token": csrfToken
@@ -157,12 +167,7 @@ export default class extends Controller {
       body: new FormData(this.usernameFormTarget)
     })
 
-    let payload = {}
-    try {
-      payload = await response.json()
-    } catch (_error) {
-      payload = {}
-    }
+    const payload = await this.parseJsonResponseBody(response)
 
     if (response.ok && payload?.ok) {
       this.closeUsernameModal()

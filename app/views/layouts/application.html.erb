@@ -125,51 +125,6 @@
 
       <section class="content-window os-window is-hidden"
         data-controller="content-window"
-        data-content-window-app-key-value="theme-studio"
-        data-content-window-app-url-value="/apps/theme_studio"
-        data-content-window-storage-key-value="nexus.contentWindow.themeStudio.bounds"
-        data-content-window-frame-id-value="theme-studio-pane"
-        aria-live="polite">
-        <header class="content-window-chrome theme-studio-window-chrome">
-          <div class="theme-studio-window-title-shell">
-            <h2 class="content-window-chrome-title">THEME STUDIO</h2>
-            <span class="theme-studio-window-title-separator" aria-hidden="true">|</span>
-            <span class="theme-studio-window-title-subtext" data-theme-studio-chrome="status">Default</span>
-            <input
-              type="text"
-              class="settings-themes-item-rename-input theme-builder-name-input theme-builder-hidden theme-studio-window-title-input"
-              data-theme-studio-chrome="name-input"
-              placeholder="Theme..."
-              autocomplete="off"
-              spellcheck="false"
-              maxlength="64"
-              aria-label="Theme name"
-            >
-            <button
-              type="button"
-              class="settings-themes-item-action-btn settings-themes-item-rename-btn theme-builder-save-btn theme-builder-hidden theme-studio-window-title-save"
-              data-theme-studio-chrome="save"
-              title="Save Theme"
-              aria-label="Save Theme"
-            ><%= material_symbol_icon(:save, size: :sm) %></button>
-          </div>
-          <%= render "shared/content_window_close_button" %>
-        </header>
-        <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="window-content">
-          <turbo-frame id="theme-studio-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
-        </div>
-      </section>
-
-      <section class="content-window os-window is-hidden"
-        data-controller="content-window"
         data-content-window-app-key-value="settings"
         data-content-window-app-url-value="/apps/settings"
         data-content-window-storage-key-value="nexus.contentWindow.settings.bounds"

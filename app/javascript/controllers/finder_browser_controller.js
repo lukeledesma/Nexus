@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
+import { materialSymbolSvg } from "lib/material_symbols"
 
 const CONTENT_TYPE_TO_APP_KEY = {
   note: "singular-note",
@@ -218,32 +219,140 @@ export default class extends Controller {
     this.reloadFrameWithSelection()
   }
 
-  async createFolder(event) {
+  createFolder(event) {
     if (event?.preventDefault) event.preventDefault()
-    const frameId = this.frameIdValue || "app-pane"
-    const response = await fetch("/apps/finder/create_folder", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        "X-Requested-With": "XMLHttpRequest",
-        "X-CSRF-Token": this.csrfToken()
-      },
-      body: JSON.stringify({ frame_id: frameId })
-    })
-    const data = await response.json().catch(() => ({}))
-    if (!response.ok) {
-      window.alert(data.error || "Could not create folder.")
+
+    const list = this.element.querySelector(".finder-folder-list")
+    if (!list) return
+
+    const existingPending = list.querySelector("[data-pending-new-folder='true']")
+    if (existingPending) {
+      const existingInput = existingPending.querySelector(".finder-folder-name-input")
+      existingInput?.focus()
+      existingInput?.select()
       return
     }
-    if (data.redirect_url) {
-      const frame = document.getElementById(frameId)
-      if (frame && frame.tagName === "TURBO-FRAME") {
-        frame.src = data.redirect_url
+
+    const previousActive = list.querySelector(".finder-folder-item.is-active")
+    list.querySelectorAll(".finder-folder-item.is-active").forEach((el) => el.classList.remove("is-active"))
+
+    const emptyMsg = this.element.querySelector(".finder-folder-list-empty")
+    const refreshEmptyMessage = () => {
+      if (!emptyMsg) return
+      const hasReal = list.querySelector(".finder-folder-item:not([data-pending-new-folder])")
+      const hasPending = list.querySelector("[data-pending-new-folder]")
+      emptyMsg.hidden = Boolean(hasReal || hasPending)
+    }
+
+    const li = document.createElement("li")
+    li.className = "finder-folder-item is-active is-pending-new-folder"
+    li.dataset.pendingNewFolder = "true"
+    li.dataset.systemFolder = "false"
+
+    const linkWrap = document.createElement("div")
+    linkWrap.className = "finder-folder-link"
+    linkWrap.setAttribute("role", "group")
+    linkWrap.setAttribute("aria-label", "New folder name")
+
+    const iconSpan = document.createElement("span")
+    iconSpan.className = "finder-folder-icon"
+    iconSpan.setAttribute("aria-hidden", "true")
+    iconSpan.innerHTML = materialSymbolSvg("folder", "md")
+
+    const input = document.createElement("input")
+    input.type = "text"
+    input.className = "finder-folder-name-input"
+    input.maxLength = 255
+    input.setAttribute("aria-label", "Folder name")
+    input.placeholder = ""
+    input.autocomplete = "off"
+    input.spellcheck = false
+
+    linkWrap.appendChild(iconSpan)
+    linkWrap.appendChild(input)
+    li.appendChild(linkWrap)
+
+    refreshEmptyMessage()
+    list.appendChild(li)
+    input.focus()
+
+    let finished = false
+    let submitting = false
+
+    const cancelPending = () => {
+      if (finished) return
+      finished = true
+      li.remove()
+      if (previousActive) previousActive.classList.add("is-active")
+      refreshEmptyMessage()
+    }
+
+    const frameId = this.frameIdValue || "app-pane"
+
+    const submitPending = async () => {
+      if (finished || submitting) return
+      const trimmed = input.value.trim()
+      if (!trimmed) {
+        cancelPending()
         return
       }
-      Turbo.visit(data.redirect_url, { frame: frameId })
+
+      submitting = true
+      try {
+        const response = await fetch("/apps/finder/create_folder", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRF-Token": this.csrfToken()
+          },
+          body: JSON.stringify({ frame_id: frameId, title: trimmed })
+        })
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) {
+          submitting = false
+          window.alert(data.error || "Could not create folder.")
+          input.focus()
+          return
+        }
+
+        finished = true
+        if (data.redirect_url) {
+          const frame = document.getElementById(frameId)
+          if (frame && frame.tagName === "TURBO-FRAME") {
+            frame.src = data.redirect_url
+            return
+          }
+          Turbo.visit(data.redirect_url, { frame: frameId })
+        }
+      } catch (_err) {
+        submitting = false
+        window.alert("Could not create folder.")
+        input.focus()
+      }
     }
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault()
+        void submitPending()
+        return
+      }
+      if (e.key === "Escape") {
+        e.preventDefault()
+        cancelPending()
+      }
+    })
+
+    input.addEventListener("blur", () => {
+      window.requestAnimationFrame(() => {
+        if (finished || submitting || !li.isConnected) return
+        const trimmed = input.value.trim()
+        if (!trimmed) cancelPending()
+        else void submitPending()
+      })
+    })
   }
 
   async renameFolder(event) {

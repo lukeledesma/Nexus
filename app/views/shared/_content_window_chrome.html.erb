@@ -13,32 +13,34 @@
   <% else %>
     <h2 class="content-window-chrome-title"><%= title %></h2>
   <% end %>
-  <% if show_finder_new_folder %>
-    <button
-      type="button"
-      class="content-window-new-folder-btn settings-themes-item-action-btn theme-builder-save-btn"
-      data-action="click->finder-toolbar#createFolder"
-      title="New folder"
-      aria-label="New folder"
-    ><%= material_symbol_icon(:add, size: :xs) %></button>
-  <% end %>
-  <% if show_task_list_add %>
-    <button
-      type="button"
-      class="content-window-new-folder-btn settings-themes-item-action-btn theme-builder-save-btn"
-      data-action="click->content-window#emitTaskListAddTask"
-      title="Add task"
-      aria-label="Add task"
-    ><%= material_symbol_icon(:add, size: :xs) %></button>
-  <% end %>
-  <% if show_save %>
-    <button
-      type="button"
-      class="content-window-save-btn settings-themes-item-action-btn theme-builder-save-btn"
-      data-action="click->content-window#openSaveDialog"
-      title="Save"
-      aria-label="Save"
-    ><%= material_symbol_icon(:save, size: :sm) %></button>
-  <% end %>
-  <%= render "shared/content_window_close_button" %>
+  <div class="content-window-chrome-actions">
+    <% if show_finder_new_folder %>
+      <button
+        type="button"
+        class="content-window-new-folder-btn settings-themes-item-action-btn theme-builder-save-btn"
+        data-action="click->finder-toolbar#createFolder"
+        title="New folder"
+        aria-label="New folder"
+      ><%= material_symbol_icon(:add, size: :xs) %></button>
+    <% end %>
+    <% if show_task_list_add %>
+      <button
+        type="button"
+        class="content-window-new-folder-btn settings-themes-item-action-btn theme-builder-save-btn"
+        data-action="click->content-window#emitTaskListAddTask"
+        title="Add task"
+        aria-label="Add task"
+      ><%= material_symbol_icon(:add, size: :xs) %></button>
+    <% end %>
+    <% if show_save %>
+      <button
+        type="button"
+        class="content-window-save-btn settings-themes-item-action-btn theme-builder-save-btn"
+        data-action="click->content-window#openSaveDialog"
+        title="Save As"
+        aria-label="Save As"
+      ><%= material_symbol_icon(:save, size: :sm) %></button>
+    <% end %>
+    <%= render "shared/content_window_close_button" %>
+  </div>
 </header>

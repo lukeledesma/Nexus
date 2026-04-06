@@ -179,6 +179,9 @@ export default class extends Controller {
 
   async createFolder(event) {
     if (event) event.preventDefault()
+    const name = window.prompt("Folder name:", "")?.trim()
+    if (!name) return
+
     const response = await fetch("/apps/finder/create_folder", {
       method: "POST",
       headers: {
@@ -187,7 +190,7 @@ export default class extends Controller {
         "X-Requested-With": "XMLHttpRequest",
         "X-CSRF-Token": this.csrfToken()
       },
-      body: JSON.stringify({ frame_id: this.frameIdValue })
+      body: JSON.stringify({ frame_id: this.frameIdValue, title: name })
     })
     const data = await response.json().catch(() => ({}))
     if (!response.ok) {

@@ -44,19 +44,30 @@ module Apps
         return render json: { error: "Workspace not ready." }, status: :unprocessable_entity
       end
 
-      folder = Document.new(is_folder: true, parent: parent, title: next_folder_name)
-
-      unless folder.save
+      title = params[:title].to_s.strip
+      if title.blank?
         if request.xhr? || request.format.json?
-          render json: { error: "Could not create folder." }, status: :unprocessable_entity
-          return
+          return render json: { error: "Folder name is required." }, status: :unprocessable_entity
         end
 
-        redirect_to apps_finder_path(frame_params), alert: "Could not create folder."
+        redirect_to apps_finder_path(frame_params), alert: "Folder name is required."
         return
       end
 
-      redirect_path = apps_finder_path(frame_params.merge(folder_id: folder.id, rename_folder_id: folder.id))
+      folder = Document.new(is_folder: true, parent: parent, title: title)
+
+      unless folder.save
+        message = folder.errors.full_messages.presence&.to_sentence || "Could not create folder."
+        if request.xhr? || request.format.json?
+          render json: { error: message }, status: :unprocessable_entity
+          return
+        end
+
+        redirect_to apps_finder_path(frame_params), alert: message
+        return
+      end
+
+      redirect_path = apps_finder_path(frame_params.merge(folder_id: folder.id))
 
       if request.xhr? || request.format.json?
         render json: {
@@ -80,29 +91,6 @@ module Apps
       end
       @selected_folder ||= @folders.first
       @files = @selected_folder ? @selected_folder.children.files.order(Arel.sql("LOWER(title) ASC")) : []
-    end
-
-    def next_folder_name
-      parent = FinderListedFolders.finder_folder_for(current_user)
-      names = parent ? parent.children.folders.pluck(:title).map(&:to_s) : []
-      base = "Untitled Folder"
-      return base unless names.include?(base)
-
-      nums = names
-        .map { |name| name[/^#{Regexp.escape(base)} (\d+)$/, 1]&.to_i }
-        .compact
-        .select { |num| num >= 2 }
-        .uniq
-        .sort
-
-      expected = 2
-      nums.each do |num|
-        return "#{base} #{expected}" if num != expected
-
-        expected += 1
-      end
-
-      "#{base} #{expected}"
     end
 
     def frame_params

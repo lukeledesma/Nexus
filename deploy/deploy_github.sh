@@ -33,7 +33,7 @@ cd "$REPO" || die "Repo not found: $REPO"
 if ! git remote get-url origin &>/dev/null; then
   warn "No git remote 'origin' found."
   echo "To add one, run:"
-  echo "  git remote add origin https://github.com/lukeledesma/Nexus.git"
+  echo "  git remote add origin https://github.com/OWNER/REPO.git"
   exit 1
 fi
 

@@ -1,13 +1,71 @@
-<section class="app-surface app-surface--tool theme-builder-view" data-controller="theme-builder">
+<section
+  class="theme-builder-view"
+  data-controller="theme-builder"
+  data-theme-builder-settings-url-value="<%= apps_settings_path %>"
+>
   <div class="theme-builder-main-shell os-window-body-start">
+  <ul class="finder-file-list settings-themes-list theme-builder-studio-rows" role="list">
 
-  <section class="theme-builder-section is-collapsed">
+  <li
+    class="theme-builder-studio-active settings-themes-item finder-file-item organizer-row finder-file-row nexus-standard-row finder-file-row--no-leading-icon is-selected is-active"
+    data-theme-builder-chrome-row
+    data-theme-studio-active-row
+    role="listitem"
+  >
+    <div class="organizer-row-left finder-file-row-main nexus-standard-row__main theme-builder-chrome-row-main">
+      <button
+        type="button"
+        class="settings-themes-item-btn theme-builder-current-theme-value theme-builder-current-theme-value--readonly"
+        data-theme-studio-chrome="status"
+      >Default</button>
+      <input
+        type="text"
+        class="settings-themes-item-rename-input theme-builder-hidden theme-builder-current-theme-name-input"
+        data-theme-studio-chrome="name-input"
+        placeholder="Theme name…"
+        autocomplete="off"
+        spellcheck="false"
+        maxlength="64"
+        aria-label="New theme name"
+      >
+    </div>
+    <div class="organizer-row-right theme-builder-chrome-row-actions settings-themes-item-actions">
+      <button
+        type="button"
+        class="item-action-btn settings-themes-item-action-btn theme-builder-save-btn theme-builder-hidden settings-theme-studio-save-btn"
+        data-theme-studio-chrome="save"
+        data-action="click->theme-builder#beginSaveCustomTheme"
+        title="Save As"
+        aria-label="Save As"
+      ><%= material_symbol_icon(:save, size: :sm) %></button>
+      <button
+        type="button"
+        class="item-action-btn settings-themes-item-action-btn theme-builder-saved-themes-btn"
+        data-theme-studio-chrome="open-saved-themes"
+        data-action="click->theme-builder#openSavedThemes"
+        title="Open Saved Themes"
+        aria-label="Open Saved Themes"
+      ><%= material_symbol_icon(:palette, size: :sm) %></button>
+      <button
+        type="button"
+        class="item-action-btn settings-themes-item-action-btn theme-builder-rename-btn theme-builder-hidden"
+        data-theme-studio-chrome="rename"
+        data-action="click->theme-builder#beginChromeRename"
+        title="Rename theme"
+        aria-label="Rename theme"
+      ><%= material_symbol_icon(:edit, size: :sm) %></button>
+    </div>
+  </li>
+
+  <li class="theme-builder-section theme-builder-studio-section is-collapsed settings-themes-item finder-file-item finder-file-row nexus-standard-row finder-file-row--no-leading-icon" role="listitem">
     <button
       type="button"
-      class="theme-builder-section-title"
+      class="theme-builder-section-title settings-themes-item-btn"
       data-action="click->theme-builder#toggleSection"
       aria-expanded="false"
-    >SHELL</button>
+    >
+      <span class="finder-file-name">Shell</span>
+    </button>
 
     <div class="theme-builder-section-body">
 
@@ -79,15 +137,17 @@
       <output class="settings-interface-value" data-theme-builder-target="transparencyValue">15%</output>
     </div>
     </div>
-  </section>
+  </li>
 
-  <section class="theme-builder-section is-collapsed">
+  <li class="theme-builder-section theme-builder-studio-section is-collapsed settings-themes-item finder-file-item finder-file-row nexus-standard-row finder-file-row--no-leading-icon" role="listitem">
     <button
       type="button"
-      class="theme-builder-section-title"
+      class="theme-builder-section-title settings-themes-item-btn"
       data-action="click->theme-builder#toggleSection"
       aria-expanded="false"
-    >BACKGROUND</button>
+    >
+      <span class="finder-file-name">Background</span>
+    </button>
 
     <div class="theme-builder-section-body">
 
@@ -210,15 +270,17 @@
       <output class="settings-interface-value" data-theme-builder-target="bgAngleValue">135°</output>
     </div>
     </div>
-  </section>
+  </li>
 
-  <section class="theme-builder-section is-collapsed">
+  <li class="theme-builder-section theme-builder-studio-section is-collapsed settings-themes-item finder-file-item finder-file-row nexus-standard-row finder-file-row--no-leading-icon" role="listitem">
     <button
       type="button"
-      class="theme-builder-section-title"
+      class="theme-builder-section-title settings-themes-item-btn"
       data-action="click->theme-builder#toggleSection"
       aria-expanded="false"
-    >CONTENT</button>
+    >
+      <span class="finder-file-name">Content</span>
+    </button>
 
     <div class="theme-builder-section-body">
 
@@ -291,6 +353,8 @@
     </div>
 
     </div>
-  </section>
+  </li>
+
+  </ul>
   </div>
 </section>

@@ -34,6 +34,10 @@ export default class extends Controller {
     "fontTwoTransparencyValue"
   ]
 
+  static values = {
+    settingsUrl: { type: String, default: "/apps/settings" }
+  }
+
   connect() {
     this.defaultShellModel = {
       hue: 180,
@@ -64,15 +68,31 @@ export default class extends Controller {
     this.isCustomLayout = false
     this.themes = []
     this.activeThemeAppearanceSnapshot = this.buildAppearancePayload(this.defaultShellModel, this.defaultBackgroundModel, this.defaultContentModel)
+    this.chromeRenameMode = false
     this.boundThemeStatus = this.handleThemeStatus.bind(this)
-    this.boundChromeSaveClick = this.beginSaveCustomTheme.bind(this)
-    this.boundChromeNameBlur = this.submitCustomThemeName.bind(this)
+    this.boundChromeNameBlur = this.handleChromeNameBlur.bind(this)
     this.boundChromeNameKeydown = this.handleNameInputKeydown.bind(this)
 
     this.bindChromeControls()
     this.syncSliderThumbColors()
+    this.updateStatusUi()
     this.loadWorkspacePreferences()
+      .then(() => this.maybeOpenSaveFromSessionFlag())
+      .catch(() => {})
     window.addEventListener("workspace:theme-status", this.boundThemeStatus)
+  }
+
+  maybeOpenSaveFromSessionFlag() {
+    try {
+      if (sessionStorage.getItem("nexus.themeStudio.beginSaveOnShow") !== "1") return
+      sessionStorage.removeItem("nexus.themeStudio.beginSaveOnShow")
+      if (!this.isCustomLayout) return
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => this.beginSaveCustomTheme())
+      })
+    } catch (_err) {
+      /* non-blocking */
+    }
   }
 
   disconnect() {
@@ -148,6 +168,7 @@ export default class extends Controller {
   beginSaveCustomTheme(event) {
     if (event) event.preventDefault()
     if (!this.isCustomLayout) return
+    this.chromeRenameMode = false
     const nameInput = this.nameInputElement()
     const statusText = this.statusTextElement()
     const saveButton = this.saveButtonElement()
@@ -158,10 +179,89 @@ export default class extends Controller {
     if (statusText) statusText.classList.add("theme-builder-hidden")
     if (saveButton) saveButton.classList.add("theme-builder-hidden")
     nameInput.focus()
+    this.updateStatusUi()
+  }
+
+  handleChromeNameBlur(event) {
+    if (this.chromeRenameMode) {
+      this.submitChromeRename(event)
+      return
+    }
+    this.submitCustomThemeName(event)
+  }
+
+  beginChromeRename(event) {
+    if (event) event.preventDefault()
+    if (!this.canRenameActiveTheme()) return
+
+    this.chromeRenameMode = true
+    const nameInput = this.nameInputElement()
+    const statusText = this.statusTextElement()
+    if (!nameInput) return
+
+    nameInput.value = (this.activeThemeName || "").trim()
+    nameInput.classList.remove("theme-builder-hidden")
+    if (statusText) statusText.classList.add("theme-builder-hidden")
+    this.updateStatusUi()
+    nameInput.focus()
+    nameInput.select()
+  }
+
+  async submitChromeRename(event) {
+    if (event) event.preventDefault()
+    const nameInput = this.nameInputElement()
+    const statusText = this.statusTextElement()
+    if (!nameInput || !this.chromeRenameMode) return
+
+    const name = nameInput.value.trim().slice(0, 64)
+    const previous = (this.activeThemeName || "").trim()
+    if (!name || name === previous) {
+      this.cancelSaveCustomThemeName()
+      return
+    }
+
+    const payload = await this.submitThemeAction({
+      action: "rename",
+      theme_id: this.activeThemeId,
+      name
+    })
+    if (!payload) {
+      this.cancelSaveCustomThemeName()
+      return
+    }
+
+    this.themes = Array.isArray(payload?.themes) ? payload.themes : this.themes
+    this.activeThemeName = String(payload?.active_theme_name || name).trim()
+    this.activeThemeId = String(payload?.active_theme_id || this.activeThemeId)
+    this.isCustomLayout = Boolean(payload?.is_custom_layout)
+
+    const appliedAppearance = payload?.appearance
+      ? this.normalizedAppearanceSnapshot(payload.appearance)
+      : this.activeThemeAppearanceSnapshot
+
+    if (payload?.appearance) {
+      this.activeThemeAppearanceSnapshot = appliedAppearance
+    }
+
+    nameInput.classList.add("theme-builder-hidden")
+    nameInput.value = ""
+    if (statusText) statusText.classList.remove("theme-builder-hidden")
+    this.chromeRenameMode = false
+    this.updateStatusUi()
+    this.broadcastThemeStatus(appliedAppearance, this.isCustomLayout, true)
+  }
+
+  canRenameActiveTheme() {
+    if (this.isCustomLayout) return false
+    const id = String(this.activeThemeId || "")
+    if (!id || id === "default") return false
+    const row = this.themes.find((t) => t.id === id)
+    return Boolean(row && !row.locked)
   }
 
   async submitCustomThemeName(event) {
     if (event) event.preventDefault()
+    if (this.chromeRenameMode) return
     const nameInput = this.nameInputElement()
     const statusText = this.statusTextElement()
     if (!nameInput) return
@@ -189,13 +289,18 @@ export default class extends Controller {
     nameInput.classList.add("theme-builder-hidden")
     nameInput.value = ""
     if (statusText) statusText.classList.remove("theme-builder-hidden")
+    this.updateStatusUi()
     this.broadcastThemeStatus(appliedAppearance, this.isCustomLayout, true)
   }
 
   handleNameInputKeydown(event) {
     if (event.key === "Enter") {
       event.preventDefault()
-      this.submitCustomThemeName()
+      if (this.chromeRenameMode) {
+        this.submitChromeRename()
+      } else {
+        this.submitCustomThemeName()
+      }
       return
     }
 
@@ -206,6 +311,7 @@ export default class extends Controller {
   }
 
   cancelSaveCustomThemeName() {
+    this.chromeRenameMode = false
     const nameInput = this.nameInputElement()
     const statusText = this.statusTextElement()
     if (!nameInput) return
@@ -471,26 +577,51 @@ export default class extends Controller {
 
   updateStatusUi() {
     const nameInput = this.nameInputElement()
-    const statusText = this.statusTextElement()
+    const statusEl = this.statusTextElement()
     const saveButton = this.saveButtonElement()
+    const activeRow = this.activeThemeRowElement()
 
-    if (!this.isCustomLayout && nameInput) {
+    if (!this.isCustomLayout && nameInput && !this.chromeRenameMode) {
       nameInput.classList.add("theme-builder-hidden")
       nameInput.value = ""
-      if (statusText) statusText.classList.remove("theme-builder-hidden")
+      if (statusEl) statusEl.classList.remove("theme-builder-hidden")
     }
 
-    const statusValue = this.isCustomLayout ? "CUSTOM" : (this.activeThemeName || "Default")
-    if (statusText) statusText.textContent = statusValue
-    if (saveButton) {
-      saveButton.classList.toggle("theme-builder-hidden", !this.isCustomLayout || (nameInput && !nameInput.classList.contains("theme-builder-hidden")))
+    const displayName = this.isCustomLayout
+      ? "Unsaved theme"
+      : (this.activeThemeName || "Default").trim() || "Default"
+
+    if (statusEl) {
+      statusEl.textContent = displayName
+      statusEl.disabled = true
+      statusEl.classList.toggle("theme-builder-current-theme-value--readonly", !this.isCustomLayout)
+    }
+
+    const nameInputVisible = Boolean(nameInput && !nameInput.classList.contains("theme-builder-hidden"))
+    const showSave = Boolean(this.isCustomLayout && !nameInputVisible)
+
+    if (saveButton) saveButton.classList.toggle("theme-builder-hidden", !showSave)
+
+    const renameButton = this.renameButtonElement()
+    if (renameButton) {
+      const showRename = this.canRenameActiveTheme() && !nameInputVisible
+      renameButton.classList.toggle("theme-builder-hidden", !showRename)
+    }
+
+    if (activeRow) {
+      const unsaved = Boolean(this.isCustomLayout)
+      activeRow.classList.toggle("is-unsaved-custom-theme", unsaved)
+      activeRow.classList.toggle("settings-themes-unsaved-row", unsaved)
+      activeRow.classList.toggle("is-renaming", nameInputVisible)
     }
   }
 
+  activeThemeRowElement() {
+    return this.chromeRoot()?.querySelector("[data-theme-studio-active-row]") || null
+  }
+
   bindChromeControls() {
-    const saveButton = this.saveButtonElement()
     const nameInput = this.nameInputElement()
-    if (saveButton) saveButton.addEventListener("click", this.boundChromeSaveClick)
     if (nameInput) {
       nameInput.addEventListener("blur", this.boundChromeNameBlur)
       nameInput.addEventListener("keydown", this.boundChromeNameKeydown)
@@ -498,17 +629,31 @@ export default class extends Controller {
   }
 
   unbindChromeControls() {
-    const saveButton = this.saveButtonElement()
     const nameInput = this.nameInputElement()
-    if (saveButton) saveButton.removeEventListener("click", this.boundChromeSaveClick)
     if (nameInput) {
       nameInput.removeEventListener("blur", this.boundChromeNameBlur)
       nameInput.removeEventListener("keydown", this.boundChromeNameKeydown)
     }
   }
 
+  openSavedThemes(event) {
+    if (event) event.preventDefault()
+    const base = (this.settingsUrlValue || "/apps/settings").toString().trim() || "/apps/settings"
+    const frame = this.element.closest("turbo-frame")
+    const url = new URL(base, window.location.origin)
+    url.searchParams.set("section", "saved_themes")
+    if (frame?.id) url.searchParams.set("frame_id", frame.id)
+
+    if (frame?.tagName === "TURBO-FRAME") {
+      frame.src = `${url.pathname}${url.search}`
+      return
+    }
+
+    window.location.assign(`${url.pathname}${url.search}`)
+  }
+
   chromeRoot() {
-    return this.element.closest(".content-window")
+    return this.element.closest("[data-theme-builder-chrome-root]")
   }
 
   statusTextElement() {
@@ -521,6 +666,10 @@ export default class extends Controller {
 
   saveButtonElement() {
     return this.chromeRoot()?.querySelector("[data-theme-studio-chrome='save']") || null
+  }
+
+  renameButtonElement() {
+    return this.chromeRoot()?.querySelector("[data-theme-studio-chrome='rename']") || null
   }
 
   currentShellModel() {

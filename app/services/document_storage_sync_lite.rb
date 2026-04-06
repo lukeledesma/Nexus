@@ -120,7 +120,7 @@ class DocumentStorageSyncLite
     parent_path = absolute_path_for(parent_relative)
     FileUtils.mkdir_p(parent_path)
 
-    filename = self.class.next_available_filename(parent_path, @document.title)
+    filename = self.class.next_available_filename(parent_path, @document.title, extension: disk_extension_for_file)
     target_relative = File.join(parent_relative, filename)
     target_path = absolute_path_for(target_relative)
 
@@ -162,7 +162,12 @@ class DocumentStorageSyncLite
     parent_path = absolute_path_for(parent_relative)
     FileUtils.mkdir_p(parent_path)
 
-    target_filename = self.class.next_available_filename(parent_path, @document.title, exclude_path: previous_path)
+    target_filename = self.class.next_available_filename(
+      parent_path,
+      @document.title,
+      extension: disk_extension_for_file,
+      exclude_path: previous_path
+    )
     target_relative = File.join(parent_relative, target_filename)
     target_path = absolute_path_for(target_relative)
 
@@ -221,9 +226,14 @@ class DocumentStorageSyncLite
   def strip_supported_extension(filename)
     value = filename.to_s
     return File.basename(value, ".txt") if value.end_with?(".txt")
+    return File.basename(value, ".rtf") if value.end_with?(".rtf")
     return File.basename(value, ".nexus") if value.end_with?(".nexus")
 
     value
+  end
+
+  def disk_extension_for_file
+    @document.content_type.to_s == "note" ? ".rtf" : ".txt"
   end
 
   def item_file_contents
@@ -232,11 +242,14 @@ class DocumentStorageSyncLite
       unified_task_list_contents
     when "stickynotes"
       unified_stickynotes_contents
+    when "note"
+      note_rtf_file_body
     else
       unified_note_contents
     end
   end
 
+  # Legacy plain-text + NEXUS header (only if a non-note type ever used note body format).
   def unified_note_contents
     header = NexusFileFormat.unified_header_lines(
       kind: NexusFileFormat::KIND_NOTE,
@@ -246,6 +259,10 @@ class DocumentStorageSyncLite
       updated_at: @document.updated_at
     )
     (header + [@document.content.to_s]).join("\n")
+  end
+
+  def note_rtf_file_body
+    NoteRtfConverter.html_to_rtf(@document.content.to_s)
   end
 
   def unified_stickynotes_contents

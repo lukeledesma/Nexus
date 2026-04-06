@@ -1,6 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 
-const VALID_SECTIONS = new Set(["saved_themes", "user"])
+const VALID_SECTIONS = new Set(["saved_themes", "theme_studio", "user"])
 
 export default class extends Controller {
   static values = {
