@@ -3,6 +3,32 @@
 This is the canonical command guide for the app repo.  
 Run commands from the repository root (e.g. `cd` into your clone of this project).
 
+## Source repository
+
+- **GitHub:** [github.com/lukeledesma/nxs.tools](https://github.com/lukeledesma/nxs.tools)  
+  Clone: `git clone https://github.com/lukeledesma/nxs.tools.git`
+
+`deploy/deploy_server.sh` reads **`git remote get-url origin` on your laptop** when the server needs to `git clone` (first deploy or missing app dir). Your local clone should use `origin` → this repo.
+
+### Server still tied to the old “Nexus” remote?
+
+If production was cloned from another GitHub URL, point it at **nxs.tools** once (SSH on the server):
+
+```bash
+cd /path/to/your/app    # e.g. the directory that contains bin/rails, config/, …
+git remote -v
+git remote set-url origin https://github.com/lukeledesma/nxs.tools.git
+git fetch origin
+git checkout main
+git reset --hard origin/main
+```
+
+Then run migrations if needed (`bin/rails db:migrate`). After that, `./deploy/deploy_server.sh` from your **updated** local clone will match the same remote.
+
+The on-disk app folder name (e.g. `apps/nexus`) does not have to match the repo name; override with `NEXUS_DEPLOY_APP` if your path differs.
+
+---
+
 ## Most Common 3 Commands
 
 1) Start local app:

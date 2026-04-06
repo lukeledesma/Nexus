@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# deploy.sh — Push local commits to GitHub and deploy to production server.
+# deploy.sh — Push to GitHub (nxs.tools) and deploy to production server.
 # Usage: ./deploy.sh [--rsync] [--branch BRANCH] [--dry-run]
 #
 # Modes:

@@ -2,6 +2,8 @@
 
 Nexus is a Rails application for folder-based notes and task lists with filesystem-aware storage synchronization.
 
+**Source:** [github.com/lukeledesma/nxs.tools](https://github.com/lukeledesma/nxs.tools)
+
 Documentation:
 
 - Command shortcuts: `docs/COMMANDS.md`

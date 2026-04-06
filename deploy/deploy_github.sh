@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# deploy_github.sh — Push local Nexus app changes to GitHub.
+# deploy_github.sh — Push local commits to GitHub (canonical repo: github.com/lukeledesma/nxs.tools).
 # Usage: ./deploy/deploy_github.sh [--message "commit message"] [--no-prompt]
 
 set -euo pipefail
@@ -33,7 +33,7 @@ cd "$REPO" || die "Repo not found: $REPO"
 if ! git remote get-url origin &>/dev/null; then
   warn "No git remote 'origin' found."
   echo "To add one, run:"
-  echo "  git remote add origin https://github.com/OWNER/REPO.git"
+  echo "  git remote add origin https://github.com/lukeledesma/nxs.tools.git"
   exit 1
 fi
 
