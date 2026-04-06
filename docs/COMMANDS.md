@@ -12,10 +12,11 @@ Run commands from the repository root (e.g. `cd` into your clone of this project
 
 ### Server still tied to the old “Nexus” remote?
 
-If production was cloned from another GitHub URL, point it at **nxs.tools** once (SSH on the server):
+If production was cloned from another GitHub URL, point it at **nxs.tools** once (SSH on the server).  
+Use your real app path (the directory that contains `bin/rails` and `config/`), for example `/home/luke/apps/nexus`:
 
 ```bash
-cd /path/to/your/app    # e.g. the directory that contains bin/rails, config/, …
+cd /path/to/your/app
 git remote -v
 git remote set-url origin https://github.com/lukeledesma/nxs.tools.git
 git fetch origin
@@ -23,7 +24,17 @@ git checkout main
 git reset --hard origin/main
 ```
 
-Then run migrations if needed (`bin/rails db:migrate`). After that, `./deploy/deploy_server.sh` from your **updated** local clone will match the same remote.
+Then apply database migrations on the server (run **exactly** this line — do not paste a trailing `# …` comment on the same line, or Rails may error with `Unrecognized command "#"`):
+
+```bash
+export RAILS_ENV=production
+export NEXUS_DATABASE_PASSWORD='your_postgres_password_for_user_alchemy'
+bin/rails db:migrate
+```
+
+Restart Puma after migrations: `sudo systemctl restart puma`
+
+After that, `./deploy/deploy_server.sh` from your **updated** local clone will match the same remote.
 
 The on-disk app folder name (e.g. `apps/nexus`) does not have to match the repo name; override with `NEXUS_DEPLOY_APP` if your path differs.
 
