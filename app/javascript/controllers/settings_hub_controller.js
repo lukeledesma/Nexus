@@ -1,26 +1,27 @@
 import { Controller } from "@hotwired/stimulus"
 import { materialSymbolSvg } from "lib/material_symbols"
 import { NEXUS_CLICKABLE_ROW_MAIN_CLASS } from "lib/nexus_ui"
+import { syncNexusWorkspaceChrome, isNexusClassicUiActive } from "lib/nexus_workspace_chrome"
 
 export default class extends Controller {
   static targets = ["themesList", "activeThemeLabel"]
   static values = { workspaceUrl: String, settingsUrl: String }
 
   connect() {
-    this.defaultShellModel = { hue: 180, saturation: 0, brightness: 15, alpha: 0.15 }
+    this.defaultShellModel = { hue: 200, saturation: 5, brightness: 20, alpha: 0.18 }
     this.defaultBackgroundModel = {
-      colorOneHue: 240,
-      colorOneSaturation: 28,
-      colorOneBrightness: 14,
-      colorTwoHue: 213,
-      colorTwoSaturation: 73,
-      colorTwoBrightness: 22,
-      angle: 135
+      colorOneHue: 210,
+      colorOneSaturation: 18,
+      colorOneBrightness: 16,
+      colorTwoHue: 195,
+      colorTwoSaturation: 25,
+      colorTwoBrightness: 20,
+      angle: 128
     }
     this.defaultContentModel = {
-      fontOne: 89,
+      fontOne: 85,
       fontOneAlpha: 100,
-      fontTwo: 63,
+      fontTwo: 60,
       fontTwoAlpha: 100
     }
 
@@ -97,6 +98,10 @@ export default class extends Controller {
       }
       this.renderThemesList(false)
       this.refreshActionStatusBadges(false)
+      syncNexusWorkspaceChrome({
+        active_theme_id: payload?.active_theme_id,
+        appearance: payload?.appearance
+      })
     } catch (_) {
       /* non-blocking */
     }
@@ -454,6 +459,7 @@ export default class extends Controller {
   }
 
   openThemeStudio({ beginSave = false } = {}) {
+    if (isNexusClassicUiActive()) return
     try {
       if (beginSave) {
         sessionStorage.setItem("nexus.themeStudio.beginSaveOnShow", "1")
@@ -561,6 +567,17 @@ export default class extends Controller {
     if (payload?.appearance) this.applyAppearanceSnapshot(payload.appearance)
     this.serverIsCustomLayout = Boolean(payload?.is_custom_layout)
     this.renderThemesList(true)
+
+    if (payload?.active_theme_id === "classic") {
+      const frame = document.getElementById("settings-pane")
+      const base = (this.settingsUrlValue || "/apps/settings").toString().trim() || "/apps/settings"
+      if (frame?.tagName === "TURBO-FRAME") {
+        const url = new URL(base, window.location.origin)
+        url.searchParams.set("section", "saved_themes")
+        url.searchParams.set("frame_id", "settings-pane")
+        frame.src = `${url.pathname}${url.search}`
+      }
+    }
   }
 
   async submitThemeAction(themePayload) {
@@ -630,6 +647,11 @@ export default class extends Controller {
     this.applyContentToneModel(contentModel)
     this.activeThemeAppearanceSnapshot = this.normalizedAppearanceSnapshot(appearance)
     this.currentLiveAppearance = this.activeThemeAppearanceSnapshot
+
+    syncNexusWorkspaceChrome({
+      active_theme_id: this.activeThemeId,
+      appearance: a
+    })
   }
 
   applyWindowShellModel(model) {

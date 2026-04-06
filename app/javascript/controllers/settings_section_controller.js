@@ -11,12 +11,32 @@ export default class extends Controller {
   }
 
   connect() {
-    const current = this.currentValue.toString().trim()
+    let current = this.currentValue.toString().trim()
     if (!VALID_SECTIONS.has(current)) return
+
+    if (document.documentElement.dataset.nexusTheme === "classic" && current === "theme_studio") {
+      current = "saved_themes"
+      const frameId = this.frameIdValue.toString().trim()
+      const baseUrl = this.baseUrlValue.toString().trim()
+      if (frameId && baseUrl) {
+        const nextUrl = new URL(baseUrl, window.location.origin)
+        nextUrl.searchParams.set("section", "saved_themes")
+        nextUrl.searchParams.set("frame_id", frameId)
+        const frame = document.getElementById(frameId)
+        if (frame && frame.tagName === "TURBO-FRAME") {
+          frame.src = `${nextUrl.pathname}${nextUrl.search}`
+          this.writeStoredSection("saved_themes")
+          return
+        }
+      }
+    }
 
     const stored = this.readStoredSection()
     const explicit = this.explicitValue === true
-    const canRestore = !explicit && stored && VALID_SECTIONS.has(stored) && stored !== current
+    const classicBlocksStudio =
+      document.documentElement.dataset.nexusTheme === "classic" && stored === "theme_studio"
+    const canRestore =
+      !explicit && stored && VALID_SECTIONS.has(stored) && stored !== current && !classicBlocksStudio
 
     if (canRestore) {
       const frameId = this.frameIdValue.toString().trim()

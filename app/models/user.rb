@@ -39,6 +39,7 @@ class User < ApplicationRecord
     root_folder ||= Document.create!(is_folder: true, title: root_name)
 
     ensure_workspace_children!(root_folder)
+    WelcomeWorkspaceSeed.ensure_for_user!(self)
   rescue StandardError => e
     Rails.logger.error("[User] workspace folder provision failed for #{id}: #{e.class}: #{e.message}")
   end

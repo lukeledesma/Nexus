@@ -9,6 +9,19 @@
  * Consider organizing styles into separate files for maintainability.
  */
 
+/* Pix Chicago — Etienne Desclides, 100% Free (DaFont). Used only when Classic UI is active.
+ * size-adjust: bitmap cell is tall vs system UI at the same font-size — scale metrics so glyphs
+ * fit the same rem-based rows/inputs (Launcher label, doc rows, theme names) without shrinking shells. */
+@font-face {
+  font-family: "Pix Chicago";
+  /* Served from /public/fonts so the path works in dev + production (Propshaft does not rewrite this url()). */
+  src: url("/fonts/pixChicago.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+  size-adjust: 77%;
+}
+
 :root {
   --bg: #0f0f12;
   --surface: #1a1a1f;
@@ -3036,7 +3049,7 @@ input.connection-inline {
 }
 
 .app-surface--tool {
-  padding: var(--os-window-padding);
+  padding: 0;
   --app-note-body-font-size: 0.92rem;
 }
 
@@ -3088,9 +3101,9 @@ input.connection-inline {
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  border: 1px solid var(--quill-note-border);
-  border-radius: 10px;
-  background: var(--quill-note-shell-bg);
+  border: none;
+  border-radius: 0;
+  background: transparent;
   overflow: hidden;
 }
 
@@ -3337,17 +3350,6 @@ input.connection-inline {
 
 .app-task-list li.is-done {
   text-decoration: line-through;
-  color: var(--text-muted);
-}
-
-.calculator-shell {
-  display: grid;
-  gap: 0.7rem;
-  max-width: 460px;
-}
-
-.calculator-result {
-  margin: 0;
   color: var(--text-muted);
 }
 
@@ -3633,6 +3635,7 @@ input.connection-inline {
 }
 
 .sticky-notes-workspace {
+  --sticky-notes-edge-gap: 0.75rem;
   display: flex;
   flex: 1;
   min-height: 0;
@@ -3649,15 +3652,18 @@ input.connection-inline {
 }
 
 .sticky-notes-content-shell.app-content-shell {
+  border: none;
+  border-radius: 0;
+  background: transparent;
   padding: 0;
   resize: none;
 }
 
 .sticky-notes-canvas {
   position: absolute;
-  inset: 0;
+  inset: var(--sticky-notes-edge-gap) 0 0 0;
   width: 100%;
-  height: 100%;
+  height: auto;
   min-height: 0;
   z-index: 1;
   pointer-events: auto;
@@ -3782,7 +3788,7 @@ input.connection-inline {
   min-height: 0;
   position: relative;
   overflow: visible;
-  padding: 0;
+  padding: var(--sticky-notes-edge-gap) 0 0;
   background: none;
   border: none;
 }
@@ -4755,6 +4761,30 @@ body.nexus-os:has(#organizer-window:not(.is-hidden)) .app-dock-button[data-hover
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+@keyframes content-window-focus-pulse {
+  0% {
+    outline: 1px solid color-mix(in srgb, var(--border-hairline) 90%, transparent);
+    outline-offset: -1px;
+  }
+  15% {
+    outline: 2px solid color-mix(in srgb, var(--border) 92%, transparent);
+    outline-offset: -2px;
+  }
+  100% {
+    outline: 1px solid color-mix(in srgb, var(--border-hairline) 82%, transparent);
+    outline-offset: -1px;
+  }
+}
+
+.content-window--focus-pulse {
+  animation: content-window-focus-pulse 780ms ease-out forwards;
+}
+
+.content-window--focus-pulse-static {
+  outline: 2px solid color-mix(in srgb, var(--border) 92%, transparent);
+  outline-offset: -2px;
 }
 
 .content-window .window-content {
@@ -7130,4 +7160,469 @@ input.app-save-dialog__btn {
   margin: 0;
   font-size: 0.82rem;
   color: var(--text-muted);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Classic theme — Mac OS–style platinum chrome (data-nexus-theme on <html>)   */
+/* -------------------------------------------------------------------------- */
+:root[data-nexus-theme="classic"] {
+  scroll-behavior: auto;
+  /* Typography scale for Pix Chicago is tuned via @font-face size-adjust (not html font-size), so rem shells stay unchanged. */
+  --nexus-classic-font-stack: "Pix Chicago", "Chicago", "Geneva", system-ui, sans-serif;
+  --nexus-icon-btn-radius: 0px;
+  --os-card-radius: 0px;
+  --os-standard-card-radius: 0px;
+  --bg: #949494;
+  --surface: #d0d0d0;
+  --surface-raised: #e6e6e6;
+  --border: rgba(0, 0, 0, 0.5);
+  --border-hairline: rgba(0, 0, 0, 0.3);
+  --accent: #1a1a1a;
+  --accent-hover: #000000;
+  --success: #2e2e2e;
+  --success-hover: #141414;
+  --scrollbar-thumb: #9e9e9e;
+  --scrollbar-thumb-hover: #858585;
+  --scrollbar-thumb-pane: #b0b0b0;
+  --scrollbar-thumb-pane-hover: #989898;
+}
+
+:root[data-nexus-theme="classic"] [data-settings-section-key="theme_studio"] {
+  display: none !important;
+}
+
+:root[data-nexus-theme="classic"] .settings-themes-item-unsaved-studio-btn {
+  display: none !important;
+}
+
+:root[data-nexus-theme="classic"] .desktop-selection-box {
+  background: transparent !important;
+  border: 1px solid #000000 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+:root[data-nexus-theme="classic"] .nexus-os *,
+:root[data-nexus-theme="classic"] .nexus-os *::before,
+:root[data-nexus-theme="classic"] .nexus-os *::after {
+  border-radius: 0 !important;
+}
+
+:root[data-nexus-theme="classic"] .nexus-os .os-window,
+:root[data-nexus-theme="classic"] .nexus-os .organizer-window,
+:root[data-nexus-theme="classic"] .nexus-os .content-window {
+  border: 1px solid var(--border-hairline);
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.35);
+}
+
+:root[data-nexus-theme="classic"] .content-window--focus-pulse {
+  animation: none !important;
+  outline: 2px solid color-mix(in srgb, var(--border) 92%, transparent);
+  outline-offset: -2px;
+}
+
+:root[data-nexus-theme="classic"] .nexus-os .app-dock-button[data-hover-label]::after {
+  /* Match default themes: label is plain text, no plaque/border (Classic gray dock → light type). */
+  color: rgba(244, 244, 245, 0.96);
+  background: transparent;
+  border: none;
+  padding: 0;
+  transition: none !important;
+}
+
+:root[data-nexus-theme="classic"] .settings-themes-item.settings-themes-unsaved-row .finder-file-name,
+:root[data-nexus-theme="classic"] .settings-themes-item.settings-themes-unsaved-row .theme-builder-current-theme-value {
+  color: #111;
+}
+
+:root[data-nexus-theme="classic"] .settings-themes-item.settings-themes-unsaved-row {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+:root[data-nexus-theme="classic"] .settings-themes-item.settings-themes-unsaved-row:hover,
+:root[data-nexus-theme="classic"] .settings-themes-item.settings-themes-unsaved-row:focus-within {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+:root[data-nexus-theme="classic"] .settings-themes-item.settings-themes-unsaved-row .item-action-btn {
+  color: #111;
+}
+
+:root[data-nexus-theme="classic"] .settings-themes-item.settings-themes-unsaved-row .item-action-btn:hover,
+:root[data-nexus-theme="classic"] .settings-themes-item.settings-themes-unsaved-row .item-action-btn:focus-visible {
+  color: #000000;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+/* Settings user panel — row + icon buttons use rgba(255,255,255,…) and E3E3E3 SVG assets (read as white on Classic). */
+:root[data-nexus-theme="classic"] .settings-user-account-row {
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+:root[data-nexus-theme="classic"] .settings-user-icon-btn {
+  border: 1px solid var(--border-hairline);
+  background: rgba(0, 0, 0, 0.06);
+}
+
+:root[data-nexus-theme="classic"] .settings-user-icon-btn:hover,
+:root[data-nexus-theme="classic"] .settings-user-icon-btn:focus-visible {
+  background: rgba(0, 0, 0, 0.12);
+  border-color: var(--border);
+}
+
+:root[data-nexus-theme="classic"] .settings-user-icon {
+  filter: brightness(0);
+  opacity: 0.92;
+}
+
+/* Saved themes hub — primary/secondary were sky / white glass. */
+:root[data-nexus-theme="classic"] .settings-hub-logout-btn {
+  border: 1px solid var(--border-hairline);
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text);
+}
+
+:root[data-nexus-theme="classic"] .settings-hub-logout-btn:hover,
+:root[data-nexus-theme="classic"] .settings-hub-logout-btn:focus-visible {
+  background: rgba(220, 38, 38, 0.14);
+  border-color: rgba(127, 29, 29, 0.55);
+  color: var(--text);
+}
+
+:root[data-nexus-theme="classic"] .settings-hub-secondary-btn {
+  border: 1px solid var(--border-hairline);
+  color: var(--text-muted);
+}
+
+:root[data-nexus-theme="classic"] .settings-hub-secondary-btn:hover,
+:root[data-nexus-theme="classic"] .settings-hub-secondary-btn:focus-visible {
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.08);
+  border-color: var(--border);
+}
+
+:root[data-nexus-theme="classic"] .settings-hub-primary-btn {
+  border: 1px solid var(--border-hairline);
+  background: rgba(0, 0, 0, 0.1);
+  color: var(--text);
+}
+
+:root[data-nexus-theme="classic"] .settings-hub-primary-btn:hover,
+:root[data-nexus-theme="classic"] .settings-hub-primary-btn:focus-visible {
+  background: rgba(0, 0, 0, 0.16);
+  border-color: var(--border);
+}
+
+:root[data-nexus-theme="classic"] .settings-hub-active-name {
+  color: var(--text);
+}
+
+/* No transitions / keyframe motion in Classic (inline JS may still set styles; timeouts cover edge cases). */
+:root[data-nexus-theme="classic"] body.nexus-os,
+:root[data-nexus-theme="classic"] body.nexus-os * {
+  transition: none !important;
+  animation: none !important;
+  font-family: var(--nexus-classic-font-stack) !important;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: unset;
+  font-synthesis: none;
+}
+
+:root[data-nexus-theme="classic"] .desktop-clock-display {
+  color: #ffffff;
+  opacity: 1;
+}
+
+/* Launcher tiles — active / hover: black chrome (no blue). */
+:root[data-nexus-theme="classic"] .os-window-card:hover,
+:root[data-nexus-theme="classic"] .os-window-card:focus-visible {
+  border-color: #000000;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+:root[data-nexus-theme="classic"] .os-window-card.is-active {
+  border-color: #000000;
+  background: rgba(0, 0, 0, 0.14);
+  color: var(--text);
+}
+
+/* Finder sidebar + folder children — selection without blue tint. */
+:root[data-nexus-theme="classic"] .finder-item.is-folder-selected {
+  background: rgba(0, 0, 0, 0.08);
+  border-color: #000000;
+}
+
+:root[data-nexus-theme="classic"] .finder-item.is-active {
+  background: rgba(0, 0, 0, 0.08);
+  border-color: #000000;
+  color: var(--text);
+}
+
+:root[data-nexus-theme="classic"] .finder-item:not(.is-active):not(.is-folder-selected):hover {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.35);
+}
+
+:root[data-nexus-theme="classic"] .finder-item-kind {
+  color: rgba(0, 0, 0, 0.22);
+}
+
+:root[data-nexus-theme="classic"] .finder-item[data-folder-id].is-folder-selected + .folder-item-panel:not(.hidden) .finder-item-child:not(.is-active):hover {
+  background: rgba(0, 0, 0, 0.06);
+  border-left-color: rgba(0, 0, 0, 0.4);
+  border-right-color: rgba(0, 0, 0, 0.4);
+  border-top-color: rgba(0, 0, 0, 0.4);
+}
+
+:root[data-nexus-theme="classic"] .finder-item[data-folder-id].is-folder-selected + .folder-item-panel:not(.hidden) .finder-item-child:not(.is-active):hover:last-child {
+  border-bottom-color: rgba(0, 0, 0, 0.4);
+}
+
+:root[data-nexus-theme="classic"] .finder-item[data-folder-id].is-folder-selected + .folder-item-panel:not(.hidden) .finder-item-child.is-active {
+  background: rgba(0, 0, 0, 0.1);
+  border-left-color: #000000;
+  border-right-color: #000000;
+  border-top-color: #000000;
+  border-bottom: 1px solid #000000;
+}
+
+:root[data-nexus-theme="classic"] .finder-item[data-folder-id].is-folder-selected + .folder-item-panel:not(.hidden) .finder-item-child.is-active:last-child {
+  border-bottom-color: #000000;
+}
+
+:root[data-nexus-theme="classic"] .finder-file-row.is-selected {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+:root[data-nexus-theme="classic"] .finder-file-row.is-selected .finder-file-name {
+  color: var(--text);
+}
+
+:root[data-nexus-theme="classic"] .finder-file-row.is-selected:hover,
+:root[data-nexus-theme="classic"] .finder-file-row.is-selected:focus-within {
+  background: rgba(0, 0, 0, 0.16);
+}
+
+/* Non-selected rows: default rgba(255,255,255,0.1) is nearly invisible on platinum; ~halfway between that and selected (0.12). */
+:root[data-nexus-theme="classic"] .finder-file-row:not(.is-selected):hover,
+:root[data-nexus-theme="classic"] .finder-file-row:not(.is-selected):focus-within {
+  background: rgba(0, 0, 0, 0.09);
+}
+
+:root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row:not(.task-item-row--checked):hover,
+:root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row:not(.task-item-row--checked):focus-within {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+:root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row.task-item-row--main.task-item-group--head:not(.task-item-row--checked) {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+/* Expanded subtasks: default rgba(255,255,255,0.05) vanishes on platinum — use same mid tint as Finder non-selected hover (0.09). */
+:root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row.task-item-row--subtask:not(.is-collapsed):not(.task-item-row--checked) {
+  background: rgba(0, 0, 0, 0.09);
+}
+
+/* Checked / completion green: default #22c55e tints wash out on light gray — deeper green + higher alpha. */
+:root[data-nexus-theme="classic"] .task-item-row--checked {
+  background: rgba(21, 128, 61, 0.4) !important;
+  border-color: rgba(21, 128, 61, 0.75) !important;
+}
+
+:root[data-nexus-theme="classic"] .task-item-row--checked:hover,
+:root[data-nexus-theme="classic"] .task-item-row--checked:focus-within {
+  background: rgba(21, 128, 61, 0.5) !important;
+  border-color: rgba(21, 128, 61, 0.88) !important;
+}
+
+:root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row.task-item-row--subtask:not(.is-collapsed).task-item-row--checked {
+  background: rgba(21, 128, 61, 0.28) !important;
+}
+
+:root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row.task-item-row--subtask:not(.is-collapsed).task-item-row--checked:hover,
+:root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row.task-item-row--subtask:not(.is-collapsed).task-item-row--checked:focus-within {
+  background: rgba(21, 128, 61, 0.36) !important;
+}
+
+:root[data-nexus-theme="classic"] .task-item-row--checked .task-toggle {
+  color: #166534;
+}
+
+:root[data-nexus-theme="classic"] .task-progress-bar-fill {
+  background: rgba(21, 128, 61, 0.95);
+}
+
+:root[data-nexus-theme="classic"] .task-item-row:has(+ .task-item-row--subtask.task-item-row--checked:not(.is-collapsed)),
+:root[data-nexus-theme="classic"] .task-item-row:has(+ .task-item-row--subtask.task-item-row--checked:not(.is-collapsed):hover),
+:root[data-nexus-theme="classic"] .task-item-row:has(+ .task-item-row--subtask.task-item-row--checked:not(.is-collapsed):focus-within),
+:root[data-nexus-theme="classic"] .task-item-row.task-item-row--checked:has(+ .task-item-row--subtask:not(.task-item-row--checked):hover),
+:root[data-nexus-theme="classic"] .task-item-row.task-item-row--checked:has(+ .task-item-row--subtask:not(.task-item-row--checked):focus-within),
+:root[data-nexus-theme="classic"] .task-item-row--subtask:not(.task-item-row--checked):hover:has(+ .task-item-row--subtask.task-item-row--checked:not(.is-collapsed)),
+:root[data-nexus-theme="classic"] .task-item-row--subtask:not(.task-item-row--checked):focus-within:has(+ .task-item-row--subtask.task-item-row--checked:not(.is-collapsed)) {
+  border-bottom-color: rgba(21, 128, 61, 0.68) !important;
+}
+
+/* Finder split: default rule uses a light hairline (for dark UIs); Classic uses same token as title chrome. */
+:root[data-nexus-theme="classic"] .finder-shell-pane--folders {
+  border-right: 1px solid var(--border-hairline);
+}
+
+/* Finder folder list: no sky-blue active row / icon / rename field (new folder + inline rename). */
+:root[data-nexus-theme="classic"] .finder-folder-item.is-active .finder-folder-link {
+  background: rgba(0, 0, 0, 0.1);
+  color: var(--text);
+}
+
+:root[data-nexus-theme="classic"] .finder-folder-link:hover,
+:root[data-nexus-theme="classic"] .finder-folder-link:focus-visible {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+:root[data-nexus-theme="classic"] .finder-folder-item.is-active .finder-folder-link:hover,
+:root[data-nexus-theme="classic"] .finder-folder-item.is-active .finder-folder-link:focus-visible {
+  background: rgba(0, 0, 0, 0.12);
+  color: var(--text);
+}
+
+:root[data-nexus-theme="classic"] .finder-folder-icon,
+:root[data-nexus-theme="classic"] .finder-file-icon--row {
+  color: #111111;
+}
+
+:root[data-nexus-theme="classic"] .finder-folder-name-input {
+  border: 1px solid var(--border-hairline);
+  background: rgba(255, 255, 255, 0.65);
+}
+
+:root[data-nexus-theme="classic"] .finder-folder-name-input:focus {
+  border-color: #000000;
+  background: #ffffff;
+}
+
+:root[data-nexus-theme="classic"] .finder-file-item.finder-file-row:focus-visible {
+  box-shadow: 0 0 0 2px #000000;
+}
+
+/* Dock: white icons when idle, black when that app/window is toggled open (no green/blue/purple). */
+:root[data-nexus-theme="classic"] .app-dock-button {
+  color: #ffffff;
+}
+
+:root[data-nexus-theme="classic"] .app-dock-button:hover,
+:root[data-nexus-theme="classic"] .app-dock-button:focus-visible {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+
+:root[data-nexus-theme="classic"] .app-dock-button.is-active,
+:root[data-nexus-theme="classic"] .app-dock-button--launcher.is-active,
+:root[data-nexus-theme="classic"] .app-dock-button--dock-app.is-active:not(.app-dock-button--running),
+:root[data-nexus-theme="classic"] .app-dock-button--dock-app.app-dock-button--running.is-active {
+  color: #000000;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+:root[data-nexus-theme="classic"] .app-dock-button.is-active:hover,
+:root[data-nexus-theme="classic"] .app-dock-button.is-active:focus-visible {
+  background: rgba(0, 0, 0, 0.14);
+  color: #000000;
+}
+
+/* Sticky Notes toolbar — dark glyphs on the app canvas (unchanged from prior Classic polish). */
+:root[data-nexus-theme="classic"] .sticky-notes-action-btn {
+  color: #111111;
+}
+
+:root[data-nexus-theme="classic"] .sticky-notes-action-btn:not(.sticky-notes-action-btn--sticky-indicator):hover,
+:root[data-nexus-theme="classic"] .sticky-notes-action-btn:not(.sticky-notes-action-btn--sticky-indicator):focus-visible {
+  background: rgba(0, 0, 0, 0.12);
+  color: #111111;
+}
+
+:root[data-nexus-theme="classic"] .sticky-notes-action-btn--sticky-indicator {
+  background: #5c5c5c;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+:root[data-nexus-theme="classic"] .sticky-notes-action-btn--sticky-indicator:hover,
+:root[data-nexus-theme="classic"] .sticky-notes-action-btn--sticky-indicator:focus-visible {
+  filter: none;
+  box-shadow: inset 0 0 0 1px #000000;
+}
+
+/* Sticky notes: solid fill + same hard shadow as OS windows. */
+:root[data-nexus-theme="classic"] .sticky-notes-sticky {
+  background: hsl(var(--sticky-hue, 45), calc(var(--sticky-saturation, 92) * 1%), calc(var(--sticky-brightness, 68) * 1%));
+  border-color: rgba(0, 0, 0, 0.45);
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.35);
+}
+
+:root[data-nexus-theme="classic"] .sticky-notes-sticky:hover {
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.35);
+}
+
+:root[data-nexus-theme="classic"] .sticky-notes-sticky.is-dragging,
+:root[data-nexus-theme="classic"] .sticky-notes-sticky.is-resizing {
+  opacity: 1;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.35);
+}
+
+:root[data-nexus-theme="classic"] .sticky-notes-sticky-content {
+  color: #1a1a1a;
+}
+
+:root[data-nexus-theme="classic"] .sticky-notes-sticky-delete-btn {
+  color: #1a1a1a;
+}
+
+:root[data-nexus-theme="classic"] .sticky-notes-sticky-delete-btn:hover {
+  color: #000000;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+:root[data-nexus-theme="classic"] .sticky-notes-grid {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+:root[data-nexus-theme="classic"] .sticky-notes-grid-lines line {
+  stroke: rgba(0, 0, 0, 0.15);
+}
+
+/* Chrome + row icon buttons: no light “white” hover wash. */
+:root[data-nexus-theme="classic"] body.nexus-os .item-action-btn,
+:root[data-nexus-theme="classic"] body.nexus-os .row-plus,
+:root[data-nexus-theme="classic"] body.nexus-os .finder-folder-add-btn,
+:root[data-nexus-theme="classic"] body.nexus-os .settings-themes-item-action-btn,
+:root[data-nexus-theme="classic"] body.nexus-os .section-add-btn,
+:root[data-nexus-theme="classic"] body.nexus-os .db-health-back,
+:root[data-nexus-theme="classic"] body.nexus-os .db-health-close,
+:root[data-nexus-theme="classic"] body.nexus-os .settings-back,
+:root[data-nexus-theme="classic"] body.nexus-os .settings-close,
+:root[data-nexus-theme="classic"] body.nexus-os .tools-close-btn {
+  color: #111111;
+}
+
+:root[data-nexus-theme="classic"] body.nexus-os .item-action-btn:hover,
+:root[data-nexus-theme="classic"] body.nexus-os .item-action-btn:focus-visible,
+:root[data-nexus-theme="classic"] body.nexus-os .row-plus:hover,
+:root[data-nexus-theme="classic"] body.nexus-os .row-plus:focus-visible,
+:root[data-nexus-theme="classic"] body.nexus-os .finder-folder-add-btn:hover,
+:root[data-nexus-theme="classic"] body.nexus-os .finder-folder-add-btn:focus-visible,
+:root[data-nexus-theme="classic"] body.nexus-os .settings-themes-item-action-btn:hover,
+:root[data-nexus-theme="classic"] body.nexus-os .settings-themes-item-action-btn:focus-visible,
+:root[data-nexus-theme="classic"] body.nexus-os .section-add-btn:hover,
+:root[data-nexus-theme="classic"] body.nexus-os .section-add-btn:focus-visible,
+:root[data-nexus-theme="classic"] body.nexus-os .db-health-back:hover,
+:root[data-nexus-theme="classic"] body.nexus-os .db-health-back:focus-visible,
+:root[data-nexus-theme="classic"] body.nexus-os .db-health-close:hover,
+:root[data-nexus-theme="classic"] body.nexus-os .db-health-close:focus-visible,
+:root[data-nexus-theme="classic"] body.nexus-os .settings-back:hover,
+:root[data-nexus-theme="classic"] body.nexus-os .settings-back:focus-visible,
+:root[data-nexus-theme="classic"] body.nexus-os .settings-close:hover,
+:root[data-nexus-theme="classic"] body.nexus-os .settings-close:focus-visible,
+:root[data-nexus-theme="classic"] body.nexus-os .tools-close-btn:hover,
+:root[data-nexus-theme="classic"] body.nexus-os .tools-close-btn:focus-visible {
+  color: #000000;
+  background: rgba(0, 0, 0, 0.1);
 }

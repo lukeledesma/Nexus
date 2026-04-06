@@ -40,24 +40,24 @@ export default class extends Controller {
 
   connect() {
     this.defaultShellModel = {
-      hue: 180,
-      saturation: 0,
-      brightness: 15,
-      alpha: 0.15
+      hue: 200,
+      saturation: 5,
+      brightness: 20,
+      alpha: 0.18
     }
     this.defaultBackgroundModel = {
-      colorOneHue: 240,
-      colorOneSaturation: 28,
-      colorOneBrightness: 14,
-      colorTwoHue: 213,
-      colorTwoSaturation: 73,
-      colorTwoBrightness: 22,
-      angle: 135
+      colorOneHue: 210,
+      colorOneSaturation: 18,
+      colorOneBrightness: 16,
+      colorTwoHue: 195,
+      colorTwoSaturation: 25,
+      colorTwoBrightness: 20,
+      angle: 128
     }
     this.defaultContentModel = {
-      fontOne: 89,
+      fontOne: 85,
       fontOneAlpha: 100,
-      fontTwo: 63,
+      fontTwo: 60,
       fontTwoAlpha: 100
     }
 

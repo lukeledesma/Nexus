@@ -12,25 +12,46 @@ class WorkspacePreferencesController < ApplicationController
 
   DEFAULT_THEME_ID = "default"
   DEFAULT_THEME_NAME = "Default"
+  CLASSIC_THEME_ID = "classic"
+  CLASSIC_THEME_NAME = "Classic"
   CUSTOM_THEME_ID = "custom"
   CUSTOM_THEME_NAME = "CUSTOM"
 
   DEFAULT_APPEARANCE = {
-    "hue" => 180,
-    "saturation" => 0,
-    "brightness" => 15,
-    "transparency" => 0.15,
-    "font_1" => 89,
+    "hue" => 200,
+    "saturation" => 5,
+    "brightness" => 20,
+    "transparency" => 0.18,
+    "font_1" => 85,
     "font_1_alpha" => 100,
-    "font_2" => 63,
+    "font_2" => 60,
     "font_2_alpha" => 100,
-    "color_1_hue" => 240,
-    "color_1_saturation" => 28,
-    "color_1_brightness" => 14,
-    "color_2_hue" => 213,
-    "color_2_saturation" => 73,
-    "color_2_brightness" => 22,
-    "angle" => 135
+    "color_1_hue" => 210,
+    "color_1_saturation" => 18,
+    "color_1_brightness" => 16,
+    "color_2_hue" => 195,
+    "color_2_saturation" => 25,
+    "color_2_brightness" => 20,
+    "angle" => 128
+  }.freeze
+
+  # Monochrome preset for Classic UI mode (sharp gray chrome; client overrides with platinum vars).
+  CLASSIC_APPEARANCE = {
+    "hue" => 0,
+    "saturation" => 0,
+    "brightness" => 78,
+    "transparency" => 0.98,
+    "font_1" => 16,
+    "font_1_alpha" => 100,
+    "font_2" => 36,
+    "font_2_alpha" => 100,
+    "color_1_hue" => 0,
+    "color_1_saturation" => 0,
+    "color_1_brightness" => 58,
+    "color_2_hue" => 0,
+    "color_2_saturation" => 0,
+    "color_2_brightness" => 54,
+    "angle" => 180
   }.freeze
 
   def show
@@ -108,7 +129,8 @@ class WorkspacePreferencesController < ApplicationController
 
   def apply_save_theme!(themes, state, payload)
     name = payload["name"].to_s.strip
-    name = next_theme_name(themes) if name.blank? || name.casecmp?(DEFAULT_THEME_NAME) || name.casecmp?(CUSTOM_THEME_NAME)
+    reserved = name.casecmp?(DEFAULT_THEME_NAME) || name.casecmp?(CLASSIC_THEME_NAME) || name.casecmp?(CUSTOM_THEME_NAME)
+    name = next_theme_name(themes) if name.blank? || reserved
 
     appearance_raw = payload["appearance"]
     appearance_hash = appearance_raw.respond_to?(:to_unsafe_h) ? appearance_raw.to_unsafe_h : appearance_raw.to_h
@@ -129,7 +151,7 @@ class WorkspacePreferencesController < ApplicationController
   def apply_rename_theme!(themes, payload)
     theme_id = payload["theme_id"].to_s
     name = payload["name"].to_s.strip.first(64)
-    return if theme_id.blank? || name.blank? || name.casecmp?(DEFAULT_THEME_NAME)
+    return if theme_id.blank? || name.blank? || name.casecmp?(DEFAULT_THEME_NAME) || name.casecmp?(CLASSIC_THEME_NAME)
 
     theme = themes.find { |item| item["id"] == theme_id }
     return if theme.blank? || ActiveModel::Type::Boolean.new.cast(theme["locked"])
@@ -139,14 +161,16 @@ class WorkspacePreferencesController < ApplicationController
 
   def apply_delete_theme!(themes, state, payload)
     theme_id = payload["theme_id"].to_s
-    return if theme_id.blank? || theme_id == DEFAULT_THEME_ID
+    return if theme_id.blank? || theme_id == DEFAULT_THEME_ID || theme_id == CLASSIC_THEME_ID
 
     theme = themes.find { |item| item["id"] == theme_id }
     return if theme.blank? || ActiveModel::Type::Boolean.new.cast(theme["locked"])
 
     themes.reject! { |item| item["id"] == theme_id }
 
-    state["active_theme_id"] = DEFAULT_THEME_ID if state["active_theme_id"] == theme_id
+    if state["active_theme_id"] == theme_id
+      state["active_theme_id"] = DEFAULT_THEME_ID
+    end
   end
 
   def apply_theme_snapshot!(themes, state, payload)
@@ -229,6 +253,15 @@ class WorkspacePreferencesController < ApplicationController
     }
   end
 
+  def classic_theme_snapshot
+    {
+      "id" => CLASSIC_THEME_ID,
+      "name" => CLASSIC_THEME_NAME,
+      "locked" => true,
+      "appearance" => normalize_appearance(CLASSIC_APPEARANCE)
+    }
+  end
+
   def ensure_default_theme(themes)
     list = Array(themes).map { |theme| normalize_theme(theme) }.compact
     default_theme = list.find { |theme| theme["id"] == DEFAULT_THEME_ID }
@@ -239,6 +272,15 @@ class WorkspacePreferencesController < ApplicationController
       default_theme["appearance"] = normalize_appearance(DEFAULT_APPEARANCE)
     else
       list << default_theme_snapshot
+    end
+
+    classic_theme = list.find { |theme| theme["id"] == CLASSIC_THEME_ID }
+    if classic_theme
+      classic_theme["name"] = CLASSIC_THEME_NAME
+      classic_theme["locked"] = true
+      classic_theme["appearance"] = normalize_appearance(CLASSIC_APPEARANCE)
+    else
+      list << classic_theme_snapshot
     end
 
     list.uniq { |theme| theme["id"] }

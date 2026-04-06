@@ -17,7 +17,7 @@
             <% if item[:key] == "user" %>
               <%= render "apps/settings/user_section_row", item: item, frame_id: frame_id, active: active %>
             <% else %>
-              <li class="finder-folder-item<%= " is-active" if active %>">
+              <li class="finder-folder-item<%= " is-active" if active %>" data-settings-section-key="<%= item[:key] %>">
                 <%= link_to apps_settings_path(section: item[:key], frame_id: frame_id), class: "finder-folder-link", aria: { label: "Open #{item[:label]} settings" } do %>
                   <span class="finder-folder-icon" aria-hidden="true"><%= material_symbol_icon(item[:icon], size: :md) %></span>
                   <span class="finder-folder-name"><%= item[:label] %></span>

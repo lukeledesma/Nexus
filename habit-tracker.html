@@ -1,0 +1,1318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Habits — Nexus</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f0f12;
+      --surface: #1a1a1f;
+      --surface-raised: #232329;
+      --surface-hover: #2a2a31;
+      --border: rgba(255,255,255,0.10);
+      --border-hairline: rgba(255,255,255,0.06);
+      --text: hsl(0 0% 89%);
+      --text-muted: hsl(0 0% 52%);
+      --text-faint: hsl(0 0% 34%);
+      --accent: #3b82f6;
+      --accent-dim: rgba(59,130,246,0.15);
+      --accent-hover: #2563eb;
+      --success: #22c55e;
+      --success-dim: rgba(34,197,94,0.12);
+      --warning: #f59e0b;
+      --warning-dim: rgba(245,158,11,0.12);
+      --danger: #ef4444;
+      --radius: 8px;
+      --radius-sm: 5px;
+      --sidebar-w: 220px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
+      height: 100vh;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ─── Sidebar ────────────────────────────────── */
+    .sidebar {
+      width: var(--sidebar-w);
+      min-width: var(--sidebar-w);
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .sidebar-header {
+      padding: 1.1rem 1rem 0.75rem;
+      border-bottom: 1px solid var(--border-hairline);
+    }
+
+    .sidebar-header h1 {
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .sidebar-date {
+      font-size: 0.72rem;
+      color: var(--text-faint);
+      margin-top: 2px;
+    }
+
+    .sidebar-section {
+      padding: 0.6rem 0.6rem 0.2rem;
+    }
+
+    .sidebar-section-label {
+      font-size: 0.66rem;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      padding: 0 0.4rem;
+      margin-bottom: 0.3rem;
+    }
+
+    .sidebar-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      padding: 0.42rem 0.5rem;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      transition: background 0.1s, color 0.1s;
+      user-select: none;
+      border: none;
+      background: none;
+      width: 100%;
+      text-align: left;
+    }
+
+    .nav-item:hover { background: var(--surface-hover); color: var(--text); }
+    .nav-item.active { background: var(--accent-dim); color: var(--accent); }
+
+    .nav-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .nav-streak {
+      margin-left: auto;
+      font-size: 0.65rem;
+      color: var(--text-faint);
+      background: var(--surface-raised);
+      padding: 1px 5px;
+      border-radius: 20px;
+    }
+
+    .nav-item.active .nav-streak { background: var(--accent-dim); color: var(--accent); }
+
+    .sidebar-add-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.4rem 0.9rem;
+      margin: 0.5rem 0.6rem;
+      border-radius: var(--radius-sm);
+      border: 1px dashed var(--border);
+      background: none;
+      color: var(--text-faint);
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: border-color 0.1s, color 0.1s;
+    }
+
+    .sidebar-add-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 0.75rem 1rem;
+      border-top: 1px solid var(--border-hairline);
+    }
+
+    .today-score {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .today-score-label { font-size: 0.72rem; color: var(--text-muted); }
+
+    .today-score-val {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--success);
+    }
+
+    .score-bar {
+      height: 3px;
+      background: var(--surface-raised);
+      border-radius: 4px;
+      margin-top: 0.4rem;
+      overflow: hidden;
+    }
+
+    .score-bar-fill {
+      height: 100%;
+      background: var(--success);
+      border-radius: 4px;
+      transition: width 0.4s ease;
+    }
+
+    /* ─── Main ────────────────────────────────────── */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .top-bar {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.75rem 1.25rem;
+      border-bottom: 1px solid var(--border-hairline);
+      flex-shrink: 0;
+    }
+
+    .top-bar-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .top-bar-subtitle {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .top-bar-actions {
+      margin-left: auto;
+      display: flex;
+      gap: 0.4rem;
+      align-items: center;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.32rem 0.7rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.76rem;
+      font-weight: 500;
+      border: none;
+      cursor: pointer;
+      transition: background 0.1s, color 0.1s;
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+
+    .btn-ghost:hover { background: var(--surface-hover); color: var(--text); }
+
+    .btn-ghost.active {
+      background: var(--accent-dim);
+      border-color: transparent;
+      color: var(--accent);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .btn-primary:hover { background: var(--accent-hover); }
+
+    .range-toggle {
+      display: flex;
+      gap: 2px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 2px;
+    }
+
+    .range-btn {
+      padding: 0.2rem 0.55rem;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-weight: 500;
+      border: none;
+      background: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: background 0.1s, color 0.1s;
+    }
+
+    .range-btn.active { background: var(--surface-raised); color: var(--text); }
+
+    /* ─── Content ─────────────────────────────────── */
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.1rem;
+    }
+
+    /* scrollbar */
+    .content::-webkit-scrollbar { width: 6px; }
+    .content::-webkit-scrollbar-track { background: transparent; }
+    .content::-webkit-scrollbar-thumb { background: var(--surface-raised); border-radius: 4px; }
+
+    /* ─── Today check-in grid ───────────────────── */
+    .section-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: 0.55rem;
+    }
+
+    .checkin-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 0.6rem;
+    }
+
+    .habit-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.75rem 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      transition: border-color 0.15s;
+      cursor: default;
+    }
+
+    .habit-card:hover { border-color: rgba(255,255,255,0.18); }
+    .habit-card.logged { border-color: rgba(34,197,94,0.3); }
+
+    .habit-card-top {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .habit-icon {
+      width: 28px; height: 28px;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .habit-name { font-size: 0.8rem; font-weight: 500; flex: 1; }
+    .habit-unit { font-size: 0.68rem; color: var(--text-faint); }
+
+    .habit-input-row {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .habit-input {
+      flex: 1;
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0.3rem 0.5rem;
+      color: var(--text);
+      font-size: 0.82rem;
+      font-family: inherit;
+      transition: border-color 0.1s;
+      outline: none;
+    }
+
+    .habit-input:focus { border-color: var(--accent); }
+
+    .log-btn {
+      padding: 0.3rem 0.55rem;
+      border-radius: var(--radius-sm);
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 0.72rem;
+      cursor: pointer;
+      transition: background 0.1s, border-color 0.1s, color 0.1s;
+      white-space: nowrap;
+    }
+
+    .log-btn:hover { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+    .log-btn.logged-state { background: var(--success-dim); border-color: rgba(34,197,94,0.3); color: var(--success); }
+
+    .habit-streak {
+      font-size: 0.68rem;
+      color: var(--text-faint);
+    }
+
+    .habit-streak span { color: var(--warning); font-weight: 600; }
+
+    /* boolean habit */
+    .bool-toggle {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 34px; height: 18px;
+      flex-shrink: 0;
+    }
+
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+
+    .toggle-slider {
+      position: absolute; inset: 0;
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .toggle-slider::before {
+      content: "";
+      position: absolute;
+      left: 2px; top: 50%;
+      transform: translateY(-50%);
+      width: 12px; height: 12px;
+      background: var(--text-faint);
+      border-radius: 50%;
+      transition: transform 0.2s, background 0.2s;
+    }
+
+    .toggle-switch input:checked + .toggle-slider {
+      background: var(--success-dim);
+      border-color: rgba(34,197,94,0.4);
+    }
+
+    .toggle-switch input:checked + .toggle-slider::before {
+      transform: translateY(-50%) translateX(16px);
+      background: var(--success);
+    }
+
+    .toggle-label { font-size: 0.75rem; color: var(--text-muted); }
+
+    /* scale habit */
+    .scale-row {
+      display: flex;
+      gap: 4px;
+    }
+
+    .scale-dot {
+      flex: 1;
+      height: 20px;
+      border-radius: 3px;
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.1s, border-color 0.1s;
+    }
+
+    /* ─── Chart section ──────────────────────────── */
+    .chart-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 0.75rem;
+    }
+
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.9rem 1rem;
+    }
+
+    .chart-card-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.8rem;
+    }
+
+    .chart-card-icon {
+      width: 22px; height: 22px;
+      border-radius: 5px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+
+    .chart-card-title { font-size: 0.8rem; font-weight: 600; flex: 1; }
+
+    .chart-card-avg {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+
+    .chart-card-avg strong { color: var(--text); font-weight: 600; }
+
+    .chart-wrap {
+      height: 100px;
+      position: relative;
+    }
+
+    /* ─── Heatmap section ─────────────────────────── */
+    .heatmap-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.9rem 1rem;
+    }
+
+    .heatmap-grid {
+      display: flex;
+      gap: 3px;
+      flex-wrap: wrap;
+      margin-top: 0.6rem;
+    }
+
+    .heatmap-cell {
+      width: 12px; height: 12px;
+      border-radius: 2px;
+      cursor: default;
+      transition: opacity 0.1s;
+    }
+
+    .heatmap-cell:hover { opacity: 0.8; }
+
+    /* ─── Stats row ────────────────────────────────── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 0.6rem;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.7rem 0.85rem;
+    }
+
+    .stat-label { font-size: 0.68rem; color: var(--text-faint); margin-bottom: 0.2rem; }
+    .stat-val { font-size: 1.3rem; font-weight: 700; line-height: 1.2; }
+    .stat-sub { font-size: 0.66rem; color: var(--text-muted); margin-top: 1px; }
+
+    /* ─── Modal ────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000;
+      backdrop-filter: blur(2px);
+    }
+
+    .modal-overlay.hidden { display: none; }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      width: 360px;
+      display: flex;
+      flex-direction: column;
+      gap: 0.9rem;
+    }
+
+    .modal-title { font-size: 0.9rem; font-weight: 600; }
+
+    .field { display: flex; flex-direction: column; gap: 0.3rem; }
+    .field label { font-size: 0.72rem; color: var(--text-muted); }
+
+    .field input, .field select {
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0.4rem 0.6rem;
+      color: var(--text);
+      font-size: 0.82rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.1s;
+    }
+
+    .field input:focus, .field select:focus { border-color: var(--accent); }
+    .field select option { background: var(--surface-raised); }
+
+    .emoji-picker {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .emoji-opt {
+      width: 32px; height: 32px;
+      border-radius: 6px;
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      font-size: 16px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color 0.1s, background 0.1s;
+    }
+
+    .emoji-opt:hover { background: var(--surface-hover); }
+    .emoji-opt.selected { border-color: var(--accent); background: var(--accent-dim); }
+
+    .color-picker {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .color-opt {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: border-color 0.1s, transform 0.1s;
+    }
+
+    .color-opt:hover { transform: scale(1.15); }
+    .color-opt.selected { border-color: var(--text); }
+
+    .modal-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
+
+    /* ─── Empty state ──────────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--text-faint);
+    }
+
+    .empty-state-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+    .empty-state p { font-size: 0.8rem; }
+
+    /* ─── Tooltip ──────────────────────────────────── */
+    [data-tip] { position: relative; }
+    [data-tip]:hover::after {
+      content: attr(data-tip);
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%; transform: translateX(-50%);
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 0.68rem;
+      padding: 3px 7px;
+      border-radius: 4px;
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 99;
+    }
+  </style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <h1>Habits</h1>
+    <div class="sidebar-date" id="today-date"></div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Overview</div>
+    <nav class="sidebar-nav">
+      <button class="nav-item active" onclick="switchView('today', this)">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="12" height="12" rx="2" opacity=".3"/><path d="M5 8h6M5 10.5h4"/></svg>
+        Today
+      </button>
+      <button class="nav-item" onclick="switchView('trends', this)">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M2 12 L5 8 L8 9 L11 5 L14 7" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Trends
+      </button>
+      <button class="nav-item" onclick="switchView('heatmap', this)">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="5" height="5" rx="1" opacity=".9"/><rect x="9" y="2" width="5" height="5" rx="1" opacity=".5"/><rect x="2" y="9" width="5" height="5" rx="1" opacity=".6"/><rect x="9" y="9" width="5" height="5" rx="1" opacity=".8"/></svg>
+        Heatmap
+      </button>
+    </nav>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Habits</div>
+    <nav class="sidebar-nav" id="habit-nav"></nav>
+  </div>
+
+  <button class="sidebar-add-btn" onclick="openModal()">
+    <svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor"><path d="M6 1v10M1 6h10"/></svg>
+    New habit
+  </button>
+
+  <div class="sidebar-footer">
+    <div class="today-score">
+      <span class="today-score-label">Today's completion</span>
+      <span class="today-score-val" id="completion-pct">0%</span>
+    </div>
+    <div class="score-bar">
+      <div class="score-bar-fill" id="score-bar-fill" style="width:0%"></div>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <div class="top-bar">
+    <div>
+      <div class="top-bar-title" id="view-title">Today</div>
+      <div class="top-bar-subtitle" id="view-subtitle">Log your habits</div>
+    </div>
+    <div class="top-bar-actions">
+      <div class="range-toggle" id="range-toggle" style="display:none">
+        <button class="range-btn active" onclick="setRange(7, this)">7d</button>
+        <button class="range-btn" onclick="setRange(30, this)">30d</button>
+        <button class="range-btn" onclick="setRange(90, this)">90d</button>
+      </div>
+      <button class="btn btn-primary" onclick="openModal()">
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor"><path d="M6 1v10M1 6h10"/></svg>
+        Add habit
+      </button>
+    </div>
+  </div>
+
+  <div class="content" id="content"></div>
+</main>
+
+<!-- ADD HABIT MODAL -->
+<div class="modal-overlay hidden" id="modal-overlay">
+  <div class="modal">
+    <div class="modal-title">New habit</div>
+
+    <div class="field">
+      <label>Name</label>
+      <input type="text" id="m-name" placeholder="e.g. Morning run" />
+    </div>
+
+    <div class="field">
+      <label>Icon</label>
+      <div class="emoji-picker" id="emoji-picker"></div>
+    </div>
+
+    <div class="field">
+      <label>Color</label>
+      <div class="color-picker" id="color-picker"></div>
+    </div>
+
+    <div class="field">
+      <label>Type</label>
+      <select id="m-type">
+        <option value="boolean">Done / Not done</option>
+        <option value="number">Number (e.g. steps, oz)</option>
+        <option value="scale">Scale 1–5</option>
+      </select>
+    </div>
+
+    <div class="field" id="m-unit-field">
+      <label>Unit label</label>
+      <input type="text" id="m-unit" placeholder="e.g. minutes, glasses" />
+    </div>
+
+    <div class="field">
+      <label>Category</label>
+      <select id="m-cat">
+        <option value="health">Health & Fitness</option>
+        <option value="mood">Mood & Energy</option>
+        <option value="productivity">Productivity</option>
+        <option value="custom">Custom</option>
+      </select>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveHabit()">Add habit</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────────
+
+const COLORS = {
+  health:      { bg: 'rgba(34,197,94,0.15)',  border: 'rgba(34,197,94,0.25)',  text: '#22c55e', chart: '#22c55e' },
+  mood:        { bg: 'rgba(168,85,247,0.15)', border: 'rgba(168,85,247,0.25)', text: '#a855f7', chart: '#a855f7' },
+  productivity:{ bg: 'rgba(59,130,246,0.15)', border: 'rgba(59,130,246,0.25)', text: '#3b82f6', chart: '#3b82f6' },
+  custom:      { bg: 'rgba(245,158,11,0.15)', border: 'rgba(245,158,11,0.25)', text: '#f59e0b', chart: '#f59e0b' },
+};
+
+const PALETTE = ['#3b82f6','#22c55e','#a855f7','#f59e0b','#ef4444','#06b6d4','#ec4899','#84cc16'];
+
+const EMOJIS = ['🏃','💪','💧','🥗','😴','🧘','📚','💻','✍️','🎯','🌞','❤️','🧠','🏋️','🚴','🎸','🎨','🌱','⚡','🔥'];
+
+let habits = JSON.parse(localStorage.getItem('nx_habits') || 'null') || [
+  { id: 1, name: 'Exercise', icon: '🏃', color: '#22c55e', category: 'health', type: 'boolean', unit: '' },
+  { id: 2, name: 'Water', icon: '💧', color: '#3b82f6', category: 'health', type: 'number', unit: 'glasses' },
+  { id: 3, name: 'Mood', icon: '🌞', color: '#f59e0b', category: 'mood', type: 'scale', unit: '' },
+  { id: 4, name: 'Deep Work', icon: '💻', color: '#a855f7', category: 'productivity', type: 'number', unit: 'hours' },
+];
+
+let logs = JSON.parse(localStorage.getItem('nx_logs') || '{}');
+// logs[habitId][dateStr] = value
+
+let selectedHabit = null;
+let currentView = 'today';
+let chartRange = 7;
+let selectedEmoji = EMOJIS[0];
+let selectedColor = PALETTE[0];
+let nextId = habits.length ? Math.max(...habits.map(h=>h.id)) + 1 : 1;
+
+const chartInstances = {};
+
+// ─── Date helpers ─────────────────────────────────────────────────────────────
+
+function todayStr() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function dateStr(d) {
+  return d.toISOString().split('T')[0];
+}
+
+function pastDates(n) {
+  const arr = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    arr.push(dateStr(d));
+  }
+  return arr;
+}
+
+function formatDateShort(str) {
+  const [y,m,d] = str.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[+m-1]} ${+d}`;
+}
+
+function getStreak(habitId) {
+  let streak = 0;
+  const today = new Date();
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const ds = dateStr(d);
+    const val = (logs[habitId] || {})[ds];
+    if (val !== undefined && val !== null && val !== 0 && val !== false) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
+// ─── Save ─────────────────────────────────────────────────────────────────────
+
+function save() {
+  localStorage.setItem('nx_habits', JSON.stringify(habits));
+  localStorage.setItem('nx_logs', JSON.stringify(logs));
+}
+
+// ─── Log value ────────────────────────────────────────────────────────────────
+
+function logHabit(habitId, value) {
+  if (!logs[habitId]) logs[habitId] = {};
+  logs[habitId][todayStr()] = value;
+  save();
+  updateSidebarNav();
+  updateCompletionScore();
+  if (currentView === 'today') renderTodayView();
+  else if (currentView === 'trends') renderTrendsView();
+}
+
+// ─── Completion ───────────────────────────────────────────────────────────────
+
+function todayCompletion() {
+  if (!habits.length) return 0;
+  let done = 0;
+  habits.forEach(h => {
+    const val = (logs[h.id] || {})[todayStr()];
+    if (val !== undefined && val !== null && val !== 0 && val !== false) done++;
+  });
+  return Math.round((done / habits.length) * 100);
+}
+
+function updateCompletionScore() {
+  const pct = todayCompletion();
+  document.getElementById('completion-pct').textContent = pct + '%';
+  document.getElementById('score-bar-fill').style.width = pct + '%';
+}
+
+// ─── Sidebar nav ──────────────────────────────────────────────────────────────
+
+function updateSidebarNav() {
+  const nav = document.getElementById('habit-nav');
+  nav.innerHTML = '';
+  habits.forEach(h => {
+    const streak = getStreak(h.id);
+    const todayLogged = (() => {
+      const val = (logs[h.id] || {})[todayStr()];
+      return val !== undefined && val !== null && val !== 0 && val !== false;
+    })();
+    const btn = document.createElement('button');
+    btn.className = 'nav-item' + (selectedHabit === h.id ? ' active' : '');
+    btn.innerHTML = `
+      <span class="nav-dot" style="background:${h.color}"></span>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h.name}</span>
+      ${streak > 0 ? `<span class="nav-streak">${streak}🔥</span>` : ''}
+    `;
+    btn.onclick = () => { selectedHabit = h.id; renderContent(); };
+    nav.appendChild(btn);
+  });
+}
+
+// ─── Views ────────────────────────────────────────────────────────────────────
+
+function switchView(view, el) {
+  document.querySelectorAll('.sidebar .nav-item').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  currentView = view;
+  selectedHabit = null;
+  renderContent();
+}
+
+function setRange(n, el) {
+  chartRange = n;
+  document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  renderTrendsView();
+}
+
+function renderContent() {
+  const titles = { today: 'Today', trends: 'Trends', heatmap: 'Year at a Glance' };
+  const subs = { today: 'Log your habits for ' + new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}), trends: 'Track your progress over time', heatmap: 'Your consistency this year' };
+  document.getElementById('view-title').textContent = titles[currentView] || 'Habits';
+  document.getElementById('view-subtitle').textContent = subs[currentView] || '';
+  document.getElementById('range-toggle').style.display = currentView === 'trends' ? 'flex' : 'none';
+
+  if (currentView === 'today') renderTodayView();
+  else if (currentView === 'trends') renderTrendsView();
+  else if (currentView === 'heatmap') renderHeatmapView();
+}
+
+// ─── Today ────────────────────────────────────────────────────────────────────
+
+function renderTodayView() {
+  const el = document.getElementById('content');
+
+  // Stats row
+  const pct = todayCompletion();
+  let bestStreak = 0;
+  habits.forEach(h => { const s = getStreak(h.id); if (s > bestStreak) bestStreak = s; });
+
+  let html = `
+    <div>
+      <div class="section-label">Overview</div>
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-label">Completion</div>
+          <div class="stat-val" style="color:var(--success)">${pct}%</div>
+          <div class="stat-sub">${habits.filter(h => {const v=(logs[h.id]||{})[todayStr()]; return v!==undefined&&v!==null&&v!==0&&v!==false}).length} / ${habits.length} habits</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Best streak</div>
+          <div class="stat-val" style="color:var(--warning)">${bestStreak}</div>
+          <div class="stat-sub">days in a row</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total habits</div>
+          <div class="stat-val">${habits.length}</div>
+          <div class="stat-sub">being tracked</div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="section-label">Log today</div>
+      ${habits.length ? '<div class="checkin-grid" id="checkin-grid"></div>' : '<div class="empty-state"><div class="empty-state-icon">✨</div><p>No habits yet. Add one to get started.</p></div>'}
+    </div>
+  `;
+
+  el.innerHTML = html;
+
+  // Render habit cards
+  if (habits.length) {
+    const grid = document.getElementById('checkin-grid');
+    habits.forEach(h => {
+      const col = COLORS[h.category] || COLORS.custom;
+      const todayVal = (logs[h.id] || {})[todayStr()];
+      const isLogged = todayVal !== undefined && todayVal !== null && todayVal !== 0 && todayVal !== false;
+      const streak = getStreak(h.id);
+
+      const card = document.createElement('div');
+      card.className = 'habit-card' + (isLogged ? ' logged' : '');
+      card.id = 'card-' + h.id;
+
+      let inputHtml = '';
+
+      if (h.type === 'boolean') {
+        const checked = isLogged ? 'checked' : '';
+        inputHtml = `
+          <div class="bool-toggle">
+            <label class="toggle-switch">
+              <input type="checkbox" ${checked} onchange="logHabit(${h.id}, this.checked ? 1 : 0)" />
+              <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label">${isLogged ? 'Done today ✓' : 'Mark done'}</span>
+          </div>
+        `;
+      } else if (h.type === 'number') {
+        inputHtml = `
+          <div class="habit-input-row">
+            <input class="habit-input" type="number" min="0" placeholder="0"
+              value="${isLogged ? todayVal : ''}"
+              onchange="logHabit(${h.id}, parseFloat(this.value)||0)"
+              id="input-${h.id}" />
+            <button class="log-btn ${isLogged ? 'logged-state' : ''}" onclick="logHabit(${h.id}, parseFloat(document.getElementById('input-${h.id}').value)||1)">
+              ${isLogged ? '✓ Logged' : 'Log'}
+            </button>
+          </div>
+        `;
+      } else if (h.type === 'scale') {
+        const cur = todayVal || 0;
+        const dots = [1,2,3,4,5].map(n => {
+          const ratio = n / 5;
+          const r = Math.round(59 + (245-59)*ratio);
+          const g = Math.round(130 + (158-130)*(1-ratio) + (197-130)*ratio);
+          const b = Math.round(246 * (1-ratio) + 11*ratio);
+          const active = n <= cur;
+          const bg = active ? `rgb(${r},${g},${b})` : 'var(--surface-raised)';
+          return `<div class="scale-dot" style="background:${bg};border-color:${active?'transparent':'var(--border)'}"
+            onclick="logHabit(${h.id}, ${n})"
+            data-tip="${n}/5"></div>`;
+        }).join('');
+        inputHtml = `<div class="scale-row">${dots}</div>`;
+      }
+
+      card.innerHTML = `
+        <div class="habit-card-top">
+          <div class="habit-icon" style="background:${col.bg}">${h.icon}</div>
+          <div>
+            <div class="habit-name">${h.name}</div>
+            ${h.unit ? `<div class="habit-unit">${h.unit}</div>` : ''}
+          </div>
+        </div>
+        ${inputHtml}
+        ${streak > 1 ? `<div class="habit-streak"><span>${streak}</span> day streak 🔥</div>` : streak === 1 ? `<div class="habit-streak">Keep going! <span>1</span> day</div>` : `<div class="habit-streak" style="opacity:.5">No streak yet</div>`}
+      `;
+
+      grid.appendChild(card);
+    });
+  }
+}
+
+// ─── Trends ───────────────────────────────────────────────────────────────────
+
+function renderTrendsView() {
+  // Destroy old charts
+  Object.values(chartInstances).forEach(c => c.destroy());
+  Object.keys(chartInstances).forEach(k => delete chartInstances[k]);
+
+  const el = document.getElementById('content');
+
+  if (!habits.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📈</div><p>Add habits to see trends.</p></div>`;
+    return;
+  }
+
+  const dates = pastDates(chartRange);
+  const labels = dates.map(d => {
+    const [,m,day] = d.split('-');
+    return `${+day}/${+m}`;
+  });
+
+  // Compute per-habit averages
+  const avgs = habits.map(h => {
+    const vals = dates.map(d => (logs[h.id]||{})[d]).filter(v => v !== undefined && v !== null);
+    const avg = vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length) : 0;
+    return { habit: h, avg };
+  });
+
+  let html = `
+    <div>
+      <div class="section-label">Last ${chartRange} days</div>
+      <div class="chart-grid" id="chart-grid"></div>
+    </div>
+    <div>
+      <div class="section-label">Averages</div>
+      <div class="stats-row">
+        ${avgs.map(({habit:h, avg}) => `
+          <div class="stat-card">
+            <div class="stat-label">${h.icon} ${h.name}</div>
+            <div class="stat-val" style="color:${h.color}">${h.type==='boolean' ? Math.round(avg*100)+'%' : h.type==='scale' ? avg.toFixed(1)+'/5' : avg.toFixed(1)}</div>
+            <div class="stat-sub">${chartRange}d average</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+
+  el.innerHTML = html;
+
+  const grid = document.getElementById('chart-grid');
+
+  habits.forEach(h => {
+    const col = COLORS[h.category] || COLORS.custom;
+    const vals = dates.map(d => (logs[h.id]||{})[d] ?? null);
+    const avg = (() => {
+      const f = vals.filter(v=>v!==null);
+      return f.length ? (f.reduce((a,b)=>a+b,0)/f.length) : 0;
+    })();
+    const avgLabel = h.type==='boolean' ? Math.round(avg*100)+'%' : h.type==='scale' ? avg.toFixed(1)+'/5' : avg.toFixed(1)+(h.unit?' '+h.unit:'');
+
+    const card = document.createElement('div');
+    card.className = 'chart-card';
+    card.innerHTML = `
+      <div class="chart-card-header">
+        <div class="chart-card-icon" style="background:${col.bg}">${h.icon}</div>
+        <span class="chart-card-title">${h.name}</span>
+        <span class="chart-card-avg">avg <strong>${avgLabel}</strong></span>
+      </div>
+      <div class="chart-wrap"><canvas id="chart-${h.id}"></canvas></div>
+    `;
+    grid.appendChild(card);
+
+    // Draw chart
+    const ctx = document.getElementById('chart-'+h.id).getContext('2d');
+    const filled = vals.map(v => v === null ? 0 : (h.type==='boolean' ? v : v));
+
+    chartInstances[h.id] = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          data: filled,
+          borderColor: h.color,
+          backgroundColor: h.color + '22',
+          borderWidth: 1.5,
+          pointRadius: 3,
+          pointBackgroundColor: h.color,
+          pointBorderWidth: 0,
+          tension: 0.3,
+          fill: true,
+          spanGaps: true,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 300 },
+        plugins: { legend: { display: false }, tooltip: {
+          backgroundColor: '#232329',
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          titleColor: '#e3e3e3',
+          bodyColor: '#8a8a8a',
+          callbacks: {
+            label: ctx => {
+              const v = ctx.parsed.y;
+              return h.type==='boolean' ? (v ? ' Done' : ' —') : h.type==='scale' ? ` ${v}/5` : ` ${v}${h.unit?' '+h.unit:''}`;
+            }
+          }
+        }},
+        scales: {
+          x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#555', font: { size: 10 }, maxTicksLimit: 7 }, border: { display: false } },
+          y: {
+            grid: { color: 'rgba(255,255,255,0.04)' },
+            ticks: { color: '#555', font: { size: 10 }, maxTicksLimit: 4 },
+            border: { display: false },
+            min: 0,
+            ...(h.type==='scale' ? { max: 5 } : {}),
+            ...(h.type==='boolean' ? { max: 1 } : {}),
+          }
+        }
+      }
+    });
+  });
+}
+
+// ─── Heatmap ──────────────────────────────────────────────────────────────────
+
+function renderHeatmapView() {
+  Object.values(chartInstances).forEach(c => c.destroy());
+  Object.keys(chartInstances).forEach(k => delete chartInstances[k]);
+
+  const el = document.getElementById('content');
+
+  if (!habits.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🗓</div><p>Add habits to see your heatmap.</p></div>`;
+    return;
+  }
+
+  const days365 = pastDates(365);
+
+  let html = `<div style="display:flex;flex-direction:column;gap:1rem;">`;
+
+  habits.forEach(h => {
+    const col = COLORS[h.category] || COLORS.custom;
+    html += `
+      <div class="heatmap-card">
+        <div style="display:flex;align-items:center;gap:.5rem">
+          <div class="chart-card-icon" style="background:${col.bg}">${h.icon}</div>
+          <span style="font-size:.8rem;font-weight:600">${h.name}</span>
+          <span style="font-size:.68rem;color:var(--text-faint);margin-left:auto">${getStreak(h.id)} day streak</span>
+        </div>
+        <div class="heatmap-grid" id="heatmap-${h.id}"></div>
+      </div>
+    `;
+  });
+
+  html += '</div>';
+  el.innerHTML = html;
+
+  habits.forEach(h => {
+    const grid = document.getElementById('heatmap-'+h.id);
+    days365.forEach(d => {
+      const val = (logs[h.id]||{})[d];
+      const hasVal = val !== undefined && val !== null && val !== 0 && val !== false;
+      let opacity = 0;
+      if (hasVal) {
+        if (h.type === 'boolean') opacity = 1;
+        else if (h.type === 'scale') opacity = val / 5;
+        else opacity = Math.min(val / 10, 1);
+      }
+      const cell = document.createElement('div');
+      cell.className = 'heatmap-cell';
+      cell.style.background = hasVal ? h.color : 'var(--surface-raised)';
+      cell.style.opacity = hasVal ? (0.2 + opacity * 0.8) : '1';
+      cell.setAttribute('data-tip', formatDateShort(d) + (hasVal ? ': ' + val : ': —'));
+      grid.appendChild(cell);
+    });
+  });
+}
+
+// ─── Modal ────────────────────────────────────────────────────────────────────
+
+function openModal() {
+  document.getElementById('modal-overlay').classList.remove('hidden');
+  document.getElementById('m-name').focus();
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.add('hidden');
+  document.getElementById('m-name').value = '';
+  document.getElementById('m-unit').value = '';
+  document.getElementById('m-type').value = 'boolean';
+  document.getElementById('m-cat').value = 'health';
+  selectedEmoji = EMOJIS[0];
+  selectedColor = PALETTE[0];
+  refreshEmojiPicker();
+  refreshColorPicker();
+  updateUnitField();
+}
+
+function saveHabit() {
+  const name = document.getElementById('m-name').value.trim();
+  if (!name) { document.getElementById('m-name').focus(); return; }
+  const type = document.getElementById('m-type').value;
+  const cat = document.getElementById('m-cat').value;
+  const unit = document.getElementById('m-unit').value.trim();
+
+  habits.push({ id: nextId++, name, icon: selectedEmoji, color: selectedColor, category: cat, type, unit });
+  save();
+  closeModal();
+  updateSidebarNav();
+  updateCompletionScore();
+  renderContent();
+}
+
+function buildEmojiPicker() {
+  const el = document.getElementById('emoji-picker');
+  el.innerHTML = '';
+  EMOJIS.forEach(e => {
+    const btn = document.createElement('div');
+    btn.className = 'emoji-opt' + (e === selectedEmoji ? ' selected' : '');
+    btn.textContent = e;
+    btn.onclick = () => { selectedEmoji = e; refreshEmojiPicker(); };
+    el.appendChild(btn);
+  });
+}
+
+function refreshEmojiPicker() {
+  document.querySelectorAll('.emoji-opt').forEach(b => {
+    b.classList.toggle('selected', b.textContent === selectedEmoji);
+  });
+}
+
+function buildColorPicker() {
+  const el = document.getElementById('color-picker');
+  el.innerHTML = '';
+  PALETTE.forEach(c => {
+    const btn = document.createElement('div');
+    btn.className = 'color-opt' + (c === selectedColor ? ' selected' : '');
+    btn.style.background = c;
+    btn.onclick = () => { selectedColor = c; refreshColorPicker(); };
+    el.appendChild(btn);
+  });
+}
+
+function refreshColorPicker() {
+  document.querySelectorAll('.color-opt').forEach(b => {
+    b.classList.toggle('selected', b.style.background === selectedColor || b.style.backgroundColor === selectedColor);
+  });
+}
+
+function updateUnitField() {
+  const type = document.getElementById('m-type').value;
+  document.getElementById('m-unit-field').style.display = type === 'number' ? '' : 'none';
+}
+
+document.getElementById('m-type').addEventListener('change', updateUnitField);
+
+document.getElementById('modal-overlay').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeModal();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+});
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+
+function init() {
+  const now = new Date();
+  document.getElementById('today-date').textContent = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  buildEmojiPicker();
+  buildColorPicker();
+  updateUnitField();
+  updateSidebarNav();
+  updateCompletionScore();
+  renderContent();
+}
+
+init();
+</script>
+</body>
+</html>

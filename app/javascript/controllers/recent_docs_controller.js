@@ -22,6 +22,33 @@ export default class extends Controller {
     }
   }
 
+  replaceRecentDocsWithEmptyState() {
+    const parent = this.element.parentNode
+    if (!parent) return
+    const p = document.createElement("p")
+    p.className = "empty-state empty-state--fade-in"
+    p.innerHTML = "No folders or items yet. Create a folder to get started."
+    parent.replaceChild(p, this.element)
+  }
+
+  /**
+   * Fade-out wrapper then swap to the global empty message.
+   * Timeout backs up `animationend` when Classic theme disables CSS animations.
+   */
+  wireRecentDocsFadeOut(wrapper) {
+    let done = false
+    const finish = () => {
+      if (done) return
+      done = true
+      clearTimeout(timeoutId)
+      wrapper.removeEventListener("animationend", onAnimEnd)
+      this.replaceRecentDocsWithEmptyState()
+    }
+    const onAnimEnd = () => finish()
+    const timeoutId = setTimeout(finish, 450)
+    wrapper.addEventListener("animationend", onAnimEnd, { once: true })
+  }
+
   toggleFolder(e) {
     if (e.currentTarget?.dataset?.type !== "folder") return
 
@@ -242,15 +269,7 @@ export default class extends Controller {
         while (this.element.firstChild) wrapper.appendChild(this.element.firstChild)
         this.element.appendChild(wrapper)
         wrapper.classList.add("recent-docs__content--fade-out")
-        const showEmpty = () => {
-          wrapper.removeEventListener("animationend", showEmpty)
-          const parent = this.element.parentNode
-          const p = document.createElement("p")
-          p.className = "empty-state empty-state--fade-in"
-          p.innerHTML = "No folders or items yet. Create a folder to get started."
-          parent.replaceChild(p, this.element)
-        }
-        wrapper.addEventListener("animationend", showEmpty, { once: true })
+        this.wireRecentDocsFadeOut(wrapper)
       }
     }
 
@@ -357,15 +376,7 @@ export default class extends Controller {
     while (this.element.firstChild) wrapper.appendChild(this.element.firstChild)
     this.element.appendChild(wrapper)
     wrapper.classList.add("recent-docs__content--fade-out")
-    const showEmpty = () => {
-      wrapper.removeEventListener("animationend", showEmpty)
-      const parent = this.element.parentNode
-      const p = document.createElement("p")
-      p.className = "empty-state empty-state--fade-in"
-      p.innerHTML = "No folders or items yet. Create a folder to get started."
-      parent.replaceChild(p, this.element)
-    }
-    wrapper.addEventListener("animationend", showEmpty, { once: true })
+    this.wireRecentDocsFadeOut(wrapper)
   }
 
   syncExpandedFolders() {
@@ -416,11 +427,17 @@ export default class extends Controller {
     requestAnimationFrame(() => {
       dropdown.style.maxHeight = `${dropdown.scrollHeight}px`
     })
-    const onDone = () => {
+    let finalized = false
+    const finalize = () => {
+      if (finalized) return
+      finalized = true
+      clearTimeout(timeoutId)
+      dropdown.removeEventListener("transitionend", onTransitionEnd)
       dropdown.style.maxHeight = "none"
-      dropdown.removeEventListener("transitionend", onDone)
     }
-    dropdown.addEventListener("transitionend", onDone)
+    const onTransitionEnd = () => finalize()
+    const timeoutId = setTimeout(finalize, 280)
+    dropdown.addEventListener("transitionend", onTransitionEnd, { once: true })
   }
 
   closeDropdown(dropdown, animate = true) {

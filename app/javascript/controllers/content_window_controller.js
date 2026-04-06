@@ -73,6 +73,7 @@ export default class extends Controller {
   disconnect() {
     this.stopDrag()
     this.stopResize()
+    if (this.attentionTimer) clearTimeout(this.attentionTimer)
     if (this.windowSizer) this.windowSizer.disconnect()
     window.removeEventListener("app-window:toggle", this.boundToggleRequest)
     window.removeEventListener("app-window:open", this.boundOpenRequest)
@@ -292,10 +293,11 @@ export default class extends Controller {
     }
 
     if (this.isForegroundContentWindow()) {
-      this.close()
-    } else {
-      this.bringToFront()
+      this.flashAttentionRing()
+      return
     }
+
+    this.bringToFront()
   }
 
   /** True when this window has the highest z-index among visible app windows (dock: second click closes). */
@@ -313,6 +315,16 @@ export default class extends Controller {
       }
     })
     return topEl === this.element
+  }
+
+  flashAttentionRing() {
+    this.element.classList.remove("content-window--focus-pulse", "content-window--focus-pulse-static")
+    void this.element.offsetWidth
+    this.element.classList.add("content-window--focus-pulse-static")
+    if (this.attentionTimer) clearTimeout(this.attentionTimer)
+    this.attentionTimer = window.setTimeout(() => {
+      this.element.classList.remove("content-window--focus-pulse", "content-window--focus-pulse-static")
+    }, 200)
   }
 
   open(options = {}) {

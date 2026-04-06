@@ -17,6 +17,7 @@ import {
   flipDockFullLayout,
   flipDockSingleElement
 } from "lib/dock_flip"
+import { syncNexusWorkspaceChrome } from "lib/nexus_workspace_chrome"
 
 const DOCK_DRAG_THRESHOLD_PX = 8
 
@@ -43,6 +44,7 @@ export default class extends Controller {
     this.boundDockPointerDown = this.onDockPointerDown.bind(this)
     this.boundDockPointerMove = this.onDockPointerMove.bind(this)
     this.boundDockPointerUp = this.onDockPointerUp.bind(this)
+    this.boundWorkspaceThemeStatus = this.handleWorkspaceThemeStatus.bind(this)
 
     this.initializeWindows()
     this.applyWorkspaceThemeOnBoot()
@@ -65,6 +67,7 @@ export default class extends Controller {
     window.addEventListener("launcher:toggle", this.boundLauncherToggle)
     window.addEventListener("launcher:close", this.boundLauncherClose)
     window.addEventListener("dock-pins:changed", this.boundDockPinsChanged)
+    window.addEventListener("workspace:theme-status", this.boundWorkspaceThemeStatus)
     document.addEventListener("pointerdown", this.boundOutsidePointer, true)
 
     if (this.launcherWindow) {
@@ -82,6 +85,7 @@ export default class extends Controller {
     window.removeEventListener("launcher:toggle", this.boundLauncherToggle)
     window.removeEventListener("launcher:close", this.boundLauncherClose)
     window.removeEventListener("dock-pins:changed", this.boundDockPinsChanged)
+    window.removeEventListener("workspace:theme-status", this.boundWorkspaceThemeStatus)
     if (this.launcherSizer) this.launcherSizer.disconnect()
   }
 
@@ -594,7 +598,7 @@ export default class extends Controller {
     if (!isOpen) {
       btn.setAttribute("aria-label", `Open ${label}`)
     } else if (isForeground) {
-      btn.setAttribute("aria-label", `Close ${label}`)
+      btn.setAttribute("aria-label", `Focus ${label}`)
     } else {
       btn.setAttribute("aria-label", `Bring ${label} to front`)
     }
@@ -739,64 +743,21 @@ export default class extends Controller {
       const response = await fetch("/workspace_preferences", { headers: { Accept: "application/json" } })
       if (!response.ok) return
       const payload = await response.json()
-      const appearance = payload?.appearance
-      if (!appearance) return
-      this.applyThemeAppearance(appearance)
+      syncNexusWorkspaceChrome({
+        active_theme_id: payload?.active_theme_id,
+        appearance: payload?.appearance
+      })
     } catch (_error) {
       // non-blocking
     }
   }
 
-  applyThemeAppearance(appearance) {
-    const root = document.documentElement
-    const hue = this.clampInt(appearance.hue, 0, 360, 180)
-    const saturation = this.clampInt(appearance.saturation, 0, 100, 0)
-    const brightness = this.clampInt(appearance.brightness, 0, 100, 15)
-    const alpha = this.clampFloat(appearance.transparency, 0.15, 0.95, 0.15)
-
-    const color1Hue = this.clampInt(appearance.color_1_hue, 0, 360, 240)
-    const color1Sat = this.clampInt(appearance.color_1_saturation, 0, 100, 28)
-    const color1Bri = this.clampInt(appearance.color_1_brightness, 0, 100, 14)
-    const color2Hue = this.clampInt(appearance.color_2_hue, 0, 360, 213)
-    const color2Sat = this.clampInt(appearance.color_2_saturation, 0, 100, 73)
-    const color2Bri = this.clampInt(appearance.color_2_brightness, 0, 100, 22)
-    const angle = this.clampInt(appearance.angle, 0, 360, 135)
-
-    const font1 = this.clampInt(appearance.font_1, 0, 100, 89)
-    const font1Alpha = this.clampInt(appearance.font_1_alpha, 0, 100, 100)
-    const font2 = this.clampInt(appearance.font_2, 0, 100, 63)
-    const font2Alpha = this.clampInt(appearance.font_2_alpha, 0, 100, 100)
-
-    root.style.setProperty("--window-bg-h", String(hue))
-    root.style.setProperty("--window-bg-saturation", `${saturation}%`)
-    root.style.setProperty("--window-bg-brightness", `${brightness}%`)
-    root.style.setProperty("--window-bg-alpha", alpha.toFixed(2))
-    root.style.setProperty("--window-ui-hue", String(hue))
-    root.style.setProperty("--window-ui-saturation", `${saturation}%`)
-    root.style.setProperty("--window-ui-brightness", `${brightness}%`)
-    root.style.setProperty("--desktop-bg-1-hue", String(color1Hue))
-    root.style.setProperty("--desktop-bg-1-saturation", `${color1Sat}%`)
-    root.style.setProperty("--desktop-bg-1-brightness", `${color1Bri}%`)
-    root.style.setProperty("--desktop-bg-2-hue", String(color2Hue))
-    root.style.setProperty("--desktop-bg-2-saturation", `${color2Sat}%`)
-    root.style.setProperty("--desktop-bg-2-brightness", `${color2Bri}%`)
-    root.style.setProperty("--desktop-bg-angle", `${angle}deg`)
-    root.style.setProperty("--font-1-tone", String(font1))
-    root.style.setProperty("--font-1-alpha", (font1Alpha / 100).toFixed(2))
-    root.style.setProperty("--font-2-tone", String(font2))
-    root.style.setProperty("--font-2-alpha", (font2Alpha / 100).toFixed(2))
-  }
-
-  clampInt(value, min, max, fallback) {
-    const parsed = Math.round(Number(value))
-    if (!Number.isFinite(parsed)) return fallback
-    return Math.min(max, Math.max(min, parsed))
-  }
-
-  clampFloat(value, min, max, fallback) {
-    const parsed = Number(value)
-    if (!Number.isFinite(parsed)) return fallback
-    return Math.min(max, Math.max(min, parsed))
+  handleWorkspaceThemeStatus(event) {
+    const d = event?.detail || {}
+    syncNexusWorkspaceChrome({
+      active_theme_id: d.active_theme_id,
+      appearance: d.appearance
+    })
   }
 
 }

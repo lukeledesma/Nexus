@@ -34,7 +34,6 @@ Nexus_Dev/
 │   │       ├── notes_controller.rb
 │   │       ├── task_lists_controller.rb
 │   │       ├── tasks_controller.rb
-│   │       ├── calculator_controller.rb
 │   │       └── settings_controller.rb
 │   ├── javascript/
 │   │   ├── application.js
@@ -54,7 +53,6 @@ Nexus_Dev/
 │   │       ├── folders_controller.js
 │   │       ├── flash_controller.js
 │   │       ├── clock_controller.js
-│   │       ├── calculator_lite_controller.js
 │   │       ├── file_field_controller.js
 │   │       ├── recent_docs_controller.js
 │   │       ├── organizer_lock_controller.js

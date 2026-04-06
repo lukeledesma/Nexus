@@ -10,8 +10,7 @@ Rails.application.routes.draw do
     get "finder/folders", to: "finder#folders_json"
     get "finder/folder_files", to: "finder#folder_files"
     post "finder/create_folder", to: "finder#create_folder"
-    get "calculator", to: "calculator#show"
-    get "settings", to: "settings#show"
+get "settings", to: "settings#show"
     get "user", to: "user#show"
     patch "user/username", to: "user#update_username", as: :user_username
     patch "user/password", to: "user#update_password", as: :user_password
