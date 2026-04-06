@@ -12,12 +12,23 @@ Run commands from the repository root (e.g. `cd` into your clone of this project
 
 ### Migrations on your Mac (development)
 
-Use the default environment (do **not** set `RAILS_ENV=production` on your laptop unless you have production credentials and `RAILS_MASTER_KEY` set). Otherwise Rails will error with **Missing `secret_key_base` for 'production'**.
+Rails must run as **development** on your laptop (not production). If you ever ran `export RAILS_ENV=production` in this terminal window, that variable **stays set** until you unset it — then you’ll see **Missing `secret_key_base` for 'production'** even when you only type `bin/rails db:migrate`.
+
+**Fix first (same terminal tab):**
+
+```bash
+unset RAILS_ENV
+unset NEXUS_DATABASE_PASSWORD
+```
+
+Then go to the app folder and migrate (two lines, paste one at a time — do not put `#` comments on the same line as `cd`):
 
 ```bash
 cd /path/to/your/Nexus_Dev_clone
 bin/rails db:migrate
 ```
+
+If you see **`cd: too many arguments`**, the shell got more than one path for `cd` (often from pasting `cd …` and `bin/rails` as one line, or a bad path). Run only `cd` with a single path, press Enter, then `bin/rails db:migrate`.
 
 Paths like `/home/luke/apps/nexus` exist **only on the Linux server**, not on macOS — `cd` to those will fail locally.
 
