@@ -5,8 +5,8 @@ Run commands from the repository root (e.g. `cd` into your clone of this project
 
 ## Source repository
 
-- **GitHub:** [github.com/lukeledesma/nxs.tools](https://github.com/lukeledesma/nxs.tools)  
-  Clone: `git clone https://github.com/lukeledesma/nxs.tools.git`
+- **GitHub:** [github.com/lukeledesma/Nexus](https://github.com/lukeledesma/Nexus)  
+  Clone: `git clone https://github.com/lukeledesma/Nexus.git`
 
 `deploy/deploy_server.sh` reads **`git remote get-url origin` on your laptop** when the server needs to `git clone` (first deploy or missing app dir). Your local clone should use `origin` → this repo.
 
@@ -36,17 +36,17 @@ Do **not** run `sudo systemctl restart puma` on your Mac; that is **server-only*
 
 ---
 
-### Server still tied to the old “Nexus” remote?
+### Server clone pointing at the wrong GitHub repo?
 
 **SSH into your Linux server first** (`ssh …@…`). Everything below runs **on the server**, not in a local Terminal tab.
 
-If production was cloned from another GitHub URL, point it at **nxs.tools** once.  
+If production was cloned from another URL, point `origin` at this repo once.  
 Use the real app path on that machine (directory containing `bin/rails` and `config/`), e.g. `/home/luke/apps/nexus`:
 
 ```bash
 cd /path/to/your/app
 git remote -v
-git remote set-url origin https://github.com/lukeledesma/nxs.tools.git
+git remote set-url origin https://github.com/lukeledesma/Nexus.git
 git fetch origin
 git checkout main
 git reset --hard origin/main

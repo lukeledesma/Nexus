@@ -11,7 +11,7 @@ This is the primary AI context document for future development sessions.
 
 - **App name**: Nexus
 - **Stack**: Rails 8.1, PostgreSQL, Puma, Nginx, Stimulus JS
-- **Source repo**: [github.com/lukeledesma/nxs.tools](https://github.com/lukeledesma/nxs.tools)
+- **Source repo**: [github.com/lukeledesma/Nexus](https://github.com/lukeledesma/Nexus)
 - **Public site**: `https://nxs.tools/`
 - **Ruby**: `3.2.3` (typical: rbenv under the deploy user on the server)
 - **Deploy**: set `NEXUS_DEPLOY_HOST` and optional variables (see `docs/COMMANDS.md`); do not commit hostnames or SSH identities into the repo. If an old server clone still uses another `origin` URL, update it to the repo above (see **Source repository** in `docs/COMMANDS.md`).

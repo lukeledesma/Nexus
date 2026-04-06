@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# deploy_github.sh — Push local commits to GitHub (canonical repo: github.com/lukeledesma/nxs.tools).
+# deploy_github.sh — Push local commits to GitHub (canonical repo: github.com/lukeledesma/Nexus).
 # Usage: ./deploy/deploy_github.sh [--message "commit message"] [--no-prompt]
 
 set -euo pipefail
@@ -33,7 +33,7 @@ cd "$REPO" || die "Repo not found: $REPO"
 if ! git remote get-url origin &>/dev/null; then
   warn "No git remote 'origin' found."
   echo "To add one, run:"
-  echo "  git remote add origin https://github.com/lukeledesma/nxs.tools.git"
+  echo "  git remote add origin https://github.com/lukeledesma/Nexus.git"
   exit 1
 fi
 

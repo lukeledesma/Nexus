@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# deploy_server.sh — Deploy this app to production (origin should be github.com/lukeledesma/nxs.tools).
+# deploy_server.sh — Deploy this app to production (laptop origin should be github.com/lukeledesma/Nexus).
 # Usage: ./deploy/deploy_server.sh [--rsync] [--branch BRANCH] [--dry-run]
 
 set -euo pipefail
