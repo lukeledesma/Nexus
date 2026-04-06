@@ -10,10 +10,27 @@ Run commands from the repository root (e.g. `cd` into your clone of this project
 
 `deploy/deploy_server.sh` reads **`git remote get-url origin` on your laptop** when the server needs to `git clone` (first deploy or missing app dir). Your local clone should use `origin` → this repo.
 
+### Migrations on your Mac (development)
+
+Use the default environment (do **not** set `RAILS_ENV=production` on your laptop unless you have production credentials and `RAILS_MASTER_KEY` set). Otherwise Rails will error with **Missing `secret_key_base` for 'production'**.
+
+```bash
+cd /path/to/your/Nexus_Dev_clone
+bin/rails db:migrate
+```
+
+Paths like `/home/luke/apps/nexus` exist **only on the Linux server**, not on macOS — `cd` to those will fail locally.
+
+Do **not** run `sudo systemctl restart puma` on your Mac; that is **server-only** (and `sudo` will ask for your **Mac login password**, not your Postgres password).
+
+---
+
 ### Server still tied to the old “Nexus” remote?
 
-If production was cloned from another GitHub URL, point it at **nxs.tools** once (SSH on the server).  
-Use your real app path (the directory that contains `bin/rails` and `config/`), for example `/home/luke/apps/nexus`:
+**SSH into your Linux server first** (`ssh …@…`). Everything below runs **on the server**, not in a local Terminal tab.
+
+If production was cloned from another GitHub URL, point it at **nxs.tools** once.  
+Use the real app path on that machine (directory containing `bin/rails` and `config/`), e.g. `/home/luke/apps/nexus`:
 
 ```bash
 cd /path/to/your/app
@@ -24,7 +41,7 @@ git checkout main
 git reset --hard origin/main
 ```
 
-Then apply database migrations on the server (run **exactly** this line — do not paste a trailing `# …` comment on the same line, or Rails may error with `Unrecognized command "#"`):
+Then run migrations **on the server** (no `#` comment on the same line as `bin/rails`):
 
 ```bash
 export RAILS_ENV=production
@@ -32,7 +49,7 @@ export NEXUS_DATABASE_PASSWORD='your_postgres_password_for_user_alchemy'
 bin/rails db:migrate
 ```
 
-Restart Puma after migrations: `sudo systemctl restart puma`
+Restart Puma: `sudo systemctl restart puma` (this `sudo` asks for the **server user’s** password, not the DB password).
 
 After that, `./deploy/deploy_server.sh` from your **updated** local clone will match the same remote.
 
