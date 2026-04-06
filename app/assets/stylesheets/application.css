@@ -1364,15 +1364,37 @@ a:hover { text-decoration: underline; }
 }
 
 .finder-file-row:hover,
-.finder-file-row:focus-within,
-.task-item-row.nexus-standard-row:not(.task-item-row--checked):hover,
-.task-item-row.nexus-standard-row:not(.task-item-row--checked):focus-within {
+.finder-file-row:focus-within {
   background: rgba(255, 255, 255, 0.1);
 }
 
-/* Same tint as hover while subtasks are expanded (JS sets .task-item-group--head when subtasks exist and not collapsed). */
+/* Tasks: ~50% subtler hover lift than Finder rows (same hue family). */
+.task-item-row.nexus-standard-row:not(.task-item-row--checked):hover,
+.task-item-row.nexus-standard-row:not(.task-item-row--checked):focus-within {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/*
+ * Main row with subtasks expanded (JS sets .task-item-group--head when subtasks exist and not collapsed).
+ * Slightly darker than plain hover so “expanded” reads as a state; hover/focus deepens further.
+ */
 .task-item-row.nexus-standard-row.task-item-row--main.task-item-group--head:not(.task-item-row--checked) {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.task-item-row.nexus-standard-row.task-item-row--main.task-item-group--head:not(.task-item-row--checked):hover,
+.task-item-row.nexus-standard-row.task-item-row--main.task-item-group--head:not(.task-item-row--checked):focus-within {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* Checked main + expanded subtasks: step above flat checked fill, with clearer hover. */
+.task-item-row.nexus-standard-row.task-item-row--main.task-item-group--head.task-item-row--checked {
+  background: rgba(34, 197, 94, 0.22) !important;
+}
+
+.task-item-row.nexus-standard-row.task-item-row--main.task-item-group--head.task-item-row--checked:hover,
+.task-item-row.nexus-standard-row.task-item-row--main.task-item-group--head.task-item-row--checked:focus-within {
+  background: rgba(34, 197, 94, 0.26) !important;
 }
 
 .nexus-standard-row__main {
@@ -1465,10 +1487,11 @@ a:hover { text-decoration: underline; }
 
 .task-list-rows {
   --task-text-control-height: 23.5px;
+  --task-list-row-gap: 0.55rem;
   display: flex;
   flex-direction: column;
   list-style: none;
-  padding: 0;
+  padding: var(--task-list-row-gap) var(--task-list-row-gap) 0;
   margin: 0;
   width: 100%;
   gap: 0 !important;
@@ -1488,7 +1511,7 @@ a:hover { text-decoration: underline; }
 
 /* Match vertical inset on the leading icon; drop card borders (Finder-like). */
 .task-item-row.nexus-standard-row {
-  padding: var(--nexus-row-padding-block, 7px);
+  padding: var(--nexus-row-padding-block, 7px) var(--nexus-row-padding-inline, 9px);
   border: none;
   transition: background 140ms ease, color 140ms ease, max-height 220ms ease, opacity 180ms ease, transform 220ms ease, padding 220ms ease;
 }
@@ -1501,12 +1524,12 @@ a:hover { text-decoration: underline; }
 }
 
 .task-item-row--main {
-  margin-top: 0.55rem !important;
+  margin-top: var(--task-list-row-gap, 0.55rem) !important;
   --completion: 0;
 }
 
 .task-item-row--main:first-child {
-  margin-top: 0 !important;
+  margin-top: var(--task-list-row-gap, 0.55rem) !important;
 }
 
 .task-item-row--main .task-item-text {
@@ -1547,11 +1570,11 @@ a:hover { text-decoration: underline; }
 }
 
 .task-item-row--subtask + .task-item-row--main {
-  margin-top: 0.55rem !important;
+  margin-top: var(--task-list-row-gap, 0.55rem) !important;
 }
 
 .task-item-row--main + .task-item-row--main {
-  margin-top: 0.55rem !important;
+  margin-top: var(--task-list-row-gap, 0.55rem) !important;
 }
 
 .task-item-text,
@@ -1634,6 +1657,13 @@ a:hover { text-decoration: underline; }
   border-color: rgba(34, 197, 94, 0.52) !important;
 }
 
+/* Main tasks only: subtler hover lift than checked subtasks. */
+.task-item-row.task-item-row--main.task-item-row--checked:hover,
+.task-item-row.task-item-row--main.task-item-row--checked:focus-within {
+  background: rgba(34, 197, 94, 0.21) !important;
+  border-color: rgba(34, 197, 94, 0.47) !important;
+}
+
 .task-item-row.nexus-standard-row.task-item-row--checked:hover {
   border: none;
 }
@@ -1641,6 +1671,12 @@ a:hover { text-decoration: underline; }
 /* Expanded subtasks: same family as main-row tint / checked fill, half opacity so they read as grouped, not top-level. */
 .task-item-row.nexus-standard-row.task-item-row--subtask:not(.is-collapsed):not(.task-item-row--checked) {
   background: rgba(255, 255, 255, 0.05);
+}
+
+/* Hover/focus: match the standard list-row highlight (same as non-expanded main hover). */
+.task-item-row.nexus-standard-row.task-item-row--subtask:not(.is-collapsed):not(.task-item-row--checked):hover,
+.task-item-row.nexus-standard-row.task-item-row--subtask:not(.is-collapsed):not(.task-item-row--checked):focus-within {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .task-item-row.nexus-standard-row.task-item-row--subtask:not(.is-collapsed).task-item-row--checked {
@@ -2134,7 +2170,7 @@ input.connection-inline {
 .organizer-row {
   display: flex !important;
   align-items: center !important;
-  width: 100% !important;
+  width: var(--organizer-row-width, 100%) !important;
   justify-content: space-between !important;
   min-width: 0 !important;
   white-space: nowrap !important;
@@ -2603,16 +2639,15 @@ input.connection-inline {
 }
 
 /*
- * Launcher inner shell (#organizer): padding is the inset from the window chrome to the content.
- * - Top + left + right: “standard” shell inset (same idea as --os-window-padding elsewhere).
- * - Bottom: separate knob — only the gap below the user/settings row to the inner bottom edge.
- * - gap: only the space between the last app row and the user/settings row (not the same as bottom inset).
+ * Launcher inner shell (#organizer): padding is the inset from the window chrome to the grid.
+ * Vertical inset matches top and bottom; horizontal uses --launcher-shell-inset-x.
+ * --launcher-footer-gap reserved if a footer row is added back (flex gap between grid and footer).
  */
 .organizer-panel--apps {
   --launcher-shell-inset-top: 0.65rem;
   --launcher-shell-inset-x: 0.65rem;
   --launcher-footer-gap: 0.65rem;
-  --launcher-footer-bottom-inset: 0.65rem;
+  --launcher-footer-bottom-inset: var(--launcher-shell-inset-top);
 }
 
 .organizer-panel-header {
@@ -5751,10 +5786,36 @@ input.app-save-dialog__btn {
   overflow: hidden;
 }
 
-.content-window[data-content-window-app-key-value="singular-task-list"] .task-list-rows {
+.content-window[data-content-window-app-key-value="singular-task-list"] .task-list-content-shell {
   flex: 1 1 auto;
   min-height: 0;
   overflow-x: hidden;
+  overflow-y: auto;
+  /* Match .finder-shell-pane padding — same inset from title chrome to first row as Settings/Finder lists */
+  padding: 12px 10px;
+  box-sizing: border-box;
+}
+
+.content-window[data-content-window-app-key-value="singular-task-list"] .task-list-rows {
+  --organizer-row-width: 100%;
+  /* Match .finder-file-list row rhythm (gap: 4px) */
+  --task-list-row-gap: 4px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  padding: 0 !important;
+  box-sizing: border-box;
+}
+
+.content-window[data-content-window-app-key-value="singular-task-list"] .task-list-rows .task-item-row {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  box-sizing: border-box;
+}
+
+/* First row: inset comes from .task-list-content-shell only (like .finder-file-list under .finder-shell-pane--contents). */
+.content-window[data-content-window-app-key-value="singular-task-list"] .task-list-rows > .task-item-row--main:first-child {
+  margin-top: 0 !important;
 }
 
 .settings-hub {
@@ -6288,6 +6349,12 @@ input.app-save-dialog__btn {
   overflow: visible;
   display: flex;
   flex-direction: column;
+  /* Hug launcher content; avoid height: 100% + flex:1 chain that stretches the grid when the
+     JS-sized window height updates after Classic font metrics / reflow (tiles looked “sliding” down). */
+  height: auto;
+  min-height: 0;
+  flex: 0 0 auto;
+  align-items: stretch;
 }
 
 /* NEXUS Header (Hidden — Organizer uses original theme) */
@@ -6310,9 +6377,12 @@ input.app-save-dialog__btn {
 }
 
 .organizer-window #organizer.organizer-panel--apps {
+  flex: 0 0 auto !important;
+  justify-content: flex-start;
+  align-items: stretch;
   overflow: visible;
   height: auto;
-  padding: var(--launcher-shell-inset-top) var(--launcher-shell-inset-x) var(--launcher-footer-bottom-inset);
+  padding: var(--launcher-shell-inset-top) var(--launcher-shell-inset-x);
   gap: var(--launcher-footer-gap);
 }
 
@@ -7412,16 +7482,35 @@ input.app-save-dialog__btn {
 
 :root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row:not(.task-item-row--checked):hover,
 :root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row:not(.task-item-row--checked):focus-within {
-  background: rgba(0, 0, 0, 0.12);
+  background: rgba(0, 0, 0, 0.06);
 }
 
 :root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row.task-item-row--main.task-item-group--head:not(.task-item-row--checked) {
-  background: rgba(0, 0, 0, 0.12);
+  background: rgba(0, 0, 0, 0.15);
+}
+
+:root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row.task-item-row--main.task-item-group--head:not(.task-item-row--checked):hover,
+:root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row.task-item-row--main.task-item-group--head:not(.task-item-row--checked):focus-within {
+  background: rgba(0, 0, 0, 0.175);
+}
+
+:root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row.task-item-row--main.task-item-group--head.task-item-row--checked {
+  background: rgba(21, 128, 61, 0.44) !important;
+}
+
+:root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row.task-item-row--main.task-item-group--head.task-item-row--checked:hover,
+:root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row.task-item-row--main.task-item-group--head.task-item-row--checked:focus-within {
+  background: rgba(21, 128, 61, 0.48) !important;
 }
 
 /* Expanded subtasks: default rgba(255,255,255,0.05) vanishes on platinum — use same mid tint as Finder non-selected hover (0.09). */
 :root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row.task-item-row--subtask:not(.is-collapsed):not(.task-item-row--checked) {
   background: rgba(0, 0, 0, 0.09);
+}
+
+:root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row.task-item-row--subtask:not(.is-collapsed):not(.task-item-row--checked):hover,
+:root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row.task-item-row--subtask:not(.is-collapsed):not(.task-item-row--checked):focus-within {
+  background: rgba(0, 0, 0, 0.12);
 }
 
 /* Checked / completion green: default #22c55e tints wash out on light gray — deeper green + higher alpha. */
@@ -7434,6 +7523,12 @@ input.app-save-dialog__btn {
 :root[data-nexus-theme="classic"] .task-item-row--checked:focus-within {
   background: rgba(21, 128, 61, 0.5) !important;
   border-color: rgba(21, 128, 61, 0.88) !important;
+}
+
+:root[data-nexus-theme="classic"] .task-item-row.task-item-row--main.task-item-row--checked:hover,
+:root[data-nexus-theme="classic"] .task-item-row.task-item-row--main.task-item-row--checked:focus-within {
+  background: rgba(21, 128, 61, 0.45) !important;
+  border-color: rgba(21, 128, 61, 0.82) !important;
 }
 
 :root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row.task-item-row--subtask:not(.is-collapsed).task-item-row--checked {
