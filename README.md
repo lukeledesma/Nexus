@@ -72,7 +72,7 @@ Production DB config uses:
 
 Deploy scripts (see `docs/COMMANDS.md`):
 
-- `NEXUS_DEPLOY_HOST` (required)
+- `NEXUS_DEPLOY_HOST` (required), or set once in gitignored `deploy/deploy.local.env` (see `deploy/deploy.local.env.example`)
 - `NEXUS_DEPLOY_USER`, `NEXUS_DEPLOY_APP`, `NEXUS_DEPLOY_RUBY`, `NEXUS_DEPLOY_SSH_KEY` (optional)
 
 Rails credentials:
@@ -85,9 +85,10 @@ Deploy:
 
 ```bash
 ./deploy/deploy_github.sh
-export NEXUS_DEPLOY_HOST=your.server.hostname.or.ip
 ./deploy/deploy_server.sh
 ```
+
+(Configure the server host once via `deploy/deploy.local.env` from `deploy/deploy.local.env.example`, or `export NEXUS_DEPLOY_HOST=…` before deploy.)
 
 Health:
 

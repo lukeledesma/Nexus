@@ -84,6 +84,10 @@ bin/rails server
 
 3) Deploy app repo to production:
 
+**One-time:** copy `deploy/deploy.local.env.example` to `deploy/deploy.local.env` and set `NEXUS_DEPLOY_HOST` (and `NEXUS_DEPLOY_USER` if not `deploy`). That file is gitignored, so `./deploy/deploy_server.sh` works in every new terminal without `export`.
+
+Or set variables when you run:
+
 ```bash
 export NEXUS_DEPLOY_HOST=your.server.hostname.or.ip
 ./deploy/deploy_server.sh
@@ -91,7 +95,7 @@ export NEXUS_DEPLOY_HOST=your.server.hostname.or.ip
 
 Optional deploy environment variables:
 
-- `NEXUS_DEPLOY_HOST` — required for deploy scripts
+- `NEXUS_DEPLOY_HOST` — required for deploy scripts (or use `deploy/deploy.local.env`)
 - `NEXUS_DEPLOY_USER` — SSH user (default: `deploy`)
 - `NEXUS_DEPLOY_APP` — app path on server (default: `/home/$NEXUS_DEPLOY_USER/apps/nexus`)
 - `NEXUS_DEPLOY_RUBY` — Ruby bin dir on server (default: rbenv 3.2.3 under that user’s home)

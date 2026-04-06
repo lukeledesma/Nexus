@@ -36,3 +36,6 @@
 # Ignore key files for decrypting credentials and more.
 /config/*.key
 
+# Local deploy target (host, SSH user, paths) — never commit.
+/deploy/deploy.local.env
+

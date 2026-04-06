@@ -7,7 +7,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOCAL_REPO="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Set NEXUS_DEPLOY_HOST (and optionally NEXUS_DEPLOY_USER, NEXUS_DEPLOY_APP, NEXUS_DEPLOY_RUBY, NEXUS_DEPLOY_SSH_KEY) before running.
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/load_deploy_env.sh"
+
+# Set NEXUS_DEPLOY_* in the shell, or once in deploy/deploy.local.env (see deploy.local.env.example).
 REMOTE_HOST="${NEXUS_DEPLOY_HOST:-}"
 REMOTE_USER="${NEXUS_DEPLOY_USER:-deploy}"
 SSH_KEY="${NEXUS_DEPLOY_SSH_KEY:-$HOME/.ssh/id_ed25519}"
@@ -23,7 +26,7 @@ success() { echo -e "${GREEN}[server]${NC} $*"; }
 warn()    { echo -e "${YELLOW}[server]${NC} $*"; }
 die()     { echo -e "${RED}[server] ERROR:${NC} $*" >&2; exit 1; }
 
-[[ -n "$REMOTE_HOST" ]] || die "Set NEXUS_DEPLOY_HOST to your server hostname or IP (see docs/COMMANDS.md)."
+[[ -n "$REMOTE_HOST" ]] || die "Set NEXUS_DEPLOY_HOST (or copy deploy/deploy.local.env.example → deploy/deploy.local.env). See docs/COMMANDS.md."
 
 while [[ $# -gt 0 ]]; do
   case "$1" in

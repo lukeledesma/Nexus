@@ -8,8 +8,11 @@
 
 set -euo pipefail
 
-# ── Configuration ─────────────────────────────────────────────────────────────
-# Set NEXUS_DEPLOY_HOST (and optionally NEXUS_DEPLOY_USER, NEXUS_DEPLOY_APP, NEXUS_DEPLOY_RUBY, NEXUS_DEPLOY_SSH_KEY) before running.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/deploy/load_deploy_env.sh"
+
+# ── Configuration (NEXUS_DEPLOY_* from env or deploy/deploy.local.env) ────────
 REMOTE_HOST="${NEXUS_DEPLOY_HOST:-}"
 REMOTE_USER="${NEXUS_DEPLOY_USER:-deploy}"
 SSH_KEY="${NEXUS_DEPLOY_SSH_KEY:-$HOME/.ssh/id_ed25519}"
@@ -19,9 +22,6 @@ BRANCH="${BRANCH:-main}"
 USE_RSYNC=false
 DRY_RUN=false
 
-# Find local repo root (where this script lives)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
 # ── Colour helpers ─────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
 info()    { echo -e "${CYAN}[deploy]${NC} $*"; }
@@ -29,7 +29,7 @@ success() { echo -e "${GREEN}[deploy]${NC} $*"; }
 warn()    { echo -e "${YELLOW}[deploy]${NC} $*"; }
 die()     { echo -e "${RED}[deploy] ERROR:${NC} $*" >&2; exit 1; }
 
-[[ -n "$REMOTE_HOST" ]] || die "Set NEXUS_DEPLOY_HOST to your server hostname or IP (see docs/COMMANDS.md)."
+[[ -n "$REMOTE_HOST" ]] || die "Set NEXUS_DEPLOY_HOST (or copy deploy/deploy.local.env.example → deploy/deploy.local.env). See docs/COMMANDS.md."
 
 # ── Argument parsing ───────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
