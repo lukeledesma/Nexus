@@ -20,7 +20,7 @@ class Item < ApplicationRecord
   end
 
   def sync_to_disk
-    ItemStorageSyncLite.sync_all!
+    ItemStorageSyncLite.sync_all!(username: Current.user&.username)
   rescue StandardError => e
     Rails.logger.error("[ItemStorageSyncLite] item sync failed: #{e.class}: #{e.message}")
   end

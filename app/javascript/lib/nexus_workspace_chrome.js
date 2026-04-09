@@ -50,7 +50,7 @@ function applyModernAppearance(root, appearance) {
   const hue = clampInt(appearance.hue, 0, 360, 200)
   const saturation = clampInt(appearance.saturation, 0, 100, 5)
   const brightness = clampInt(appearance.brightness, 0, 100, 20)
-  const alpha = clampFloat(appearance.transparency, 0.15, 0.95, 0.18)
+  const alpha = clampFloat(appearance.transparency, 0.15, 1, 0.18)
 
   const color1Hue = clampInt(appearance.color_1_hue, 0, 360, 210)
   const color1Sat = clampInt(appearance.color_1_saturation, 0, 100, 18)

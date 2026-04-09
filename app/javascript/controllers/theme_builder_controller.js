@@ -870,13 +870,13 @@ export default class extends Controller {
   clampTransparency(value) {
     const parsed = Number(value)
     if (!Number.isFinite(parsed)) return this.defaultShellModel.alpha
-    return Math.min(0.95, Math.max(0.15, parsed))
+    return Math.min(1, Math.max(0.15, parsed))
   }
 
   clampTransparencyPercent(value) {
     const parsed = Math.round(Number(value))
     if (!Number.isFinite(parsed)) return 15
-    return Math.min(95, Math.max(15, parsed))
+    return Math.min(100, Math.max(15, parsed))
   }
 
   clampTransparencyFromPercent(value) {

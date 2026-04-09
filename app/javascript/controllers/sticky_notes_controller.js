@@ -1,20 +1,89 @@
 import { Controller } from "@hotwired/stimulus"
 import { observeContent } from "lib/os_window_sizing"
-import { materialSymbolSvg } from "lib/material_symbols"
 
 /** New sticky: 9 spectrum hues × 3 soft saturations × 3 light brightness tiers (pastel-friendly). */
 const STICKY_SPAWN_HUES = [0, 40, 80, 120, 160, 200, 240, 280, 320]
 const STICKY_SPAWN_SATURATIONS = [34, 44, 54]
 const STICKY_SPAWN_BRIGHTNESSES = [72, 77, 83]
 
+/** Excel-style fixed palette for sticky fill (HSL). */
+const STICKY_FILL_PRESETS = [
+  { h: 48, s: 96, b: 76 },
+  { h: 352, s: 70, b: 78 },
+  { h: 268, s: 55, b: 76 },
+  { h: 200, s: 72, b: 78 },
+  { h: 160, s: 52, b: 72 },
+  { h: 120, s: 45, b: 70 },
+  { h: 28, s: 92, b: 72 },
+  { h: 0, s: 65, b: 76 },
+  { h: 88, s: 50, b: 74 },
+  { h: 308, s: 55, b: 78 }
+]
+
+/** Theme-style text colors (Excel-like standard colors). */
+const STICKY_TEXT_PRESETS = [
+  "#FFFFFF",
+  "#000000",
+  "#C00000",
+  "#FFC000",
+  "#FFFF00",
+  "#00B050",
+  "#0070C0",
+  "#002060",
+  "#7030A0",
+  "#7F7F7F"
+]
+
+const DEFAULT_STICKY_TEXT_COLOR = "#FFFFFF"
+
+function normalizeStickyTextColor(raw) {
+  if (raw == null || raw === "") return DEFAULT_STICKY_TEXT_COLOR
+  let s = String(raw).trim()
+  if (!s.startsWith("#")) s = `#${s}`
+  if (/^#[0-9A-Fa-f]{3}$/.test(s)) {
+    const r = s[1]
+    const g = s[2]
+    const b = s[3]
+    s = `#${r}${r}${g}${g}${b}${b}`
+  }
+  if (/^#[0-9A-Fa-f]{6}$/.test(s)) return s.toUpperCase()
+  return DEFAULT_STICKY_TEXT_COLOR
+}
+
 export default class extends Controller {
-  static targets = ["contentShell", "canvas", "grid", "gridToggle", "gridIconOn", "gridIconOff", "stickyColorAnchor", "stickySelection", "colorPopover", "colorSlider", "saturationSlider", "brightnessSlider", "minimap", "minimapViewport"]
+  static targets = [
+    "contentShell",
+    "canvas",
+    "grid",
+    "gridToggle",
+    "gridIconOn",
+    "gridIconOff",
+    "stickyColorAnchor",
+    "stickySelection",
+    "colorPopover",
+    "fillSwatchGrid",
+    "textColorAnchor",
+    "textColorSelection",
+    "textColorPopover",
+    "textSwatchGrid",
+    "deleteAnchor",
+    "minimap",
+    "minimapBitmap",
+    "minimapViewport",
+    "interactionToggle",
+    "interactionIconPan",
+    "interactionIconSelect"
+  ]
 
   static values = {
     columns: { type: Number, default: 75 },
     rows: { type: Number, default: 75 },
     stickies: { type: Array, default: [] },
-    saveUrl: { type: String, default: "" }
+    saveUrl: { type: String, default: "" },
+    /** When true, empty-canvas drag draws a selection marquee; when false (default), it pans. */
+    selectMode: { type: Boolean, default: false },
+    /** Saved zoom / pan from server: { zoom?, panX?, panY? } */
+    viewport: { type: Object, default: {} }
   }
 
   connect() {
@@ -24,12 +93,19 @@ export default class extends Controller {
     this.stickyZCounter = 0
     this.activeStickyDrag = null
     this.activeStickyResize = null
-    this.selectedSticky = null
-    this.colorPopoverOpen = false
-    this.pendingStickyColorSave = false
+    this.selection = new Set()
+    this.pendingStickyPointer = null
+    this.activeMarquee = null
+    this.marqueeEl = null
+    this.boundMarqueeMove = null
+    this.boundMarqueeEnd = null
+    this.fillColorPopoverOpen = false
+    this.textColorPopoverOpen = false
+    this.pendingStickyAppearanceSave = false
     this.zoomValue = 1
     this.panX = 0
     this.panY = 0
+    this.applySavedViewportFromValue()
     this.activeCanvasPan = null
     this._minimapHideTimer = null
     this.boundCanvasPanMove = (e) => this.handleCanvasPanMove(e)
@@ -38,19 +114,26 @@ export default class extends Controller {
     this.boundContentShellMouseDown = (event) => this.handleContentShellPointerDown(event)
     this.boundContentShellTouchStart = (event) => this.handleContentShellPointerDown(event)
     this.boundDocumentPointerDown = (event) => this.handleDocumentPointerDown(event)
+    this.boundDocumentPointerDownClearSelection = (event) =>
+      this.handleDocumentPointerDownClearSelection(event)
+    this.boundContentShellWheel = (event) => this.handleContentShellWheel(event)
     this.boundRequestSave = (event) => this.handleRequestSave(event)
     document.addEventListener("nexus:request-save", this.boundRequestSave)
 
     this.gridObserver = observeContent("singular-sticky-notes", this.contentShellTarget, () => {
-      console.log("[sticky-notes] content shell resized via observer")
       this.queueSync()
     })
 
     window.addEventListener("resize", this.boundWindowResize)
     this.contentShellTarget.addEventListener("mousedown", this.boundContentShellMouseDown)
     this.contentShellTarget.addEventListener("touchstart", this.boundContentShellTouchStart, { passive: false })
+    this.contentShellTarget.addEventListener("wheel", this.boundContentShellWheel, { passive: false })
     document.addEventListener("mousedown", this.boundDocumentPointerDown)
     document.addEventListener("touchstart", this.boundDocumentPointerDown, { passive: true })
+    document.addEventListener("mousedown", this.boundDocumentPointerDownClearSelection, true)
+    document.addEventListener("touchstart", this.boundDocumentPointerDownClearSelection, { passive: true, capture: true })
+    this.boundStickyNotesAddFromChrome = (e) => this.handleStickyNotesAddFromChrome(e)
+    window.addEventListener("nexus:sticky-notes-add-sticky", this.boundStickyNotesAddFromChrome)
 
     // Load grid visibility state from localStorage, default to visible.
     const gridVisible = this.loadGridState() !== false
@@ -60,9 +143,14 @@ export default class extends Controller {
       this.gridTarget.classList.add("sticky-notes-grid--hidden")
     }
     this.syncGridToggleUi()
+    this.loadSelectModePreference()
+    this.syncInteractionToggleUi()
 
     this.renderGrid()
+    this.buildFillSwatches()
+    this.buildTextSwatches()
     this.syncStickySelectionButton()
+    this.clampPan()
     this.applyViewportTransform()
     this.queueSync()
 
@@ -86,8 +174,14 @@ export default class extends Controller {
     window.removeEventListener("resize", this.boundWindowResize)
     this.contentShellTarget.removeEventListener("mousedown", this.boundContentShellMouseDown)
     this.contentShellTarget.removeEventListener("touchstart", this.boundContentShellTouchStart)
+    this.contentShellTarget.removeEventListener("wheel", this.boundContentShellWheel)
     document.removeEventListener("mousedown", this.boundDocumentPointerDown)
     document.removeEventListener("touchstart", this.boundDocumentPointerDown)
+    document.removeEventListener("mousedown", this.boundDocumentPointerDownClearSelection, true)
+    document.removeEventListener("touchstart", this.boundDocumentPointerDownClearSelection, { capture: true })
+    window.removeEventListener("nexus:sticky-notes-add-sticky", this.boundStickyNotesAddFromChrome)
+    this.stopMarquee(null, true)
+    this.stopPendingStickyPointer()
   }
 
   handleRequestSave(event) {
@@ -140,7 +234,62 @@ export default class extends Controller {
     }
   }
 
+  // ── Pan vs selection (empty canvas drag) ───────────────────────────────────
+
+  loadSelectModePreference() {
+    try {
+      const stored = localStorage.getItem("sticky-notes-select-mode")
+      if (stored === "true") this.selectModeValue = true
+      else if (stored === "false") this.selectModeValue = false
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  saveSelectModePreference() {
+    try {
+      localStorage.setItem("sticky-notes-select-mode", this.selectModeValue ? "true" : "false")
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  toggleSelectMode() {
+    this.selectModeValue = !this.selectModeValue
+    this.saveSelectModePreference()
+    this.syncInteractionToggleUi()
+  }
+
+  syncInteractionToggleUi() {
+    const selectMode = this.selectModeValue
+    if (this.hasInteractionIconSelectTarget && this.hasInteractionIconPanTarget) {
+      // Pan mode: show “select” icon (click to switch); select mode: show “pan” icon.
+      this.interactionIconSelectTarget.hidden = selectMode
+      this.interactionIconPanTarget.hidden = !selectMode
+    }
+    if (this.hasInteractionToggleTarget) {
+      const label = selectMode ? "Switch to pan mode" : "Switch to selection mode"
+      this.interactionToggleTarget.setAttribute("aria-label", label)
+      this.interactionToggleTarget.setAttribute("title", label)
+    }
+  }
+
+  handleContentShellWheel(event) {
+    if (event.target.closest(".sticky-notes-sticky.is-editing .sticky-notes-sticky-content")) return
+    const dy = event.deltaY
+    if (dy === 0) return
+    event.preventDefault()
+    if (dy < 0) this.zoomIn()
+    else this.zoomOut()
+  }
+
   // ── Sticky notes ─────────────────────────────────────────────────────────────
+
+  handleStickyNotesAddFromChrome(event) {
+    const frame = this.element.closest("turbo-frame")
+    if (!frame || event.detail?.frameId !== frame.id) return
+    this.addSticky()
+  }
 
   addSticky() {
     const maxW = Math.min(20, Math.max(1, this.columnsValue))
@@ -216,7 +365,7 @@ export default class extends Controller {
     return evens[this.randomInt(0, evens.length - 1)]
   }
 
-  renderSticky({ col, row, cols, rows, text, hue, saturation, brightness }) {
+  renderSticky({ col, row, cols, rows, text, hue, saturation, brightness, text_color }) {
     const el = document.createElement("div")
     el.classList.add("sticky-notes-sticky")
     el.dataset.stickyCol = String(col)
@@ -226,18 +375,8 @@ export default class extends Controller {
     el.dataset.stickyHue = String(Number.isFinite(parseInt(hue, 10)) ? parseInt(hue, 10) : 45)
     el.dataset.stickySaturation = String(Number.isFinite(parseInt(saturation, 10)) ? parseInt(saturation, 10) : 92)
     el.dataset.stickyBrightness = String(Number.isFinite(parseInt(brightness, 10)) ? parseInt(brightness, 10) : 68)
+    el.dataset.stickyTextColor = normalizeStickyTextColor(text_color)
     this.applyStickyPosition(el)
-
-    const deleteBtn = document.createElement("button")
-    deleteBtn.classList.add("sticky-notes-sticky-delete-btn")
-    deleteBtn.setAttribute("type", "button")
-    deleteBtn.setAttribute("aria-label", "Delete sticky note")
-    deleteBtn.innerHTML = materialSymbolSvg("close", "xs")
-    deleteBtn.addEventListener("click", (e) => {
-      e.stopPropagation()
-      this.deleteSticky(el)
-    })
-    el.appendChild(deleteBtn)
 
     const content = document.createElement("div")
     content.classList.add("sticky-notes-sticky-content")
@@ -245,34 +384,20 @@ export default class extends Controller {
     content.setAttribute("spellcheck", "false")
     if (text) content.textContent = text
     el.appendChild(content)
+    this.applyStickyTextColor(el)
 
     const host = this.hasCanvasTarget ? this.canvasTarget : this.contentShellTarget
     host.appendChild(el)
     this.bringToFront(el)
 
-    el.addEventListener("mousedown", (e) => {
-      this.selectSticky(el)
-      if (el.classList.contains("is-editing")) return
-      const edgeInfo = this.getResizeEdgeInfo(el, e)
-      if (edgeInfo.hasEdge) {
-        this.startStickyResize(e, el, edgeInfo)
-      } else {
-        this.startStickyDrag(e, el)
-      }
-    })
-    el.addEventListener("touchstart", (e) => {
-      this.selectSticky(el)
-      if (el.classList.contains("is-editing")) return
-      const edgeInfo = this.getResizeEdgeInfo(el, e)
-      if (edgeInfo.hasEdge) {
-        this.startStickyResize(e, el, edgeInfo)
-      } else {
-        this.startStickyDrag(e, el)
-      }
-    }, { passive: false })
+    el.addEventListener("mousedown", (e) => this.handleStickyNotePointerDown(e, el))
+    el.addEventListener("touchstart", (e) => this.handleStickyNotePointerDown(e, el), { passive: false })
 
     el.addEventListener("dblclick", () => {
-      this.selectSticky(el)
+      this.selection.clear()
+      this.selection.add(el)
+      this.syncSelectionClasses()
+      this.syncStickySelectionButton()
       this.startEditSticky(el)
     })
 
@@ -281,54 +406,281 @@ export default class extends Controller {
 
   handleContentShellPointerDown(event) {
     if (event.target.closest(".sticky-notes-sticky")) return
-    this.clearStickySelection(true)
+    if (event.target.closest(".sticky-notes-action-shell")) return
+
+    const panGesture = event.button === 1 || event.altKey
+    if (panGesture) {
+      this.clearStickySelection(true)
+      this.startCanvasPan(event)
+      return
+    }
     if (event.button !== undefined && event.button !== 0) return
-    this.startCanvasPan(event)
+
+    this.clearStickySelection(true)
+    if (this.selectModeValue) {
+      this.startMarquee(event)
+    } else {
+      this.startCanvasPan(event)
+    }
+  }
+
+  handleStickyNotePointerDown(event, el) {
+    if (el.classList.contains("is-editing")) return
+
+    this.stopStickyEditing()
+
+    const edgeInfo = this.getResizeEdgeInfo(el, event)
+    if (edgeInfo.hasEdge) {
+      this.setSelectionSingle(el)
+      this.startStickyResize(event, el, edgeInfo)
+      return
+    }
+
+    event.stopPropagation()
+    if (event.button !== undefined && event.button !== 0) return
+
+    const additive = event.shiftKey
+    if (additive) {
+      this.toggleStickyInSelection(el)
+    } else if (!this.selection.has(el)) {
+      this.selection.clear()
+      this.selection.add(el)
+    }
+    this.syncSelectionClasses()
+    this.syncStickySelectionButton()
+    this.selection.forEach((node) => this.bringToFront(node))
+
+    const coords = this.getEventCoords(event)
+    this.pendingStickyPointer = {
+      startX: coords.x,
+      startY: coords.y,
+      stickies: Array.from(this.selection),
+      pointerId: event.pointerId
+    }
+
+    this.boundPendingStickyMove = (e) => this.handlePendingStickyPointerMove(e)
+    this.boundPendingStickyUp = (e) => this.handlePendingStickyPointerUp(e)
+    document.addEventListener("mousemove", this.boundPendingStickyMove)
+    document.addEventListener("mouseup", this.boundPendingStickyUp)
+    document.addEventListener("touchmove", this.boundPendingStickyMove, { passive: false })
+    document.addEventListener("touchend", this.boundPendingStickyUp)
+    if (event.cancelable) event.preventDefault()
+  }
+
+  handlePendingStickyPointerMove(event) {
+    if (!this.pendingStickyPointer) return
+    if (event.touches) event.preventDefault()
+    const coords = this.getEventCoords(event)
+    const dx = coords.x - this.pendingStickyPointer.startX
+    const dy = coords.y - this.pendingStickyPointer.startY
+    if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return
+    const stickies = this.pendingStickyPointer.stickies
+    this.stopPendingStickyPointer()
+    this.startGroupDrag(event, stickies)
+  }
+
+  handlePendingStickyPointerUp() {
+    this.stopPendingStickyPointer()
+  }
+
+  stopPendingStickyPointer() {
+    if (this.boundPendingStickyMove) {
+      document.removeEventListener("mousemove", this.boundPendingStickyMove)
+      document.removeEventListener("mouseup", this.boundPendingStickyUp)
+      document.removeEventListener("touchmove", this.boundPendingStickyMove)
+      document.removeEventListener("touchend", this.boundPendingStickyUp)
+      this.boundPendingStickyMove = null
+      this.boundPendingStickyUp = null
+    }
+    this.pendingStickyPointer = null
+  }
+
+  setSelectionSingle(el) {
+    this.selection.clear()
+    this.selection.add(el)
+    this.syncSelectionClasses()
+    this.syncStickySelectionButton()
+  }
+
+  toggleStickyInSelection(el) {
+    if (this.selection.has(el)) this.selection.delete(el)
+    else this.selection.add(el)
+    this.syncSelectionClasses()
+    this.syncStickySelectionButton()
+  }
+
+  syncSelectionClasses() {
+    if (!this.hasCanvasTarget) return
+    this.canvasTarget.querySelectorAll(".sticky-notes-sticky").forEach((node) => {
+      node.classList.toggle("is-selected", this.selection.has(node))
+    })
+  }
+
+  startMarquee(event) {
+    const shell = this.contentShellTarget.getBoundingClientRect()
+    const coords = this.getEventCoords(event)
+    const x0 = coords.x - shell.left
+    const y0 = coords.y - shell.top
+
+    this.activeMarquee = { x0, y0, x1: x0, y1: y0 }
+
+    if (!this.marqueeEl) {
+      this.marqueeEl = document.createElement("div")
+      this.marqueeEl.className = "sticky-notes-marquee"
+      this.marqueeEl.setAttribute("aria-hidden", "true")
+      this.contentShellTarget.appendChild(this.marqueeEl)
+    }
+    this.marqueeEl.hidden = false
+    this.updateMarqueeElement()
+
+    this.boundMarqueeMove = (e) => this.handleMarqueeMove(e)
+    this.boundMarqueeEnd = (e) => this.stopMarquee(e)
+    document.addEventListener("mousemove", this.boundMarqueeMove)
+    document.addEventListener("mouseup", this.boundMarqueeEnd)
+    document.addEventListener("touchmove", this.boundMarqueeMove, { passive: false })
+    document.addEventListener("touchend", this.boundMarqueeEnd)
+    if (event.cancelable) event.preventDefault()
+  }
+
+  handleMarqueeMove(event) {
+    if (!this.activeMarquee) return
+    if (event.touches) event.preventDefault()
+    const shell = this.contentShellTarget.getBoundingClientRect()
+    const coords = this.getEventCoords(event)
+    this.activeMarquee.x1 = coords.x - shell.left
+    this.activeMarquee.y1 = coords.y - shell.top
+    this.updateMarqueeElement()
+  }
+
+  updateMarqueeElement() {
+    if (!this.marqueeEl || !this.activeMarquee) return
+    const { x0, y0, x1, y1 } = this.activeMarquee
+    const left = Math.min(x0, x1)
+    const top = Math.min(y0, y1)
+    const width = Math.abs(x1 - x0)
+    const height = Math.abs(y1 - y0)
+    this.marqueeEl.style.left = `${left}px`
+    this.marqueeEl.style.top = `${top}px`
+    this.marqueeEl.style.width = `${width}px`
+    this.marqueeEl.style.height = `${height}px`
+  }
+
+  stopMarquee(event, cancelled = false) {
+    if (this.boundMarqueeMove) {
+      document.removeEventListener("mousemove", this.boundMarqueeMove)
+      document.removeEventListener("mouseup", this.boundMarqueeEnd)
+      document.removeEventListener("touchmove", this.boundMarqueeMove)
+      document.removeEventListener("touchend", this.boundMarqueeEnd)
+    }
+    this.boundMarqueeMove = null
+    this.boundMarqueeEnd = null
+
+    if (this.marqueeEl) this.marqueeEl.hidden = true
+
+    if (!cancelled && this.activeMarquee && this.marqueeEl && this.hasCanvasTarget) {
+      const shell = this.contentShellTarget.getBoundingClientRect()
+      const { x0, y0, x1, y1 } = this.activeMarquee
+      const mw = Math.abs(x1 - x0)
+      const mh = Math.abs(y1 - y0)
+      if (mw >= 3 || mh >= 3) {
+      const left = Math.min(x0, x1)
+      const top = Math.min(y0, y1)
+      const right = Math.max(x0, x1)
+      const bottom = Math.max(y0, y1)
+      const marqueeRect = {
+        left: shell.left + left,
+        top: shell.top + top,
+        right: shell.left + right,
+        bottom: shell.top + bottom
+      }
+
+      const intersects = (a, b) => !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom)
+
+      if (!event?.shiftKey) this.selection.clear()
+
+      this.canvasTarget.querySelectorAll(".sticky-notes-sticky").forEach((el) => {
+        const r = el.getBoundingClientRect()
+        const stickyRect = { left: r.left, top: r.top, right: r.right, bottom: r.bottom }
+        if (intersects(stickyRect, marqueeRect)) this.selection.add(el)
+      })
+      this.syncSelectionClasses()
+      this.syncStickySelectionButton()
+      }
+    }
+
+    this.activeMarquee = null
+  }
+
+  /** Click/touch outside this app (dock, other windows) clears selection and ends edit. */
+  handleDocumentPointerDownClearSelection(event) {
+    if (this.element.contains(event.target)) return
+    this.clearStickySelection(true)
   }
 
   handleDocumentPointerDown(event) {
-    if (!this.colorPopoverOpen) return
+    if (!this.fillColorPopoverOpen && !this.textColorPopoverOpen) return
 
     const target = event.target
     if (this.hasStickyColorAnchorTarget && this.stickyColorAnchorTarget.contains(target)) return
     if (this.hasColorPopoverTarget && this.colorPopoverTarget.contains(target)) return
+    if (this.hasTextColorAnchorTarget && this.textColorAnchorTarget.contains(target)) return
+    if (this.hasTextColorPopoverTarget && this.textColorPopoverTarget.contains(target)) return
+    if (this.fillColorPopoverOpen) this.closeStickyColorPopover(true)
+    if (this.textColorPopoverOpen) this.closeTextColorPopover(true)
+  }
 
-    this.closeStickyColorPopover(true)
+  getPrimarySelected() {
+    return this.selection.size > 0 ? this.selection.values().next().value : null
   }
 
   selectSticky(el) {
-    if (this.selectedSticky === el) return
-
-    if (this.selectedSticky) {
-      this.selectedSticky.classList.remove("is-selected")
-    }
-
-    this.selectedSticky = el
-    if (this.selectedSticky) {
-      this.selectedSticky.classList.add("is-selected")
-    }
-
-    this.syncStickySelectionButton()
+    this.setSelectionSingle(el)
   }
 
-  clearStickySelection(commitColor = false) {
-    if (!this.selectedSticky) return
+  /** End contenteditable on any note; blur fires save handler on the sticky. */
+  stopStickyEditing() {
+    if (!this.hasCanvasTarget) return
+    this.canvasTarget.querySelectorAll(".sticky-notes-sticky.is-editing").forEach((el) => {
+      const content = el.querySelector(".sticky-notes-sticky-content")
+      if (content) content.blur()
+    })
+  }
 
-    this.selectedSticky.classList.remove("is-selected")
-    this.selectedSticky = null
-    this.closeStickyColorPopover(commitColor)
+  clearStickySelection(commitAppearance = false) {
+    this.stopStickyEditing()
+    if (this.selection.size === 0) {
+      this.closeStickyColorPopover(commitAppearance)
+      this.closeTextColorPopover(commitAppearance)
+      this.syncStickySelectionButton()
+      return
+    }
+    this.selection.clear()
+    this.syncSelectionClasses()
+    this.closeStickyColorPopover(commitAppearance)
+    this.closeTextColorPopover(commitAppearance)
     this.syncStickySelectionButton()
   }
 
   syncStickySelectionButton() {
-    const hasSelection = Boolean(this.selectedSticky)
+    const primary = this.getPrimarySelected()
+    const hasSelection = Boolean(primary)
 
     if (this.hasStickyColorAnchorTarget) {
       this.stickyColorAnchorTarget.classList.toggle("sticky-notes-action-btn--hidden", !hasSelection)
     }
+    if (this.hasTextColorAnchorTarget) {
+      this.textColorAnchorTarget.classList.toggle("sticky-notes-action-btn--hidden", !hasSelection)
+    }
+    if (this.hasDeleteAnchorTarget) {
+      this.deleteAnchorTarget.classList.toggle("sticky-notes-action-btn--hidden", !hasSelection)
+    }
     if (this.hasStickySelectionTarget) {
       this.stickySelectionTarget.setAttribute("aria-hidden", String(!hasSelection))
       this.stickySelectionTarget.tabIndex = hasSelection ? 0 : -1
+    }
+    if (this.hasTextColorSelectionTarget) {
+      this.textColorSelectionTarget.setAttribute("aria-hidden", String(!hasSelection))
+      this.textColorSelectionTarget.tabIndex = hasSelection ? 0 : -1
     }
 
     if (!hasSelection) {
@@ -338,43 +690,29 @@ export default class extends Controller {
       this.stickySelectionTarget.style.removeProperty("--window-ui-hue")
       this.stickySelectionTarget.style.removeProperty("--window-ui-saturation")
       this.stickySelectionTarget.style.removeProperty("--window-ui-brightness")
-      if (this.hasColorPopoverTarget) this.colorPopoverTarget.style.removeProperty("--sticky-hue")
-      if (this.hasColorPopoverTarget) this.colorPopoverTarget.style.removeProperty("--sticky-saturation")
-      if (this.hasColorPopoverTarget) this.colorPopoverTarget.style.removeProperty("--sticky-brightness")
-      if (this.hasColorPopoverTarget) this.colorPopoverTarget.style.removeProperty("--window-ui-hue")
-      if (this.hasColorPopoverTarget) this.colorPopoverTarget.style.removeProperty("--window-ui-saturation")
-      if (this.hasColorPopoverTarget) this.colorPopoverTarget.style.removeProperty("--window-ui-brightness")
-      if (this.hasColorSliderTarget) this.colorSliderTarget.style.removeProperty("--sticky-hue")
-      if (this.hasColorSliderTarget) this.colorSliderTarget.style.removeProperty("--sticky-saturation")
-      if (this.hasColorSliderTarget) this.colorSliderTarget.style.removeProperty("--sticky-brightness")
-      if (this.hasColorSliderTarget) this.colorSliderTarget.style.removeProperty("--window-ui-hue")
-      if (this.hasColorSliderTarget) this.colorSliderTarget.style.removeProperty("--window-ui-saturation")
-      if (this.hasColorSliderTarget) this.colorSliderTarget.style.removeProperty("--window-ui-brightness")
-      if (this.hasSaturationSliderTarget) {
-        this.saturationSliderTarget.style.removeProperty("--sticky-hue")
-        this.saturationSliderTarget.style.removeProperty("--sticky-saturation")
-        this.saturationSliderTarget.style.removeProperty("--sticky-brightness")
-        this.saturationSliderTarget.style.removeProperty("--window-ui-hue")
-        this.saturationSliderTarget.style.removeProperty("--window-ui-saturation")
-        this.saturationSliderTarget.style.removeProperty("--window-ui-brightness")
+      if (this.hasTextColorSelectionTarget) {
+        this.textColorSelectionTarget.style.removeProperty("color")
       }
-      if (this.hasBrightnessSliderTarget) {
-        this.brightnessSliderTarget.style.removeProperty("--sticky-hue")
-        this.brightnessSliderTarget.style.removeProperty("--sticky-saturation")
-        this.brightnessSliderTarget.style.removeProperty("--sticky-brightness")
-        this.brightnessSliderTarget.style.removeProperty("--window-ui-hue")
-        this.brightnessSliderTarget.style.removeProperty("--window-ui-saturation")
-        this.brightnessSliderTarget.style.removeProperty("--window-ui-brightness")
+      if (this.hasColorPopoverTarget) {
+        this.colorPopoverTarget.style.removeProperty("--sticky-hue")
+        this.colorPopoverTarget.style.removeProperty("--sticky-saturation")
+        this.colorPopoverTarget.style.removeProperty("--sticky-brightness")
+        this.colorPopoverTarget.style.removeProperty("--window-ui-hue")
+        this.colorPopoverTarget.style.removeProperty("--window-ui-saturation")
+        this.colorPopoverTarget.style.removeProperty("--window-ui-brightness")
       }
+      this.syncFillSwatchSelection(null)
+      this.syncTextSwatchSelection(null)
       return
     }
 
-    const rawHue = parseInt(this.selectedSticky.dataset.stickyHue, 10)
+    const rawHue = parseInt(primary.dataset.stickyHue, 10)
     const hue = Number.isFinite(rawHue) ? rawHue : 45
-    const rawSaturation = parseInt(this.selectedSticky.dataset.stickySaturation, 10)
+    const rawSaturation = parseInt(primary.dataset.stickySaturation, 10)
     const saturation = Number.isFinite(rawSaturation) ? rawSaturation : 92
-    const rawBrightness = parseInt(this.selectedSticky.dataset.stickyBrightness, 10)
+    const rawBrightness = parseInt(primary.dataset.stickyBrightness, 10)
     const brightness = Number.isFinite(rawBrightness) ? rawBrightness : 68
+    const textHex = normalizeStickyTextColor(primary.dataset.stickyTextColor)
 
     const syncColorVars = (el) => {
       if (!el) return
@@ -388,100 +726,194 @@ export default class extends Controller {
 
     syncColorVars(this.stickySelectionTarget)
     if (this.hasColorPopoverTarget) syncColorVars(this.colorPopoverTarget)
-    if (this.hasColorSliderTarget) syncColorVars(this.colorSliderTarget)
-    if (this.hasSaturationSliderTarget) syncColorVars(this.saturationSliderTarget)
-    if (this.hasBrightnessSliderTarget) syncColorVars(this.brightnessSliderTarget)
-    if (this.hasColorSliderTarget) {
-      this.colorSliderTarget.value = String(hue)
+    if (this.hasTextColorSelectionTarget) {
+      this.textColorSelectionTarget.style.setProperty("color", textHex)
     }
-    if (this.hasSaturationSliderTarget) {
-      this.saturationSliderTarget.value = String(saturation)
-    }
-    if (this.hasBrightnessSliderTarget) {
-      this.brightnessSliderTarget.value = String(brightness)
-    }
+    this.syncFillSwatchSelection({ h: hue, s: saturation, b: brightness })
+    this.syncTextSwatchSelection(textHex)
+  }
+
+  buildFillSwatches() {
+    if (!this.hasFillSwatchGridTarget) return
+    this.fillSwatchGridTarget.replaceChildren()
+    STICKY_FILL_PRESETS.forEach((p) => {
+      const btn = document.createElement("button")
+      btn.type = "button"
+      btn.className = "sticky-notes-color-swatch"
+      btn.style.background = `hsl(${p.h}, ${p.s}%, ${p.b}%)`
+      btn.dataset.stickyFillH = String(p.h)
+      btn.dataset.stickyFillS = String(p.s)
+      btn.dataset.stickyFillB = String(p.b)
+      btn.setAttribute("aria-label", "Sticky fill color")
+      btn.addEventListener("click", (e) => this.pickFillPreset(e))
+      this.fillSwatchGridTarget.appendChild(btn)
+    })
+  }
+
+  buildTextSwatches() {
+    if (!this.hasTextSwatchGridTarget) return
+    this.textSwatchGridTarget.replaceChildren()
+    STICKY_TEXT_PRESETS.forEach((hex) => {
+      const btn = document.createElement("button")
+      btn.type = "button"
+      btn.className = "sticky-notes-color-swatch"
+      btn.style.background = hex
+      btn.dataset.stickyTextHex = hex
+      btn.setAttribute("aria-label", "Text color")
+      btn.addEventListener("click", (e) => this.pickTextPreset(e))
+      this.textSwatchGridTarget.appendChild(btn)
+    })
+  }
+
+  syncFillSwatchSelection(preset) {
+    if (!this.hasFillSwatchGridTarget) return
+    this.fillSwatchGridTarget.querySelectorAll("button").forEach((btn) => {
+      const match =
+        preset != null &&
+        parseInt(btn.dataset.stickyFillH, 10) === preset.h &&
+        parseInt(btn.dataset.stickyFillS, 10) === preset.s &&
+        parseInt(btn.dataset.stickyFillB, 10) === preset.b
+      btn.classList.toggle("sticky-notes-color-swatch--selected", Boolean(match))
+    })
+  }
+
+  syncTextSwatchSelection(hex) {
+    if (!this.hasTextSwatchGridTarget) return
+    const normalized = hex == null ? null : normalizeStickyTextColor(hex)
+    this.textSwatchGridTarget.querySelectorAll("button").forEach((btn) => {
+      const match = normalized != null && normalizeStickyTextColor(btn.dataset.stickyTextHex) === normalized
+      btn.classList.toggle("sticky-notes-color-swatch--selected", Boolean(match))
+    })
+  }
+
+  pickFillPreset(event) {
+    event.preventDefault()
+    event.stopPropagation()
+    if (this.selection.size === 0) return
+
+    const btn = event.currentTarget
+    const h = parseInt(btn.dataset.stickyFillH, 10)
+    const s = parseInt(btn.dataset.stickyFillS, 10)
+    const b = parseInt(btn.dataset.stickyFillB, 10)
+    if (!Number.isFinite(h) || !Number.isFinite(s) || !Number.isFinite(b)) return
+
+    this.selection.forEach((el) => {
+      el.dataset.stickyHue = String(h)
+      el.dataset.stickySaturation = String(s)
+      el.dataset.stickyBrightness = String(b)
+      this.applyStickyPosition(el)
+    })
+    this.syncStickySelectionButton()
+    this.pendingStickyAppearanceSave = true
+  }
+
+  pickTextPreset(event) {
+    event.preventDefault()
+    event.stopPropagation()
+    if (this.selection.size === 0) return
+
+    const hex = normalizeStickyTextColor(event.currentTarget.dataset.stickyTextHex)
+    this.selection.forEach((el) => {
+      el.dataset.stickyTextColor = hex
+      this.applyStickyTextColor(el)
+    })
+    this.syncStickySelectionButton()
+    this.pendingStickyAppearanceSave = true
+  }
+
+  applyStickyTextColor(el) {
+    const content = el.querySelector(".sticky-notes-sticky-content")
+    if (!content) return
+    const hex = normalizeStickyTextColor(el.dataset.stickyTextColor)
+    el.dataset.stickyTextColor = hex
+    content.style.color = hex
   }
 
   toggleStickyColorPopover(event) {
     event.preventDefault()
     event.stopPropagation()
-    if (!this.selectedSticky) return
+    if (!this.getPrimarySelected()) return
 
-    if (this.colorPopoverOpen) {
+    if (this.fillColorPopoverOpen) {
       this.closeStickyColorPopover(true)
       return
     }
 
-    const hue = parseInt(this.selectedSticky.dataset.stickyHue, 10) || 45
-    const saturation = parseInt(this.selectedSticky.dataset.stickySaturation, 10) || 92
-    const brightness = parseInt(this.selectedSticky.dataset.stickyBrightness, 10) || 68
-    if (this.hasColorSliderTarget) {
-      this.colorSliderTarget.value = String(hue)
-    }
-    if (this.hasSaturationSliderTarget) {
-      this.saturationSliderTarget.value = String(saturation)
-    }
-    if (this.hasBrightnessSliderTarget) {
-      this.brightnessSliderTarget.value = String(brightness)
-    }
-    this.colorPopoverOpen = true
+    if (this.textColorPopoverOpen) this.closeTextColorPopover(false)
+
+    const primary = this.getPrimarySelected()
+    const hue = parseInt(primary.dataset.stickyHue, 10) || 45
+    const saturation = parseInt(primary.dataset.stickySaturation, 10) || 92
+    const brightness = parseInt(primary.dataset.stickyBrightness, 10) || 68
+    this.syncFillSwatchSelection({ h: hue, s: saturation, b: brightness })
+    this.fillColorPopoverOpen = true
     this.colorPopoverTarget.classList.remove("sticky-notes-action-btn--hidden")
     this.colorPopoverTarget.setAttribute("aria-hidden", "false")
   }
 
-  updateStickyColor(event) {
-    if (!this.selectedSticky) return
+  toggleTextColorPopover(event) {
+    event.preventDefault()
+    event.stopPropagation()
+    if (!this.getPrimarySelected()) return
 
-    const raw = parseInt(event.target.value, 10)
-    const hue = Number.isFinite(raw) ? Math.max(0, Math.min(raw, 360)) : 45
-    this.selectedSticky.dataset.stickyHue = String(hue)
-    this.applyStickyPosition(this.selectedSticky)
-    this.syncStickySelectionButton()
-    this.pendingStickyColorSave = true
+    if (this.textColorPopoverOpen) {
+      this.closeTextColorPopover(true)
+      return
+    }
+
+    if (this.fillColorPopoverOpen) this.closeStickyColorPopover(false)
+
+    const textHex = normalizeStickyTextColor(this.getPrimarySelected().dataset.stickyTextColor)
+    this.syncTextSwatchSelection(textHex)
+    this.textColorPopoverOpen = true
+    this.textColorPopoverTarget.classList.remove("sticky-notes-action-btn--hidden")
+    this.textColorPopoverTarget.setAttribute("aria-hidden", "false")
   }
 
-  updateStickySaturation(event) {
-    if (!this.selectedSticky) return
+  closeStickyColorPopover(commitAppearance = false) {
+    if (!this.fillColorPopoverOpen) return
 
-    const raw = parseInt(event.target.value, 10)
-    const saturation = Number.isFinite(raw) ? Math.max(0, Math.min(raw, 100)) : 92
-    this.selectedSticky.dataset.stickySaturation = String(saturation)
-    this.applyStickyPosition(this.selectedSticky)
-    this.syncStickySelectionButton()
-    this.pendingStickyColorSave = true
-  }
-
-  updateStickyBrightness(event) {
-    if (!this.selectedSticky) return
-
-    const raw = parseInt(event.target.value, 10)
-    const brightness = Number.isFinite(raw) ? Math.max(0, Math.min(raw, 100)) : 68
-    this.selectedSticky.dataset.stickyBrightness = String(brightness)
-    this.applyStickyPosition(this.selectedSticky)
-    this.syncStickySelectionButton()
-    this.pendingStickyColorSave = true
-  }
-
-  closeStickyColorPopover(commitColor = false) {
-    if (!this.colorPopoverOpen) return
-
-    this.colorPopoverOpen = false
+    this.fillColorPopoverOpen = false
     if (this.hasColorPopoverTarget) {
       this.colorPopoverTarget.classList.add("sticky-notes-action-btn--hidden")
       this.colorPopoverTarget.setAttribute("aria-hidden", "true")
     }
 
-    if (commitColor && this.pendingStickyColorSave) {
-      this.scheduleSave()
+    if (commitAppearance) {
+      if (this.pendingStickyAppearanceSave) this.scheduleSave()
+      this.pendingStickyAppearanceSave = false
     }
-    this.pendingStickyColorSave = false
   }
 
-  deleteSticky(el) {
-    el.remove()
-    if (this.selectedSticky === el) {
-      this.clearStickySelection(false)
+  closeTextColorPopover(commitAppearance = false) {
+    if (!this.textColorPopoverOpen) return
+
+    this.textColorPopoverOpen = false
+    if (this.hasTextColorPopoverTarget) {
+      this.textColorPopoverTarget.classList.add("sticky-notes-action-btn--hidden")
+      this.textColorPopoverTarget.setAttribute("aria-hidden", "true")
     }
+
+    if (commitAppearance) {
+      if (this.pendingStickyAppearanceSave) this.scheduleSave()
+      this.pendingStickyAppearanceSave = false
+    }
+  }
+
+  deleteSelectedStickies(event) {
+    event?.preventDefault?.()
+    event?.stopPropagation?.()
+    if (this.selection.size === 0) return
+    const count = this.selection.size
+    const message =
+      count === 1
+        ? "Are you sure you want to delete this sticky note?"
+        : `Are you sure you want to delete ${count} sticky notes?`
+    if (!window.confirm(message)) return
+    this.selection.forEach((el) => el.remove())
+    this.selection.clear()
+    this.syncSelectionClasses()
+    this.syncStickySelectionButton()
     this.scheduleSave()
   }
 
@@ -523,22 +955,24 @@ export default class extends Controller {
     el.style.setProperty("--sticky-brightness", el.dataset.stickyBrightness || "68")
   }
 
-  startStickyDrag(event, el) {
+  startGroupDrag(event, stickies) {
     if (event.button !== undefined && event.button !== 0) return
     event.preventDefault()
     this.stopCanvasPan()
-    this.bringToFront(el)
+    stickies.forEach((el) => this.bringToFront(el))
 
     const coords = this.getEventCoords(event)
 
     this.activeStickyDrag = {
-      el,
+      items: stickies.map((el) => ({
+        el,
+        startCol: parseInt(el.dataset.stickyCol, 10) || 0,
+        startRow: parseInt(el.dataset.stickyRow, 10) || 0,
+        cols: parseInt(el.dataset.stickyCols, 10) || 10,
+        rows: parseInt(el.dataset.stickyRows, 10) || 10
+      })),
       startMouseX: coords.x,
       startMouseY: coords.y,
-      startCol: parseInt(el.dataset.stickyCol, 10) || 0,
-      startRow: parseInt(el.dataset.stickyRow, 10) || 0,
-      cols: parseInt(el.dataset.stickyCols, 10) || 10,
-      rows: parseInt(el.dataset.stickyRows, 10) || 10,
       dragStarted: false
     }
 
@@ -554,7 +988,7 @@ export default class extends Controller {
     if (!this.activeStickyDrag) return
     if (event.touches) event.preventDefault()
 
-    const { el, startMouseX, startMouseY, startCol, startRow, cols, rows } = this.activeStickyDrag
+    const { items, startMouseX, startMouseY } = this.activeStickyDrag
     const coords = this.getEventCoords(event)
     const dx = coords.x - startMouseX
     const dy = coords.y - startMouseY
@@ -562,27 +996,44 @@ export default class extends Controller {
     if (!this.activeStickyDrag.dragStarted) {
       if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return
       this.activeStickyDrag.dragStarted = true
-      el.classList.add("is-dragging")
+      items.forEach(({ el }) => el.classList.add("is-dragging"))
     }
 
     const shellRect = this.contentShellTarget.getBoundingClientRect()
     const z = this.zoomValue
     const cellW = (shellRect.width / this.columnsValue) * z
     const cellH = (shellRect.height / this.rowsValue) * z
-    const rawCol = startCol + dx / cellW
-    const rawRow = startRow + dy / cellH
-    const newCol = this.snapStickyGridDual(rawCol)
-    const newRow = this.snapStickyGridDual(rawRow)
 
-    el.dataset.stickyCol = String(Math.max(0, Math.min(newCol, this.columnsValue - cols)))
-    el.dataset.stickyRow = String(Math.max(0, Math.min(newRow, this.rowsValue - rows)))
-    this.applyStickyPosition(el)
+    let deltaCol = Math.round(dx / cellW)
+    let deltaRow = Math.round(dy / cellH)
+
+    // Clamp one shared delta so the whole selection stays in-bounds without squashing spacing.
+    let colMin = -Infinity
+    let colMax = Infinity
+    let rowMin = -Infinity
+    let rowMax = Infinity
+    for (const { startCol, startRow, cols, rows: rowSpan } of items) {
+      colMin = Math.max(colMin, -startCol)
+      colMax = Math.min(colMax, this.columnsValue - cols - startCol)
+      rowMin = Math.max(rowMin, -startRow)
+      rowMax = Math.min(rowMax, this.rowsValue - rowSpan - startRow)
+    }
+    deltaCol = Math.max(colMin, Math.min(colMax, deltaCol))
+    deltaRow = Math.max(rowMin, Math.min(rowMax, deltaRow))
+
+    items.forEach(({ el, startCol, startRow, cols, rows }) => {
+      const newCol = startCol + deltaCol
+      const newRow = startRow + deltaRow
+      el.dataset.stickyCol = String(newCol)
+      el.dataset.stickyRow = String(newRow)
+      this.applyStickyPosition(el)
+    })
   }
 
   stopStickyDrag() {
     if (!this.activeStickyDrag) return
     if (this.activeStickyDrag.dragStarted) {
-      this.activeStickyDrag.el.classList.remove("is-dragging")
+      this.activeStickyDrag.items.forEach(({ el }) => el.classList.remove("is-dragging"))
       this.scheduleSave()
     }
     this.activeStickyDrag = null
@@ -727,8 +1178,16 @@ export default class extends Controller {
       hue: parseInt(el.dataset.stickyHue, 10) || 45,
       saturation: parseInt(el.dataset.stickySaturation, 10) || 92,
       brightness: parseInt(el.dataset.stickyBrightness, 10) || 68,
+      text_color: normalizeStickyTextColor(el.dataset.stickyTextColor),
       text: el.querySelector(".sticky-notes-sticky-content")?.innerText || ""
     }))
+
+    const payload = {
+      stickies,
+      zoom: this.zoomValue,
+      panX: this.panX,
+      panY: this.panY
+    }
 
     const csrfToken = document.querySelector("meta[name='csrf-token']")?.content || ""
     return fetch(this.saveUrlValue, {
@@ -737,7 +1196,7 @@ export default class extends Controller {
         "Content-Type": "application/json",
         "X-CSRF-Token": csrfToken
       },
-      body: JSON.stringify({ stickies: JSON.stringify(stickies) })
+      body: JSON.stringify({ stickies: JSON.stringify(payload) })
     })
       .then(async (res) => {
         if (!res.ok) return
@@ -751,8 +1210,23 @@ export default class extends Controller {
         document.dispatchEvent(
           new CustomEvent("nexus:sticky-save-complete", { bubbles: true, detail: { frameId } })
         )
+        this.requestWorkspaceDiskFlush()
       })
       .catch(() => {})
+  }
+
+  requestWorkspaceDiskFlush() {
+    const token = document.querySelector("meta[name='csrf-token']")?.content || ""
+    if (!token) return
+    void fetch("/apps/workspace/flush_disk", {
+      method: "POST",
+      headers: {
+        "X-CSRF-Token": token,
+        Accept: "application/json",
+        "X-Requested-With": "XMLHttpRequest"
+      },
+      credentials: "same-origin"
+    }).catch(() => {})
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -769,12 +1243,18 @@ export default class extends Controller {
     return { x: event.clientX, y: event.clientY }
   }
 
-  /** Snap sticky origin to 2×2 cell grid (even col/row indices). */
-  snapStickyGridDual(value) {
-    return Math.round(value / 2) * 2
-  }
-
   // ── Viewport zoom / pan ─────────────────────────────────────────────────────
+
+  applySavedViewportFromValue() {
+    const v = this.viewportValue
+    if (!v || typeof v !== "object") return
+    if (typeof v.zoom === "number" && Number.isFinite(v.zoom)) {
+      const z = Math.min(2.5, Math.max(1, v.zoom))
+      this.zoomValue = Math.round(z * 100) / 100
+    }
+    if (typeof v.panX === "number" && Number.isFinite(v.panX)) this.panX = v.panX
+    if (typeof v.panY === "number" && Number.isFinite(v.panY)) this.panY = v.panY
+  }
 
   zoomIn() {
     this.zoomValue = Math.min(2.5, Math.round((this.zoomValue + 0.25) * 100) / 100)
@@ -783,6 +1263,7 @@ export default class extends Controller {
     this.queueSync()
     this.showMinimap()
     this.scheduleMinimapHide(1100)
+    this.scheduleSave()
   }
 
   zoomOut() {
@@ -794,6 +1275,7 @@ export default class extends Controller {
     this.queueSync()
     this.showMinimap()
     this.scheduleMinimapHide(1100)
+    this.scheduleSave()
   }
 
   clampPan() {
@@ -810,8 +1292,14 @@ export default class extends Controller {
   }
 
   applyViewportTransform() {
-    if (this.hasCanvasTarget) {
-      this.canvasTarget.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.zoomValue})`
+    if (this.hasCanvasTarget && this.hasContentShellTarget) {
+      const shell = this.contentShellTarget.getBoundingClientRect()
+      const z = Math.max(this.zoomValue, 0.01)
+      const w = Math.max(0, shell.width)
+      const h = Math.max(0, shell.height)
+      this.canvasTarget.style.width = `${w * z}px`
+      this.canvasTarget.style.height = `${h * z}px`
+      this.canvasTarget.style.transform = `translate(${this.panX}px, ${this.panY}px)`
       this.canvasTarget.style.transformOrigin = "0 0"
     }
     this.updateMinimap()
@@ -864,6 +1352,72 @@ export default class extends Controller {
     vp.style.top = `${top * 100}%`
     vp.style.width = `${Math.min(1 - left, vw) * 100}%`
     vp.style.height = `${Math.min(1 - top, vh) * 100}%`
+    this.drawMinimapBitmapPreview()
+  }
+
+  /** Low-res overview of grid + note colors (matches logical layout, not zoom). */
+  drawMinimapBitmapPreview() {
+    if (!this.hasMinimapBitmapTarget || !this.hasCanvasTarget) return
+    const inner = this.minimapBitmapTarget.parentElement
+    if (!inner) return
+    const rect = inner.getBoundingClientRect()
+    const w = Math.max(1, Math.round(rect.width))
+    const h = Math.max(1, Math.round(rect.height))
+    const dpr = window.devicePixelRatio || 1
+    const canvas = this.minimapBitmapTarget
+    canvas.width = Math.floor(w * dpr)
+    canvas.height = Math.floor(h * dpr)
+    canvas.style.width = `${w}px`
+    canvas.style.height = `${h}px`
+    const ctx = canvas.getContext("2d")
+    if (!ctx) return
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    ctx.clearRect(0, 0, w, h)
+    ctx.fillStyle = "rgb(36, 38, 44)"
+    ctx.fillRect(0, 0, w, h)
+
+    const cols = Math.max(this.columnsValue, 1)
+    const rows = Math.max(this.rowsValue, 1)
+    const step = Math.max(1, Math.floor(cols / 14))
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.05)"
+    ctx.lineWidth = 1
+    for (let i = 0; i <= cols; i += step) {
+      const x = (i / cols) * w
+      ctx.beginPath()
+      ctx.moveTo(x + 0.5, 0)
+      ctx.lineTo(x + 0.5, h)
+      ctx.stroke()
+    }
+    for (let j = 0; j <= rows; j += step) {
+      const y = (j / rows) * h
+      ctx.beginPath()
+      ctx.moveTo(0, y + 0.5)
+      ctx.lineTo(w, y + 0.5)
+      ctx.stroke()
+    }
+
+    this.canvasTarget.querySelectorAll(".sticky-notes-sticky").forEach((el) => {
+      const col = parseInt(el.dataset.stickyCol, 10) || 0
+      const row = parseInt(el.dataset.stickyRow, 10) || 0
+      const cw = parseInt(el.dataset.stickyCols, 10) || 2
+      const rh = parseInt(el.dataset.stickyRows, 10) || 2
+      const hue = parseInt(el.dataset.stickyHue, 10) || 45
+      const sat = parseInt(el.dataset.stickySaturation, 10) || 92
+      const bri = parseInt(el.dataset.stickyBrightness, 10) || 68
+      const x = (col / cols) * w
+      const y = (row / rows) * h
+      const ww = (cw / cols) * w
+      const hh = (rh / rows) * h
+      const rad = Math.min(8, ww * 0.14, hh * 0.14)
+      ctx.fillStyle = `hsl(${hue}, ${sat}%, ${bri}%)`
+      if (typeof ctx.roundRect === "function") {
+        ctx.beginPath()
+        ctx.roundRect(x, y, Math.max(1, ww), Math.max(1, hh), rad)
+        ctx.fill()
+      } else {
+        ctx.fillRect(x, y, Math.max(1, ww), Math.max(1, hh))
+      }
+    })
   }
 
   startCanvasPan(event) {
@@ -910,7 +1464,10 @@ export default class extends Controller {
     document.removeEventListener("touchmove", this.boundCanvasPanMove)
     document.removeEventListener("touchend", this.boundCanvasPanEnd)
     this.contentShellTarget.classList.remove("sticky-notes-content-shell--pan-armed", "sticky-notes-content-shell--is-panning")
-    if (panMoved) this.scheduleMinimapHide(750)
+    if (panMoved) {
+      this.scheduleMinimapHide(750)
+      this.scheduleSave()
+    }
   }
 
   renderGrid() {
@@ -943,7 +1500,6 @@ export default class extends Controller {
   queueSync() {
     if (this.syncQueued) return
 
-    console.log("[sticky-notes] queueSync called")
     this.syncQueued = true
     this.syncFrame = window.requestAnimationFrame(() => {
       this.syncQueued = false
@@ -954,23 +1510,23 @@ export default class extends Controller {
   syncGridMetrics() {
     if (!this.hasContentShellTarget || !this.hasGridTarget) return
 
+    this.applyViewportTransform()
+
     const shellRect = this.contentShellTarget.getBoundingClientRect()
-    const width = Math.max(shellRect.width, 0)
-    const height = Math.max(shellRect.height, 0)
+    const sw = Math.max(shellRect.width, 0)
+    const sh = Math.max(shellRect.height, 0)
+    if (this.hasMinimapTarget && sw > 0 && sh > 0) {
+      this.minimapTarget.style.setProperty("--sticky-notes-shell-aspect", String(sw / sh))
+    }
+    const z = Math.max(this.zoomValue, 0.01)
+    const width = sw * z
+    const height = sh * z
     const columns = Math.max(this.columnsValue, 1)
     const rows = Math.max(this.rowsValue, 1)
     const cellWidth = width > 0 ? width / columns : 0
     const cellHeight = height > 0 ? height / rows : 0
     const columnPercent = 100 / columns
     const rowPercent = 100 / rows
-
-    const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
-    const noteBodyMinPx = rootPx * 0.92
-    const scaled = cellHeight * 0.72
-    const maxFit = cellHeight * 0.88
-    let fontSize = Math.min(Math.max(scaled, noteBodyMinPx), maxFit)
-    if (!Number.isFinite(fontSize) || fontSize <= 0) fontSize = noteBodyMinPx
-    fontSize *= 1.22
 
     // Published on contentShellTarget so stickies (siblings of .sticky-notes-grid) inherit them.
     this.contentShellTarget.style.setProperty("--sticky-notes-grid-cell-width", `${cellWidth}px`)
@@ -979,13 +1535,6 @@ export default class extends Controller {
     this.contentShellTarget.style.setProperty("--sticky-notes-grid-rows", String(rows))
     this.contentShellTarget.style.setProperty("--sticky-notes-grid-col-percent", `${columnPercent}%`)
     this.contentShellTarget.style.setProperty("--sticky-notes-grid-row-percent", `${rowPercent}%`)
-    this.contentShellTarget.style.setProperty("--sticky-notes-sticky-font-size", `${fontSize}px`)
-
-    // Also directly apply font size to all existing sticky content elements
-    const stickyContents = this.contentShellTarget.querySelectorAll(".sticky-notes-sticky-content")
-    stickyContents.forEach(el => {
-      el.style.fontSize = `${fontSize}px`
-    })
 
     this.gridTarget.style.setProperty("--sticky-notes-grid-columns", String(columns))
     this.gridTarget.style.setProperty("--sticky-notes-grid-rows", String(rows))

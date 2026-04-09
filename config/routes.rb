@@ -7,6 +7,7 @@ Rails.application.routes.draw do
     resources :folders, only: %i[show create update destroy]
     resources :task_lists, only: %i[show create update destroy]
     get "finder", to: "finder#show"
+    get "habit_tracker", to: "habit_tracker#show"
     get "finder/folders", to: "finder#folders_json"
     get "finder/folder_files", to: "finder#folder_files"
     post "finder/create_folder", to: "finder#create_folder"
@@ -20,6 +21,7 @@ get "settings", to: "settings#show"
     get "singular_sticky_notes", to: "singular#sticky_notes"
     patch "singular_sticky_notes", to: "singular#update_sticky_notes"
     post "singular/save_file", to: "singular#save_file"
+    post "workspace/flush_disk", to: "workspace_sync#flush_disk"
     get "all_tasks",  to: "task_lists#index"
   end
 

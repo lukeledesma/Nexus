@@ -130,9 +130,9 @@ class DocumentDiskLoader
     def purge_missing_from_database!(seen_paths)
       keep = seen_paths.uniq
 
-      missing_documents = Document.where.not(storage_path: keep)
-        .or(Document.where(storage_path: [nil, ""]))
-      missing_documents.find_each(&:destroy)
+      # Only remove rows whose path exists on disk but file is gone — never wipe records that
+      # still need a storage_path backfill (would look "missing" and get destroyed every sync).
+      Document.where.not(storage_path: [nil, ""]).where.not(storage_path: keep).find_each(&:destroy)
     end
 
     def find_or_initialize_by_storage_path(storage_path, is_folder:)

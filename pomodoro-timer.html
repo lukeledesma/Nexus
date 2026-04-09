@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pomodoro Timer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: #aaa;
+      margin-bottom: 32px;
+    }
+
+    .modes {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 40px;
+    }
+
+    .mode-btn {
+      padding: 8px 20px;
+      border-radius: 999px;
+      border: none;
+      background: transparent;
+      color: #aaa;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .mode-btn.active {
+      background: rgba(255,255,255,0.15);
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .mode-btn:hover:not(.active) {
+      background: rgba(255,255,255,0.07);
+      color: #ddd;
+    }
+
+    .timer-ring {
+      position: relative;
+      width: 280px;
+      height: 280px;
+      margin-bottom: 40px;
+    }
+
+    .timer-ring svg {
+      transform: rotate(-90deg);
+    }
+
+    .ring-bg {
+      fill: none;
+      stroke: rgba(255,255,255,0.08);
+      stroke-width: 8;
+    }
+
+    .ring-progress {
+      fill: none;
+      stroke: #e05252;
+      stroke-width: 8;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 1s linear, stroke 0.4s;
+    }
+
+    .timer-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+
+    .timer-display {
+      font-size: 4rem;
+      font-weight: 200;
+      letter-spacing: 0.05em;
+      line-height: 1;
+    }
+
+    .timer-label {
+      font-size: 0.75rem;
+      color: #888;
+      margin-top: 6px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      margin-bottom: 40px;
+    }
+
+    .btn-main {
+      padding: 14px 52px;
+      border-radius: 999px;
+      border: none;
+      background: #e05252;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      box-shadow: 0 4px 24px rgba(224,82,82,0.3);
+    }
+
+    .btn-main:hover { background: #c74444; }
+    .btn-main:active { transform: scale(0.97); }
+
+    .btn-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.15);
+      background: transparent;
+      color: #aaa;
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .btn-icon:hover {
+      border-color: rgba(255,255,255,0.35);
+      color: #fff;
+    }
+
+    .rounds {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 32px;
+    }
+
+    .round-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.15);
+      transition: background 0.3s;
+    }
+
+    .round-dot.done {
+      background: #e05252;
+    }
+
+    .settings {
+      display: flex;
+      gap: 32px;
+      font-size: 0.8rem;
+      color: #666;
+    }
+
+    .settings span { color: #aaa; font-weight: 500; }
+
+    /* Mode color themes */
+    body.short-break .ring-progress { stroke: #52b4e0; }
+    body.short-break .btn-main { background: #52b4e0; box-shadow: 0 4px 24px rgba(82,180,224,0.3); }
+    body.short-break .btn-main:hover { background: #3da0cc; }
+    body.short-break .round-dot.done { background: #52b4e0; }
+
+    body.long-break .ring-progress { stroke: #5cc8a8; }
+    body.long-break .btn-main { background: #5cc8a8; box-shadow: 0 4px 24px rgba(92,200,168,0.3); }
+    body.long-break .btn-main:hover { background: #49b090; }
+    body.long-break .round-dot.done { background: #5cc8a8; }
+
+    .toast {
+      position: fixed;
+      bottom: 32px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 12px;
+      padding: 12px 24px;
+      font-size: 0.9rem;
+      transition: transform 0.4s ease;
+    }
+
+    .toast.show { transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+  <h1>🍅 Pomodoro</h1>
+
+  <div class="modes">
+    <button class="mode-btn active" onclick="setMode('pomodoro')">Pomodoro</button>
+    <button class="mode-btn" onclick="setMode('short-break')">Short Break</button>
+    <button class="mode-btn" onclick="setMode('long-break')">Long Break</button>
+  </div>
+
+  <div class="timer-ring">
+    <svg width="280" height="280" viewBox="0 0 280 280">
+      <circle class="ring-bg" cx="140" cy="140" r="126"/>
+      <circle class="ring-progress" id="ring" cx="140" cy="140" r="126"
+        stroke-dasharray="792" stroke-dashoffset="0"/>
+    </svg>
+    <div class="timer-text">
+      <div class="timer-display" id="display">25:00</div>
+      <div class="timer-label" id="status-label">Focus Time</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn-icon" title="Restart" onclick="resetTimer()">↺</button>
+    <button class="btn-main" id="startBtn" onclick="toggleTimer()">START</button>
+    <button class="btn-icon" title="Skip" onclick="skipSession()">⏭</button>
+  </div>
+
+  <div class="rounds" id="rounds">
+    <div class="round-dot"></div>
+    <div class="round-dot"></div>
+    <div class="round-dot"></div>
+    <div class="round-dot"></div>
+  </div>
+
+  <div class="settings">
+    <div>Pomodoro: <span>25 min</span></div>
+    <div>Short break: <span>5 min</span></div>
+    <div>Long break: <span>15 min</span></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const MODES = {
+      'pomodoro':    { label: 'Focus Time',   duration: 25 * 60, body: '' },
+      'short-break': { label: 'Short Break',  duration:  5 * 60, body: 'short-break' },
+      'long-break':  { label: 'Long Break',   duration: 15 * 60, body: 'long-break' },
+    };
+
+    const CIRCUMFERENCE = 2 * Math.PI * 126; // ≈ 792
+
+    let currentMode = 'pomodoro';
+    let totalSeconds = MODES[currentMode].duration;
+    let remaining   = totalSeconds;
+    let running     = false;
+    let interval    = null;
+    let completedRounds = 0;
+
+    const display  = document.getElementById('display');
+    const ring     = document.getElementById('ring');
+    const startBtn = document.getElementById('startBtn');
+    const statusLbl= document.getElementById('status-label');
+    const toast    = document.getElementById('toast');
+
+    ring.style.strokeDasharray  = CIRCUMFERENCE;
+    ring.style.strokeDashoffset = 0;
+
+    function setMode(mode) {
+      if (running) toggleTimer();
+      currentMode  = mode;
+      totalSeconds = MODES[mode].duration;
+      remaining    = totalSeconds;
+      document.body.className = MODES[mode].body;
+      statusLbl.textContent   = MODES[mode].label;
+      document.querySelectorAll('.mode-btn').forEach(b =>
+        b.classList.toggle('active', b.textContent.toLowerCase().replace(' ', '-') === mode
+          || (mode === 'short-break' && b.textContent === 'Short Break')
+          || (mode === 'long-break'  && b.textContent === 'Long Break')
+          || (mode === 'pomodoro'    && b.textContent === 'Pomodoro'))
+      );
+      updateDisplay();
+    }
+
+    function toggleTimer() {
+      if (running) {
+        clearInterval(interval);
+        running = false;
+        startBtn.textContent = 'START';
+      } else {
+        running = true;
+        startBtn.textContent = 'PAUSE';
+        interval = setInterval(tick, 1000);
+      }
+    }
+
+    function tick() {
+      if (remaining <= 0) {
+        clearInterval(interval);
+        running = false;
+        startBtn.textContent = 'START';
+        onSessionComplete();
+        return;
+      }
+      remaining--;
+      updateDisplay();
+    }
+
+    function updateDisplay() {
+      const m = String(Math.floor(remaining / 60)).padStart(2, '0');
+      const s = String(remaining % 60).padStart(2, '0');
+      display.textContent = `${m}:${s}`;
+      const pct = remaining / totalSeconds;
+      ring.style.strokeDashoffset = CIRCUMFERENCE * (1 - pct);
+    }
+
+    function resetTimer() {
+      if (running) toggleTimer();
+      remaining = totalSeconds;
+      updateDisplay();
+    }
+
+    function skipSession() {
+      if (running) toggleTimer();
+      onSessionComplete(true);
+    }
+
+    function onSessionComplete(skipped = false) {
+      if (currentMode === 'pomodoro') {
+        completedRounds = Math.min(completedRounds + 1, 4);
+        updateRounds();
+        if (completedRounds === 4) {
+          showToast('🎉 4 rounds done! Time for a long break.');
+          setMode('long-break');
+          completedRounds = 0;
+          updateRounds();
+        } else {
+          showToast('✅ Pomodoro done! Take a short break.');
+          setMode('short-break');
+        }
+      } else {
+        showToast('🍅 Break over! Back to focus.');
+        setMode('pomodoro');
+      }
+    }
+
+    function updateRounds() {
+      document.querySelectorAll('.round-dot').forEach((dot, i) =>
+        dot.classList.toggle('done', i < completedRounds)
+      );
+    }
+
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 3500);
+    }
+
+    updateDisplay();
+  </script>
+</body>
+</html>

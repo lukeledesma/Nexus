@@ -1,5 +1,6 @@
 class ApplicationController < ActionController::Base
   before_action :require_login
+  before_action :set_current_attributes
 
   helper_method :current_user, :logged_in?
 
@@ -21,5 +22,9 @@ class ApplicationController < ActionController::Base
 
   def require_login
     redirect_to login_path unless logged_in?
+  end
+
+  def set_current_attributes
+    Current.user = logged_in? ? current_user : nil
   end
 end

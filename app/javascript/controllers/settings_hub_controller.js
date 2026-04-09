@@ -788,7 +788,7 @@ export default class extends Controller {
   clampTransparency(value) {
     const n = Number(value)
     if (!Number.isFinite(n)) return 0.15
-    return Math.min(0.95, Math.max(0.15, n))
+    return Math.min(1, Math.max(0.15, n))
   }
 
   clampAngle(value) {

@@ -1,0 +1,70 @@
+<% frame_id = params[:frame_id].presence || "app-pane" %>
+<turbo-frame id="<%= frame_id %>">
+  <section class="app-surface app-surface--tool app-surface--finder app-surface--habit-tracker" data-controller="habit-tracker">
+    <div class="finder-shell os-window-body-start">
+      <aside class="finder-shell-pane finder-shell-pane--folders" aria-label="Habit tracker sections">
+        <ul class="finder-folder-list settings-sections-list habit-tracker-panel-list" role="list">
+          <li class="finder-folder-item habit-tracker-panel-row is-active" data-habit-tracker-target="panelRow" data-view="today" role="listitem">
+            <button type="button" class="finder-folder-link finder-folder-link--button" data-view="today" data-action="click->habit-tracker#switchView" aria-label="Open Habits">
+              <span class="finder-folder-icon" aria-hidden="true"><%= material_symbol_icon(:timer, size: :md) %></span>
+              <span class="finder-folder-name">Habits</span>
+            </button>
+          </li>
+          <li class="finder-folder-item habit-tracker-panel-row" data-habit-tracker-target="panelRow" data-view="trends" role="listitem">
+            <button type="button" class="finder-folder-link finder-folder-link--button" data-view="trends" data-action="click->habit-tracker#switchView" aria-label="Open Trends">
+              <span class="finder-folder-icon" aria-hidden="true"><%= material_symbol_icon(:monitoring, size: :md) %></span>
+              <span class="finder-folder-name">Trends</span>
+            </button>
+          </li>
+          <li class="finder-folder-item habit-tracker-panel-row" data-habit-tracker-target="panelRow" data-view="heatmap" role="listitem">
+            <button type="button" class="finder-folder-link finder-folder-link--button" data-view="heatmap" data-action="click->habit-tracker#switchView" aria-label="Open Heatmap">
+              <span class="finder-folder-icon habit-tracker-heatmap-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="3" y="3" width="8" height="8" rx="1.5" opacity=".9"></rect>
+                  <rect x="13" y="3" width="8" height="8" rx="1.5" opacity=".5"></rect>
+                  <rect x="3" y="13" width="8" height="8" rx="1.5" opacity=".6"></rect>
+                  <rect x="13" y="13" width="8" height="8" rx="1.5" opacity=".8"></rect>
+                </svg>
+              </span>
+              <span class="finder-folder-name">Heatmap</span>
+            </button>
+          </li>
+        </ul>
+      </aside>
+
+      <main class="finder-shell-pane finder-shell-pane--contents habit-tracker-main">
+        <section class="habit-tracker-content" data-habit-tracker-target="content"></section>
+      </main>
+    </div>
+
+    <div class="habit-tracker-modal-layer" data-habit-tracker-target="modal" hidden>
+      <div class="habit-tracker-modal-backdrop" data-action="click->habit-tracker#backdropClick"></div>
+      <div class="habit-tracker-modal" role="dialog" aria-modal="true" aria-label="Habit editor">
+        <h4 class="habit-tracker-modal-title" data-habit-tracker-target="modalTitle">Add habit</h4>
+        <label class="habit-tracker-field">
+          <span>Name</span>
+          <input type="text" data-habit-tracker-target="nameInput" maxlength="60" placeholder="Habit name">
+        </label>
+        <label class="habit-tracker-field">
+          <span>Type</span>
+          <select data-habit-tracker-target="typeSelect">
+            <option value="boolean">Done / not done</option>
+            <option value="number">Number</option>
+          </select>
+        </label>
+        <label class="habit-tracker-field">
+          <span>Unit (optional)</span>
+          <input type="text" data-habit-tracker-target="unitInput" maxlength="20" placeholder="minutes">
+        </label>
+        <label class="habit-tracker-field">
+          <span>Color</span>
+          <input type="color" data-habit-tracker-target="colorInput" value="#8b5cf6" aria-label="Habit color">
+        </label>
+        <footer class="habit-tracker-modal-actions">
+          <button type="button" class="habit-tracker-btn habit-tracker-btn--ghost" data-action="click->habit-tracker#closeModal">Cancel</button>
+          <button type="button" class="habit-tracker-btn" data-habit-tracker-target="saveButton" data-action="click->habit-tracker#saveHabit">Add</button>
+        </footer>
+      </div>
+    </div>
+  </section>
+</turbo-frame>

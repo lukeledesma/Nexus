@@ -16,7 +16,7 @@ export default class extends Controller {
     document.removeEventListener("keydown", this.boundKeydown)
   }
 
-  open(event) {
+  async open(event) {
     if (event) event.preventDefault()
     if (!this.hasLayerTarget) return
     this.layerTarget.hidden = false
@@ -26,6 +26,8 @@ export default class extends Controller {
       this.filenameInputTarget.focus()
       this.filenameInputTarget.select()
     }
+    // Always hydrate from the same Finder endpoints so Save As mirrors live Finder contents.
+    await this.refreshFolderListFromServer()
     this.restoreFolderSelection()
     document.addEventListener("keydown", this.boundKeydown)
   }

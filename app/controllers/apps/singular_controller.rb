@@ -41,7 +41,9 @@ module Apps
     def sticky_notes
       @sticky_notes_item = @app_folder.items.find_by(item_type: "stickynotes")
       apply_singular_document_or_blank(@sticky_notes_item, "stickynotes")
-      @stickies = parse_stickies(@sticky_notes_item&.body)
+      doc = parse_sticky_notes_document(@sticky_notes_item&.body)
+      @stickies = doc[:stickies]
+      @sticky_notes_viewport = doc[:viewport] || {}
     end
 
     # PATCH /apps/singular_sticky_notes
@@ -155,12 +157,37 @@ module Apps
       raise
     end
 
-    def parse_stickies(body)
-      return [] if body.blank?
+    # Body is either a JSON array of stickies (legacy) or
+    # { "stickies": [...], "zoom": 1.25, "panX": 0, "panY": 0 }.
+    def parse_sticky_notes_document(body)
+      return { stickies: [], viewport: {} } if body.blank?
 
-      JSON.parse(body)
-    rescue JSON::ParserError
-      []
+      parsed = JSON.parse(body)
+      if parsed.is_a?(Array)
+        { stickies: parsed, viewport: {} }
+      elsif parsed.is_a?(Hash) && parsed["stickies"].is_a?(Array)
+        viewport = sticky_notes_viewport_from_hash(parsed)
+        { stickies: parsed["stickies"], viewport: viewport }
+      else
+        { stickies: [], viewport: {} }
+      end
+    rescue JSON::ParserError, TypeError
+      { stickies: [], viewport: {} }
+    end
+
+    def sticky_notes_viewport_from_hash(parsed)
+      vp = {}
+      if parsed.key?("zoom")
+        z = parsed["zoom"]
+        vp[:zoom] = z.is_a?(Numeric) ? z.to_f : z.to_s.to_f
+      end
+      if parsed.key?("panX") || parsed.key?("pan_x")
+        vp[:panX] = (parsed["panX"] || parsed["pan_x"]).to_f
+      end
+      if parsed.key?("panY") || parsed.key?("pan_y")
+        vp[:panY] = (parsed["panY"] || parsed["pan_y"]).to_f
+      end
+      vp
     end
 
     def normalize_tasks(value)

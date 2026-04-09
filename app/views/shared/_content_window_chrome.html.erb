@@ -2,7 +2,9 @@
 <% open_file_badge = local_assigns.fetch(:open_file_badge, false) %>
 <% show_finder_new_folder = local_assigns.fetch(:show_finder_new_folder, false) %>
 <% show_task_list_add = local_assigns.fetch(:show_task_list_add, false) %>
-<% chrome_toolbar = show_finder_new_folder || show_task_list_add %>
+<% show_habit_add = local_assigns.fetch(:show_habit_add, false) %>
+<% show_sticky_notes_add = local_assigns.fetch(:show_sticky_notes_add, false) %>
+<% chrome_toolbar = show_finder_new_folder || show_task_list_add || show_habit_add || show_sticky_notes_add %>
 <header class="content-window-chrome<%= " content-window-chrome--with-save" if show_save %><%= " content-window-chrome--with-open-file" if open_file_badge %><%= " content-window-chrome--with-finder-toolbar" if chrome_toolbar %>">
   <% if open_file_badge %>
     <div class="content-window-title-shell">
@@ -30,6 +32,24 @@
         data-action="click->content-window#emitTaskListAddTask"
         title="Add task"
         aria-label="Add task"
+      ><%= material_symbol_icon(:add, size: :xs) %></button>
+    <% end %>
+    <% if show_habit_add %>
+      <button
+        type="button"
+        class="content-window-new-folder-btn settings-themes-item-action-btn theme-builder-save-btn"
+        data-action="click->content-window#emitHabitAdd"
+        title="New habit"
+        aria-label="New habit"
+      ><%= material_symbol_icon(:add, size: :xs) %></button>
+    <% end %>
+    <% if show_sticky_notes_add %>
+      <button
+        type="button"
+        class="content-window-new-folder-btn settings-themes-item-action-btn theme-builder-save-btn"
+        data-action="click->content-window#emitStickyNotesAddSticky"
+        title="Add sticky note"
+        aria-label="Add sticky note"
       ><%= material_symbol_icon(:add, size: :xs) %></button>
     <% end %>
     <% if show_save %>

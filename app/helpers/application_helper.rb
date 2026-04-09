@@ -15,6 +15,7 @@ module ApplicationHelper
       { window_key: "singular-note", pin_key: "singular-note", label: "NOTEPAD", icon: :notepad },
       { window_key: "singular-task-list", pin_key: "singular-task-list", label: "TASKS", icon: :task_checklist },
       { window_key: "singular-sticky-notes", pin_key: "singular-sticky-notes", label: "STICKY NOTES", icon: :sticky_note },
+      { window_key: "habit-tracker", pin_key: "habit-tracker", label: "HABITS", icon: :timer },
       { window_key: "finder", pin_key: "finder", label: "FINDER", icon: :folder },
       { window_key: "settings", pin_key: "settings", label: "SETTINGS", icon: :settings }
     ].freeze

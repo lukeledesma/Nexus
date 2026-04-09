@@ -109,7 +109,7 @@
         data-content-window-storage-key-value="nexus.contentWindow.singularStickyNotes.bounds"
         data-content-window-frame-id-value="singular-sticky-notes-pane"
         aria-live="polite">
-        <%= render "shared/content_window_chrome", title: "STICKY NOTES", show_save: true, open_file_badge: true %>
+        <%= render "shared/content_window_chrome", title: "STICKY NOTES", show_save: true, open_file_badge: true, show_sticky_notes_add: true %>
         <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
@@ -120,6 +120,27 @@
         <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="window-content">
           <turbo-frame id="singular-sticky-notes-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
+        </div>
+      </section>
+
+      <section class="content-window os-window is-hidden"
+        data-controller="content-window"
+        data-content-window-app-key-value="habit-tracker"
+        data-content-window-app-url-value="/apps/habit_tracker"
+        data-content-window-storage-key-value="nexus.contentWindow.habitTracker.bounds"
+        data-content-window-frame-id-value="habit-tracker-pane"
+        aria-live="polite">
+        <%= render "shared/content_window_chrome", title: "HABITS", show_habit_add: true %>
+        <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="window-content">
+          <turbo-frame id="habit-tracker-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
         </div>
       </section>
 

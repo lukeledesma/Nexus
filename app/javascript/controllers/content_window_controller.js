@@ -27,6 +27,7 @@ export default class extends Controller {
     const minByAppKey = {
       "singular-note": { width: 581, height: 500 },
       "singular-sticky-notes": { width: 520, height: 420 },
+      "habit-tracker": finderLikeMin,
       "finder": finderLikeMin,
       "settings": finderLikeMin,
       "user": { width: 320, height: 220 },
@@ -68,6 +69,16 @@ export default class extends Controller {
     this.syncDesktopZIndexFloor()
     this.restoreWindowBounds()
     this.restoreOpenState()
+
+    if (this.appKeyValue === "singular-sticky-notes") {
+      this.stickyNotesK = null
+      this.stickyNotesKFallback = 100
+      this.boundStickyNotesFrameLoad = () => {
+        requestAnimationFrame(() => this.measureStickyNotesK())
+      }
+      this.frameTarget?.addEventListener("load", this.boundStickyNotesFrameLoad)
+      requestAnimationFrame(() => this.measureStickyNotesK())
+    }
   }
 
   disconnect() {
@@ -75,6 +86,9 @@ export default class extends Controller {
     this.stopResize()
     if (this.attentionTimer) clearTimeout(this.attentionTimer)
     if (this.windowSizer) this.windowSizer.disconnect()
+    if (this.boundStickyNotesFrameLoad && this.hasFrameTarget) {
+      this.frameTarget.removeEventListener("load", this.boundStickyNotesFrameLoad)
+    }
     window.removeEventListener("app-window:toggle", this.boundToggleRequest)
     window.removeEventListener("app-window:open", this.boundOpenRequest)
     window.removeEventListener("nexus:singular-disk-saved", this.boundSingularSaved)
@@ -485,6 +499,34 @@ export default class extends Controller {
     if (left + width > vw - margin) width = vw - margin - left
     if (top + height > vh - this.bottomDockBoundary) height = vh - this.bottomDockBoundary - top
 
+    if (this.appKeyValue === "singular-sticky-notes") {
+      const k = this.getStickyNotesK()
+      if (k != null) {
+        const edge = this.activeResize.edge
+        const isCorner = edge.split("-").length === 2
+        if (isCorner) {
+          const w = (width + height + k) / 2
+          const h = w - k
+          width = w
+          height = h
+        } else if (edge === "top" || edge === "bottom") {
+          width = height + k
+        } else {
+          height = width - k
+        }
+        const r = this.reanchorStickyNotesResize(edge, width, height)
+        left = r.left
+        top = r.top
+        width = r.width
+        height = r.height
+        const snapped = this.snapStickyNotesBounds(left, top, width, height)
+        left = snapped.left
+        top = snapped.top
+        width = snapped.width
+        height = snapped.height
+      }
+    }
+
     this.element.style.left = `${left}px`
     this.element.style.top = `${top}px`
     this.element.style.width = `${width}px`
@@ -503,17 +545,158 @@ export default class extends Controller {
     document.removeEventListener("touchend", this.boundResizeEnd)
   }
 
+  /** Sticky Notes: outer W − H must stay constant so the iframe grid shell stays square (see syncGridMetrics). */
+  measureStickyNotesK() {
+    if (this.appKeyValue !== "singular-sticky-notes") return
+    if (!this.hasFrameTarget) return
+    const doc = this.frameTarget.contentDocument || this.frameTarget.contentWindow?.document
+    if (!doc?.body) return
+    const shell = doc.querySelector('[data-sticky-notes-target="contentShell"]')
+    if (!shell) return
+    const win = this.element.getBoundingClientRect()
+    const cs = shell.getBoundingClientRect()
+    const chromeW = win.width - cs.width
+    const chromeH = win.height - cs.height
+    const k = chromeW - chromeH
+    if (Number.isFinite(k)) this.stickyNotesK = k
+  }
+
+  getStickyNotesK() {
+    if (this.appKeyValue !== "singular-sticky-notes") return null
+    const k = this.stickyNotesK
+    if (k != null && Number.isFinite(k)) return k
+    return this.stickyNotesKFallback ?? 100
+  }
+
+  reanchorStickyNotesResize(edge, width, height) {
+    const ar = this.activeResize
+    const right = ar.startLeft + ar.startWidth
+    const bottom = ar.startTop + ar.startHeight
+    let left = ar.startLeft
+    let top = ar.startTop
+    if (edge.includes("left")) left = right - width
+    if (edge.includes("top")) top = bottom - height
+    return { left, top, width, height }
+  }
+
+  snapStickyNotesBounds(left, top, width, height) {
+    const k = this.getStickyNotesK()
+    if (k == null) return { left, top, width, height }
+
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    const m = this.viewportMargin
+    const dock = this.dockLeftBoundary
+    const bot = this.bottomDockBoundary
+
+    const minW = Math.max(this.minWindowWidth, this.minWindowHeight + k)
+    const minH = Math.max(this.minWindowHeight, this.minWindowWidth - k)
+
+    const absMaxW = vw - dock - m
+    const absMaxH = vh - m - bot
+
+    let w = width
+    let h = w - k
+    if (w < minW) {
+      w = minW
+      h = w - k
+    }
+    if (h < minH) {
+      h = minH
+      w = h + k
+    }
+    if (w > absMaxW) {
+      w = absMaxW
+      h = w - k
+    }
+    if (h > absMaxH) {
+      h = absMaxH
+      w = h + k
+    }
+    if (w > absMaxW) {
+      w = absMaxW
+      h = w - k
+    }
+    if (h < minH) {
+      h = minH
+      w = h + k
+    }
+    if (w < minW) {
+      w = minW
+      h = w - k
+    }
+
+    let l = left
+    let tt = top
+
+    for (let i = 0; i < 24; i++) {
+      const maxWHere = vw - m - l
+      const maxHHere = vh - bot - tt
+
+      if (w > maxWHere) {
+        w = Math.max(minW, maxWHere)
+        h = w - k
+      }
+      if (h > maxHHere) {
+        h = Math.max(minH, maxHHere)
+        w = h + k
+      }
+      if (w > maxWHere) {
+        w = Math.max(minW, maxWHere)
+        h = w - k
+      }
+      if (h < minH) {
+        h = minH
+        w = h + k
+      }
+      if (w < minW) {
+        w = minW
+        h = w - k
+      }
+
+      if (l < dock) l = dock
+      if (tt < m) tt = m
+      if (l + w > vw - m) l = vw - m - w
+      if (tt + h > vh - bot) tt = vh - bot - h
+
+      const mw = vw - m - l
+      const mh = vh - bot - tt
+      if (w <= mw && h <= mh && l >= dock && tt >= m) break
+    }
+
+    l = Math.min(Math.max(l, dock), vw - m - w)
+    tt = Math.min(Math.max(tt, m), vh - bot - h)
+
+    return { left: l, top: tt, width: w, height: h }
+  }
+
   positionWindow() {
     const vw = window.innerWidth
     const vh = window.innerHeight
-    const width = Math.max(this.minWindowWidth, Math.min(this.windowWidth, vw - 40))
-    const height = Math.max(this.minWindowHeight, Math.min(this.windowHeight, vh - 40))
-    const centeredLeft = Math.round((vw - width) / 2)
-    const centeredTop = Math.round((vh - height) / 2)
-    const maxLeft = Math.max(this.dockLeftBoundary, vw - this.viewportMargin - width)
-    const maxTop = Math.max(this.viewportMargin, vh - this.bottomDockBoundary - height)
-    const left = Math.min(Math.max(centeredLeft, this.dockLeftBoundary), maxLeft)
-    const top = Math.min(Math.max(centeredTop, this.viewportMargin), maxTop)
+    let width = Math.max(this.minWindowWidth, Math.min(this.windowWidth, vw - 40))
+    let height = Math.max(this.minWindowHeight, Math.min(this.windowHeight, vh - 40))
+
+    if (this.appKeyValue === "singular-sticky-notes") {
+      const k = this.getStickyNotesK()
+      if (k != null) {
+        height = width - k
+      }
+    }
+
+    let centeredLeft = Math.round((vw - width) / 2)
+    let centeredTop = Math.round((vh - height) / 2)
+    let maxLeft = Math.max(this.dockLeftBoundary, vw - this.viewportMargin - width)
+    let maxTop = Math.max(this.viewportMargin, vh - this.bottomDockBoundary - height)
+    let left = Math.min(Math.max(centeredLeft, this.dockLeftBoundary), maxLeft)
+    let top = Math.min(Math.max(centeredTop, this.viewportMargin), maxTop)
+
+    if (this.appKeyValue === "singular-sticky-notes") {
+      const snapped = this.snapStickyNotesBounds(left, top, width, height)
+      left = snapped.left
+      top = snapped.top
+      width = snapped.width
+      height = snapped.height
+    }
 
     this.element.style.width = `${width}px`
     this.element.style.height = `${height}px`
@@ -590,12 +773,20 @@ export default class extends Controller {
     const margin = this.viewportMargin
     const maxWidth = Math.max(this.minWindowWidth, vw - this.dockLeftBoundary - margin)
     const maxHeight = Math.max(this.minWindowHeight, vh - (margin + this.bottomDockBoundary))
-    const width = Math.min(Math.max(bounds.width, this.minWindowWidth), maxWidth)
-    const height = Math.min(Math.max(bounds.height, this.minWindowHeight), maxHeight)
+    let width = Math.min(Math.max(bounds.width, this.minWindowWidth), maxWidth)
+    let height = Math.min(Math.max(bounds.height, this.minWindowHeight), maxHeight)
     const maxLeft = Math.max(this.dockLeftBoundary, vw - margin - width)
     const maxTop = Math.max(margin, vh - this.bottomDockBoundary - height)
-    const left = Math.min(Math.max(bounds.left, this.dockLeftBoundary), maxLeft)
-    const top = Math.min(Math.max(bounds.top, margin), maxTop)
+    let left = Math.min(Math.max(bounds.left, this.dockLeftBoundary), maxLeft)
+    let top = Math.min(Math.max(bounds.top, margin), maxTop)
+
+    if (this.appKeyValue === "singular-sticky-notes") {
+      const snapped = this.snapStickyNotesBounds(left, top, width, height)
+      left = snapped.left
+      top = snapped.top
+      width = snapped.width
+      height = snapped.height
+    }
 
     return { left, top, width, height }
   }
@@ -642,6 +833,26 @@ export default class extends Controller {
     window.dispatchEvent(
       new CustomEvent("nexus:task-list-add-task", {
         detail: { frameId: this.hasFrameIdValue ? this.frameIdValue : "singular-task-list-pane" }
+      })
+    )
+  }
+
+  emitHabitAdd(event) {
+    if (event) event.preventDefault()
+    if (this.appKeyValue !== "habit-tracker") return
+    window.dispatchEvent(
+      new CustomEvent("nexus:habit-add", {
+        detail: { frameId: this.hasFrameIdValue ? this.frameIdValue : "habit-tracker-pane" }
+      })
+    )
+  }
+
+  emitStickyNotesAddSticky(event) {
+    if (event) event.preventDefault()
+    if (this.appKeyValue !== "singular-sticky-notes") return
+    window.dispatchEvent(
+      new CustomEvent("nexus:sticky-notes-add-sticky", {
+        detail: { frameId: this.hasFrameIdValue ? this.frameIdValue : "singular-sticky-notes-pane" }
       })
     )
   }
