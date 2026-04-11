@@ -2,7 +2,7 @@
 class Item < ApplicationRecord
   belongs_to :folder
 
-  TYPES = %w[note task_list stickynotes].freeze
+  TYPES = %w[note task_list stickynotes thread_board].freeze
 
   validates :name, presence: true
   validates :item_type, inclusion: { in: TYPES }

@@ -1,0 +1,6 @@
+Sprites in this folder are from clawd-on-desk (MIT License).
+Source: https://github.com/rullerzhou-afk/clawd-on-desk/tree/main/assets/gif
+Copyright (c) 2026 rullerzhou-afk
+
+Bundled assets include full-size clawd-*.gif (idle, thinking, typing, etc.)
+and optional clawd-mini-*.gif from the same repository.

@@ -20,8 +20,11 @@ get "settings", to: "settings#show"
     get "singular_task_list", to: "singular#task_list"
     get "singular_sticky_notes", to: "singular#sticky_notes"
     patch "singular_sticky_notes", to: "singular#update_sticky_notes"
+    get "singular_thread_board", to: "singular#thread_board"
+    patch "singular_thread_board", to: "singular#update_thread_board"
     post "singular/save_file", to: "singular#save_file"
     post "workspace/flush_disk", to: "workspace_sync#flush_disk"
+    post "ollama_helper/chat", to: "ollama_helper#chat", as: :ollama_helper_chat
     get "all_tasks",  to: "task_lists#index"
   end
 

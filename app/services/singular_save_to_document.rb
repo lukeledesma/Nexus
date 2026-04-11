@@ -5,7 +5,8 @@ class SingularSaveToDocument
   FRAME_MAP = {
     "singular-note-pane" => { item_type: "note", content_type: "note" },
     "singular-task-list-pane" => { item_type: "task_list", content_type: "task_list" },
-    "singular-sticky-notes-pane" => { item_type: "stickynotes", content_type: "stickynotes" }
+    "singular-sticky-notes-pane" => { item_type: "stickynotes", content_type: "stickynotes" },
+    "singular-thread-board-pane" => { item_type: "thread_board", content_type: "thread_board" }
   }.freeze
 
   def initialize(user:, folder_id:, frame_id:, filename:, document_id: nil)
@@ -79,6 +80,12 @@ class SingularSaveToDocument
       doc.reset_days = []
       doc.last_reset_at = nil
     when "stickynotes"
+      doc.content = item.body.to_s
+      doc.tasks = []
+      doc.reset_mode = "none"
+      doc.reset_days = []
+      doc.last_reset_at = nil
+    when "thread_board"
       doc.content = item.body.to_s
       doc.tasks = []
       doc.reset_mode = "none"

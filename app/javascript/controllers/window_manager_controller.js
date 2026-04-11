@@ -724,7 +724,9 @@ export default class extends Controller {
 
   bringLauncherToFront() {
     if (!this.launcherWindow || this.launcherWindow.classList.contains("is-hidden")) return
-    const next = Number(window.__nexusDesktopZIndex || 1500) + 1
+    const bumped = Number(window.__nexusDesktopZIndex || 1500) + 1
+    /* Stay at least at the organizer window’s CSS floor (application.css `.organizer-window.os-window`). */
+    const next = Math.max(bumped, 1720)
     window.__nexusDesktopZIndex = next
     this.launcherWindow.style.zIndex = String(next)
     this.emitLauncherState(true)

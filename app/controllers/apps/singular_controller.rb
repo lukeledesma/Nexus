@@ -2,7 +2,7 @@
 
 module Apps
   class SingularController < BaseController
-    before_action :redirect_top_level_frame_requests, only: %i[note task_list sticky_notes]
+    before_action :redirect_top_level_frame_requests, only: %i[note task_list sticky_notes thread_board]
 
     before_action :ensure_singular_items
 
@@ -63,6 +63,33 @@ module Apps
         }
       else
         render json: { errors: @sticky_notes_item.errors.full_messages }, status: :unprocessable_entity
+      end
+    end
+
+    # GET /apps/singular_thread_board
+    def thread_board
+      @thread_board_item = @app_folder.items.find_by(item_type: "thread_board")
+      apply_singular_document_or_blank(@thread_board_item, "thread_board")
+      @thread_board_doc = parse_thread_board_document(@thread_board_item&.body)
+    end
+
+    # PATCH /apps/singular_thread_board
+    def update_thread_board
+      @thread_board_item = @app_folder.items.find_by(item_type: "thread_board")
+      return head :not_found unless @thread_board_item
+
+      raw = params[:thread_board]
+      json = raw.is_a?(String) ? raw : raw.to_json
+
+      if @thread_board_item.update(body: json)
+        ItemStorageSyncLite.sync_all!(username: current_user&.username)
+        render json: {
+          ok: true,
+          item_type: "thread_board",
+          updated_at: @thread_board_item.updated_at&.utc&.iso8601
+        }
+      else
+        render json: { errors: @thread_board_item.errors.full_messages }, status: :unprocessable_entity
       end
     end
 
@@ -144,6 +171,14 @@ module Apps
         item.tasks = []
       end
 
+      Item.find_or_create_by!(folder_id: @app_folder.id, item_type: "thread_board") do |item|
+        item.folder_id = @app_folder.id
+        item.name = "Thread Board"
+        item.item_type = "thread_board"
+        item.body = "{}"
+        item.tasks = []
+      end
+
       # Sync to disk to ensure workspace text files exist.
       # Rare cache-clear reload spikes can trigger transient file races; retry once.
       begin
@@ -188,6 +223,33 @@ module Apps
         vp[:panY] = (parsed["panY"] || parsed["pan_y"]).to_f
       end
       vp
+    end
+
+    def parse_thread_board_document(body)
+      return empty_thread_board_document if body.blank?
+
+      parsed = JSON.parse(body)
+      return empty_thread_board_document unless parsed.is_a?(Hash)
+
+      {
+        "cards" => parsed["cards"].is_a?(Array) ? parsed["cards"] : [],
+        "connections" => parsed["connections"].is_a?(Array) ? parsed["connections"] : [],
+        "view" => parsed["view"].is_a?(Hash) ? parsed["view"] : {},
+        "nextCardId" => (parsed["nextCardId"] || parsed["next_card_id"]).to_i,
+        "nextConnId" => (parsed["nextConnId"] || parsed["next_conn_id"]).to_i
+      }
+    rescue JSON::ParserError, TypeError
+      empty_thread_board_document
+    end
+
+    def empty_thread_board_document
+      {
+        "cards" => [],
+        "connections" => [],
+        "view" => {},
+        "nextCardId" => 0,
+        "nextConnId" => 0
+      }
     end
 
     def normalize_tasks(value)
@@ -259,6 +321,8 @@ module Apps
         item.update!(tasks: doc.tasks || [])
       when "stickynotes"
         item.update!(body: doc.content.to_s)
+      when "thread_board"
+        item.update!(body: doc.content.to_s)
       end
     end
 
@@ -270,6 +334,8 @@ module Apps
         item.update!(tasks: [])
       when "stickynotes"
         item.update!(body: "[]")
+      when "thread_board"
+        item.update!(body: "{}")
       end
     end
   end

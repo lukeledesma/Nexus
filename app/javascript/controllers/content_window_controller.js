@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 import { createOsWindowSizer } from "lib/os_window_sizing"
+import { syncOrganizerAboveVisibleContentWindows } from "lib/nexus_desktop_layers"
 
 const DESKTOP_WINDOW_LAYERS_KEY = "nexus.desktop.windowLayers"
 
@@ -27,6 +28,7 @@ export default class extends Controller {
     const minByAppKey = {
       "singular-note": { width: 581, height: 500 },
       "singular-sticky-notes": { width: 520, height: 420 },
+      "singular-thread-board": { width: 640, height: 480 },
       "habit-tracker": finderLikeMin,
       "finder": finderLikeMin,
       "settings": finderLikeMin,
@@ -67,6 +69,7 @@ export default class extends Controller {
 
     this.restoreWindowZIndex()
     this.syncDesktopZIndexFloor()
+    syncOrganizerAboveVisibleContentWindows()
     this.restoreWindowBounds()
     this.restoreOpenState()
 
@@ -367,7 +370,9 @@ export default class extends Controller {
   }
 
   isSingularApp() {
-    return ["singular-note", "singular-task-list", "singular-sticky-notes"].includes(this.appKeyValue)
+    return ["singular-note", "singular-task-list", "singular-sticky-notes", "singular-thread-board"].includes(
+      this.appKeyValue
+    )
   }
 
   buildAppUrl(options = {}) {
@@ -819,6 +824,7 @@ export default class extends Controller {
     window.__nexusDesktopZIndex = next
     this.element.style.zIndex = String(next)
     this.persistWindowLayer(next)
+    syncOrganizerAboveVisibleContentWindows()
     this.emitWindowState(!this.element.classList.contains("is-hidden"))
   }
 

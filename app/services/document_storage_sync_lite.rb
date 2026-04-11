@@ -242,6 +242,8 @@ class DocumentStorageSyncLite
       unified_task_list_contents
     when "stickynotes"
       unified_stickynotes_contents
+    when "thread_board"
+      unified_thread_board_contents
     when "note"
       note_rtf_file_body
     else
@@ -268,6 +270,17 @@ class DocumentStorageSyncLite
   def unified_stickynotes_contents
     header = NexusFileFormat.unified_header_lines(
       kind: NexusFileFormat::KIND_STICKYNOTES,
+      title: @document.title,
+      document_id: @document.id,
+      created_at: @document.created_at,
+      updated_at: @document.updated_at
+    )
+    (header + [@document.content.to_s]).join("\n")
+  end
+
+  def unified_thread_board_contents
+    header = NexusFileFormat.unified_header_lines(
+      kind: NexusFileFormat::KIND_THREAD_BOARD,
       title: @document.title,
       document_id: @document.id,
       created_at: @document.created_at,

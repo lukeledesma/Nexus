@@ -318,6 +318,26 @@ export default class extends Controller {
           })
         )
       })
+    } else if (frameId.includes("thread-board")) {
+      await new Promise((resolve) => {
+        const timeout = window.setTimeout(() => {
+          document.removeEventListener("nexus:thread-board-save-complete", onTb)
+          resolve()
+        }, 10000)
+        const onTb = (e) => {
+          if (e.detail?.frameId !== frameId) return
+          window.clearTimeout(timeout)
+          document.removeEventListener("nexus:thread-board-save-complete", onTb)
+          resolve()
+        }
+        document.addEventListener("nexus:thread-board-save-complete", onTb)
+        document.dispatchEvent(
+          new CustomEvent("nexus:request-save", {
+            bubbles: true,
+            detail: { frameId, folderId }
+          })
+        )
+      })
     } else {
       document.dispatchEvent(
         new CustomEvent("nexus:request-save", {

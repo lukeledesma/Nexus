@@ -190,6 +190,8 @@ class DocumentDiskLoader
         build_task_list_attributes(metadata, body)
       when NexusFileFormat::KIND_STICKYNOTES
         parse_stickynotes_from_unified(metadata, body)
+      when NexusFileFormat::KIND_THREAD_BOARD
+        parse_thread_board_from_unified(metadata, body)
       else
         parse_note(lines)
       end
@@ -255,6 +257,19 @@ class DocumentDiskLoader
     def parse_stickynotes_from_unified(metadata, body)
       {
         content_type: "stickynotes",
+        content: body,
+        tasks: [],
+        reset_mode: "none",
+        reset_days: [],
+        last_reset_at: nil,
+        created_at: parse_time(metadata["created_at"]),
+        updated_at: parse_time(metadata["updated_at"])
+      }
+    end
+
+    def parse_thread_board_from_unified(metadata, body)
+      {
+        content_type: "thread_board",
         content: body,
         tasks: [],
         reset_mode: "none",

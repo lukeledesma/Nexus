@@ -125,6 +125,27 @@
 
       <section class="content-window os-window is-hidden"
         data-controller="content-window"
+        data-content-window-app-key-value="singular-thread-board"
+        data-content-window-app-url-value="/apps/singular_thread_board"
+        data-content-window-storage-key-value="nexus.contentWindow.singularThreadBoard.bounds"
+        data-content-window-frame-id-value="singular-thread-board-pane"
+        aria-live="polite">
+        <%= render "shared/content_window_chrome", title: "THREAD BOARD", show_save: true, open_file_badge: true %>
+        <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="window-content">
+          <turbo-frame id="singular-thread-board-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
+        </div>
+      </section>
+
+      <section class="content-window os-window is-hidden"
+        data-controller="content-window"
         data-content-window-app-key-value="habit-tracker"
         data-content-window-app-url-value="/apps/habit_tracker"
         data-content-window-storage-key-value="nexus.contentWindow.habitTracker.bounds"
@@ -189,8 +210,11 @@
       <%= render "shared/app_save_dialog", frame_id: "singular-note-pane", default_filename: "Notes" %>
       <%= render "shared/app_save_dialog", frame_id: "singular-task-list-pane", default_filename: "Tasks" %>
       <%= render "shared/app_save_dialog", frame_id: "singular-sticky-notes-pane", default_filename: "Sticky notes" %>
+      <%= render "shared/app_save_dialog", frame_id: "singular-thread-board-pane", default_filename: "Thread board" %>
 
       <%= render "apps/user/security_modals", frame_id: "settings-pane" %>
+
+      <%= render "shared/ollama_helper" %>
 
     <% end %>
 

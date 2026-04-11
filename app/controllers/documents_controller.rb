@@ -101,12 +101,21 @@ class DocumentsController < ApplicationController
     end
 
     content_type = normalize_content_type(params[:content_type])
+    initial_content =
+      if content_type == "note"
+        ""
+      elsif content_type == "thread_board"
+        "{}"
+      else
+        nil
+      end
+
     item = Document.new(
       is_folder: false,
       parent: @document,
       title: next_item_title(@document, content_type),
       content_type: content_type,
-      content: (content_type == "note" ? "" : nil),
+      content: initial_content,
       tasks: [],
       reset_mode: "none",
       reset_days: []
@@ -265,7 +274,11 @@ class DocumentsController < ApplicationController
   end
 
   def next_item_title(folder, content_type)
-    base = (content_type == "task_list" ? "Untitled Task List" : "Untitled Note")
+    base = case content_type.to_s
+           when "task_list" then "Untitled Task List"
+           when "thread_board" then Document::DEFAULT_THREAD_BOARD_TITLE
+           else "Untitled Note"
+           end
     names = folder.children.files.where(content_type: content_type).pluck(:title).map(&:to_s)
     return base unless names.include?(base)
 

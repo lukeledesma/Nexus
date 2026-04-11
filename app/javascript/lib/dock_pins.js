@@ -10,6 +10,7 @@ export const PINNABLE_APP_KEYS = new Set([
   "singular-note",
   "singular-task-list",
   "singular-sticky-notes",
+  "singular-thread-board",
   "habit-tracker",
   "finder",
   "settings"
@@ -20,6 +21,7 @@ export const DOCK_APP_KEY_ORDER = [
   "singular-note",
   "singular-task-list",
   "singular-sticky-notes",
+  "singular-thread-board",
   "habit-tracker",
   "finder",
   "settings"
@@ -159,6 +161,7 @@ export const DOCK_HOVER_LABELS = {
   "singular-note": "Notepad",
   "singular-task-list": "Tasks",
   "singular-sticky-notes": "Sticky Notes",
+  "singular-thread-board": "Thread Board",
   "habit-tracker": "Habits",
   settings: "Settings"
 }

@@ -62,10 +62,15 @@ class ItemStorageSyncLite
         stickies = app_folder.items.find_by(item_type: "stickynotes")
         stickies_content = stickies ? item_contents(stickies) : empty_stickynotes_contents
         File.write(temp_root.join("stickynotes.txt"), stickies_content)
+
+        thread_board = app_folder.items.find_by(item_type: "thread_board")
+        thread_board_content = thread_board ? item_contents(thread_board) : empty_thread_board_contents
+        File.write(temp_root.join("thread_board.txt"), thread_board_content)
       else
         # Create empty placeholders if App folder doesn't exist yet
         File.write(temp_root.join("Tasks.txt"), empty_task_list_contents)
         File.write(temp_root.join("stickynotes.txt"), empty_stickynotes_contents)
+        File.write(temp_root.join("thread_board.txt"), empty_thread_board_contents)
       end
 
     # Write user folders as subdirectories (without items inside them)
@@ -142,6 +147,7 @@ class ItemStorageSyncLite
   def item_contents(item)
     return task_list_contents(item) if item.item_type == "task_list"
     return stickynotes_contents(item) if item.item_type == "stickynotes"
+    return thread_board_contents(item) if item.item_type == "thread_board"
 
     ""
   end
@@ -165,6 +171,28 @@ class ItemStorageSyncLite
       "# updated_at: null",
       "",
       "[]"
+    ].join("\n")
+  end
+
+  def thread_board_contents(item)
+    [
+      "# NEXUS_THREAD_BOARD",
+      "# name: #{item.name}",
+      "# item_id: #{item.id}",
+      "# updated_at: #{iso8601_or_nil(item.updated_at)}",
+      "",
+      item.body.to_s
+    ].join("\n")
+  end
+
+  def empty_thread_board_contents
+    [
+      "# NEXUS_THREAD_BOARD",
+      "# name: Thread Board",
+      "# item_id: ",
+      "# updated_at: null",
+      "",
+      "{}"
     ].join("\n")
   end
 

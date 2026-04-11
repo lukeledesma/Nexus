@@ -1,5 +1,6 @@
 module ApplicationHelper
   include NexusUiHelper
+  include MaterialIconsHelper
 
   # Same folder list as Finder sidebar (user folders under Finder, excluding Desktop/Documents).
   def finder_sidebar_folders
@@ -15,6 +16,7 @@ module ApplicationHelper
       { window_key: "singular-note", pin_key: "singular-note", label: "NOTEPAD", icon: :notepad },
       { window_key: "singular-task-list", pin_key: "singular-task-list", label: "TASKS", icon: :task_checklist },
       { window_key: "singular-sticky-notes", pin_key: "singular-sticky-notes", label: "STICKY NOTES", icon: :sticky_note },
+      { window_key: "singular-thread-board", pin_key: "singular-thread-board", label: "THREAD BOARD", icon: :swap_horizontal },
       { window_key: "habit-tracker", pin_key: "habit-tracker", label: "HABITS", icon: :timer },
       { window_key: "finder", pin_key: "finder", label: "FINDER", icon: :folder },
       { window_key: "settings", pin_key: "settings", label: "SETTINGS", icon: :settings }
@@ -34,6 +36,7 @@ module ApplicationHelper
     when "note" then :notepad
     when "task_list" then :task_checklist
     when "stickynotes" then :sticky_note
+    when "thread_board" then :swap_horizontal
     else :file_document
     end
   end

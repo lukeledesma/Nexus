@@ -4,7 +4,8 @@ class Document < ApplicationRecord
   DEFAULT_FOLDER_TITLE = "New Folder"
   DEFAULT_NOTE_TITLE = "Untitled Note"
   DEFAULT_TASK_LIST_TITLE = "Untitled Task List"
-  CONTENT_TYPES = %w[note task_list stickynotes].freeze
+  DEFAULT_THREAD_BOARD_TITLE = "Untitled Thread Board"
+  CONTENT_TYPES = %w[note task_list stickynotes thread_board].freeze
 
   belongs_to :parent, class_name: "Document", optional: true
   has_many :children, class_name: "Document", foreign_key: :parent_id, dependent: :destroy
@@ -89,7 +90,11 @@ class Document < ApplicationRecord
       self.reset_days = []
     else
       self.content_type = content_type.to_s.presence || "note"
-      default_title = (content_type == "task_list" ? DEFAULT_TASK_LIST_TITLE : DEFAULT_NOTE_TITLE)
+      default_title = case content_type.to_s
+                      when "task_list" then DEFAULT_TASK_LIST_TITLE
+                      when "thread_board" then DEFAULT_THREAD_BOARD_TITLE
+                      else DEFAULT_NOTE_TITLE
+                      end
       self.title = (title.presence || default_title).to_s.strip
       self.tasks = normalize_tasks(tasks)
 
@@ -107,6 +112,12 @@ class Document < ApplicationRecord
         self.last_reset_at = nil
       elsif content_type == "stickynotes"
         self.content = content.to_s
+        self.tasks = []
+        self.reset_mode = "none"
+        self.reset_days = []
+        self.last_reset_at = nil
+      elsif content_type == "thread_board"
+        self.content = content.present? ? content.to_s : "{}"
         self.tasks = []
         self.reset_mode = "none"
         self.reset_days = []
@@ -174,6 +185,6 @@ class Document < ApplicationRecord
     return if folder?
     return if CONTENT_TYPES.include?(content_type.to_s)
 
-    errors.add(:content_type, "must be note, task_list, or stickynotes")
+    errors.add(:content_type, "must be note, task_list, stickynotes, or thread_board")
   end
 end

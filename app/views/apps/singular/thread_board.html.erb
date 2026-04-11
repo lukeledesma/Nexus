@@ -1,0 +1,55 @@
+<% frame_id = params[:frame_id].presence || "app-pane" %>
+<turbo-frame id="<%= frame_id %>" data-singular-draft-root>
+  <section
+    class="app-surface app-surface--tool app-surface--thread-board"
+    data-controller="thread-board"
+    data-thread-board-initial-document-value="<%= json_escape(@thread_board_doc.to_json) %>"
+    data-thread-board-save-url-value="<%= apps_singular_thread_board_path %>">
+    <div class="thread-board-hint" data-thread-board-target="hint" aria-hidden="true">
+      Double-click to add a card &nbsp;·&nbsp; Drag empty space to pan &nbsp;·&nbsp; Scroll to zoom &nbsp;·&nbsp; Drag anchor dots to connect
+    </div>
+    <div class="thread-board-viewport" data-thread-board-target="viewport">
+      <canvas class="thread-board-grid-canvas" data-thread-board-target="gridCanvas" aria-hidden="true"></canvas>
+      <div class="thread-board-world" data-thread-board-target="world">
+        <svg class="thread-board-conn-svg" data-thread-board-target="connSvg" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg>
+      </div>
+    </div>
+    <svg class="thread-board-draft-svg" data-thread-board-target="draftSvg" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path class="thread-board-draft-path" data-thread-board-target="draftPath" d=""></path>
+    </svg>
+    <div class="thread-board-toolbar" data-thread-board-target="toolbar">
+      <button type="button" class="thread-board-tbtn" data-thread-board-target="btnAdd" data-action="click->thread-board#addCardCenter" title="Add card" aria-label="Add card">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="4" x2="12" y2="20"/><line x1="4" y1="12" x2="20" y2="12"/></svg>
+      </button>
+      <button type="button" class="thread-board-tbtn" data-thread-board-target="btnDel" data-action="click->thread-board#deleteSelected" title="Delete selected" aria-label="Delete selected">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/><path d="M9 6V4h6v2"/></svg>
+      </button>
+      <div class="thread-board-tsep" aria-hidden="true"></div>
+      <div class="thread-board-swatches" data-thread-board-target="swatches"></div>
+      <div class="thread-board-tsep" aria-hidden="true"></div>
+      <button type="button" class="thread-board-tbtn active" data-thread-board-target="btnGrid" data-action="click->thread-board#toggleGrid" title="Toggle grid" aria-label="Toggle grid" aria-pressed="true">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      </button>
+      <span class="thread-board-zoom-label" data-thread-board-target="zoomLabel">100%</span>
+      <button type="button" class="thread-board-tbtn" data-thread-board-target="btnFit" data-action="click->thread-board#fitAll" title="Fit all cards" aria-label="Fit all cards">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>
+      </button>
+      <button type="button" class="thread-board-tbtn" data-thread-board-target="btnClear" data-action="click->thread-board#clearBoard" title="Clear board" aria-label="Clear board">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+      </button>
+    </div>
+    <div class="thread-board-minimap" data-thread-board-target="minimap" aria-hidden="true">
+      <canvas class="thread-board-minimap-canvas" data-thread-board-target="minimapCanvas"></canvas>
+      <div class="thread-board-minimap-vp" data-thread-board-target="minimapVp"></div>
+    </div>
+    <div class="thread-board-ctx-menu" data-thread-board-target="ctxMenu" hidden>
+      <div class="thread-board-ctx-label" aria-hidden="true">CARD COLOR</div>
+      <div class="thread-board-ctx-colors" data-thread-board-target="ctxColors"></div>
+      <div class="thread-board-ctx-sep" aria-hidden="true"></div>
+      <button type="button" class="thread-board-ctx-del danger" data-action="click->thread-board#ctxDelete">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+        Delete
+      </button>
+    </div>
+  </section>
+</turbo-frame>

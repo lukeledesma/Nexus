@@ -5,13 +5,15 @@ import { materialSymbolSvg } from "lib/material_symbols"
 const CONTENT_TYPE_TO_APP_KEY = {
   note: "singular-note",
   task_list: "singular-task-list",
-  stickynotes: "singular-sticky-notes"
+  stickynotes: "singular-sticky-notes",
+  thread_board: "singular-thread-board"
 }
 
 const SINGULAR_FRAME_ID_BY_APP = {
   "singular-note": "singular-note-pane",
   "singular-task-list": "singular-task-list-pane",
-  "singular-sticky-notes": "singular-sticky-notes-pane"
+  "singular-sticky-notes": "singular-sticky-notes-pane",
+  "singular-thread-board": "singular-thread-board-pane"
 }
 
 function finderDisplayTitleFromStorageName(title) {
@@ -60,7 +62,7 @@ export default class extends Controller {
 
     if (window.nexusWorkspaceUnsaved) {
       const proceed = window.confirm(
-        "You have unsaved changes in Notepad, Tasks, or Sticky Notes. Save from the app’s Save dialog first if you want those changes on disk.\n\nOpen this file anyway? Unsaved edits may be lost if you continue."
+        "You have unsaved changes in Notepad, Tasks, Sticky Notes, or Thread Board. Save from the app’s Save dialog first if you want those changes on disk.\n\nOpen this file anyway? Unsaved edits may be lost if you continue."
       )
       if (!proceed) return
       window.nexusWorkspaceUnsaved = false

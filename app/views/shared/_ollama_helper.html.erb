@@ -1,0 +1,63 @@
+<%# Clawd GIFs (MIT): https://github.com/rullerzhou-afk/clawd-on-desk — public/vendor/clawd-on-desk/NOTICE.txt %>
+<div
+  class="ollama-helper"
+  data-controller="ollama-helper"
+  data-ollama-helper-chat-url-value="<%= apps_ollama_helper_chat_path %>"
+  data-ollama-helper-sprite-idle-value="/vendor/clawd-on-desk/clawd-idle.gif"
+  data-ollama-helper-sprite-sleep-value="/vendor/clawd-on-desk/clawd-sleeping.gif"
+  data-ollama-helper-sprite-thinking-value="/vendor/clawd-on-desk/clawd-thinking.gif"
+  data-ollama-helper-sprite-typing-value="/vendor/clawd-on-desk/clawd-typing.gif"
+  data-ollama-helper-sprite-happy-value="/vendor/clawd-on-desk/clawd-happy.gif"
+  data-ollama-helper-sprite-error-value="/vendor/clawd-on-desk/clawd-error.gif"
+  data-ollama-helper-sprite-juggling-value="/vendor/clawd-on-desk/clawd-juggling.gif"
+  data-ollama-helper-sprite-reading-value="/vendor/clawd-on-desk/clawd-idle-reading.gif"
+  data-ollama-helper-target="root">
+  <div class="ollama-helper__dock" data-ollama-helper-target="dock">
+    <section
+      class="ollama-helper__speech"
+      data-ollama-helper-target="panel"
+      data-action="pointerdown->ollama-helper#onPanelPointerDown"
+      data-ollama-placement="above"
+      role="dialog"
+      aria-label="Chat"
+      aria-modal="false">
+      <div class="ollama-helper__speech-inner">
+        <div class="ollama-helper__speech-tools">
+          <button type="button" class="tools-close-btn" data-action="click->ollama-helper#close" aria-label="Hide chat" title="Hide chat">
+            <%= material_symbol_icon(:close, size: :xs) %>
+          </button>
+        </div>
+        <div class="ollama-helper__messages" data-ollama-helper-target="messages"></div>
+        <p class="ollama-helper__status" data-ollama-helper-target="status" aria-live="polite"></p>
+        <form class="ollama-helper__form" data-action="submit->ollama-helper#submit">
+          <textarea
+            class="ollama-helper__input"
+            data-ollama-helper-target="input"
+            data-action="keydown->ollama-helper#maybeSubmit input->ollama-helper#onInput blur->ollama-helper#onInputBlur"
+            rows="1"
+            placeholder="Message…"
+            autocomplete="off"
+            aria-label="Message"></textarea>
+        </form>
+      </div>
+    </section>
+
+    <div
+      class="ollama-helper__pet"
+      data-ollama-helper-target="pet"
+      role="button"
+      tabindex="0"
+      data-action="pointerdown->ollama-helper#onPetPointerDown keydown->ollama-helper#onPetKeydown"
+      aria-label="Assistant"
+      aria-expanded="false">
+      <img
+        class="ollama-helper__mascot"
+        data-ollama-helper-target="mascot"
+        src="/vendor/clawd-on-desk/clawd-idle.gif"
+        alt=""
+        width="128"
+        height="128"
+        decoding="async">
+    </div>
+  </div>
+</div>
