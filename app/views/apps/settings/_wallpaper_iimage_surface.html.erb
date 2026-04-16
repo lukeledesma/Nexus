@@ -1,0 +1,33 @@
+<%# Wallpaper section body: Embedded/Wallpaper folder — empty = gray panel; file rows match Shell panel (saved themes) styling. %>
+<% folder = @wallpaper_iimage_folder %>
+<% files = @wallpaper_iimage_files %>
+<% wp = @wallpaper_picker || {} %>
+<% img_pick = wp[:kind].to_s == "image" %>
+<% pick_doc = wp[:image_document_id].to_i %>
+<% if folder.blank? %>
+  <div class="settings-iimage-finder-panel settings-iimage-finder-panel--unavailable" role="region" aria-label="Embedded workspace is not available"></div>
+<% elsif files.empty? %>
+  <div
+    class="settings-iimage-finder-panel"
+    role="region"
+    aria-label="Wallpaper folder — drop JPEG or PNG files here"
+  ></div>
+<% else %>
+  <ul class="finder-file-list settings-themes-list settings-iimage-file-rows" aria-label="Wallpapers in Wallpaper folder">
+    <% files.each do |file| %>
+      <% row_selected = img_pick && pick_doc == file.id %>
+      <li
+        class="settings-themes-item finder-file-item organizer-row finder-file-row nexus-standard-row finder-file-row--no-leading-icon settings-iimage-wallpaper-row<%= " is-active is-selected" if row_selected %>"
+        data-document-id="<%= file.id %>"
+      >
+        <div class="organizer-row-left finder-file-row-main nexus-standard-row__main <%= nexus_clickable_row_main_class %> settings-iimage-file-line">
+          <span class="finder-file-name settings-iimage-file-title" data-role="task-text"><%= file.title %></span>
+        </div>
+        <div class="organizer-row-right">
+          <span class="item-action-btn" title="Rename" aria-label="Rename wallpaper"><%= material_symbol_icon(:edit, size: :xs) %></span>
+          <span class="item-action-btn item-action-delete" title="Delete" aria-label="Delete wallpaper"><%= material_symbol_icon(:delete, size: :xs) %></span>
+        </div>
+      </li>
+    <% end %>
+  </ul>
+<% end %>

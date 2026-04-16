@@ -4,8 +4,13 @@ class Document < ApplicationRecord
   DEFAULT_FOLDER_TITLE = "New Folder"
   DEFAULT_NOTE_TITLE = "Untitled Note"
   DEFAULT_TASK_LIST_TITLE = "Untitled Task List"
-  DEFAULT_THREAD_BOARD_TITLE = "Untitled Thread Board"
-  CONTENT_TYPES = %w[note task_list stickynotes thread_board].freeze
+  CONTENT_TYPES = %w[note task_list asset].freeze
+
+  # Binary/media files on disk (bytes are not stored in `content`; sync reads/writes the file at storage_path).
+  ASSET_FILE_EXTENSIONS = %w[.wav .aif .aiff .mp3 .m4a .flac .ogg .jpg .jpeg .png].freeze
+
+  # One-shot payload for creating a new asset from uploaded bytes (cleared by DocumentStorageSyncLite after write).
+  attr_accessor :pending_asset_bytes, :pending_disk_extension
 
   belongs_to :parent, class_name: "Document", optional: true
   has_many :children, class_name: "Document", foreign_key: :parent_id, dependent: :destroy
@@ -28,6 +33,16 @@ class Document < ApplicationRecord
 
   def file?
     !folder?
+  end
+
+  # Absolute path to synced on-disk file for `content_type: "asset"` rows.
+  def asset_disk_path
+    return nil unless file? && content_type.to_s == "asset"
+
+    rel = storage_path.to_s
+    return nil if rel.blank?
+
+    DocumentStorageSyncLite.storage_root.join(rel)
   end
 
   def new_untitled_placeholder?
@@ -92,7 +107,7 @@ class Document < ApplicationRecord
       self.content_type = content_type.to_s.presence || "note"
       default_title = case content_type.to_s
                       when "task_list" then DEFAULT_TASK_LIST_TITLE
-                      when "thread_board" then DEFAULT_THREAD_BOARD_TITLE
+                      when "asset" then "Untitled"
                       else DEFAULT_NOTE_TITLE
                       end
       self.title = (title.presence || default_title).to_s.strip
@@ -110,14 +125,8 @@ class Document < ApplicationRecord
         self.reset_days = []
         self.reset_mode = "none"
         self.last_reset_at = nil
-      elsif content_type == "stickynotes"
-        self.content = content.to_s
-        self.tasks = []
-        self.reset_mode = "none"
-        self.reset_days = []
-        self.last_reset_at = nil
-      elsif content_type == "thread_board"
-        self.content = content.present? ? content.to_s : "{}"
+      elsif content_type == "asset"
+        self.content = nil
         self.tasks = []
         self.reset_mode = "none"
         self.reset_days = []
@@ -185,6 +194,6 @@ class Document < ApplicationRecord
     return if folder?
     return if CONTENT_TYPES.include?(content_type.to_s)
 
-    errors.add(:content_type, "must be note, task_list, stickynotes, or thread_board")
+    errors.add(:content_type, "must be note, task_list, or asset")
   end
 end

@@ -51,27 +51,16 @@ class ItemStorageSyncLite
 
     # Write singular app files from the App folder at the root.
     app_folder = Folder.find_by(name: "App")
-      if app_folder
-        task_list = app_folder.items.find_by(item_type: "task_list")
+    if app_folder
+      task_list = app_folder.items.find_by(item_type: "task_list")
 
-        # Write TaskList (or empty placeholder if it doesn't exist)
-        task_content = task_list ? item_contents(task_list) : empty_task_list_contents
-        File.write(temp_root.join("Tasks.txt"), task_content)
-
-        # Sticky Notes (or empty placeholder if it doesn't exist)
-        stickies = app_folder.items.find_by(item_type: "stickynotes")
-        stickies_content = stickies ? item_contents(stickies) : empty_stickynotes_contents
-        File.write(temp_root.join("stickynotes.txt"), stickies_content)
-
-        thread_board = app_folder.items.find_by(item_type: "thread_board")
-        thread_board_content = thread_board ? item_contents(thread_board) : empty_thread_board_contents
-        File.write(temp_root.join("thread_board.txt"), thread_board_content)
-      else
-        # Create empty placeholders if App folder doesn't exist yet
-        File.write(temp_root.join("Tasks.txt"), empty_task_list_contents)
-        File.write(temp_root.join("stickynotes.txt"), empty_stickynotes_contents)
-        File.write(temp_root.join("thread_board.txt"), empty_thread_board_contents)
-      end
+      # Write TaskList (or empty placeholder if it doesn't exist)
+      task_content = task_list ? item_contents(task_list) : empty_task_list_contents
+      File.write(temp_root.join("Tasks.txt"), task_content)
+    else
+      # Create empty placeholders if App folder doesn't exist yet
+      File.write(temp_root.join("Tasks.txt"), empty_task_list_contents)
+    end
 
     # Write user folders as subdirectories (without items inside them)
     used_folder_names = {}
@@ -97,15 +86,39 @@ class ItemStorageSyncLite
       preserved_configs[filename] = File.read(path) if File.exist?(path)
     end
 
-    Dir.children(root).each do |entry|
-      next if [".sync_old", active_temp_dirname].include?(entry)
-      next if [WORKSPACE_STATE_FILENAME, LAYOUT_THEMES_FILENAME, LEGACY_WINDOWS_FILENAME].include?(entry)
+    # Document model (Finder 2) stores trees under Embedded — e.g. Image/ for wallpapers.
+    # Item sync only regenerates Tasks + Folder shells; it must not rm_rf those trees
+    # or DocumentDiskLoader will purge DB rows and images "disappear" after refresh.
+    preserve_stash = Dir.mktmpdir("nexus-embedded-doc-preserve-")
+    begin
+      Dir.children(root).each do |entry|
+        next if [".sync_old", active_temp_dirname].include?(entry)
+        next if [WORKSPACE_STATE_FILENAME, LAYOUT_THEMES_FILENAME, LEGACY_WINDOWS_FILENAME].include?(entry)
 
-      FileUtils.rm_rf(root.join(entry))
-    end
+        path = root.join(entry)
+        if document_embedded_tree_to_preserve?(entry, path)
+          FileUtils.mv(path.to_s, File.join(preserve_stash, entry))
+          next
+        end
 
-    Dir.children(temp_root).each do |entry|
-      FileUtils.mv(temp_root.join(entry), root.join(entry))
+        FileUtils.rm_rf(path)
+      end
+
+      Dir.children(temp_root).each do |entry|
+        FileUtils.mv(temp_root.join(entry), root.join(entry))
+      end
+
+      if Dir.exist?(preserve_stash)
+        Dir.children(preserve_stash).each do |entry|
+          src = File.join(preserve_stash, entry)
+          dest = root.join(entry)
+          FileUtils.rm_rf(dest) if File.exist?(dest)
+
+          FileUtils.mv(src, dest.to_s)
+        end
+      end
+    ensure
+      FileUtils.rm_rf(preserve_stash) if preserve_stash && Dir.exist?(preserve_stash)
     end
 
     preserved_configs.each do |filename, contents|
@@ -113,6 +126,13 @@ class ItemStorageSyncLite
     end
 
     FileUtils.rm_rf(root.join(".sync_old"))
+  end
+
+  def document_embedded_tree_to_preserve?(entry, path)
+    return false unless File.directory?(path)
+
+    names = ["Finder"] + EmbeddedIimageFolder::KNOWN_FOLDER_NAMES
+    names.uniq.any? { |n| entry.to_s.casecmp?(n) }
   end
 
   def next_available_name(raw, used, extension: "")
@@ -146,54 +166,8 @@ class ItemStorageSyncLite
 
   def item_contents(item)
     return task_list_contents(item) if item.item_type == "task_list"
-    return stickynotes_contents(item) if item.item_type == "stickynotes"
-    return thread_board_contents(item) if item.item_type == "thread_board"
 
     ""
-  end
-
-  def stickynotes_contents(item)
-    [
-      "# NEXUS_STICKY_NOTES",
-      "# name: #{item.name}",
-      "# item_id: #{item.id}",
-      "# updated_at: #{iso8601_or_nil(item.updated_at)}",
-      "",
-      item.body.to_s
-    ].join("\n")
-  end
-
-  def empty_stickynotes_contents
-    [
-      "# NEXUS_STICKY_NOTES",
-      "# name: Sticky Notes",
-      "# item_id: ",
-      "# updated_at: null",
-      "",
-      "[]"
-    ].join("\n")
-  end
-
-  def thread_board_contents(item)
-    [
-      "# NEXUS_THREAD_BOARD",
-      "# name: #{item.name}",
-      "# item_id: #{item.id}",
-      "# updated_at: #{iso8601_or_nil(item.updated_at)}",
-      "",
-      item.body.to_s
-    ].join("\n")
-  end
-
-  def empty_thread_board_contents
-    [
-      "# NEXUS_THREAD_BOARD",
-      "# name: Thread Board",
-      "# item_id: ",
-      "# updated_at: null",
-      "",
-      "{}"
-    ].join("\n")
   end
 
   def task_list_contents(item)

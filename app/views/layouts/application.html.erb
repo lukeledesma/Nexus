@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html<%= workspace_theme_boot_html_attributes %>>
   <head>
     <title><%= content_for(:title) || "NEXUS" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -22,22 +22,21 @@
 
     <%# Includes all stylesheet files in app/assets/stylesheets %>
     <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
+    <%= workspace_theme_boot_style_tag %>
     <%= javascript_importmap_tags %>
   </head>
 
   <body class="<%= logged_in? ? "nexus-os" : "" %>" data-controller="window-manager workspace-draft-tracker user-security-modal">
     <% if logged_in? %>
-      <div id="desktop" class="desktop-layer" data-controller="desktop-selection"></div>
+      <div id="desktop" class="desktop-layer" data-controller="desktop-selection"<%= workspace_desktop_boot_layer_attributes %>></div>
       <div class="desktop-clock" data-controller="desktop-clock">
         <span class="desktop-clock-display" data-desktop-clock-target="display"></span>
       </div>
 
-      <section id="organizer-window" class="os-window organizer-window is-hidden" aria-live="polite">
-        <div class="window-content">
-          <%= render "organizer/sidebar" %>
-        </div>
-      </section>
+      <%= render "shared/desktop_side_panel" %>
 
+      <div id="desktop-shell">
+        <div id="desktop-shell-canvas">
       <section class="content-window os-window is-hidden"
         data-controller="content-window finder-toolbar"
         data-finder-toolbar-frame-id-value="finder-pane"
@@ -47,38 +46,17 @@
         data-content-window-frame-id-value="finder-pane"
         aria-live="polite">
         <%= render "shared/content_window_chrome", title: "FINDER", show_finder_new_folder: true %>
-        <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="window-content">
+        <div class="pane-resize-handle pane-resize-handle--top" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <%= content_window_shell do %>
           <turbo-frame id="finder-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
-        </div>
-      </section>
-
-      <section class="content-window os-window is-hidden"
-        data-controller="content-window"
-        data-content-window-app-key-value="singular-note"
-        data-content-window-app-url-value="/apps/singular_note"
-        data-content-window-storage-key-value="nexus.contentWindow.singularNote.bounds"
-        data-content-window-frame-id-value="singular-note-pane"
-        aria-live="polite">
-        <%= render "shared/content_window_chrome", title: "NOTEPAD", show_save: true, open_file_badge: true %>
-        <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="window-content">
-          <turbo-frame id="singular-note-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
-        </div>
+        <% end %>
       </section>
 
       <section class="content-window os-window is-hidden"
@@ -87,82 +65,41 @@
         data-content-window-app-url-value="/apps/singular_task_list"
         data-content-window-storage-key-value="nexus.contentWindow.singularTaskList.bounds"
         data-content-window-frame-id-value="singular-task-list-pane"
+        data-content-window-has-singular-save-picker-value="true"
         aria-live="polite">
-        <%= render "shared/content_window_chrome", title: "TASKS", show_save: true, open_file_badge: true, show_task_list_add: true %>
-        <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="window-content">
+        <%= render "shared/content_window_chrome", title: "TASKS", open_file_badge: true, show_task_list_add: true, singular_save_flow: true, show_save: true %>
+        <div class="pane-resize-handle pane-resize-handle--top" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <%= content_window_shell singular_save_picker: true do %>
           <turbo-frame id="singular-task-list-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
-        </div>
+        <% end %>
       </section>
 
       <section class="content-window os-window is-hidden"
-        data-controller="content-window"
-        data-content-window-app-key-value="singular-sticky-notes"
-        data-content-window-app-url-value="/apps/singular_sticky_notes"
-        data-content-window-storage-key-value="nexus.contentWindow.singularStickyNotes.bounds"
-        data-content-window-frame-id-value="singular-sticky-notes-pane"
+        data-controller="content-window loops"
+        data-content-window-app-key-value="loops"
+        data-content-window-app-url-value="/apps/loops"
+        data-content-window-storage-key-value="nexus.contentWindow.loops.bounds"
+        data-content-window-frame-id-value="loops-pane"
         aria-live="polite">
-        <%= render "shared/content_window_chrome", title: "STICKY NOTES", show_save: true, open_file_badge: true, show_sticky_notes_add: true %>
-        <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="window-content">
-          <turbo-frame id="singular-sticky-notes-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
-        </div>
-      </section>
-
-      <section class="content-window os-window is-hidden"
-        data-controller="content-window"
-        data-content-window-app-key-value="singular-thread-board"
-        data-content-window-app-url-value="/apps/singular_thread_board"
-        data-content-window-storage-key-value="nexus.contentWindow.singularThreadBoard.bounds"
-        data-content-window-frame-id-value="singular-thread-board-pane"
-        aria-live="polite">
-        <%= render "shared/content_window_chrome", title: "THREAD BOARD", show_save: true, open_file_badge: true %>
-        <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="window-content">
-          <turbo-frame id="singular-thread-board-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
-        </div>
-      </section>
-
-      <section class="content-window os-window is-hidden"
-        data-controller="content-window"
-        data-content-window-app-key-value="habit-tracker"
-        data-content-window-app-url-value="/apps/habit_tracker"
-        data-content-window-storage-key-value="nexus.contentWindow.habitTracker.bounds"
-        data-content-window-frame-id-value="habit-tracker-pane"
-        aria-live="polite">
-        <%= render "shared/content_window_chrome", title: "HABITS", show_habit_add: true %>
-        <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="window-content">
-          <turbo-frame id="habit-tracker-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
-        </div>
+        <%= render "shared/content_window_chrome", title: "AUDIO", open_file_badge: true, show_loops_play_pause: true %>
+        <div class="pane-resize-handle pane-resize-handle--top" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <%= content_window_shell do %>
+          <turbo-frame id="loops-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
+        <% end %>
       </section>
 
       <section class="content-window os-window is-hidden"
@@ -173,17 +110,17 @@
         data-content-window-frame-id-value="settings-pane"
         aria-live="polite">
         <%= render "shared/content_window_chrome", title: "SETTINGS" %>
-        <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="window-content">
+        <div class="pane-resize-handle pane-resize-handle--top" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <%= content_window_shell do %>
           <turbo-frame id="settings-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
-        </div>
+        <% end %>
       </section>
 
       <section class="content-window os-window is-hidden"
@@ -194,27 +131,26 @@
         data-content-window-frame-id-value="user-pane"
         aria-live="polite">
         <%= render "shared/content_window_chrome", title: "USER" %>
-        <div class="pane-resize-handle pane-resize-handle--top" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="window-content">
+        <div class="pane-resize-handle pane-resize-handle--top" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <%= content_window_shell do %>
           <turbo-frame id="user-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
-        </div>
+        <% end %>
       </section>
-
-      <%= render "shared/app_save_dialog", frame_id: "singular-note-pane", default_filename: "Notes" %>
-      <%= render "shared/app_save_dialog", frame_id: "singular-task-list-pane", default_filename: "Tasks" %>
-      <%= render "shared/app_save_dialog", frame_id: "singular-sticky-notes-pane", default_filename: "Sticky notes" %>
-      <%= render "shared/app_save_dialog", frame_id: "singular-thread-board-pane", default_filename: "Thread board" %>
+        </div>
+      </div>
 
       <%= render "apps/user/security_modals", frame_id: "settings-pane" %>
 
+      <%# Crab before content_windows_boot so the dock isn’t painted at CSS bottom/right after a layout flush from boot. %>
       <%= render "shared/ollama_helper" %>
+      <%= render "shared/content_windows_boot" %>
 
     <% end %>
 

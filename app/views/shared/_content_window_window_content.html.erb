@@ -1,0 +1,24 @@
+<% singular_save_picker = local_assigns.fetch(:singular_save_picker, false) %>
+<div class="window-content">
+  <% if singular_save_picker %>
+    <div class="content-window-body-stack">
+      <div class="content-window-app-layer" data-content-window-target="appLayer">
+        <%= inner %>
+      </div>
+      <div
+        class="content-window-save-picker-layer"
+        data-content-window-target="savePickerLayer"
+        hidden
+        aria-hidden="true"
+      >
+        <iframe
+          class="content-window-save-picker-iframe"
+          data-content-window-target="savePickerIframe"
+          title="Save/Open"
+        ></iframe>
+      </div>
+    </div>
+  <% else %>
+    <%= inner %>
+  <% end %>
+</div>

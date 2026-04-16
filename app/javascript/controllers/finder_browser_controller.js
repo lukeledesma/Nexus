@@ -1,19 +1,29 @@
 import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
+import {
+  finderApiHeaders,
+  finderCollectExpandedFolderIdsFromDom,
+  finderCsrfToken,
+  finderReadExpandedFolderIds,
+  finderSanitizeDocumentId,
+  finderWriteExpandedFolderIds
+} from "lib/finder"
 import { materialSymbolSvg } from "lib/material_symbols"
+import { dispatchSingularHostEvent } from "lib/singular_host_events"
 
 const CONTENT_TYPE_TO_APP_KEY = {
-  note: "singular-note",
-  task_list: "singular-task-list",
-  stickynotes: "singular-sticky-notes",
-  thread_board: "singular-thread-board"
+  asset: "loops",
+  task_list: "singular-task-list"
 }
 
 const SINGULAR_FRAME_ID_BY_APP = {
-  "singular-note": "singular-note-pane",
-  "singular-task-list": "singular-task-list-pane",
-  "singular-sticky-notes": "singular-sticky-notes-pane",
-  "singular-thread-board": "singular-thread-board-pane"
+  loops: "loops-pane",
+  "singular-task-list": "singular-task-list-pane"
+}
+
+const SINGULAR_APP_LABEL = {
+  loops: "Audio",
+  "singular-task-list": "Tasks"
 }
 
 function finderDisplayTitleFromStorageName(title) {
@@ -22,79 +32,259 @@ function finderDisplayTitleFromStorageName(title) {
   return s.replace(/\.(txt|nexus)$/i, "").trim() || "Untitled"
 }
 
+/**
+ * Finder tree: create/rename/delete, open linked docs, Turbo frame refresh; read-only save-as flow for singular apps.
+ */
 export default class extends Controller {
   static values = {
-    frameId: String
+    frameId: String,
+    rootFolderId: Number,
+    readOnly: { type: Boolean, default: false },
+    singularSaveIcon: { type: String, default: "file_document" }
   }
 
   connect() {
-    this.boundChromeCreateFolder = (e) => {
-      if (e.detail?.frameId !== (this.frameIdValue || "app-pane")) return
-      this.createFolder(e)
+    if (!this.readOnlyValue) {
+      this.boundChromeCreate = (e) => {
+        if (e.detail?.frameId !== this.frameIdValue) return
+        const pid = e.detail?.parentId
+        if (pid == null) this.startCreateFolder(this.rootFolderIdValue)
+        else this.startCreateFolder(Number(pid))
+      }
+      window.addEventListener("nexus:finder-create-folder", this.boundChromeCreate)
     }
-    window.addEventListener("nexus:finder-create-folder", this.boundChromeCreateFolder)
-
-    const autoRenameItem = this.element.querySelector(".finder-folder-item[data-auto-rename='true']")
-    if (autoRenameItem && autoRenameItem.dataset.systemFolder !== "true") this.startInlineRename(autoRenameItem)
   }
 
   disconnect() {
-    if (this.boundChromeCreateFolder) {
-      window.removeEventListener("nexus:finder-create-folder", this.boundChromeCreateFolder)
+    if (this.boundChromeCreate) {
+      window.removeEventListener("nexus:finder-create-folder", this.boundChromeCreate)
     }
   }
 
-  onFinderFileRowKeydown(event) {
+  /** Save-as picker: start naming a new file under this folder (read-only mode only). */
+  beginSaveFileHere(event) {
+    if (!this.readOnlyValue) return
+    event.preventDefault()
+    event.stopPropagation()
+    if (this.element.querySelector("[data-pending-save-file='true']")) return
+
+    const raw = event.currentTarget?.dataset?.parentId
+    const parentId = raw != null && raw !== "" ? Number.parseInt(raw, 10) : NaN
+    if (!Number.isFinite(parentId)) return
+
+    const safeId = finderSanitizeDocumentId(parentId)
+    if (!safeId) return
+    const parentLi = this.element.querySelector(`li[data-finder-tree-node-id="${safeId}"]`)
+    let childUl = parentLi?.querySelector(":scope > ul.finder-tree")
+
+    if (!childUl && parentLi) {
+      childUl = document.createElement("ul")
+      childUl.className = "finder-tree"
+      childUl.setAttribute("role", "group")
+      parentLi.appendChild(childUl)
+    }
+
+    if (!childUl && parentId === this.rootFolderIdValue) {
+      childUl = this.element.querySelector("ul.finder-tree--root")
+    }
+
+    if (!childUl) return
+
+    if (parentLi) {
+      parentLi.classList.remove("is-collapsed")
+      const link = parentLi.querySelector(":scope > .finder-tree__row-line a.finder-tree__row--folder")
+      if (link) link.setAttribute("aria-expanded", "true")
+    }
+
+    const li = document.createElement("li")
+    li.className = "finder-tree__node finder-tree__node--file finder-tree__node--connector-end"
+    li.dataset.pendingSaveFile = "true"
+
+    const line = document.createElement("div")
+    line.className = "finder-tree__row-line"
+    line.setAttribute("draggable", "false")
+
+    const row = document.createElement("div")
+    row.className = "finder-tree__row finder-tree__row--file finder-tree__row--pending"
+
+    const icon = document.createElement("span")
+    icon.className = "finder-tree__icon finder-tree__icon--file"
+    icon.setAttribute("aria-hidden", "true")
+    const iconKey = this.singularSaveIconValue || "file_document"
+    icon.innerHTML = materialSymbolSvg(iconKey, "sm") || materialSymbolSvg("file_document", "sm")
+
+    const input = document.createElement("input")
+    input.type = "text"
+    input.className = "finder-folder-name-input finder-tree__pending-name-input"
+    input.maxLength = 255
+    input.setAttribute("aria-label", "File name")
+    input.autocomplete = "off"
+    input.placeholder = "Name…"
+
+    row.appendChild(icon)
+    row.appendChild(input)
+    line.appendChild(row)
+    li.appendChild(line)
+    childUl.insertBefore(li, childUl.firstChild)
+    input.focus()
+
+    let finished = false
+    let submitting = false
+
+    const cleanup = () => {
+      if (finished) return
+      finished = true
+      li.remove()
+    }
+
+    const submitSave = async () => {
+      if (finished || submitting) return
+      const trimmed = input.value.trim()
+      if (!trimmed) {
+        cleanup()
+        return
+      }
+      submitting = true
+
+      let documentId = null
+      try {
+        documentId = window.sessionStorage.getItem(`nexus.singularLinkedDocument.${this.frameIdValue}`)
+      } catch (_e) {
+        /* ignore */
+      }
+
+      const body = new FormData()
+      body.set("folder_id", String(parentId))
+      body.set("frame_id", this.frameIdValue)
+      body.set("filename", trimmed)
+      if (documentId) body.set("document_id", documentId)
+
+      try {
+        const response = await fetch("/apps/singular/save_file", {
+          method: "POST",
+          headers: { "X-CSRF-Token": finderCsrfToken() },
+          body
+        })
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) {
+          submitting = false
+          window.alert(data.error || (Array.isArray(data.errors) ? data.errors.join(", ") : null) || "Could not save.")
+          input.focus()
+          return
+        }
+        finished = true
+        li.remove()
+
+        dispatchSingularHostEvent("nexus:singular-disk-saved", {
+          frameId: this.frameIdValue,
+          title: data.display_title || data.title || trimmed
+        })
+        if (data.document_id != null) {
+          try {
+            window.sessionStorage.setItem(`nexus.singularLinkedDocument.${this.frameIdValue}`, String(data.document_id))
+          } catch (_e) {
+            /* ignore */
+          }
+        }
+
+        dispatchSingularHostEvent("nexus:singular-save-picker-close", {
+          frameId: this.frameIdValue,
+          saved: true,
+          documentId: data.document_id
+        })
+      } catch (_e) {
+        submitting = false
+        window.alert("Could not save.")
+        input.focus()
+      }
+    }
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault()
+        void submitSave()
+      } else if (e.key === "Escape") {
+        e.preventDefault()
+        cleanup()
+      }
+    })
+
+    input.addEventListener("blur", () => {
+      requestAnimationFrame(() => {
+        if (finished || submitting || !li.isConnected) return
+        if (!input.value.trim()) cleanup()
+      })
+    })
+  }
+
+  createSubfolder(event) {
+    if (this.readOnlyValue) return
+    event.preventDefault()
+    event.stopPropagation()
+    const raw = event.currentTarget?.dataset?.parentId
+    const parentId = raw != null && raw !== "" ? Number.parseInt(raw, 10) : NaN
+    if (!Number.isFinite(parentId)) return
+    this.startCreateFolder(parentId)
+  }
+
+  openLinkedFileKey(event) {
     if (event.key !== "Enter" && event.key !== " ") return
     event.preventDefault()
-    this.openFinderFile(event)
+    this.openLinkedFile(event)
   }
 
-  /** Whole row opens the file (same idea as Tasks); action buttons opt out. */
-  onFinderFileRowClick(event) {
-    if (event.target.closest(".item-action-btn")) return
-    this.openFinderFile(event)
-  }
-
-  /** Finder file rows launch Notepad / Tasks / Sticky Notes with this document loaded — not the generic document editor. */
-  openFinderFile(event) {
-    event.preventDefault()
-
-    if (window.nexusWorkspaceUnsaved) {
-      const proceed = window.confirm(
-        "You have unsaved changes in Notepad, Tasks, Sticky Notes, or Thread Board. Save from the app’s Save dialog first if you want those changes on disk.\n\nOpen this file anyway? Unsaved edits may be lost if you continue."
-      )
-      if (!proceed) return
-      window.nexusWorkspaceUnsaved = false
+  /** Toolbar control: open linked doc in Tasks, optionally close Finder or exit save picker. */
+  openLinkedFileInApp(event) {
+    if (typeof event.preventDefault === "function") event.preventDefault()
+    if (typeof event.stopPropagation === "function") event.stopPropagation()
+    const el = event.currentTarget
+    if (this.readOnlyValue) {
+      this.#openLinkedDocumentCommon(el, { fromEmbeddedPicker: true })
+      return
     }
+    this.#openLinkedDocumentCommon(el, { closeFinderWindow: true })
+  }
 
-    const item = event.currentTarget.closest(".finder-file-item")
-    if (!item) return
-    if (item.querySelector(".finder-file-name-input")) return
+  openLinkedFile(event) {
+    if (this.readOnlyValue) return
+    if (typeof event.preventDefault === "function") event.preventDefault()
+    if (typeof event.stopPropagation === "function") event.stopPropagation()
+    this.#openLinkedDocumentCommon(event.currentTarget, {})
+  }
 
-    const documentId = item.dataset.documentId
-    const contentType = item.dataset.contentType
+  #openLinkedDocumentCommon(el, options) {
+    const documentId = el?.dataset?.documentId
+    const contentType = el?.dataset?.contentType
     if (!documentId || !contentType) return
 
     const appKey = CONTENT_TYPE_TO_APP_KEY[contentType]
-    if (!appKey) {
-      window.alert("This file type does not have a linked app.")
-      return
-    }
+    if (!appKey) return
 
-    this.element.querySelectorAll(".finder-file-item.is-selected").forEach((el) => {
-      el.classList.remove("is-selected")
+    this.element.querySelectorAll(".finder-tree__row-line.is-selected").forEach((line) => {
+      line.classList.remove("is-selected")
     })
-    item.classList.add("is-selected")
+    el.closest(".finder-tree__row-line")?.classList.add("is-selected")
 
     const paneId = SINGULAR_FRAME_ID_BY_APP[appKey]
     if (paneId) {
       try {
         window.sessionStorage.setItem(`nexus.singularLinkedDocument.${paneId}`, String(documentId))
-      } catch (_) {}
+      } catch (_e) {
+        /* ignore */
+      }
     }
 
-    const documentTitle = (item.dataset.documentTitle || "").trim()
+    const documentTitle = (el.dataset.documentTitle || "").trim()
+
+    if (options.fromEmbeddedPicker) {
+      dispatchSingularHostEvent("nexus:singular-open-from-embedded-finder", {
+        frameId: this.frameIdValue,
+        appKey,
+        documentId: String(documentId),
+        documentTitle
+      })
+      return
+    }
 
     window.dispatchEvent(
       new CustomEvent("app-window:open", {
@@ -105,211 +295,97 @@ export default class extends Controller {
         }
       })
     )
+
+    if (options.closeFinderWindow) {
+      window.dispatchEvent(new CustomEvent("app-window:close", { detail: { appKey: "finder" } }))
+    }
   }
 
-  renameFile(event) {
-    event.preventDefault()
-    event.stopPropagation()
+  startCreateFolder(parentDocumentId) {
+    if (this.readOnlyValue) return
+    if (!parentDocumentId) return
+    const url = `/documents/${parentDocumentId}/create_subfolder`
+    const safeId = finderSanitizeDocumentId(parentDocumentId)
+    if (!safeId) return
+    const parentLi = this.element.querySelector(`li[data-finder-tree-node-id="${safeId}"]`)
+    let childUl = parentLi?.querySelector(":scope > ul.finder-tree")
 
-    const item = event.currentTarget.closest(".finder-file-item")
-    if (!item) return
-
-    this.startInlineFileRename(item)
-  }
-
-  startInlineFileRename(item) {
-    if (!item) return
-
-    const renameUrl = item.dataset.renameUrl
-    if (!renameUrl) return
-
-    const label = item.querySelector("[data-finder-file-name-label]")
-    if (!label) return
-
-    if (item.querySelector(".finder-file-name-input")) return
-
-    const currentStorageName = item.dataset.fileName || ""
-    const input = document.createElement("input")
-    input.type = "text"
-    input.className = "finder-folder-name-input finder-file-name-input"
-    input.value = finderDisplayTitleFromStorageName(currentStorageName)
-    input.maxLength = 255
-
-    label.replaceWith(input)
-    input.focus()
-    input.select()
-
-    const cancelEdit = () => {
-      input.replaceWith(label)
-      label.textContent = item.dataset.documentTitle || finderDisplayTitleFromStorageName(currentStorageName)
+    if (!childUl && parentLi) {
+      childUl = document.createElement("ul")
+      childUl.className = "finder-tree"
+      childUl.setAttribute("role", "group")
+      parentLi.appendChild(childUl)
     }
 
-    const saveEdit = async () => {
-      const trimmedName = input.value.trim()
-      if (!trimmedName || trimmedName === finderDisplayTitleFromStorageName(currentStorageName)) {
-        cancelEdit()
-        return
-      }
-
-      const response = await fetch(renameUrl, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          "X-Requested-With": "XMLHttpRequest",
-          "X-CSRF-Token": this.csrfToken()
-        },
-        body: JSON.stringify({ name: trimmedName })
-      })
-
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}))
-        window.alert(payload.error || "Could not rename file.")
-        cancelEdit()
-        return
-      }
-
-      await response.json().catch(() => ({}))
-      this.reloadFrameWithSelection()
+    if (!childUl && parentDocumentId === this.rootFolderIdValue) {
+      childUl = this.element.querySelector("ul.finder-tree--root")
     }
 
-    input.addEventListener("keydown", (keyEvent) => {
-      if (keyEvent.key === "Enter") {
-        keyEvent.preventDefault()
-        saveEdit()
-      }
+    if (!childUl) return
 
-      if (keyEvent.key === "Escape") {
-        keyEvent.preventDefault()
-        cancelEdit()
-      }
-    })
+    if (parentLi) {
+      parentLi.classList.remove("is-collapsed")
+      const link = parentLi.querySelector(":scope > .finder-tree__row-line a.finder-tree__row--folder")
+      if (link) link.setAttribute("aria-expanded", "true")
+    }
 
-    input.addEventListener("blur", () => {
-      saveEdit()
-    })
-  }
-
-  async deleteFile(event) {
-    event.preventDefault()
-    event.stopPropagation()
-
-    const item = event.currentTarget.closest(".finder-file-item")
-    if (!item) return
-
-    const deleteUrl = item.dataset.deleteUrl
-    if (!deleteUrl) return
-
-    const name = item.dataset.documentTitle || "this file"
-    if (!window.confirm(`Delete \"${name}\"?`)) return
-
-    const response = await fetch(deleteUrl, {
-      method: "DELETE",
-      headers: {
-        Accept: "application/json",
-        "X-Requested-With": "XMLHttpRequest",
-        "X-CSRF-Token": this.csrfToken()
-      }
-    })
-
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({}))
-      window.alert(payload.error || "Could not delete file.")
+    if (childUl.querySelector("[data-pending-new-folder='true']")) {
+      childUl.querySelector("[data-pending-new-folder='true'] input")?.focus()
       return
-    }
-
-    this.reloadFrameWithSelection()
-  }
-
-  createFolder(event) {
-    if (event?.preventDefault) event.preventDefault()
-
-    const list = this.element.querySelector(".finder-folder-list")
-    if (!list) return
-
-    const existingPending = list.querySelector("[data-pending-new-folder='true']")
-    if (existingPending) {
-      const existingInput = existingPending.querySelector(".finder-folder-name-input")
-      existingInput?.focus()
-      existingInput?.select()
-      return
-    }
-
-    const previousActive = list.querySelector(".finder-folder-item.is-active")
-    list.querySelectorAll(".finder-folder-item.is-active").forEach((el) => el.classList.remove("is-active"))
-
-    const emptyMsg = this.element.querySelector(".finder-folder-list-empty")
-    const refreshEmptyMessage = () => {
-      if (!emptyMsg) return
-      const hasReal = list.querySelector(".finder-folder-item:not([data-pending-new-folder])")
-      const hasPending = list.querySelector("[data-pending-new-folder]")
-      emptyMsg.hidden = Boolean(hasReal || hasPending)
     }
 
     const li = document.createElement("li")
-    li.className = "finder-folder-item is-active is-pending-new-folder"
+    li.className = "finder-tree__node finder-tree__node--folder finder-tree__node--connector-end"
     li.dataset.pendingNewFolder = "true"
-    li.dataset.systemFolder = "false"
 
-    const linkWrap = document.createElement("div")
-    linkWrap.className = "finder-folder-link"
-    linkWrap.setAttribute("role", "group")
-    linkWrap.setAttribute("aria-label", "New folder name")
+    const line = document.createElement("div")
+    line.className = "finder-tree__row-line"
+    line.setAttribute("draggable", "false")
 
-    const iconSpan = document.createElement("span")
-    iconSpan.className = "finder-folder-icon"
-    iconSpan.setAttribute("aria-hidden", "true")
-    iconSpan.innerHTML = materialSymbolSvg("folder", "md")
+    const row = document.createElement("div")
+    row.className = "finder-tree__row finder-tree__row--folder finder-tree__row--pending"
+
+    const icon = document.createElement("span")
+    icon.className = "finder-tree__icon finder-tree__icon--folder finder-tree__icon--folder-empty"
+    icon.setAttribute("aria-hidden", "true")
+    icon.innerHTML = materialSymbolSvg("folder", "sm")
 
     const input = document.createElement("input")
     input.type = "text"
-    input.className = "finder-folder-name-input"
+    input.className = "finder-folder-name-input finder-tree__pending-name-input"
     input.maxLength = 255
-    input.setAttribute("aria-label", "Folder name")
-    input.placeholder = ""
+    input.setAttribute("aria-label", "New folder name")
     input.autocomplete = "off"
-    input.spellcheck = false
 
-    linkWrap.appendChild(iconSpan)
-    linkWrap.appendChild(input)
-    li.appendChild(linkWrap)
-
-    refreshEmptyMessage()
-    list.appendChild(li)
+    row.appendChild(icon)
+    row.appendChild(input)
+    line.appendChild(row)
+    li.appendChild(line)
+    childUl.insertBefore(li, childUl.firstChild)
     input.focus()
 
     let finished = false
     let submitting = false
 
-    const cancelPending = () => {
+    const cleanup = () => {
       if (finished) return
       finished = true
       li.remove()
-      if (previousActive) previousActive.classList.add("is-active")
-      refreshEmptyMessage()
     }
 
-    const frameId = this.frameIdValue || "app-pane"
-
-    const submitPending = async () => {
+    const submit = async () => {
       if (finished || submitting) return
       const trimmed = input.value.trim()
       if (!trimmed) {
-        cancelPending()
+        cleanup()
         return
       }
-
       submitting = true
       try {
-        const response = await fetch("/apps/finder/create_folder", {
+        const response = await fetch(url, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            "X-Requested-With": "XMLHttpRequest",
-            "X-CSRF-Token": this.csrfToken()
-          },
-          body: JSON.stringify({ frame_id: frameId, title: trimmed })
+          headers: finderApiHeaders({ jsonBody: true }),
+          body: JSON.stringify({ title: trimmed })
         })
         const data = await response.json().catch(() => ({}))
         if (!response.ok) {
@@ -318,17 +394,10 @@ export default class extends Controller {
           input.focus()
           return
         }
-
         finished = true
-        if (data.redirect_url) {
-          const frame = document.getElementById(frameId)
-          if (frame && frame.tagName === "TURBO-FRAME") {
-            frame.src = data.redirect_url
-            return
-          }
-          Turbo.visit(data.redirect_url, { frame: frameId })
-        }
-      } catch (_err) {
+        li.remove()
+        this.reloadFramePreservingBrowse()
+      } catch (_e) {
         submitting = false
         window.alert("Could not create folder.")
         input.focus()
@@ -338,171 +407,198 @@ export default class extends Controller {
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         e.preventDefault()
-        void submitPending()
-        return
-      }
-      if (e.key === "Escape") {
+        void submit()
+      } else if (e.key === "Escape") {
         e.preventDefault()
-        cancelPending()
+        cleanup()
       }
     })
 
     input.addEventListener("blur", () => {
-      window.requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
         if (finished || submitting || !li.isConnected) return
-        const trimmed = input.value.trim()
-        if (!trimmed) cancelPending()
-        else void submitPending()
+        if (!input.value.trim()) cleanup()
+        else void submit()
       })
     })
   }
 
-  async renameFolder(event) {
+  renameFolder(event) {
+    if (this.readOnlyValue) return
     event.preventDefault()
     event.stopPropagation()
-
-    const item = event.currentTarget.closest(".finder-folder-item")
-    if (!item) return
-
-    this.startInlineRename(item)
+    const li = event.currentTarget.closest("li.finder-tree__node--folder")
+    if (!li?.dataset.finderTreeNodeId) return
+    this.startRename(li, { isFolder: true })
   }
 
-  startInlineRename(item) {
-    if (!item) return
-    if (item.dataset.systemFolder === "true") return
+  renameFile(event) {
+    if (this.readOnlyValue) return
+    event.preventDefault()
+    event.stopPropagation()
+    const li = event.currentTarget.closest("li.finder-tree__node--file")
+    if (!li?.dataset.finderTreeNodeId) return
+    this.startRename(li, { isFolder: false })
+  }
 
-    const renameUrl = item.dataset.renameUrl
+  startRename(li, { isFolder }) {
+    const renameUrl = li.dataset.renameUrl
     if (!renameUrl) return
+    const label = li.querySelector("[data-finder-tree-label]")
+    if (!label || li.querySelector(".finder-tree__pending-name-input")) return
 
-    const label = item.querySelector("[data-folder-name-label]")
-    if (!label) return
-
-    if (item.querySelector(".finder-folder-name-input")) return
-
-    const currentName = item.dataset.folderName || label.textContent || ""
+    const storageName = li.dataset.storageName || ""
+    const displayTitle = li.dataset.displayTitle || label.textContent || ""
     const input = document.createElement("input")
     input.type = "text"
-    input.className = "finder-folder-name-input"
-    input.value = currentName
+    input.className = "finder-folder-name-input finder-tree__pending-name-input"
+    input.value = isFolder ? displayTitle : finderDisplayTitleFromStorageName(storageName)
     input.maxLength = 255
 
     label.replaceWith(input)
     input.focus()
     input.select()
 
-    const cancelEdit = () => {
+    const cancel = () => {
       input.replaceWith(label)
-      label.textContent = currentName
+      label.textContent = displayTitle
     }
 
-    const saveEdit = async () => {
-      const trimmedName = input.value.trim()
-      if (!trimmedName || trimmedName === currentName) {
-        cancelEdit()
+    const save = async () => {
+      const trimmed = input.value.trim()
+      const cmp = isFolder ? displayTitle : finderDisplayTitleFromStorageName(storageName)
+      if (!trimmed || trimmed === cmp) {
+        cancel()
         return
       }
-
       const response = await fetch(renameUrl, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-          "X-Requested-With": "XMLHttpRequest",
-          "X-CSRF-Token": this.csrfToken()
-        },
-        body: JSON.stringify({ name: trimmedName })
+        headers: finderApiHeaders({ jsonBody: true }),
+        body: JSON.stringify({ name: trimmed })
       })
-
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}))
-        window.alert(payload.error || "Could not rename folder.")
-        cancelEdit()
+        window.alert(payload.error || "Could not rename.")
+        cancel()
         return
       }
-
-      item.dataset.folderName = trimmedName
-      this.reloadFrameWithSelection()
+      await response.json().catch(() => ({}))
+      this.reloadFramePreservingBrowse()
     }
 
-    input.addEventListener("keydown", (keyEvent) => {
-      if (keyEvent.key === "Enter") {
-        keyEvent.preventDefault()
-        saveEdit()
-      }
-
-      if (keyEvent.key === "Escape") {
-        keyEvent.preventDefault()
-        cancelEdit()
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault()
+        void save()
+      } else if (e.key === "Escape") {
+        e.preventDefault()
+        cancel()
       }
     })
-
     input.addEventListener("blur", () => {
-      saveEdit()
+      void save()
     })
   }
 
   async deleteFolder(event) {
+    if (this.readOnlyValue) return
     event.preventDefault()
     event.stopPropagation()
+    const li = event.currentTarget.closest("li.finder-tree__node--folder")
+    await this.deleteItem(li, "folder")
+  }
 
-    const item = event.currentTarget.closest(".finder-folder-item")
-    if (!item) return
-    if (item.dataset.systemFolder === "true") return
+  async deleteFile(event) {
+    if (this.readOnlyValue) return
+    event.preventDefault()
+    event.stopPropagation()
+    const li = event.currentTarget.closest("li.finder-tree__node--file")
+    await this.deleteItem(li, "file")
+  }
 
-    const deleteUrl = item.dataset.deleteUrl
+  async deleteItem(li, kind) {
+    if (!li) return
+    const deleteUrl = li.dataset.deleteUrl
     if (!deleteUrl) return
-
-    const name = item.dataset.folderName || "this folder"
-    if (!window.confirm(`Delete \"${name}\" and all of its items?`)) return
+    const name = li.dataset.displayTitle || "this item"
+    const msg =
+      kind === "folder"
+        ? `Delete "${name}" and everything inside it?`
+        : `Delete "${name}"?`
+    if (!window.confirm(msg)) return
 
     const response = await fetch(deleteUrl, {
       method: "DELETE",
-      headers: {
-        "Accept": "application/json",
-        "X-Requested-With": "XMLHttpRequest",
-        "X-CSRF-Token": this.csrfToken()
-      }
+      headers: finderApiHeaders({ jsonBody: false })
     })
-
     if (!response.ok) {
       const payload = await response.json().catch(() => ({}))
-      window.alert(payload.error || "Could not delete folder.")
+      window.alert(payload.error || "Could not delete.")
       return
     }
 
-    this.reloadFrameAfterDelete(item)
+    const deletedId = li.dataset.finderTreeNodeId
+    const browseParam = new URLSearchParams(window.location.search).get("browse_id")
+    const nextBrowse =
+      browseParam && browseParam === deletedId ? this.rootFolderIdValue : browseParam || this.rootFolderIdValue
+    this.reloadFrameWithBrowseId(nextBrowse, { pruneSubtreeLi: li })
   }
 
-  reloadFrameWithSelection() {
-    const frameId = this.frameIdValue || "app-pane"
-    const activeOpenButton = this.element.querySelector(".finder-folder-item.is-active .finder-folder-link")
-    const activeUrl = activeOpenButton?.getAttribute("href")
-    const fallbackButton = this.element.querySelector(".finder-folder-link")
-    const nextUrl = activeUrl || fallbackButton?.getAttribute("href") || `/apps/finder?frame_id=${encodeURIComponent(frameId)}`
-    const frame = document.getElementById(frameId)
-    if (frame && frame.tagName === "TURBO-FRAME") {
-      frame.src = nextUrl
-      return
+  selectedBrowseId() {
+    const line = this.element.querySelector(".finder-tree__row-line.is-selected")
+    const folderLink = line?.querySelector("a.finder-tree__row--folder")
+    if (folderLink) {
+      return folderLink.closest("li")?.dataset?.finderTreeNodeId ?? null
     }
-
-    Turbo.visit(nextUrl, { frame: frameId })
+    try {
+      return new URL(window.location.href).searchParams.get("browse_id")
+    } catch (_e) {
+      return null
+    }
   }
 
-  reloadFrameAfterDelete(deletedItem) {
-    const frameId = this.frameIdValue || "app-pane"
-    const candidates = Array.from(this.element.querySelectorAll(".finder-folder-link"))
-    const nextButton = candidates.find((link) => link.closest(".finder-folder-item") !== deletedItem)
-    const nextUrl = nextButton?.getAttribute("href") || `/apps/finder?frame_id=${encodeURIComponent(frameId)}`
+  reloadFramePreservingBrowse() {
+    const id = this.selectedBrowseId() || this.rootFolderIdValue
+    this.reloadFrameWithBrowseId(id)
+  }
+
+  reloadFrameWithBrowseId(browseId, { pruneSubtreeLi = null } = {}) {
+    const frameId = this.frameIdValue
     const frame = document.getElementById(frameId)
-    if (frame && frame.tagName === "TURBO-FRAME") {
-      frame.src = nextUrl
-      return
+    if (!frame) return
+    const rootId = this.rootFolderIdValue
+
+    let expanded = new Set([
+      ...finderCollectExpandedFolderIdsFromDom(this.element),
+      ...(rootId ? finderReadExpandedFolderIds(rootId) : [])
+    ])
+
+    if (pruneSubtreeLi) {
+      const doomed = new Set()
+      pruneSubtreeLi.querySelectorAll("[data-finder-tree-node-id]").forEach((el) => {
+        const id = el.dataset.finderTreeNodeId
+        if (id) doomed.add(String(id))
+      })
+      expanded = new Set([...expanded].filter((id) => !doomed.has(String(id))))
     }
 
-    Turbo.visit(nextUrl, { frame: frameId })
+    if (rootId) finderWriteExpandedFolderIds(rootId, [...expanded])
+
+    const url = new URL("/apps/finder", window.location.origin)
+    url.searchParams.set("frame_id", frameId)
+    if (this.readOnlyValue) url.searchParams.set("mode", "save_as")
+    if (browseId) url.searchParams.set("browse_id", String(browseId))
+    if (expanded.size > 0) url.searchParams.set("expanded_ids", [...expanded].sort().join(","))
+    else url.searchParams.delete("expanded_ids")
+    const next = `${url.pathname}${url.search}`
+    if (frame.tagName === "TURBO-FRAME") {
+      frame.src = next
+      return
+    }
+    Turbo.visit(next, { frame: frameId })
   }
 
   csrfToken() {
-    return document.querySelector("meta[name='csrf-token']")?.content || ""
+    return finderCsrfToken()
   }
 }

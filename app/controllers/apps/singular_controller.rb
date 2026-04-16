@@ -2,95 +2,16 @@
 
 module Apps
   class SingularController < BaseController
-    before_action :redirect_top_level_frame_requests, only: %i[note task_list sticky_notes thread_board]
+    before_action :redirect_top_level_frame_requests, only: %i[task_list]
 
     before_action :ensure_singular_items
-
-    # GET /apps/singular_note
-    def note
-      @note = @app_folder.items.find_by(item_type: "note")
-      apply_singular_document_or_blank(@note, "note")
-    end
-
-    # PATCH /apps/singular_note
-    def update_note
-      @note = @app_folder.items.find_by(item_type: "note")
-      return head :not_found unless @note
-
-      if @note.update(note_params)
-        render json: {
-          ok: true,
-          id: @note.id,
-          item_type: @note.item_type,
-          name: @note.name,
-          updated_at: @note.updated_at&.utc&.iso8601
-        }
-      else
-        render json: { errors: @note.errors.full_messages }, status: :unprocessable_entity
-      end
-    end
 
     # GET /apps/singular_task_list
     def task_list
       @task_list = @app_folder.items.find_by(item_type: "task_list")
+      @linked_document_id = openable_linked_document_id("task_list")
       apply_singular_document_or_blank(@task_list, "task_list")
       @tasks_for_view = normalize_tasks(@task_list.tasks) if @task_list
-    end
-
-    # GET /apps/singular_sticky_notes
-    def sticky_notes
-      @sticky_notes_item = @app_folder.items.find_by(item_type: "stickynotes")
-      apply_singular_document_or_blank(@sticky_notes_item, "stickynotes")
-      doc = parse_sticky_notes_document(@sticky_notes_item&.body)
-      @stickies = doc[:stickies]
-      @sticky_notes_viewport = doc[:viewport] || {}
-    end
-
-    # PATCH /apps/singular_sticky_notes
-    def update_sticky_notes
-      @sticky_notes_item = @app_folder.items.find_by(item_type: "stickynotes")
-      return head :not_found unless @sticky_notes_item
-
-      raw = params[:stickies]
-      stickies_json = raw.is_a?(String) ? raw : raw.to_json
-
-      if @sticky_notes_item.update(body: stickies_json)
-        ItemStorageSyncLite.sync_all!(username: current_user&.username)
-        render json: {
-          ok: true,
-          item_type: "stickynotes",
-          updated_at: @sticky_notes_item.updated_at&.utc&.iso8601
-        }
-      else
-        render json: { errors: @sticky_notes_item.errors.full_messages }, status: :unprocessable_entity
-      end
-    end
-
-    # GET /apps/singular_thread_board
-    def thread_board
-      @thread_board_item = @app_folder.items.find_by(item_type: "thread_board")
-      apply_singular_document_or_blank(@thread_board_item, "thread_board")
-      @thread_board_doc = parse_thread_board_document(@thread_board_item&.body)
-    end
-
-    # PATCH /apps/singular_thread_board
-    def update_thread_board
-      @thread_board_item = @app_folder.items.find_by(item_type: "thread_board")
-      return head :not_found unless @thread_board_item
-
-      raw = params[:thread_board]
-      json = raw.is_a?(String) ? raw : raw.to_json
-
-      if @thread_board_item.update(body: json)
-        ItemStorageSyncLite.sync_all!(username: current_user&.username)
-        render json: {
-          ok: true,
-          item_type: "thread_board",
-          updated_at: @thread_board_item.updated_at&.utc&.iso8601
-        }
-      else
-        render json: { errors: @thread_board_item.errors.full_messages }, status: :unprocessable_entity
-      end
     end
 
     # POST /apps/singular/save_file
@@ -132,25 +53,24 @@ module Apps
 
     private
 
-      def redirect_top_level_frame_requests
-        return if params[:frame_id].blank?
-        return if request.headers["Turbo-Frame"].present?
+    def openable_linked_document_id(expected_content_type)
+      did = params[:document_id].presence
+      return nil if did.blank?
 
-        redirect_to root_path
-      end
+      doc = WorkspaceDocumentAccess.openable_document_for(current_user, did, content_type: expected_content_type)
+      doc&.id
+    end
+
+    def redirect_top_level_frame_requests
+      return if params[:frame_id].blank?
+      return if request.headers["Turbo-Frame"].present?
+
+      redirect_to root_path
+    end
 
     def ensure_singular_items
       @app_folder = Folder.find_or_create_by!(name: "App") do |folder|
         folder.name = "App"
-      end
-
-      # Ensure Note item exists
-      Item.find_or_create_by!(folder_id: @app_folder.id, item_type: "note") do |item|
-        item.folder_id = @app_folder.id
-        item.name = "Notes"
-        item.item_type = "note"
-        item.body = ""
-        item.tasks = []
       end
 
       # Ensure TaskList item exists
@@ -159,23 +79,6 @@ module Apps
         item.name = "Tasks"
         item.item_type = "task_list"
         item.body = nil
-        item.tasks = []
-      end
-
-      # Ensure Sticky Notes item exists
-      Item.find_or_create_by!(folder_id: @app_folder.id, item_type: "stickynotes") do |item|
-        item.folder_id = @app_folder.id
-        item.name = "Sticky Notes"
-        item.item_type = "stickynotes"
-        item.body = "[]"
-        item.tasks = []
-      end
-
-      Item.find_or_create_by!(folder_id: @app_folder.id, item_type: "thread_board") do |item|
-        item.folder_id = @app_folder.id
-        item.name = "Thread Board"
-        item.item_type = "thread_board"
-        item.body = "{}"
         item.tasks = []
       end
 
@@ -192,66 +95,6 @@ module Apps
       raise
     end
 
-    # Body is either a JSON array of stickies (legacy) or
-    # { "stickies": [...], "zoom": 1.25, "panX": 0, "panY": 0 }.
-    def parse_sticky_notes_document(body)
-      return { stickies: [], viewport: {} } if body.blank?
-
-      parsed = JSON.parse(body)
-      if parsed.is_a?(Array)
-        { stickies: parsed, viewport: {} }
-      elsif parsed.is_a?(Hash) && parsed["stickies"].is_a?(Array)
-        viewport = sticky_notes_viewport_from_hash(parsed)
-        { stickies: parsed["stickies"], viewport: viewport }
-      else
-        { stickies: [], viewport: {} }
-      end
-    rescue JSON::ParserError, TypeError
-      { stickies: [], viewport: {} }
-    end
-
-    def sticky_notes_viewport_from_hash(parsed)
-      vp = {}
-      if parsed.key?("zoom")
-        z = parsed["zoom"]
-        vp[:zoom] = z.is_a?(Numeric) ? z.to_f : z.to_s.to_f
-      end
-      if parsed.key?("panX") || parsed.key?("pan_x")
-        vp[:panX] = (parsed["panX"] || parsed["pan_x"]).to_f
-      end
-      if parsed.key?("panY") || parsed.key?("pan_y")
-        vp[:panY] = (parsed["panY"] || parsed["pan_y"]).to_f
-      end
-      vp
-    end
-
-    def parse_thread_board_document(body)
-      return empty_thread_board_document if body.blank?
-
-      parsed = JSON.parse(body)
-      return empty_thread_board_document unless parsed.is_a?(Hash)
-
-      {
-        "cards" => parsed["cards"].is_a?(Array) ? parsed["cards"] : [],
-        "connections" => parsed["connections"].is_a?(Array) ? parsed["connections"] : [],
-        "view" => parsed["view"].is_a?(Hash) ? parsed["view"] : {},
-        "nextCardId" => (parsed["nextCardId"] || parsed["next_card_id"]).to_i,
-        "nextConnId" => (parsed["nextConnId"] || parsed["next_conn_id"]).to_i
-      }
-    rescue JSON::ParserError, TypeError
-      empty_thread_board_document
-    end
-
-    def empty_thread_board_document
-      {
-        "cards" => [],
-        "connections" => [],
-        "view" => {},
-        "nextCardId" => 0,
-        "nextConnId" => 0
-      }
-    end
-
     def normalize_tasks(value)
       Array(value).filter_map do |task|
         if task.is_a?(String)
@@ -261,9 +104,6 @@ module Apps
           { "text" => text, "checked" => false, "note" => "", "subtasks" => [] }
         elsif task.respond_to?(:to_h)
           hash = task.to_h
-          text = hash["text"].to_s.strip
-          next if text.empty?
-
           note = hash["note"].to_s
 
           subtasks = Array(hash["subtasks"]).filter_map do |subtask|
@@ -280,6 +120,9 @@ module Apps
             }
           end
 
+          text = hash["text"].to_s.strip
+          next if text.empty? && subtasks.empty?
+
           checked = ActiveModel::Type::Boolean.new.cast(hash["checked"])
           checked = subtasks.present? ? subtasks.all? { |subtask| subtask["checked"] } : checked
 
@@ -291,10 +134,6 @@ module Apps
           }
         end
       end
-    end
-
-    def note_params
-      params.require(:item).permit(:body)
     end
 
     def apply_singular_document_or_blank(item, expected_type)
@@ -315,27 +154,15 @@ module Apps
       return unless doc
 
       case expected_type
-      when "note"
-        item.update!(body: doc.content.to_s)
       when "task_list"
         item.update!(tasks: doc.tasks || [])
-      when "stickynotes"
-        item.update!(body: doc.content.to_s)
-      when "thread_board"
-        item.update!(body: doc.content.to_s)
       end
     end
 
     def reset_singular_item_to_blank(item, expected_type)
       case expected_type
-      when "note"
-        item.update!(body: "")
       when "task_list"
         item.update!(tasks: [])
-      when "stickynotes"
-        item.update!(body: "[]")
-      when "thread_board"
-        item.update!(body: "{}")
       end
     end
   end

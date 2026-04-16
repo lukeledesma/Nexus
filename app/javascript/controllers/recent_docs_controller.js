@@ -552,45 +552,6 @@ export default class extends Controller {
     }) || null
   }
 
-  reopenFolderByName(name) {
-    const normalized = String(name || "").trim().toLowerCase()
-    if (!normalized) return false
-
-    const rows = this.element.querySelectorAll("[data-folder-row='true']")
-    const match = Array.from(rows).find((row) => {
-      const label = row.querySelector(".folder-toggle .doc-name")
-      return (label?.textContent || "").trim().toLowerCase() === normalized
-    })
-    if (!match) return false
-
-    this.collapseOtherFolders(match)
-    this.setFolderExpanded(match, true, false)
-    return true
-  }
-
-  revealFolderByName(name) {
-    const normalized = String(name || "").trim().toLowerCase()
-    if (!normalized) return false
-
-    const rows = this.element.querySelectorAll("[data-folder-row='true']")
-    const match = Array.from(rows).find((row) => {
-      const label = row.querySelector(".folder-toggle .doc-name")
-      return (label?.textContent || "").trim().toLowerCase() === normalized
-    })
-    if (!match) return false
-
-    if (typeof match.scrollIntoView === "function") {
-      match.scrollIntoView({ behavior: "smooth", block: "nearest" })
-    }
-    return true
-  }
-
-  getExpandedFolderName() {
-    const expanded = this.element.querySelector("[data-folder-row='true'][data-expanded='true']")
-    const label = expanded?.querySelector(".folder-toggle .doc-name")
-    return (label?.textContent || "").trim()
-  }
-
   fileRowKey(fileRow) {
     return fileRow?.dataset?.deleteUrl || null
   }

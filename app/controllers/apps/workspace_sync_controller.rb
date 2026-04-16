@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Apps
-  # Pushes in-memory workspace state to storage/workspace (Embedded mirror + Finder documents).
+  # Pushes in-memory workspace state to storage/workspace (Embedded mirror + Finder 2 documents).
   class WorkspaceSyncController < ApplicationController
     def flush_disk
       username = current_user&.username.to_s.strip
@@ -11,7 +11,7 @@ module Apps
         ItemStorageSyncLite.sync_all!
       end
 
-      root = FinderListedFolders.finder_folder_for(current_user)
+      root = Apps::FinderController.workspace_finder_root_folder(current_user)
       if root
         stack = [root]
         while (node = stack.pop)

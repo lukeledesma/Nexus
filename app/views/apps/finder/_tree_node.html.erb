@@ -1,0 +1,185 @@
+<%# Recursive tree row. node: { kind:, id?, title, writable, children?, ... }; browse_folder_id + expanded_folder_ids drive open/selected state. %>
+<% read_only = local_assigns.fetch(:read_only, false) %>
+<% open_in_app_content_types = local_assigns.fetch(:open_in_app_content_types, %w[task_list]) %>
+<% is_folder = node[:kind] == :folder %>
+<% children = is_folder ? Array(node[:children]) : [] %>
+<% has_children = children.any? %>
+<% expanded_ids = local_assigns.fetch(:expanded_folder_ids) %>
+<% branch_open = has_children && expanded_ids.include?(node[:id]) %>
+<% writable = node.fetch(:writable, true) %>
+<% connector =
+     local_assigns.fetch(:is_last_child, true) ? "finder-tree__node--connector-end" : "finder-tree__node--connector-branch" %>
+<li
+  class="finder-tree__node<%= " finder-tree__node--folder" if is_folder %><%= " finder-tree__node--file" unless is_folder %><%= " finder-tree__node--has-children" if is_folder && has_children %> <%= connector %><%= " is-collapsed" if is_folder && has_children && !branch_open %>"
+  <% if is_folder %>data-finder-folder-writable="<%= writable %>"<% end %>
+  <% if node[:id] %>data-finder-tree-node-id="<%= node[:id] %>"
+  data-rename-url="<%= rename_document_path(node[:id]) %>"
+  data-delete-url="<%= document_path(node[:id]) %>"
+  data-storage-name="<%= is_folder ? node[:title].to_s : node.fetch(:storage_name, node[:title]).to_s %>"
+  data-display-title="<%= node[:title].to_s %>"<% end %>
+>
+  <% if is_folder %>
+    <% folder_selected =
+         browse_folder_id.present? &&
+           browse_folder_id == node[:id] &&
+           (!has_children || branch_open) %>
+    <% folder_href = apps_finder_path({ frame_id: frame_id, browse_id: node[:id] }.merge(read_only ? { mode: "save_as" } : {})) %>
+    <div
+      class="finder-tree__row-line<%= ' is-selected' if folder_selected %>"
+      draggable="<%= (writable && !read_only) ? "true" : "false" %>"
+    >
+      <%= link_to folder_href,
+            class: "finder-tree__row finder-tree__row--folder",
+            draggable: false,
+            data: { turbo: false },
+            role: "treeitem",
+            tabindex: "0",
+            aria: {
+              label: "Folder #{node[:title]}",
+              expanded: (has_children ? (branch_open ? "true" : "false") : nil)
+            }.compact do %>
+        <span
+          class="finder-tree__icon finder-tree__icon--folder<%= " finder-tree__icon--folder-empty" unless has_children %>"
+          aria-hidden="true"
+        >
+          <%= material_symbol_icon(:folder, size: :sm) %>
+        </span>
+        <span class="finder-tree__label" data-finder-tree-label><%= node[:title] %></span>
+      <% end %>
+      <% if read_only && writable %>
+        <div class="finder-tree__row-actions finder-tree__row-actions--save-here">
+          <button
+            type="button"
+            class="row-save-here item-action-btn"
+            title="Save here"
+            aria-label="Save into folder <%= node[:title] %>"
+            data-parent-id="<%= node[:id] %>"
+            data-action="click->finder-browser#beginSaveFileHere"
+          ><%= material_symbol_icon(:save, size: :xs) %></button>
+        </div>
+      <% end %>
+      <% if writable && !read_only %>
+        <div class="finder-tree__row-actions">
+          <button
+            type="button"
+            class="row-plus"
+            title="New folder inside"
+            aria-label="New folder inside <%= node[:title] %>"
+            data-parent-id="<%= node[:id] %>"
+            data-action="click->finder-browser#createSubfolder"
+          ><%= material_symbol_icon(:add, size: :xs) %></button>
+          <button
+            type="button"
+            class="item-action-btn"
+            title="Rename"
+            aria-label="Rename folder <%= node[:title] %>"
+            data-action="click->finder-browser#renameFolder"
+          ><%= material_symbol_icon(:edit, size: :xs) %></button>
+          <button
+            type="button"
+            class="item-action-btn item-action-delete"
+            title="Delete"
+            aria-label="Delete folder <%= node[:title] %>"
+            data-action="click->finder-browser#deleteFolder"
+          ><%= material_symbol_icon(:delete, size: :xs) %></button>
+        </div>
+      <% end %>
+    </div>
+    <% if has_children %>
+      <ul class="finder-tree" role="group">
+        <% children.each_with_index do |child, idx| %>
+          <%= render "tree_node",
+                node: child,
+                is_last_child: idx == children.size - 1,
+                browse_folder_id: browse_folder_id,
+                expanded_folder_ids: expanded_ids,
+                frame_id: frame_id,
+                read_only: read_only,
+                open_in_app_content_types: open_in_app_content_types %>
+        <% end %>
+      </ul>
+    <% end %>
+  <% else %>
+    <% file_linked = node.fetch(:has_linked_app, false) %>
+    <% show_open_in_app = file_linked && open_in_app_content_types.include?(node[:content_type].to_s) %>
+    <% finder_open_doc_title = finder_document_display_title(node[:title].to_s) %>
+    <div class="finder-tree__row-line" draggable="<%= (writable && !read_only) ? "true" : "false" %>">
+      <% if file_linked && !read_only %>
+        <%= link_to "#",
+              class: "finder-tree__row finder-tree__row--file",
+              draggable: false,
+              data: {
+                turbo: false,
+                document_id: node[:id],
+                content_type: node[:content_type],
+                document_title: finder_open_doc_title,
+                action: "click->finder-browser#openLinkedFile keydown->finder-browser#openLinkedFileKey"
+              },
+              role: "treeitem",
+              tabindex: "0",
+              aria: { label: "Open #{node[:title]}" } do %>
+          <span class="finder-tree__icon finder-tree__icon--file" aria-hidden="true">
+            <%= material_symbol_icon(finder_file_icon_for_content_type(node[:content_type]), size: :sm) %>
+          </span>
+          <span class="finder-tree__label" data-finder-tree-label><%= node[:title] %></span>
+        <% end %>
+      <% elsif file_linked && read_only %>
+        <span
+          class="finder-tree__row finder-tree__row--file finder-tree__row--file-no-app"
+          role="treeitem"
+          tabindex="0"
+          aria-label="<%= node[:title] %>"
+        >
+          <span class="finder-tree__icon finder-tree__icon--file" aria-hidden="true">
+            <%= material_symbol_icon(finder_file_icon_for_content_type(node[:content_type]), size: :sm) %>
+          </span>
+          <span class="finder-tree__label" data-finder-tree-label><%= node[:title] %></span>
+        </span>
+      <% else %>
+        <span
+          class="finder-tree__row finder-tree__row--file finder-tree__row--file-no-app"
+          role="treeitem"
+          tabindex="0"
+          aria-label="<%= node[:title] %> (no app for this type yet)"
+        >
+          <span class="finder-tree__icon finder-tree__icon--file" aria-hidden="true">
+            <%= material_symbol_icon(finder_file_icon_for_content_type(node[:content_type]), size: :sm) %>
+          </span>
+          <span class="finder-tree__label" data-finder-tree-label><%= node[:title] %></span>
+        </span>
+      <% end %>
+      <% if show_open_in_app %>
+        <div class="finder-tree__row-actions finder-tree__row-actions--open-in-app">
+          <button
+            type="button"
+            class="finder-tree__open-in-app item-action-btn"
+            title="Open in app"
+            aria-label="Open <%= node[:title] %> in app"
+            data-document-id="<%= node[:id] %>"
+            data-content-type="<%= node[:content_type] %>"
+            data-document-title="<%= finder_open_doc_title %>"
+            data-action="click->finder-browser#openLinkedFileInApp"
+          ><%= material_symbol_icon(:open_in_new, size: :xs) %></button>
+        </div>
+      <% end %>
+      <% if writable && !read_only %>
+        <div class="finder-tree__row-actions">
+          <button
+            type="button"
+            class="item-action-btn"
+            title="Rename"
+            aria-label="Rename <%= node[:title] %>"
+            data-action="click->finder-browser#renameFile"
+          ><%= material_symbol_icon(:edit, size: :xs) %></button>
+          <button
+            type="button"
+            class="item-action-btn item-action-delete"
+            title="Delete"
+            aria-label="Delete <%= node[:title] %>"
+            data-action="click->finder-browser#deleteFile"
+          ><%= material_symbol_icon(:delete, size: :xs) %></button>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+</li>

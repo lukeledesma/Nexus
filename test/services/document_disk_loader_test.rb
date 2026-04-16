@@ -42,6 +42,17 @@ class DocumentDiskLoaderTest < ActiveSupport::TestCase
     assert_equal "Legacy subtask", parsed[:tasks][0]["subtasks"][0]["text"]
   end
 
+  test "wav and related extensions are indexed as asset documents" do
+    assert DocumentDiskLoader.send(:supported_file_extension?, "/tmp/x.wav")
+    assert DocumentDiskLoader.send(:supported_file_extension?, "/tmp/x.WAV")
+    assert DocumentDiskLoader.send(:disk_asset_file?, "/a/b/c.mp3")
+    assert_equal "707 Crash", DocumentDiskLoader.send(:basename_without_supported_extension, "/Cymbals/707 Crash.wav")
+
+    attrs = DocumentDiskLoader.send(:asset_file_attributes)
+    assert_equal "asset", attrs[:content_type]
+    assert_nil attrs[:content]
+  end
+
   test "purge removes missing folders and files" do
     stale_folder = Document.create!(is_folder: true, title: "Stale Folder", storage_path: "stale-folder")
     stale_file = Document.create!(is_folder: false, title: "Stale", content_type: "note", content: "<p>x</p>", storage_path: "stale.rtf")

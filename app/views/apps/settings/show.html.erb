@@ -32,25 +32,35 @@
         <section class="finder-shell-pane finder-shell-pane--contents" aria-label="Settings content">
           <%= render "apps/user/panel", frame_id: frame_id %>
         </section>
+      <% elsif @active_settings_section == "wallpaper" %>
+        <section
+          class="finder-shell-pane finder-shell-pane--contents settings-pane-wallpaper"
+          aria-label="Wallpaper"
+          data-controller="wallpaper-iimage"
+          data-wallpaper-iimage-folder-id-value="<%= @wallpaper_iimage_folder&.id.to_i %>"
+          data-wallpaper-iimage-workspace-url-value="<%= workspace_preferences_path %>"
+        >
+          <div class="theme-builder-view settings-wallpaper-theme-builder">
+            <div class="theme-builder-main-shell os-window-body-start">
+              <div
+                data-wallpaper-iimage-target="surface"
+                class="settings-iimage-surface"
+                data-action="click->wallpaper-iimage#surfaceClick keydown->wallpaper-iimage#surfaceKeydown"
+              >
+                <%= render "apps/settings/wallpaper_iimage_surface" %>
+              </div>
+            </div>
+          </div>
+        </section>
       <% elsif @active_settings_section == "saved_themes" %>
-        <section class="finder-shell-pane finder-shell-pane--contents" aria-label="Saved themes">
+        <section class="finder-shell-pane finder-shell-pane--contents" aria-label="Shell">
           <div
             class="settings-hub"
             data-controller="settings-hub"
             data-settings-hub-workspace-url-value="<%= workspace_preferences_path %>"
             data-settings-hub-settings-url-value="<%= apps_settings_path %>"
           >
-            <ul class="finder-file-list settings-themes-list settings-hub-themes-list" role="list" aria-label="Saved themes" data-settings-hub-target="themesList"></ul>
-          </div>
-        </section>
-      <% else %>
-        <section
-          class="finder-shell-pane finder-shell-pane--contents settings-pane-theme-studio"
-          aria-label="Theme studio"
-          data-theme-builder-chrome-root
-        >
-          <div class="settings-theme-studio-body">
-            <%= render "apps/theme_builder/studio" %>
+            <ul class="finder-file-list settings-themes-list settings-hub-themes-list" role="list" aria-label="Shell" data-settings-hub-target="themesList"></ul>
           </div>
         </section>
       <% end %>

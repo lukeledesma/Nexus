@@ -12,23 +12,34 @@
   data-ollama-helper-sprite-juggling-value="/vendor/clawd-on-desk/clawd-juggling.gif"
   data-ollama-helper-sprite-reading-value="/vendor/clawd-on-desk/clawd-idle-reading.gif"
   data-ollama-helper-target="root">
-  <div class="ollama-helper__dock" data-ollama-helper-target="dock">
+  <div id="ollama-helper-dock" class="ollama-helper__dock" data-ollama-helper-target="dock">
+<%# Apply saved left/top before dock children parse (avoids bottom-right flash when boot script runs earlier on the page). %>
+<script>
+(function () {
+  try {
+    var raw = localStorage.getItem("nexus.ollamaHelper.position")
+    if (!raw) return
+    var dock = document.getElementById("ollama-helper-dock")
+    if (!dock) return
+    var o = JSON.parse(raw)
+    if (typeof o.left !== "number" || typeof o.top !== "number" || !isFinite(o.left) || !isFinite(o.top)) return
+    dock.style.left = Math.round(o.left) + "px"
+    dock.style.top = Math.round(o.top) + "px"
+    dock.style.right = "auto"
+    dock.style.bottom = "auto"
+  } catch (e) { /* private mode / bad JSON */ }
+})()
+</script>
     <section
       class="ollama-helper__speech"
       data-ollama-helper-target="panel"
       data-action="pointerdown->ollama-helper#onPanelPointerDown"
-      data-ollama-placement="above"
       role="dialog"
       aria-label="Chat"
       aria-modal="false">
       <div class="ollama-helper__speech-inner">
-        <div class="ollama-helper__speech-tools">
-          <button type="button" class="tools-close-btn" data-action="click->ollama-helper#close" aria-label="Hide chat" title="Hide chat">
-            <%= material_symbol_icon(:close, size: :xs) %>
-          </button>
-        </div>
         <div class="ollama-helper__messages" data-ollama-helper-target="messages"></div>
-        <p class="ollama-helper__status" data-ollama-helper-target="status" aria-live="polite"></p>
+        <p class="ollama-helper__status" data-ollama-helper-target="status" aria-live="polite"><%# keep empty — no whitespace or :empty fails and reserves min-height %></p>
         <form class="ollama-helper__form" data-action="submit->ollama-helper#submit">
           <textarea
             class="ollama-helper__input"
@@ -60,4 +71,33 @@
         decoding="async">
     </div>
   </div>
+<%# Position payload stores right/bottom only (left/top is normalized in script right after dock opens). Matches ollama_helper_controller STORAGE_POS. %>
+<script>
+(function () {
+  try {
+    var raw = localStorage.getItem("nexus.ollamaHelper.position")
+    if (!raw) return
+    var dock = document.getElementById("ollama-helper-dock")
+    if (!dock) return
+    var o = JSON.parse(raw)
+    if (typeof o.left === "number" && typeof o.top === "number") return
+    if (typeof o.right !== "number" || typeof o.bottom !== "number" || !isFinite(o.right) || !isFinite(o.bottom)) return
+    function placeLegacy() {
+      var w = dock.offsetWidth
+      var h = dock.offsetHeight
+      if (w < 4 || h < 4) {
+        requestAnimationFrame(placeLegacy)
+        return
+      }
+      var iw = window.innerWidth
+      var ih = window.innerHeight
+      dock.style.left = Math.round(iw - o.right - w) + "px"
+      dock.style.top = Math.round(ih - o.bottom - h) + "px"
+      dock.style.right = "auto"
+      dock.style.bottom = "auto"
+    }
+    requestAnimationFrame(placeLegacy)
+  } catch (e) { /* private mode / bad JSON */ }
+})()
+</script>
 </div>

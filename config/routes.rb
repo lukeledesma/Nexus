@@ -7,25 +7,16 @@ Rails.application.routes.draw do
     resources :folders, only: %i[show create update destroy]
     resources :task_lists, only: %i[show create update destroy]
     get "finder", to: "finder#show"
-    get "habit_tracker", to: "habit_tracker#show"
-    get "finder/folders", to: "finder#folders_json"
-    get "finder/folder_files", to: "finder#folder_files"
-    post "finder/create_folder", to: "finder#create_folder"
-get "settings", to: "settings#show"
+    get "loops", to: "loops#show"
+    get "settings", to: "settings#show"
+    get "wallpaper_iimage/files", to: "wallpaper_iimage#files"
     get "user", to: "user#show"
     patch "user/username", to: "user#update_username", as: :user_username
     patch "user/password", to: "user#update_password", as: :user_password
-    get "singular_note", to: "singular#note"
-    patch "singular_note", to: "singular#update_note"
     get "singular_task_list", to: "singular#task_list"
-    get "singular_sticky_notes", to: "singular#sticky_notes"
-    patch "singular_sticky_notes", to: "singular#update_sticky_notes"
-    get "singular_thread_board", to: "singular#thread_board"
-    patch "singular_thread_board", to: "singular#update_thread_board"
     post "singular/save_file", to: "singular#save_file"
     post "workspace/flush_disk", to: "workspace_sync#flush_disk"
     post "ollama_helper/chat", to: "ollama_helper#chat", as: :ollama_helper_chat
-    get "all_tasks",  to: "task_lists#index"
   end
 
   resources :folders, only: %i[create update destroy], controller: "apps/folders"
@@ -50,8 +41,13 @@ get "settings", to: "settings#show"
 
     member do
       post :create_file
+      post :create_subfolder
+      post :move_folder
+      post :move_file
+      post :upload_images
       patch :rename
       get :file_list
+      get :asset_file
     end
   end
 end

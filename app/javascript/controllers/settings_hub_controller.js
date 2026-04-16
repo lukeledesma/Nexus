@@ -1,22 +1,30 @@
 import { Controller } from "@hotwired/stimulus"
 import { materialSymbolSvg } from "lib/material_symbols"
 import { NEXUS_CLICKABLE_ROW_MAIN_CLASS } from "lib/nexus_ui"
-import { syncNexusWorkspaceChrome, isNexusClassicUiActive } from "lib/nexus_workspace_chrome"
+import { syncNexusDesktopWallpaper, syncNexusWorkspaceChrome, isNexusClassicUiActive } from "lib/nexus_workspace_chrome"
+
+const SHELL_MODE_STORAGE_KEY = "nexus.settings.shellMode"
+const SHELL_MODE_ORDER = ["dark", "light", "system"]
+const SHELL_MODE_META = {
+  dark: { label: "Dark", icon: "dark_mode" },
+  light: { label: "Light", icon: "light_mode" },
+  system: { label: "System", icon: "desktop_windows" }
+}
 
 export default class extends Controller {
   static targets = ["themesList", "activeThemeLabel"]
   static values = { workspaceUrl: String, settingsUrl: String }
 
   connect() {
-    this.defaultShellModel = { hue: 200, saturation: 5, brightness: 20, alpha: 0.18 }
+    this.defaultShellModel = { hue: 200, saturation: 5, brightness: 13, alpha: 0.95 }
     this.defaultBackgroundModel = {
-      colorOneHue: 210,
-      colorOneSaturation: 18,
-      colorOneBrightness: 16,
-      colorTwoHue: 195,
-      colorTwoSaturation: 25,
-      colorTwoBrightness: 20,
-      angle: 128
+      colorOneHue: 0,
+      colorOneSaturation: 0,
+      colorOneBrightness: 0,
+      colorTwoHue: 0,
+      colorTwoSaturation: 0,
+      colorTwoBrightness: 0,
+      angle: 180
     }
     this.defaultContentModel = {
       fontOne: 85,
@@ -37,6 +45,12 @@ export default class extends Controller {
     this.currentLiveAppearance = null
     this._lastRenderedThemesSignature = null
     this._lastRenderedCustomLayout = null
+    this.gradientSourceThemeId = ""
+    this.gradientSourceThemeName = ""
+    this.wallpaperBackgroundKind = ""
+    this.wallpaperGradientThemeId = ""
+    this.wallpaperImageDocumentId = 0
+    this.shellMode = this.readShellModePreference()
 
     this.boundThemeStatus = this.handleThemeStatus.bind(this)
     window.addEventListener("workspace:theme-status", this.boundThemeStatus)
@@ -59,6 +73,32 @@ export default class extends Controller {
     this.serverIsCustomLayout = Boolean(detail?.is_custom_layout)
     if (detail?.active_theme_id) this.activeThemeId = String(detail.active_theme_id)
     if (Array.isArray(detail?.themes)) this.themes = detail.themes
+    if (detail && Object.prototype.hasOwnProperty.call(detail, "gradient_source_theme_id")) {
+      this.gradientSourceThemeId =
+        detail.gradient_source_theme_id != null ? String(detail.gradient_source_theme_id) : ""
+    }
+    if (detail && Object.prototype.hasOwnProperty.call(detail, "gradient_source_theme_name")) {
+      this.gradientSourceThemeName = String(detail.gradient_source_theme_name || "").trim()
+    }
+    if (detail && Object.prototype.hasOwnProperty.call(detail, "wallpaper_background_kind")) {
+      this.wallpaperBackgroundKind = detail.wallpaper_background_kind ? String(detail.wallpaper_background_kind) : ""
+    }
+    if (detail && Object.prototype.hasOwnProperty.call(detail, "wallpaper_gradient_theme_id")) {
+      const raw = detail.wallpaper_gradient_theme_id
+      this.wallpaperGradientThemeId = raw != null ? String(raw) : ""
+    }
+    if (detail && Object.prototype.hasOwnProperty.call(detail, "wallpaper_image_document_id")) {
+      const raw = detail.wallpaper_image_document_id
+      const n = raw != null ? Number.parseInt(String(raw), 10) : 0
+      this.wallpaperImageDocumentId = Number.isFinite(n) && n > 0 ? n : 0
+    }
+    if (detail && Object.prototype.hasOwnProperty.call(detail, "shell_mode")) {
+      const mode = String(detail.shell_mode || "").trim().toLowerCase()
+      if (SHELL_MODE_ORDER.includes(mode)) {
+        this.shellMode = mode
+        this.writeShellModePreference(mode)
+      }
+    }
     if (detail?.appearance) {
       const snapshot = this.normalizedAppearanceSnapshot(detail.appearance)
       this.currentLiveAppearance = snapshot
@@ -96,12 +136,33 @@ export default class extends Controller {
         this.activeThemeAppearanceSnapshot = snapshot
         this.currentLiveAppearance = snapshot
       }
+      if (Object.prototype.hasOwnProperty.call(payload || {}, "gradient_source_theme_id")) {
+        this.gradientSourceThemeId =
+          payload.gradient_source_theme_id != null ? String(payload.gradient_source_theme_id) : ""
+      }
+      if (Object.prototype.hasOwnProperty.call(payload || {}, "gradient_source_theme_name")) {
+        this.gradientSourceThemeName = String(payload.gradient_source_theme_name || "").trim()
+      }
+      if (Object.prototype.hasOwnProperty.call(payload || {}, "wallpaper_background_kind")) {
+        this.wallpaperBackgroundKind = payload.wallpaper_background_kind ? String(payload.wallpaper_background_kind) : ""
+      }
+      if (Object.prototype.hasOwnProperty.call(payload || {}, "wallpaper_gradient_theme_id")) {
+        const raw = payload.wallpaper_gradient_theme_id
+        this.wallpaperGradientThemeId = raw != null ? String(raw) : ""
+      }
+      if (Object.prototype.hasOwnProperty.call(payload || {}, "wallpaper_image_document_id")) {
+        const raw = payload.wallpaper_image_document_id
+        const n = raw != null ? Number.parseInt(String(raw), 10) : 0
+        this.wallpaperImageDocumentId = Number.isFinite(n) && n > 0 ? n : 0
+      }
       this.renderThemesList(false)
       this.refreshActionStatusBadges(false)
       syncNexusWorkspaceChrome({
         active_theme_id: payload?.active_theme_id,
-        appearance: payload?.appearance
+        appearance: payload?.appearance,
+        shell_mode: this.shellMode
       })
+      syncNexusDesktopWallpaper(payload || {})
     } catch (_) {
       /* non-blocking */
     }
@@ -134,22 +195,8 @@ export default class extends Controller {
       const selected = id === this.selectedThemeId && !this.serverIsCustomLayout
       li.classList.toggle("is-active", selected)
       li.classList.toggle("is-selected", selected)
-
-      const nameBtn = li.querySelector(".settings-themes-item-btn")
-      if (!nameBtn) return
-      let meta = nameBtn.querySelector(".settings-themes-item-meta")
-      const showActive = id === this.activeThemeId && !this.serverIsCustomLayout
-      if (showActive) {
-        if (!meta) {
-          meta = document.createElement("span")
-          meta.className = "settings-themes-item-meta"
-          meta.textContent = "(Active)"
-          nameBtn.appendChild(meta)
-        }
-      } else if (meta) {
-        meta.remove()
-      }
     })
+    this.refreshShellModeWidgets()
   }
 
   renderThemesList(shouldBroadcast = true) {
@@ -198,17 +245,37 @@ export default class extends Controller {
       nameLabel.textContent = theme.name
       nameBtn.appendChild(nameLabel)
 
-      if (theme.id === this.activeThemeId && !this.serverIsCustomLayout) {
-        const meta = document.createElement("span")
-        meta.className = "settings-themes-item-meta"
-        meta.textContent = "(Active)"
-        nameBtn.appendChild(meta)
-      }
-
       left.appendChild(nameBtn)
       li.appendChild(left)
 
-      if (!theme.locked) {
+      if (theme.id === "default") {
+        const actionsContainer = document.createElement("div")
+        actionsContainer.className = "organizer-row-right settings-themes-item-actions settings-shell-mode-actions"
+
+        const modeLabel = document.createElement("span")
+        modeLabel.className = "settings-shell-mode-label"
+        modeLabel.dataset.shellModeLabel = "true"
+        modeLabel.textContent = this.shellModeLabel()
+
+        const modeBtn = document.createElement("button")
+        modeBtn.type = "button"
+        modeBtn.className = "item-action-btn settings-shell-mode-btn"
+        modeBtn.title = `Switch shell mode (${this.shellModeLabel()})`
+        modeBtn.setAttribute("aria-label", "Cycle shell mode")
+        modeBtn.dataset.shellModeButton = "true"
+        modeBtn.innerHTML = materialSymbolSvg(this.shellModeIcon(), "xs")
+        modeBtn.addEventListener("click", (e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          this.cycleShellMode()
+          this.applyShellModePreview()
+          this.refreshShellModeWidgets()
+        })
+
+        actionsContainer.appendChild(modeLabel)
+        actionsContainer.appendChild(modeBtn)
+        li.appendChild(actionsContainer)
+      } else if (!theme.locked) {
         const actionsContainer = document.createElement("div")
         actionsContainer.className = "organizer-row-right settings-themes-item-actions"
 
@@ -610,6 +677,25 @@ export default class extends Controller {
       this.activeThemeAppearanceSnapshot = snapshot
       this.currentLiveAppearance = snapshot
     }
+    if (payload && Object.prototype.hasOwnProperty.call(payload, "gradient_source_theme_id")) {
+      this.gradientSourceThemeId =
+        payload.gradient_source_theme_id != null ? String(payload.gradient_source_theme_id) : ""
+    }
+    if (payload && Object.prototype.hasOwnProperty.call(payload, "gradient_source_theme_name")) {
+      this.gradientSourceThemeName = String(payload.gradient_source_theme_name || "").trim()
+    }
+    if (payload && Object.prototype.hasOwnProperty.call(payload, "wallpaper_background_kind")) {
+      this.wallpaperBackgroundKind = payload.wallpaper_background_kind ? String(payload.wallpaper_background_kind) : ""
+    }
+    if (payload && Object.prototype.hasOwnProperty.call(payload, "wallpaper_gradient_theme_id")) {
+      const raw = payload.wallpaper_gradient_theme_id
+      this.wallpaperGradientThemeId = raw != null ? String(raw) : ""
+    }
+    if (payload && Object.prototype.hasOwnProperty.call(payload, "wallpaper_image_document_id")) {
+      const raw = payload.wallpaper_image_document_id
+      const n = raw != null ? Number.parseInt(String(raw), 10) : 0
+      this.wallpaperImageDocumentId = Number.isFinite(n) && n > 0 ? n : 0
+    }
     this.selectedThemeId = this.resolveSelectableThemeId(this.selectedThemeId)
   }
 
@@ -650,7 +736,8 @@ export default class extends Controller {
 
     syncNexusWorkspaceChrome({
       active_theme_id: this.activeThemeId,
-      appearance: a
+      appearance: a,
+      shell_mode: this.shellMode
     })
   }
 
@@ -744,7 +831,7 @@ export default class extends Controller {
 
   refreshActionStatusBadges(shouldBroadcast = true) {
     const activeTheme = this.themes.find((t) => t.id === this.activeThemeId)
-    const activeThemeName = activeTheme?.name || "Default"
+    const activeThemeName = activeTheme?.name || "Modern"
 
     if (this.hasActiveThemeLabelTarget) {
       this.activeThemeLabelTarget.textContent = this.serverIsCustomLayout ? "Custom (unsaved)" : activeThemeName
@@ -759,7 +846,13 @@ export default class extends Controller {
           active_theme_id: this.activeThemeId,
           is_custom_layout: this.serverIsCustomLayout,
           appearance: this.currentAppearanceSnapshot(),
-          themes: this.themes
+          themes: this.themes,
+          gradient_source_theme_id: this.gradientSourceThemeId || null,
+          gradient_source_theme_name: this.gradientSourceThemeName || null,
+          wallpaper_background_kind: this.wallpaperBackgroundKind || null,
+          wallpaper_gradient_theme_id: this.wallpaperGradientThemeId || null,
+          wallpaper_image_document_id: this.wallpaperImageDocumentId || null,
+          shell_mode: this.shellMode
         }
       })
     )
@@ -794,5 +887,60 @@ export default class extends Controller {
   clampAngle(value) {
     if (!Number.isFinite(Number(value))) return this.defaultBackgroundModel.angle
     return Math.min(360, Math.max(0, Number(value)))
+  }
+
+  readShellModePreference() {
+    try {
+      const raw = String(window.localStorage.getItem(SHELL_MODE_STORAGE_KEY) || "").trim().toLowerCase()
+      return SHELL_MODE_ORDER.includes(raw) ? raw : "dark"
+    } catch (_e) {
+      return "dark"
+    }
+  }
+
+  writeShellModePreference(mode) {
+    try {
+      window.localStorage.setItem(SHELL_MODE_STORAGE_KEY, mode)
+    } catch (_e) {
+      /* non-blocking */
+    }
+  }
+
+  cycleShellMode() {
+    const idx = SHELL_MODE_ORDER.indexOf(this.shellMode)
+    const next = SHELL_MODE_ORDER[(idx + 1) % SHELL_MODE_ORDER.length]
+    this.shellMode = next
+    this.writeShellModePreference(next)
+  }
+
+  applyShellModePreview() {
+    const appearance = this.currentAppearanceSnapshot()
+    syncNexusWorkspaceChrome({
+      active_theme_id: this.activeThemeId,
+      appearance,
+      shell_mode: this.shellMode
+    })
+    this.refreshActionStatusBadges(true)
+  }
+
+  shellModeLabel() {
+    return SHELL_MODE_META[this.shellMode]?.label || "Dark"
+  }
+
+  shellModeIcon() {
+    return SHELL_MODE_META[this.shellMode]?.icon || "dark_mode"
+  }
+
+  refreshShellModeWidgets() {
+    if (!this.hasThemesListTarget) return
+    const modeLabel = this.shellModeLabel()
+    const modeIcon = this.shellModeIcon()
+    this.themesListTarget.querySelectorAll("[data-shell-mode-label]").forEach((el) => {
+      el.textContent = modeLabel
+    })
+    this.themesListTarget.querySelectorAll("[data-shell-mode-button]").forEach((btn) => {
+      btn.title = `Switch shell mode (${modeLabel})`
+      btn.innerHTML = materialSymbolSvg(modeIcon, "xs")
+    })
   }
 }

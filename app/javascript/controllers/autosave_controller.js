@@ -4,7 +4,8 @@ export default class extends Controller {
   static values = {
     debounce: { type: Number, default: 250 },
     itemId: Number,
-    itemType: String
+    itemType: String,
+    linkedDocumentId: { type: Number, default: 0 }
   }
 
   connect() {
@@ -66,7 +67,7 @@ export default class extends Controller {
 
     const headers = {
       "X-Requested-With": "XMLHttpRequest",
-      "Accept": "application/json"
+      Accept: "application/json"
     }
     if (token) headers["X-CSRF-Token"] = token
 
@@ -83,15 +84,47 @@ export default class extends Controller {
       const json = await response.json().catch(() => ({}))
       const savedName = (json.name || nameBeforeSave || "").toString().trim()
       if (savedName.length > 0) this.#updateSidebarName(savedName)
+
+      const linkedId = this.hasLinkedDocumentIdValue ? this.linkedDocumentIdValue : 0
+      if (Number.isFinite(linkedId) && linkedId > 0) {
+        await this.#syncLinkedWorkspaceDocument(form, linkedId, token)
+      }
+
       this.#publishSaveState(json)
     } catch (_error) {
-      // Keep autosave silent; user can still press explicit Save.
+      // Keep autosave silent; user can still use Finder save flow when unlinked.
     } finally {
       this.inFlight = false
       if (this.pending) {
         this.pending = false
         this.submit(0)
       }
+    }
+  }
+
+  async #syncLinkedWorkspaceDocument(form, documentId, token) {
+    const payload = form.querySelector('input[name="item[tasks_payload]"]')?.value
+    if (payload == null) return
+
+    const fd = new FormData()
+    fd.set("document[tasks_payload]", payload)
+    fd.set("_method", "patch")
+    if (token) fd.set("authenticity_token", token)
+
+    const headers = {
+      "X-Requested-With": "XMLHttpRequest",
+      Accept: "application/json"
+    }
+    if (token) headers["X-CSRF-Token"] = token
+
+    try {
+      await fetch(`/documents/${documentId}`, {
+        method: "POST",
+        headers,
+        body: fd
+      })
+    } catch (_e) {
+      /* non-blocking */
     }
   }
 

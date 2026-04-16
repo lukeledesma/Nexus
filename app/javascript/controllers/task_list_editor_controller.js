@@ -1,6 +1,12 @@
 import { Controller } from "@hotwired/stimulus"
 import { materialSymbolSvg } from "lib/material_symbols"
 import { NEXUS_CLICKABLE_ROW_MAIN_CLASS } from "lib/nexus_ui"
+import {
+  clearSingularPickerDraft,
+  readSingularPickerDraft,
+  SINGULAR_BEFORE_SAVE_PICKER,
+  writeSingularPickerDraft
+} from "lib/singular_finder_picker_draft"
 
 function taskToggleMarkup(checked) {
   return checked ? materialSymbolSvg("check", "xs") : materialSymbolSvg("circle_outline", "xs")
@@ -13,15 +19,27 @@ export default class extends Controller {
     this.boundWindowState = this.handleWindowState.bind(this)
     this.boundRequestSave = this.handleRequestSave.bind(this)
     this.boundTaskListAddFromChrome = this.handleTaskListAddFromChrome.bind(this)
+    this.boundBeforeSavePicker = this.handleBeforeSavePicker.bind(this)
+    this.boundSyncPayloadInput = () => this.#syncPayload()
     window.addEventListener("app-window:state", this.boundWindowState)
     window.addEventListener("nexus:task-list-add-task", this.boundTaskListAddFromChrome)
+    window.addEventListener(SINGULAR_BEFORE_SAVE_PICKER, this.boundBeforeSavePicker)
     document.addEventListener("nexus:request-save", this.boundRequestSave)
-    this.#refreshAll()
+    if (this.hasListTarget) {
+      this.listTarget.addEventListener("input", this.boundSyncPayloadInput, true)
+    }
+    this.dragState = null
+    this.suppressNextClick = false
+    if (!this.#restorePickerDraftIfAny()) this.#refreshAll()
   }
 
   disconnect() {
     document.removeEventListener("nexus:request-save", this.boundRequestSave)
     window.removeEventListener("nexus:task-list-add-task", this.boundTaskListAddFromChrome)
+    window.removeEventListener(SINGULAR_BEFORE_SAVE_PICKER, this.boundBeforeSavePicker)
+    if (this.hasListTarget && this.boundSyncPayloadInput) {
+      this.listTarget.removeEventListener("input", this.boundSyncPayloadInput, true)
+    }
     if (this.autosaveTimer) {
       window.clearTimeout(this.autosaveTimer)
       this.autosaveTimer = null
@@ -40,14 +58,76 @@ export default class extends Controller {
   handleRequestSave(event) {
     const frame = this.element.closest("turbo-frame")
     if (!frame || event.detail?.frameId !== frame.id) return
-    this.#commitActiveEditIfAny()
+    this.#flushAllPendingEdits()
     this.#refreshAll()
+  }
+
+  handleBeforeSavePicker(event) {
+    const frame = this.element.closest("turbo-frame")
+    if (!frame || event.detail?.frameId !== frame.id || !this.hasListTarget || !this.hasPayloadTarget) return
+    if (frame.getAttribute("data-singular-has-linked-document") === "true") {
+      clearSingularPickerDraft(frame.id)
+      return
+    }
+    this.#flushAllPendingEdits()
+    this.#syncPayload()
+    writeSingularPickerDraft(frame.id, { app: "task_list", tasksPayload: this.payloadTarget.value })
+  }
+
+  /** Commit every in-progress row edit (main or subtask) so payload + picker snapshot match the UI. */
+  #flushAllPendingEdits() {
+    if (!this.hasListTarget) return
+    for (let i = 0; i < 32; i += 1) {
+      const input = this.listTarget.querySelector(".task-edit-input")
+      if (!input) break
+      this.#finishEdit(input, true)
+    }
+  }
+
+  #restorePickerDraftIfAny() {
+    const frame = this.element.closest("turbo-frame")
+    if (!frame || !this.hasListTarget || frame.getAttribute("data-singular-has-linked-document") === "true")
+      return false
+    const data = readSingularPickerDraft(frame.id)
+    if (!data || data.app !== "task_list" || data.tasksPayload == null) return false
+    let tasks
+    try {
+      tasks = JSON.parse(data.tasksPayload)
+    } catch (_e) {
+      return false
+    }
+    if (!Array.isArray(tasks)) return false
+
+    clearSingularPickerDraft(frame.id)
+
+    while (this.listTarget.firstChild) this.listTarget.removeChild(this.listTarget.firstChild)
+    tasks.forEach((t) => {
+      const subs = (Array.isArray(t?.subtasks) ? t.subtasks : []).map((s) => ({
+        text: String(s?.text ?? ""),
+        checked: Boolean(s?.checked)
+      }))
+      this.listTarget.appendChild(
+        this.#buildMainTaskRow(String(t?.text ?? ""), Boolean(t?.checked), subs)
+      )
+    })
+    this.#refreshAll()
+    this.#triggerAutosave(0)
+    if (this.#restoredTasksLookSubstantive(tasks)) window.nexusWorkspaceUnsaved = true
+    return true
+  }
+
+  #restoredTasksLookSubstantive(tasks) {
+    return tasks.some((t) => {
+      if (String(t?.text ?? "").trim().length > 0) return true
+      const subs = Array.isArray(t?.subtasks) ? t.subtasks : []
+      return subs.some((s) => String(s?.text ?? "").trim().length > 0)
+    })
   }
 
   handleWindowState(event) {
     if (event.detail?.appKey !== "singular-task-list") return
     if (event.detail?.open !== false) return
-    this.#commitActiveEditIfAny()
+    this.#flushAllPendingEdits()
   }
 
   addTask(event) {
@@ -69,6 +149,11 @@ export default class extends Controller {
   }
 
   handleListClick(event) {
+    if (this.suppressNextClick) {
+      this.suppressNextClick = false
+      event.preventDefault()
+      return
+    }
     const row = event.target.closest(".task-item-row")
     if (!row) return
 
@@ -124,6 +209,78 @@ export default class extends Controller {
       event.preventDefault()
       this.#finishEdit(input, false)
     }
+  }
+
+  handleDragStart(event) {
+    const row = event.target.closest(".task-item-row")
+    if (!row || row.querySelector(".task-edit-input")) {
+      event.preventDefault()
+      return
+    }
+    if (event.target.closest(".task-toggle, .row-plus, .item-action-btn, .task-edit-input")) {
+      event.preventDefault()
+      return
+    }
+
+    const mode = row.matches(".task-item-row--main") ? "main" : "subtask"
+    if (mode === "subtask") {
+      const mainRow = this.#findMainRowForSubtask(row)
+      if (!mainRow) {
+        event.preventDefault()
+        return
+      }
+      this.dragState = { mode, row, mainRow, rows: [row] }
+    } else {
+      const rows = this.#mainGroupRows(row)
+      this.dragState = { mode, row, rows }
+    }
+
+    row.classList.add("task-item-row--dragging")
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move"
+      event.dataTransfer.setData("text/plain", "task-row")
+    }
+  }
+
+  handleDragOver(event) {
+    if (!this.dragState) return
+    const target = event.target.closest(".task-item-row")
+    if (!target) return
+
+    const drop = this.#computeDropCandidate(target, event.clientY)
+    this.#clearDropIndicators()
+    if (!drop) return
+    event.preventDefault()
+    drop.row.classList.add(drop.where === "before" ? "task-item-row--drop-before" : "task-item-row--drop-after")
+  }
+
+  handleDrop(event) {
+    if (!this.dragState) return
+    const target = event.target.closest(".task-item-row")
+    if (!target) {
+      this.handleDragEnd()
+      return
+    }
+    const drop = this.#computeDropCandidate(target, event.clientY)
+    this.#clearDropIndicators()
+    if (!drop) {
+      this.handleDragEnd()
+      return
+    }
+    event.preventDefault()
+    this.#applyDrop(drop)
+    this.suppressNextClick = true
+    this.#triggerAutosave(0)
+    this.#refreshAll()
+    this.handleDragEnd()
+  }
+
+  handleDragEnd() {
+    this.listTarget.querySelectorAll(".task-item-row--dragging").forEach((row) => {
+      row.classList.remove("task-item-row--dragging")
+    })
+    this.#clearDropIndicators()
+    this.dragState = null
   }
 
   startEdit(event) {
@@ -404,6 +561,7 @@ export default class extends Controller {
   #buildMainTaskRow(text, checked, subtasks) {
     const row = document.createElement("li")
     row.className = "task-item-row task-item-row--main organizer-row nexus-standard-row"
+    row.draggable = true
     row.dataset.mainChecked = checked ? "true" : "false"
     row.dataset.hasSubtasks = subtasks.length > 0 ? "true" : "false"
 
@@ -440,6 +598,7 @@ export default class extends Controller {
   #buildSubtaskRow(text, checked) {
     const row = document.createElement("li")
     row.className = "task-item-row task-item-row--subtask organizer-row nexus-standard-row task-item-group--child"
+    row.draggable = true
     if (checked) row.classList.add("task-item-row--checked")
 
     row.innerHTML =
@@ -458,6 +617,7 @@ export default class extends Controller {
   }
 
   #refreshAll() {
+    this.#ensureRowUids()
     const mainRows = Array.from(this.listTarget.querySelectorAll(".task-item-row--main"))
 
     mainRows.forEach((mainRow) => {
@@ -513,6 +673,76 @@ export default class extends Controller {
     this.#syncPayload()
   }
 
+  #ensureRowUids() {
+    let next = 1
+    this.listTarget.querySelectorAll(".task-item-row").forEach((row) => {
+      if (!row.dataset.rowUid) {
+        row.dataset.rowUid = `task-row-${Date.now().toString(36)}-${next}`
+        next += 1
+      }
+    })
+  }
+
+  #mainGroupRows(mainRow) {
+    return [mainRow, ...this.#subtasksFor(mainRow)]
+  }
+
+  #clearDropIndicators() {
+    this.listTarget.querySelectorAll(".task-item-row--drop-before, .task-item-row--drop-after").forEach((row) => {
+      row.classList.remove("task-item-row--drop-before", "task-item-row--drop-after")
+    })
+  }
+
+  #computeDropCandidate(targetRow, clientY) {
+    if (!this.dragState) return null
+    const rect = targetRow.getBoundingClientRect()
+    const where = clientY < rect.top + rect.height / 2 ? "before" : "after"
+
+    if (this.dragState.mode === "main") {
+      const targetMain = targetRow.matches(".task-item-row--main")
+        ? targetRow
+        : this.#findMainRowForSubtask(targetRow)
+      if (!targetMain) return null
+      if (this.dragState.rows.includes(targetMain)) return null
+      return { row: targetMain, where, mode: "main" }
+    }
+
+    if (!targetRow.matches(".task-item-row--subtask")) return null
+    if (targetRow === this.dragState.row) return null
+    const targetMain = this.#findMainRowForSubtask(targetRow)
+    if (!targetMain || targetMain !== this.dragState.mainRow) return null
+    return { row: targetRow, where, mode: "subtask" }
+  }
+
+  #applyDrop(drop) {
+    if (!this.dragState) return
+
+    if (drop.mode === "main") {
+      const rows = [...this.dragState.rows]
+      const targetMain = drop.row
+      rows.forEach((row) => row.remove())
+      const anchor = drop.where === "after" ? (this.#lastSubtaskFor(targetMain) || targetMain) : targetMain
+      const insertBeforeNode = drop.where === "after" ? anchor.nextElementSibling : anchor
+      rows.forEach((row) => this.listTarget.insertBefore(row, insertBeforeNode))
+      return
+    }
+
+    const row = this.dragState.row
+    const target = drop.row
+    row.remove()
+    if (drop.where === "before") {
+      this.listTarget.insertBefore(row, target)
+    } else {
+      target.insertAdjacentElement("afterend", row)
+    }
+  }
+
+  #rowTextForSync(row) {
+    const input = row.querySelector(".task-edit-input")
+    if (input) return input.value.trim()
+    return row.querySelector("[data-role='task-text']")?.textContent.trim() || ""
+  }
+
   #syncPayload() {
     if (!this.hasPayloadTarget) return
 
@@ -522,13 +752,13 @@ export default class extends Controller {
     rows.forEach((row) => {
       if (!row.matches(".task-item-row--main")) return
 
-      const text = row.querySelector("[data-role='task-text']")?.textContent.trim() || ""
-      if (!text) return
-
+      const text = this.#rowTextForSync(row)
       const subtasks = this.#subtasksFor(row).map((subtask) => ({
-        text: subtask.querySelector("[data-role='task-text']")?.textContent.trim() || "",
+        text: this.#rowTextForSync(subtask),
         checked: subtask.classList.contains("task-item-row--checked")
       })).filter((subtask) => subtask.text.length > 0)
+
+      if (!text && subtasks.length === 0) return
 
       const checked = subtasks.length > 0
         ? subtasks.every((subtask) => subtask.checked)

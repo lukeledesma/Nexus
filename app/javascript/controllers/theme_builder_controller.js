@@ -547,7 +547,9 @@ export default class extends Controller {
       active_theme_name: name,
       active_theme_id: isCustom ? "custom" : this.activeThemeId,
       is_custom_layout: isCustom,
-      appearance
+      appearance,
+      gradient_source_theme_id: null,
+      gradient_source_theme_name: null
     }
     if (includeThemes) detail.themes = this.themes
 
@@ -588,13 +590,25 @@ export default class extends Controller {
     }
 
     const displayName = this.isCustomLayout
-      ? "Unsaved theme"
+      ? "Unsaved Theme"
       : (this.activeThemeName || "Default").trim() || "Default"
 
-    if (statusEl) {
+    const statusLabel = statusEl?.querySelector?.("[data-theme-studio-chrome='status-label']")
+    const activeMeta = statusEl?.querySelector?.("[data-theme-studio-chrome='active-meta']")
+
+    if (statusLabel) {
+      statusLabel.textContent = displayName
+    } else if (statusEl) {
       statusEl.textContent = displayName
+    }
+
+    if (statusEl) {
       statusEl.disabled = true
       statusEl.classList.toggle("theme-builder-current-theme-value--readonly", !this.isCustomLayout)
+    }
+
+    if (activeMeta) {
+      activeMeta.classList.toggle("theme-builder-hidden", Boolean(this.isCustomLayout))
     }
 
     const nameInputVisible = Boolean(nameInput && !nameInput.classList.contains("theme-builder-hidden"))

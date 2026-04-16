@@ -1,9 +1,16 @@
 import { Controller } from "@hotwired/stimulus"
+import { getNexusDesktopShellInsetPx } from "lib/desktop_shell_metrics"
 import { syncOrganizerAboveVisibleContentWindows } from "lib/nexus_desktop_layers"
 
+/** Kept in sync with inline boot scripts in `shared/_ollama_helper.html.erb` (early left/top + legacy tail). */
 const STORAGE_POS = "nexus.ollamaHelper.position"
 const STORAGE_OPEN = "nexus.ollamaHelper.open"
 const DRAG_THRESHOLD_PX = 6
+/* Treat dock as “hugging” an edge within this px so left/top pins win over right/bottom when both overflow. */
+const DOCK_EDGE_HUG_PX = 3
+
+/** @typedef {"none"|"left"|"right"} DockPinX */
+/** @typedef {"none"|"top"|"bottom"} DockPinY */
 
 const SPRITE_VALUE = {
   idle: "spriteIdle",
@@ -54,10 +61,23 @@ export default class extends Controller {
     this._petDragReady = false
     this._dockDragOffset = { x: 0, y: 0 }
 
+    this._dockPositionReady = false
+    /** @type {DockPinX} */
+    this._dockPinX = "none"
+    /** @type {DockPinY} */
+    this._dockPinY = "none"
+    this._dockLeft = 0
+    this._dockTop = 0
+    this._pendingLegacyRb = null
+
     this._onPetMove = this.handlePetMove.bind(this)
     this._onPetUp = this.handlePetUp.bind(this)
+    this._onOutsidePointerDown = this.handleOutsidePointerDown.bind(this)
     this._bubbleRaf = null
-    this.onResize = () => this.scheduleBubblePlacement()
+    this.onResize = () => {
+      this.reconcileDockOnResize()
+      this.scheduleBubblePlacement()
+    }
 
     this.restoreState()
     this.onEscape = (e) => {
@@ -70,12 +90,28 @@ export default class extends Controller {
     this.bumpActivity()
     this._varietyInterval = window.setInterval(() => this.maybeIdleVariety(), 32_000)
     requestAnimationFrame(() => {
+      this.applyLegacyRightBottomIfPending()
+      this.bootstrapDockFromDomIfNeeded()
+      this.clampSpawnIfOffScreen()
+      this.reconcileDockOnResize()
+      syncOrganizerAboveVisibleContentWindows()
       this.updateBubblePlacement()
       this.resizeTextarea()
+      if (!this._dockPositionReady) {
+        requestAnimationFrame(() => {
+          this.applyLegacyRightBottomIfPending()
+          this.bootstrapDockFromDomIfNeeded()
+          this.clampSpawnIfOffScreen()
+          this.reconcileDockOnResize()
+          syncOrganizerAboveVisibleContentWindows()
+          this.updateBubblePlacement()
+        })
+      }
     })
   }
 
   disconnect() {
+    this.detachOutsideCloseListener()
     this.detachPetListeners()
     window.removeEventListener("keydown", this.onEscape)
     window.removeEventListener("resize", this.onResize)
@@ -223,10 +259,12 @@ export default class extends Controller {
       this._petDragging = true
       const dock = this.dockTarget
       const r = dock.getBoundingClientRect()
-      dock.style.left = `${r.left}px`
-      dock.style.top = `${r.top}px`
-      dock.style.right = "auto"
-      dock.style.bottom = "auto"
+      this._dockPinX = "none"
+      this._dockPinY = "none"
+      this._dockLeft = r.left
+      this._dockTop = r.top
+      this._dockPositionReady = true
+      this.applyDockPixelPosition()
       this._dockDragOffset = {
         x: event.clientX - r.left,
         y: event.clientY - r.top
@@ -250,23 +288,233 @@ export default class extends Controller {
     this.petTarget.classList.remove("ollama-helper__pet--grabbing")
 
     if (wasDrag) {
-      this.persistDockPosition()
+      this.finalizeDockAfterDrag()
       this.updateBubblePlacement()
       return
     }
     if (ptr) this.toggle()
   }
 
+  /** Left edge of draggable crab dock (shell inset + side panel block when open). */
+  crabLeftMinPx() {
+    return getNexusDesktopShellInsetPx()
+  }
+
   moveDockTo(left, top) {
     const dock = this.dockTarget
     const w = dock.offsetWidth
     const h = dock.offsetHeight
-    const maxL = Math.max(8, window.innerWidth - w - 8)
-    const maxT = Math.max(8, window.innerHeight - h - 8)
-    dock.style.left = `${Math.min(Math.max(8, left), maxL)}px`
-    dock.style.top = `${Math.min(Math.max(8, top), maxT)}px`
+    const m = getNexusDesktopShellInsetPx()
+    const lx = this.crabLeftMinPx()
+    const maxL = Math.max(lx, window.innerWidth - w - m)
+    const maxT = Math.max(m, window.innerHeight - h - m)
+    const cl = Math.min(Math.max(lx, left), maxL)
+    const ct = Math.min(Math.max(m, top), maxT)
+    this._dockLeft = cl
+    this._dockTop = ct
+    this._dockPositionReady = true
+    dock.style.left = `${cl}px`
+    dock.style.top = `${ct}px`
     dock.style.right = "auto"
     dock.style.bottom = "auto"
+  }
+
+  applyDockPixelPosition() {
+    if (!this.hasDockTarget) return
+    const dock = this.dockTarget
+    dock.style.left = `${Math.round(this._dockLeft)}px`
+    dock.style.top = `${Math.round(this._dockTop)}px`
+    dock.style.right = "auto"
+    dock.style.bottom = "auto"
+  }
+
+  persistDockState() {
+    if (!this._dockPositionReady) return
+    try {
+      localStorage.setItem(
+        STORAGE_POS,
+        JSON.stringify({
+          left: Math.round(this._dockLeft),
+          top: Math.round(this._dockTop),
+          pinX: this._dockPinX,
+          pinY: this._dockPinY
+        })
+      )
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /**
+   * Float at a fixed viewport position until an edge would clip the dock; then stick to that edge
+   * so further resize along that axis moves the crab with the border. Pins clear on drag.
+   */
+  reconcileDockOnResize() {
+    if (!this.hasDockTarget || this._petDragging || !this._dockPositionReady) return
+
+    const iw = window.innerWidth
+    const ih = window.innerHeight
+    const m = getNexusDesktopShellInsetPx()
+    const lx = this.crabLeftMinPx()
+    const dock = this.dockTarget
+    const w = dock.offsetWidth
+    const h = dock.offsetHeight
+    if (w < 1 || h < 1) return
+
+    let left = this._dockLeft
+    let top = this._dockTop
+    let pinX = this._dockPinX
+    let pinY = this._dockPinY
+
+    if (w + 2 * m > iw) {
+      left = lx
+      pinX = "left"
+    }
+    if (h + 2 * m > ih) {
+      top = m
+      pinY = "top"
+    }
+
+    if (pinX === "right") {
+      left = iw - w - m
+    } else if (pinX === "left") {
+      left = lx
+    } else {
+      const overflowRight = left + w > iw - m
+      const overflowLeft = left < lx
+      const hugLeft = left <= lx + DOCK_EDGE_HUG_PX
+      const hugRight = left + w >= iw - m - DOCK_EDGE_HUG_PX
+
+      if (overflowLeft && overflowRight) {
+        const gapL = left - lx
+        const gapR = iw - m - (left + w)
+        if (gapL <= gapR) {
+          left = lx
+          pinX = "left"
+        } else {
+          left = iw - w - m
+          pinX = "right"
+        }
+      } else if (overflowRight && hugLeft) {
+        left = lx
+        pinX = "left"
+      } else if (overflowLeft && hugRight) {
+        left = iw - w - m
+        pinX = "right"
+      } else if (overflowRight) {
+        left = iw - w - m
+        pinX = "right"
+      } else if (overflowLeft) {
+        left = lx
+        pinX = "left"
+      }
+    }
+
+    if (pinY === "bottom") {
+      top = ih - h - m
+    } else if (pinY === "top") {
+      top = m
+    } else {
+      const overflowBottom = top + h > ih - m
+      const overflowTop = top < m
+      const hugTop = top <= m + DOCK_EDGE_HUG_PX
+      const hugBottom = top + h >= ih - m - DOCK_EDGE_HUG_PX
+
+      if (overflowTop && overflowBottom) {
+        const gapT = top - m
+        const gapB = ih - m - (top + h)
+        if (gapT <= gapB) {
+          top = m
+          pinY = "top"
+        } else {
+          top = ih - h - m
+          pinY = "bottom"
+        }
+      } else if (overflowBottom && hugTop) {
+        top = m
+        pinY = "top"
+      } else if (overflowTop && hugBottom) {
+        top = ih - h - m
+        pinY = "bottom"
+      } else if (overflowBottom) {
+        top = ih - h - m
+        pinY = "bottom"
+      } else if (overflowTop) {
+        top = m
+        pinY = "top"
+      }
+    }
+
+    const maxL = Math.max(lx, iw - w - m)
+    const maxT = Math.max(m, ih - h - m)
+    left = Math.min(Math.max(lx, left), maxL)
+    top = Math.min(Math.max(m, top), maxT)
+
+    this._dockLeft = left
+    this._dockTop = top
+    this._dockPinX = pinX
+    this._dockPinY = pinY
+    this.applyDockPixelPosition()
+    this.persistDockState()
+  }
+
+  bootstrapDockFromDomIfNeeded() {
+    if (!this.hasDockTarget || this._dockPositionReady || this._pendingLegacyRb) return
+    const r = this.dockTarget.getBoundingClientRect()
+    this._dockLeft = r.left
+    this._dockTop = r.top
+    this._dockPinX = "none"
+    this._dockPinY = "none"
+    this._dockPositionReady = true
+    this.applyDockPixelPosition()
+  }
+
+  applyLegacyRightBottomIfPending() {
+    if (!this._pendingLegacyRb || !this.hasDockTarget) return
+    const dock = this.dockTarget
+    const w = dock.offsetWidth
+    const h = dock.offsetHeight
+    if (w < 4 || h < 4) return
+    const { right, bottom } = this._pendingLegacyRb
+    const iw = window.innerWidth
+    const ih = window.innerHeight
+    this._dockLeft = iw - right - w
+    this._dockTop = ih - bottom - h
+    this._dockPinX = "none"
+    this._dockPinY = "none"
+    this._dockPositionReady = true
+    this._pendingLegacyRb = null
+    this.applyDockPixelPosition()
+  }
+
+  /** After refresh: if the dock does not intersect the viewport, place it back inside the margins. */
+  clampSpawnIfOffScreen() {
+    if (!this.hasDockTarget || !this._dockPositionReady) return
+    const iw = window.innerWidth
+    const ih = window.innerHeight
+    const dock = this.dockTarget
+    const w = dock.offsetWidth
+    const h = dock.offsetHeight
+    if (w < 1 || h < 1) return
+    const left = this._dockLeft
+    const top = this._dockTop
+    const intersects = left < iw && left + w > 0 && top < ih && top + h > 0
+    if (intersects) return
+
+    const m = getNexusDesktopShellInsetPx()
+    const lx = this.crabLeftMinPx()
+    this._dockLeft = Math.min(Math.max(lx, left), Math.max(m, iw - w - m))
+    this._dockTop = Math.min(Math.max(m, top), Math.max(m, ih - h - m))
+    this._dockPinX = "none"
+    this._dockPinY = "none"
+    this.applyDockPixelPosition()
+    this.persistDockState()
+  }
+
+  finalizeDockAfterDrag() {
+    this._dockPinX = "none"
+    this._dockPinY = "none"
+    this.reconcileDockOnResize()
   }
 
   onPetKeydown(event) {
@@ -291,10 +539,10 @@ export default class extends Controller {
     const pet = this.petTarget
     const panel = this.panelTarget
     const gap = 0
-    /* Pull bubble toward the crab (~half prior slack: small gap + shorter tail). */
+    /* Pull bubble toward the crab (~half prior slack). */
     const tuckPx = 16
-    const minTail = 12
-    const maxTail = 88
+    /* Former clip-path tail was 10px tall; shift anchor so the panel edge sits where the tip was. */
+    const formerTailPx = 10
 
     const dr = dock.getBoundingClientRect()
     const anchor = this.hasMascotTarget ? this.mascotTarget.getBoundingClientRect() : pet.getBoundingClientRect()
@@ -307,28 +555,23 @@ export default class extends Controller {
     const needV = estH + gap + 24
     const preferBelow = spaceAbove < needV && spaceBelow > spaceAbove + 20
 
-    panel.dataset.ollamaPlacement = preferBelow ? "below" : "above"
-
     let leftRelDock = petCx - dr.left - w * 0.5
     const maxLeft = window.innerWidth - 8 - w - dr.left
     const minLeft = 8 - dr.left
     leftRelDock = Math.min(maxLeft, Math.max(minLeft, leftRelDock))
 
-    const bubbleLeftVp = dr.left + leftRelDock
-    let pct = ((petCx - bubbleLeftVp) / w) * 100
-    pct = Math.min(maxTail, Math.max(minTail, pct))
-    panel.style.setProperty("--ollama-tail-x", `${pct}%`)
-
     panel.style.left = `${leftRelDock}px`
     panel.style.right = "auto"
     panel.style.transform = "none"
 
-    const stack = Math.max(0, pet.offsetHeight + gap - tuckPx)
+    const baseStack = Math.max(0, pet.offsetHeight + gap - tuckPx)
+    /* Lift bubble so it clears the mascot; pull down by former tail so bottom matches old tip. */
+    const bubbleLiftPx = 14
     if (preferBelow) {
-      panel.style.top = `${stack}px`
+      panel.style.top = `${baseStack - formerTailPx}px`
       panel.style.bottom = "auto"
     } else {
-      panel.style.bottom = `${stack}px`
+      panel.style.bottom = `${baseStack + bubbleLiftPx - formerTailPx}px`
       panel.style.top = "auto"
     }
   }
@@ -337,18 +580,37 @@ export default class extends Controller {
     try {
       const raw = localStorage.getItem(STORAGE_POS)
       if (raw) {
-        const { left, top } = JSON.parse(raw)
-        if (typeof left === "number" && typeof top === "number") {
-          this.dockTarget.style.left = `${left}px`
-          this.dockTarget.style.top = `${top}px`
-          this.dockTarget.style.right = "auto"
-          this.dockTarget.style.bottom = "auto"
+        const o = JSON.parse(raw)
+        if (typeof o.left === "number" && typeof o.top === "number") {
+          this._dockLeft = o.left
+          this._dockTop = o.top
+          this._dockPinX = o.pinX === "left" || o.pinX === "right" ? o.pinX : "none"
+          this._dockPinY = o.pinY === "top" || o.pinY === "bottom" ? o.pinY : "none"
+          this._dockPositionReady = true
+          this.applyDockPixelPosition()
+        } else if (typeof o.right === "number" && typeof o.bottom === "number") {
+          this._pendingLegacyRb = { right: o.right, bottom: o.bottom }
         }
       }
       const open = localStorage.getItem(STORAGE_OPEN) === "1"
       if (open) this.open({ fromRestore: true })
       else this.close({ fromRestore: true })
-      requestAnimationFrame(() => this.scheduleBubblePlacement())
+      requestAnimationFrame(() => {
+        this.applyLegacyRightBottomIfPending()
+        this.bootstrapDockFromDomIfNeeded()
+        this.clampSpawnIfOffScreen()
+        this.reconcileDockOnResize()
+        this.scheduleBubblePlacement()
+        if (!this._dockPositionReady) {
+          requestAnimationFrame(() => {
+            this.applyLegacyRightBottomIfPending()
+            this.bootstrapDockFromDomIfNeeded()
+            this.clampSpawnIfOffScreen()
+            this.reconcileDockOnResize()
+            this.scheduleBubblePlacement()
+          })
+        }
+      })
     } catch {
       this.close({ fromRestore: true })
     }
@@ -357,17 +619,6 @@ export default class extends Controller {
   persistOpen(open) {
     try {
       localStorage.setItem(STORAGE_OPEN, open ? "1" : "0")
-    } catch { /* ignore */ }
-  }
-
-  persistDockPosition() {
-    try {
-      const el = this.dockTarget
-      const left = parseFloat(el.style.left)
-      const top = parseFloat(el.style.top)
-      if (Number.isFinite(left) && Number.isFinite(top)) {
-        localStorage.setItem(STORAGE_POS, JSON.stringify({ left, top }))
-      }
     } catch { /* ignore */ }
   }
 
@@ -390,23 +641,49 @@ export default class extends Controller {
     this.bringHelperToFront()
   }
 
+  attachOutsideCloseListener() {
+    window.addEventListener("pointerdown", this._onOutsidePointerDown, true)
+  }
+
+  detachOutsideCloseListener() {
+    window.removeEventListener("pointerdown", this._onOutsidePointerDown, true)
+  }
+
+  handleOutsidePointerDown(event) {
+    if (!this.rootTarget.classList.contains("ollama-helper--open")) return
+    const t = event.target
+    if (this.panelTarget.contains(t)) return
+    if (this.petTarget.contains(t)) return
+    this.close()
+  }
+
+  syncThreadVisibility() {
+    if (!this.hasPanelTarget || !this.hasMessagesTarget) return
+    const empty = this.messagesTarget.childElementCount === 0
+    const loading = this.rootTarget.classList.contains("ollama-helper--loading")
+    this.panelTarget.classList.toggle("ollama-helper--no-thread", empty && !loading)
+  }
+
   open(opts = {}) {
     this.rootTarget.classList.add("ollama-helper--open")
     this.petTarget.setAttribute("aria-expanded", "true")
     this.persistOpen(true)
     this.bringHelperToFront()
+    this.attachOutsideCloseListener()
     if (!opts.fromRestore) this.bumpActivity()
     requestAnimationFrame(() => {
       this.updateBubblePlacement()
       requestAnimationFrame(() => {
         this.updateBubblePlacement()
         this.resizeTextarea()
+        this.syncThreadVisibility()
         this.inputTarget?.focus()
       })
     })
   }
 
   close(opts = {}) {
+    this.detachOutsideCloseListener()
     this.rootTarget.classList.remove("ollama-helper--open")
     this.petTarget.setAttribute("aria-expanded", "false")
     this.persistOpen(false)
@@ -506,6 +783,7 @@ export default class extends Controller {
     wrap.appendChild(bubble)
     row.appendChild(wrap)
     this.messagesTarget.appendChild(row)
+    this.syncThreadVisibility()
     this.scrollMessages()
     this.scheduleBubblePlacement()
   }
@@ -518,6 +796,7 @@ export default class extends Controller {
     this.rootTarget.classList.toggle("ollama-helper--loading", on)
     if (this.hasStatusTarget) this.statusTarget.textContent = on ? "Thinking…" : ""
     if (this.hasInputTarget) this.inputTarget.disabled = on
+    this.syncThreadVisibility()
   }
 
   scrollMessages() {

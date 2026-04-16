@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# Unified on-disk header for workspace text files (Notepad, Tasks, Sticky Notes, Finder, future apps).
+# Unified on-disk header for workspace text files (Tasks, Finder notes, and future app text formats).
 # First line is always "# NEXUS_FILE v1"; metadata lines use "# key: value" until a blank line, then body.
 module NexusFileFormat
   VERSION = "1"
@@ -8,8 +8,6 @@ module NexusFileFormat
 
   KIND_NOTE = "note"
   KIND_TASK_LIST = "task_list"
-  KIND_STICKYNOTES = "stickynotes"
-  KIND_THREAD_BOARD = "thread_board"
 
   module_function
 

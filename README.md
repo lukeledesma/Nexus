@@ -141,8 +141,8 @@ sudo systemctl restart puma
 
 ## Key Frontend Files
 
-- `app/views/organizer/_sidebar.html.erb`
-- `app/views/apps/task_lists/show.html.erb`
+- `app/views/shared/_desktop_side_panel.html.erb`
+- `app/views/apps/singular/task_list.html.erb`
 - `app/javascript/controllers/`
 - `app/assets/stylesheets/application.css`
 

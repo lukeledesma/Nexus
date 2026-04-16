@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "cgi"
 require "fileutils"
 require "find"
 require "time"
@@ -103,7 +104,7 @@ class DocumentDiskLoader
     end
 
     def upsert_file_from_path!(absolute_file, relative_path, parent)
-      parsed = parse_nexus_file(absolute_file)
+      parsed = disk_asset_file?(absolute_file) ? asset_file_attributes : parse_nexus_file(absolute_file)
       title = basename_without_supported_extension(absolute_file)
       document = find_or_initialize_by_storage_path(relative_path, is_folder: false)
 
@@ -129,10 +130,37 @@ class DocumentDiskLoader
 
     def purge_missing_from_database!(seen_paths)
       keep = seen_paths.uniq
+      root = storage_root
 
-      # Only remove rows whose path exists on disk but file is gone — never wipe records that
-      # still need a storage_path backfill (would look "missing" and get destroyed every sync).
-      Document.where.not(storage_path: [nil, ""]).where.not(storage_path: keep).find_each(&:destroy)
+      # Files: only remove rows whose path is gone from disk. Rows missing from `keep` but still
+      # present on disk are kept (indexing gaps / races).
+      #
+      # Folders must NOT be destroyed in the same loop as arbitrary "missing path" checks:
+      # `Document` uses `dependent: :destroy` on children, so destroying one folder row wipes every
+      # nested document and runs `sync_destroy_on_disk` on each file — deleting real bytes on disk.
+      # A folder path can be "wrong" (rename drift Embedded/Image vs IImage) while child file paths
+      # are still valid; one refresh then deleted everything under both DB and disk.
+      Document.where(is_folder: false).where.not(storage_path: [nil, ""]).find_each do |doc|
+        rel = doc.storage_path.to_s
+        next if keep.include?(rel)
+
+        abs = root.join(rel)
+        next if abs.exist?
+
+        doc.destroy
+      end
+
+      # Empty folders only: no children left to cascade-delete.
+      Document.where(is_folder: true).where.not(storage_path: [nil, ""]).find_each do |doc|
+        rel = doc.storage_path.to_s
+        next if keep.include?(rel)
+
+        abs = root.join(rel)
+        next if abs.exist?
+        next if doc.children.exists?
+
+        doc.destroy
+      end
     end
 
     def find_or_initialize_by_storage_path(storage_path, is_folder:)
@@ -151,16 +179,38 @@ class DocumentDiskLoader
     end
 
     def supported_file_extension?(path)
-      path.end_with?(".nexus") || path.end_with?(".txt") || path.end_with?(".rtf")
+      ext = File.extname(path.to_s).downcase
+      path.end_with?(".nexus") || path.end_with?(".txt") || path.end_with?(".rtf") ||
+        Document::ASSET_FILE_EXTENSIONS.include?(ext)
     end
 
     def basename_without_supported_extension(path)
       base = File.basename(path)
+      ext = File.extname(base)
+      ext_down = ext.downcase
+      return File.basename(base, ext) if Document::ASSET_FILE_EXTENSIONS.include?(ext_down)
       return File.basename(base, ".nexus") if base.end_with?(".nexus")
       return File.basename(base, ".txt") if base.end_with?(".txt")
       return File.basename(base, ".rtf") if base.end_with?(".rtf")
 
       base
+    end
+
+    def disk_asset_file?(path)
+      Document::ASSET_FILE_EXTENSIONS.include?(File.extname(path.to_s).downcase)
+    end
+
+    def asset_file_attributes
+      {
+        content_type: "asset",
+        content: nil,
+        tasks: [],
+        reset_mode: "none",
+        reset_days: [],
+        last_reset_at: nil,
+        created_at: nil,
+        updated_at: nil
+      }
     end
 
     def parse_nexus_file(path)
@@ -188,10 +238,16 @@ class DocumentDiskLoader
         parse_note_from_unified(metadata, body)
       when NexusFileFormat::KIND_TASK_LIST
         build_task_list_attributes(metadata, body)
-      when NexusFileFormat::KIND_STICKYNOTES
-        parse_stickynotes_from_unified(metadata, body)
-      when NexusFileFormat::KIND_THREAD_BOARD
-        parse_thread_board_from_unified(metadata, body)
+      when "stickynotes"
+        parse_note_from_unified(
+          metadata,
+          "<p><em>This file used a retired Sticky Notes format; content is preserved below.</em></p><pre>#{CGI.escapeHTML(body.to_s.byteslice(0, 50_000))}</pre>"
+        )
+      when "kanban", "thought_wall"
+        parse_note_from_unified(
+          metadata,
+          "<p><em>This file was a board format that is no longer supported; imported as a note.</em></p>"
+        )
       else
         parse_note(lines)
       end
@@ -251,32 +307,6 @@ class DocumentDiskLoader
         last_reset_at: nil,
         created_at: nil,
         updated_at: nil
-      }
-    end
-
-    def parse_stickynotes_from_unified(metadata, body)
-      {
-        content_type: "stickynotes",
-        content: body,
-        tasks: [],
-        reset_mode: "none",
-        reset_days: [],
-        last_reset_at: nil,
-        created_at: parse_time(metadata["created_at"]),
-        updated_at: parse_time(metadata["updated_at"])
-      }
-    end
-
-    def parse_thread_board_from_unified(metadata, body)
-      {
-        content_type: "thread_board",
-        content: body,
-        tasks: [],
-        reset_mode: "none",
-        reset_days: [],
-        last_reset_at: nil,
-        created_at: parse_time(metadata["created_at"]),
-        updated_at: parse_time(metadata["updated_at"])
       }
     end
 

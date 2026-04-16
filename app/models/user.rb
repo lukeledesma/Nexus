@@ -49,13 +49,8 @@ class User < ApplicationRecord
       root_folder.children.create!(is_folder: true, title: "Embedded")
     end
 
-    finder = root_folder.children.folders.where("LOWER(title) = ?", "finder").first
-    finder ||= root_folder.children.create!(is_folder: true, title: "Finder")
-
-    %w[Desktop Documents].each do |child_name|
-      next if finder.children.folders.where("LOWER(title) = ?", child_name.downcase).exists?
-
-      finder.children.create!(is_folder: true, title: child_name)
+    unless root_folder.children.folders.where("LOWER(title) = ?", "finder").exists?
+      root_folder.children.create!(is_folder: true, title: "Finder")
     end
   end
 

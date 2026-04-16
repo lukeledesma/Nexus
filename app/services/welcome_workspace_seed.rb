@@ -1,10 +1,9 @@
 # frozen_string_literal: true
 
-# Ensures each user has Finder/Welcome/Welcome (note) with onboarding HTML once.
-# Does not overwrite an existing welcome note (users may edit freely).
+# Ensures each user has Finder/Welcome/Welcome with onboarding text once.
 class WelcomeWorkspaceSeed
   FOLDER_TITLE = "Welcome"
-  NOTE_TITLE = "Welcome"
+  DOC_TITLE = "Welcome"
 
   class << self
     def ensure_for_user!(user)
@@ -19,50 +18,58 @@ class WelcomeWorkspaceSeed
   def ensure!
     return unless @user
 
-    finder = FinderListedFolders.finder_folder_for(@user)
-    return unless finder
+    finder_root = Apps::FinderController.workspace_finder_root_folder(@user)
+    return unless finder_root
 
-    welcome_folder = finder.children.folders.where("LOWER(title) = ?", FOLDER_TITLE.downcase).first
-    welcome_folder ||= finder.children.create!(is_folder: true, title: FOLDER_TITLE)
-    note = welcome_note(welcome_folder)
+    welcome_folder = finder_root.children.folders.where("LOWER(title) = ?", FOLDER_TITLE.downcase).first
+    welcome_folder ||= finder_root.children.create!(is_folder: true, title: FOLDER_TITLE)
 
-    if note
-      refresh_malformed_legacy_content!(note)
+    same_title = welcome_folder.children.files.where("LOWER(title) = ?", DOC_TITLE.downcase).to_a
+    return if same_title.any? { |f| f.content_type.to_s == "note" }
+
+    legacy_task = same_title.find { |f| f.content_type.to_s == "task_list" }
+    if legacy_task
+      legacy_task.update!(
+        content_type: "note",
+        content: default_welcome_note_html,
+        tasks: [],
+        reset_mode: "none",
+        reset_days: [],
+        last_reset_at: nil
+      )
       return
     end
 
+    return if same_title.any?
+
     welcome_folder.children.create!(
       is_folder: false,
-      title: NOTE_TITLE,
+      title: DOC_TITLE,
       content_type: "note",
-      content: default_welcome_html
+      content: default_welcome_note_html,
+      tasks: [],
+      reset_mode: "none",
+      reset_days: []
     )
   end
 
   private
 
-  def welcome_note(welcome_folder)
-    welcome_folder.children.files.where(content_type: "note").where("LOWER(title) = ?", NOTE_TITLE.downcase).first
-  end
-
-  def refresh_malformed_legacy_content!(note)
-    body = note.content.to_s
-    return unless body.include?("&#39;3f") || body.include?("•3f")
-
-    note.update!(content: default_welcome_html)
-  end
-
-  def default_welcome_html
-    <<~HTML.squish
-      <h1>Welcome to Nexus</h1>
-      <p>Your workspace for notes, task lists, and sticky notes - kept in folders so everything stays easy to find.</p>
-      <h2>Get started</h2>
-      <p>- Create your first folder with the <strong>+</strong> button in the Finder window toolbar.</p>
-      <p>- Open Notepad, Tasks, or Sticky Notes from the dock or Launcher, then use <strong>Save</strong> to put files inside a folder.</p>
-      <p>- Open <strong>Settings</strong> anytime to adjust your account and how Nexus looks.</p>
-      <h2>Quick tips</h2>
-      <p>- Use the Launcher (grid icon on the dock) to switch between apps.</p>
-      <p>- Rename or delete items with the small icons beside each row in the Finder.</p>
+  def default_welcome_note_html
+    <<~HTML.strip
+      <p><strong>Welcome to Nexus</strong></p>
+      <p>Your workspace for task lists and notes, kept in folders so everything stays easy to find.</p>
+      <p><strong>Get started</strong></p>
+      <ul>
+        <li>Open Finder from the side panel, then use + in the title bar to create folders under your workspace Finder folder.</li>
+        <li>Open Tasks from the side panel. Use Save to Finder when you want a copy on disk.</li>
+        <li>Open Settings anytime to adjust your account and how Nexus looks.</li>
+      </ul>
+      <p><strong>Quick tips</strong></p>
+      <ul>
+        <li>Use the side panel to switch between apps.</li>
+        <li>Rename or delete items with the small icons beside each row in Finder.</li>
+      </ul>
     HTML
   end
 end

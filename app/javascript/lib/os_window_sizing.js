@@ -1,5 +1,11 @@
 const DEFAULT_VIEWPORT_MARGIN = 6
 
+function resolveViewportMargin(marginOpt) {
+  if (typeof marginOpt === "function") return marginOpt()
+  if (Number.isFinite(marginOpt)) return marginOpt
+  return DEFAULT_VIEWPORT_MARGIN
+}
+
 export function measureContentHeight(element) {
   if (!element) return 0
 
@@ -12,7 +18,7 @@ export function measureContentHeight(element) {
 export function applyWindowHeight(windowElement, height, options = {}) {
   if (!windowElement) return 0
 
-  const margin = Number.isFinite(options.viewportMargin) ? options.viewportMargin : DEFAULT_VIEWPORT_MARGIN
+  const margin = resolveViewportMargin(options.viewportMargin)
   const viewportMaxHeight = Math.max(0, window.innerHeight - (margin * 2))
   const targetHeight = Math.max(0, Math.min(Math.ceil(height), viewportMaxHeight))
 
@@ -79,13 +85,13 @@ export function createOsWindowSizer(config) {
 
   const onViewportResize = () => {
     if (!isWindowOpen()) return
-    const height = syncOnOpen(windowId, contentElement, windowElement, { viewportMargin })
+    const height = syncOnOpen(windowId, contentElement, windowElement, { viewportMargin: resolveViewportMargin(viewportMargin) })
     if (typeof onHeightApplied === "function") onHeightApplied(height)
   }
 
   const sync = () => {
     if (!isWindowOpen()) return 0
-    const height = syncOnOpen(windowId, contentElement, windowElement, { viewportMargin })
+    const height = syncOnOpen(windowId, contentElement, windowElement, { viewportMargin: resolveViewportMargin(viewportMargin) })
     if (typeof onHeightApplied === "function") onHeightApplied(height)
     return height
   }

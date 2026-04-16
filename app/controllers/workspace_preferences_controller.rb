@@ -1,56 +1,56 @@
 # frozen_string_literal: true
 
 require "json"
-require "securerandom"
 
-# Persists the active theme choice and saved theme snapshots in text files under
-# storage/workspace/<username>:
-# - WorkspaceState.txt: active_theme_id only (window bounds live in the browser)
-# - LayoutThemes.txt: default + custom named theme snapshots
+# Minimal workspace preferences:
+# - Shell choice: default | classic
+# - Wallpaper choice: image | none (black fallback)
 class WorkspacePreferencesController < ApplicationController
   STORAGE_ROOT = Rails.root.join("storage", "workspace").freeze
 
   DEFAULT_THEME_ID = "default"
-  DEFAULT_THEME_NAME = "Default"
+  DEFAULT_THEME_NAME = "Modern"
   CLASSIC_THEME_ID = "classic"
   CLASSIC_THEME_NAME = "Classic"
+  # Legacy id referenced by WorkspaceThemeBoot; workspace is always default/classic now.
   CUSTOM_THEME_ID = "custom"
   CUSTOM_THEME_NAME = "CUSTOM"
+  ALLOWED_THEME_IDS = [DEFAULT_THEME_ID, CLASSIC_THEME_ID].freeze
 
+  # Forest-like dark shell (desktop fallback gradient is forced to black in chrome sync).
   DEFAULT_APPEARANCE = {
     "hue" => 200,
     "saturation" => 5,
-    "brightness" => 20,
-    "transparency" => 0.18,
+    "brightness" => 13,
+    "transparency" => 0.95,
     "font_1" => 85,
     "font_1_alpha" => 100,
     "font_2" => 60,
     "font_2_alpha" => 100,
-    "color_1_hue" => 210,
+    "color_1_hue" => 190,
     "color_1_saturation" => 18,
-    "color_1_brightness" => 16,
+    "color_1_brightness" => 55,
     "color_2_hue" => 195,
     "color_2_saturation" => 25,
     "color_2_brightness" => 20,
-    "angle" => 128
+    "angle" => 333
   }.freeze
 
-  # Monochrome preset for Classic UI mode (sharp gray chrome; client overrides with platinum vars).
   CLASSIC_APPEARANCE = {
-    "hue" => 0,
-    "saturation" => 0,
-    "brightness" => 78,
-    "transparency" => 0.98,
-    "font_1" => 16,
+    "hue" => 214,
+    "saturation" => 22,
+    "brightness" => 92,
+    "transparency" => 0.9,
+    "font_1" => 15,
     "font_1_alpha" => 100,
-    "font_2" => 36,
+    "font_2" => 38,
     "font_2_alpha" => 100,
-    "color_1_hue" => 0,
-    "color_1_saturation" => 0,
-    "color_1_brightness" => 58,
-    "color_2_hue" => 0,
-    "color_2_saturation" => 0,
-    "color_2_brightness" => 54,
+    "color_1_hue" => 210,
+    "color_1_saturation" => 16,
+    "color_1_brightness" => 93,
+    "color_2_hue" => 218,
+    "color_2_saturation" => 18,
+    "color_2_brightness" => 88,
     "angle" => 180
   }.freeze
 
@@ -61,24 +61,48 @@ class WorkspacePreferencesController < ApplicationController
 
   def update
     ensure_storage_files
-
-    if params[:theme].present?
-      update_theme
-      return
-    end
-
     state = read_state_data
     themes = ensure_default_theme(read_themes_data)
 
-    incoming_appearance = normalize_appearance_payload(params[:appearance])
-    if incoming_appearance.present?
-      current_appearance = active_theme_appearance(themes, state)
-      merged_appearance = normalize_appearance(current_appearance.merge(incoming_appearance))
-      state["active_theme_id"] = apply_or_clear_custom_theme!(themes, merged_appearance)
-      write_themes_data(themes)
+    if params[:theme].present?
+      payload = params[:theme].respond_to?(:to_unsafe_h) ? params[:theme].to_unsafe_h : params[:theme].to_h
+      action = payload["action"].to_s.downcase
+      if action != "apply"
+        render json: { error: "Only shell apply is supported." }, status: :unprocessable_entity
+        return
+      end
+
+      theme_id = payload["theme_id"].to_s
+      unless ALLOWED_THEME_IDS.include?(theme_id)
+        render json: { error: "Only Modern and Classic shells are available." }, status: :unprocessable_entity
+        return
+      end
+      state["active_theme_id"] = theme_id
     end
 
+    if params[:apply_theme_gradient].present?
+      render json: { error: "Gradient wallpaper is no longer supported." }, status: :unprocessable_entity
+      return
+    end
+
+    if params[:appearance].present?
+      render json: { error: "Custom shell editing is no longer supported." }, status: :unprocessable_entity
+      return
+    end
+
+    wallpaper_image_doc_id = wallpaper_apply_image_document_id_param
+    if wallpaper_image_doc_id.present?
+      ok, err = apply_wallpaper_image_pick!(state, wallpaper_image_doc_id)
+      unless ok
+        render json: { error: err || "Could not select image." }, status: :unprocessable_entity
+        return
+      end
+    end
+
+    active_theme = themes.find { |theme| theme["id"] == state["active_theme_id"] }
+    sync_state_wallpaper_from_theme!(themes, state, active_theme)
     write_state_data(state)
+    write_themes_data(themes)
     render_current_payload
   end
 
@@ -101,146 +125,52 @@ class WorkspacePreferencesController < ApplicationController
     workspace_storage_dir.join("LayoutThemes.txt")
   end
 
-  def update_theme
-    payload = params[:theme].respond_to?(:to_unsafe_h) ? params[:theme].to_unsafe_h : params[:theme].to_h
-    action = payload["action"].to_s.downcase
-
-    state = read_state_data
-    themes = ensure_default_theme(read_themes_data)
-
-    case action
-    when "save"
-      apply_save_theme!(themes, state, payload)
-    when "rename"
-      apply_rename_theme!(themes, payload)
-    when "delete"
-      apply_delete_theme!(themes, state, payload)
-    when "apply"
-      apply_theme_snapshot!(themes, state, payload)
-    else
-      render json: { error: "Invalid theme action" }, status: :unprocessable_entity
-      return
-    end
-
-    write_themes_data(themes)
-    write_state_data(state)
-    render_current_payload
-  end
-
-  def apply_save_theme!(themes, state, payload)
-    name = payload["name"].to_s.strip
-    reserved = name.casecmp?(DEFAULT_THEME_NAME) || name.casecmp?(CLASSIC_THEME_NAME) || name.casecmp?(CUSTOM_THEME_NAME)
-    name = next_theme_name(themes) if name.blank? || reserved
-
-    appearance_raw = payload["appearance"]
-    appearance_hash = appearance_raw.respond_to?(:to_unsafe_h) ? appearance_raw.to_unsafe_h : appearance_raw.to_h
-    appearance = normalize_appearance(appearance_hash)
-    id = "theme-#{SecureRandom.hex(4)}"
-
-    themes << {
-      "id" => id,
-      "name" => name.first(64),
-      "locked" => false,
-      "appearance" => appearance
-    }
-
-    remove_custom_theme!(themes)
-    state["active_theme_id"] = id
-  end
-
-  def apply_rename_theme!(themes, payload)
-    theme_id = payload["theme_id"].to_s
-    name = payload["name"].to_s.strip.first(64)
-    return if theme_id.blank? || name.blank? || name.casecmp?(DEFAULT_THEME_NAME) || name.casecmp?(CLASSIC_THEME_NAME)
-
-    theme = themes.find { |item| item["id"] == theme_id }
-    return if theme.blank? || ActiveModel::Type::Boolean.new.cast(theme["locked"])
-
-    theme["name"] = name
-  end
-
-  def apply_delete_theme!(themes, state, payload)
-    theme_id = payload["theme_id"].to_s
-    return if theme_id.blank? || theme_id == DEFAULT_THEME_ID || theme_id == CLASSIC_THEME_ID
-
-    theme = themes.find { |item| item["id"] == theme_id }
-    return if theme.blank? || ActiveModel::Type::Boolean.new.cast(theme["locked"])
-
-    themes.reject! { |item| item["id"] == theme_id }
-
-    if state["active_theme_id"] == theme_id
-      state["active_theme_id"] = DEFAULT_THEME_ID
-    end
-  end
-
-  def apply_theme_snapshot!(themes, state, payload)
-    theme_id = payload["theme_id"].to_s
-    return if theme_id.blank?
-
-    theme = themes.find { |item| item["id"] == theme_id }
-    return if theme.blank?
-
-    remove_custom_theme!(themes)
-    state["active_theme_id"] = theme["id"]
-  end
-
-  def next_theme_name(themes)
-    base = "Custom theme"
-    existing = themes.map { |theme| theme["name"].to_s.downcase }
-    return base unless existing.include?(base.downcase)
-
-    suffix = 2
-    loop do
-      candidate = "#{base} #{suffix}"
-      return candidate unless existing.include?(candidate.downcase)
-
-      suffix += 1
-    end
-  end
-
   def render_current_payload
     state = read_state_data
     themes = ensure_default_theme(read_themes_data)
-    active_theme_id = state["active_theme_id"].presence || DEFAULT_THEME_ID
-    active_theme = themes.find { |theme| theme["id"] == active_theme_id }
+    active_theme_id = state["active_theme_id"].presence
+    active_theme_id = DEFAULT_THEME_ID unless ALLOWED_THEME_IDS.include?(active_theme_id)
+    active_theme = themes.find { |theme| theme["id"] == active_theme_id } || default_theme_snapshot
+    state["active_theme_id"] = active_theme_id
 
-    if active_theme.blank?
-      active_theme_id = DEFAULT_THEME_ID
-      active_theme = themes.find { |theme| theme["id"] == DEFAULT_THEME_ID }
-    end
-
-    current_appearance = normalize_appearance(active_theme&.dig("appearance") || DEFAULT_APPEARANCE)
-    is_custom_layout = active_theme_id == CUSTOM_THEME_ID
-    active_theme_name = if is_custom_layout
-      CUSTOM_THEME_NAME
-    else
-      active_theme&.dig("name").presence || DEFAULT_THEME_NAME
-    end
+    state_dirty, themes_dirty = sync_state_wallpaper_from_theme!(themes, state, active_theme)
+    write_state_data(state) if state_dirty
+    write_themes_data(themes) if themes_dirty
 
     render json: {
-      "appearance" => current_appearance,
+      "appearance" => normalize_appearance(active_theme["appearance"] || DEFAULT_APPEARANCE),
       "active_theme_id" => active_theme_id,
-      "active_theme_name" => active_theme_name,
-      "is_custom_layout" => is_custom_layout,
-      "themes" => theme_summaries(themes)
+      "active_theme_name" => active_theme["name"].to_s,
+      "is_custom_layout" => false,
+      "themes" => theme_summaries(themes),
+      "gradient_source_theme_id" => nil,
+      "gradient_source_theme_name" => nil,
+      "wallpaper_background_kind" => state["wallpaper_background_kind"],
+      "wallpaper_image_document_id" => state["wallpaper_image_document_id"],
+      "wallpaper_gradient_theme_id" => nil,
+      "wallpaper_gradient_theme_name" => nil
     }
   end
 
   def theme_summaries(themes)
-    themes.reject { |theme| theme["id"] == CUSTOM_THEME_ID }.map do |theme|
+    themes.map do |theme|
       {
         "id" => theme["id"].to_s,
         "name" => theme["name"].to_s,
-        "locked" => ActiveModel::Type::Boolean.new.cast(theme["locked"])
+        "locked" => true
       }
-    end.sort_by do |theme|
-      [theme["locked"] ? 0 : 1, theme["name"].downcase]
     end
   end
 
   def default_state
     {
-      "active_theme_id" => DEFAULT_THEME_ID
+      "active_theme_id" => DEFAULT_THEME_ID,
+      "gradient_source_theme_id" => nil,
+      "gradient_source_theme_name" => nil,
+      "wallpaper_background_kind" => nil,
+      "wallpaper_image_document_id" => nil,
+      "wallpaper_gradient_theme_id" => nil,
+      "wallpaper_gradient_theme_name" => nil
     }
   end
 
@@ -262,50 +192,9 @@ class WorkspacePreferencesController < ApplicationController
     }
   end
 
-  def ensure_default_theme(themes)
-    list = Array(themes).map { |theme| normalize_theme(theme) }.compact
-    default_theme = list.find { |theme| theme["id"] == DEFAULT_THEME_ID }
-
-    if default_theme
-      default_theme["name"] = DEFAULT_THEME_NAME
-      default_theme["locked"] = true
-      default_theme["appearance"] = normalize_appearance(DEFAULT_APPEARANCE)
-    else
-      list << default_theme_snapshot
-    end
-
-    classic_theme = list.find { |theme| theme["id"] == CLASSIC_THEME_ID }
-    if classic_theme
-      classic_theme["name"] = CLASSIC_THEME_NAME
-      classic_theme["locked"] = true
-      classic_theme["appearance"] = normalize_appearance(CLASSIC_APPEARANCE)
-    else
-      list << classic_theme_snapshot
-    end
-
-    list.uniq { |theme| theme["id"] }
-  end
-
-  def normalize_theme(theme)
-    return nil unless theme.respond_to?(:to_h)
-
-    raw = theme.to_h.transform_keys(&:to_s)
-    id = raw["id"].to_s.presence
-    name = raw["name"].to_s.strip.presence
-    return nil if id.blank? || name.blank?
-
-    if id == CUSTOM_THEME_ID
-      name = CUSTOM_THEME_NAME
-    elsif name.casecmp?(CUSTOM_THEME_NAME)
-      return nil
-    end
-
-    {
-      "id" => id,
-      "name" => name.first(64),
-      "locked" => id == CUSTOM_THEME_ID ? true : ActiveModel::Type::Boolean.new.cast(raw["locked"]),
-      "appearance" => normalize_appearance(raw["appearance"] || {})
-    }
+  # Strict shell set: only Default + Classic.
+  def ensure_default_theme(_themes)
+    [default_theme_snapshot, classic_theme_snapshot]
   end
 
   def ensure_storage_files
@@ -313,23 +202,28 @@ class WorkspacePreferencesController < ApplicationController
     return if File.exist?(workspace_state_file) && File.exist?(layout_themes_file)
 
     write_state_data(default_state)
-    write_themes_data([default_theme_snapshot])
+    write_themes_data(ensure_default_theme(nil))
   end
 
   def read_state_data
     payload = parse_json_file(workspace_state_file)
-    return default_state unless payload.respond_to?(:to_h)
+    return default_state.dup unless payload.respond_to?(:to_h)
 
-    state = payload.to_h.transform_keys(&:to_s)
-    {
-      "active_theme_id" => state["active_theme_id"].presence || DEFAULT_THEME_ID
-    }
+    state = default_state.merge(payload.to_h.transform_keys(&:to_s))
+    state["active_theme_id"] = DEFAULT_THEME_ID unless ALLOWED_THEME_IDS.include?(state["active_theme_id"].to_s)
+    state["gradient_source_theme_id"] = nil
+    state["gradient_source_theme_name"] = nil
+    state["wallpaper_gradient_theme_id"] = nil
+    state["wallpaper_gradient_theme_name"] = nil
+    state
   end
 
   def write_state_data(state)
-    output = {
-      "active_theme_id" => state["active_theme_id"].presence || DEFAULT_THEME_ID
-    }
+    output = default_state.merge(
+      "active_theme_id" => ALLOWED_THEME_IDS.include?(state["active_theme_id"].to_s) ? state["active_theme_id"] : DEFAULT_THEME_ID,
+      "wallpaper_background_kind" => state["wallpaper_background_kind"].presence,
+      "wallpaper_image_document_id" => state["wallpaper_image_document_id"].presence
+    )
     File.write(workspace_state_file, JSON.pretty_generate(output) + "\n")
   end
 
@@ -352,42 +246,8 @@ class WorkspacePreferencesController < ApplicationController
     {}
   end
 
-  def normalize_appearance_payload(raw)
-    payload = if raw.respond_to?(:to_unsafe_h)
-      raw.to_unsafe_h
-    elsif raw.respond_to?(:to_h)
-      raw.to_h
-    else
-      {}
-    end
-
-    return {} if payload.blank?
-
-    keyed = payload.transform_keys { |key| key.to_s.downcase }
-    normalized = {}
-
-    normalized["hue"] = clamp_integer(keyed["hue"], 0, 360, DEFAULT_APPEARANCE["hue"]) if keyed.key?("hue")
-    normalized["saturation"] = clamp_integer(keyed["saturation"], 0, 100, DEFAULT_APPEARANCE["saturation"]) if keyed.key?("saturation")
-    normalized["brightness"] = clamp_integer(keyed["brightness"], 0, 100, DEFAULT_APPEARANCE["brightness"]) if keyed.key?("brightness")
-    normalized["transparency"] = clamp_float(keyed["transparency"], 0.15, 0.95, DEFAULT_APPEARANCE["transparency"]) if keyed.key?("transparency")
-    normalized["font_1"] = clamp_integer(keyed["font_1"], 0, 100, DEFAULT_APPEARANCE["font_1"]) if keyed.key?("font_1")
-    normalized["font_1_alpha"] = clamp_integer(keyed["font_1_alpha"], 0, 100, DEFAULT_APPEARANCE["font_1_alpha"]) if keyed.key?("font_1_alpha")
-    normalized["font_2"] = clamp_integer(keyed["font_2"], 0, 100, DEFAULT_APPEARANCE["font_2"]) if keyed.key?("font_2")
-    normalized["font_2_alpha"] = clamp_integer(keyed["font_2_alpha"], 0, 100, DEFAULT_APPEARANCE["font_2_alpha"]) if keyed.key?("font_2_alpha")
-    normalized["color_1_hue"] = clamp_integer(keyed["color_1_hue"], 0, 360, DEFAULT_APPEARANCE["color_1_hue"]) if keyed.key?("color_1_hue")
-    normalized["color_1_saturation"] = clamp_integer(keyed["color_1_saturation"], 0, 100, DEFAULT_APPEARANCE["color_1_saturation"]) if keyed.key?("color_1_saturation")
-    normalized["color_1_brightness"] = clamp_integer(keyed["color_1_brightness"], 0, 100, DEFAULT_APPEARANCE["color_1_brightness"]) if keyed.key?("color_1_brightness")
-    normalized["color_2_hue"] = clamp_integer(keyed["color_2_hue"], 0, 360, DEFAULT_APPEARANCE["color_2_hue"]) if keyed.key?("color_2_hue")
-    normalized["color_2_saturation"] = clamp_integer(keyed["color_2_saturation"], 0, 100, DEFAULT_APPEARANCE["color_2_saturation"]) if keyed.key?("color_2_saturation")
-    normalized["color_2_brightness"] = clamp_integer(keyed["color_2_brightness"], 0, 100, DEFAULT_APPEARANCE["color_2_brightness"]) if keyed.key?("color_2_brightness")
-    normalized["angle"] = clamp_integer(keyed["angle"], 0, 360, DEFAULT_APPEARANCE["angle"]) if keyed.key?("angle")
-
-    normalized
-  end
-
   def normalize_appearance(raw)
     input = raw.respond_to?(:transform_keys) ? raw.transform_keys { |key| key.to_s.downcase } : {}
-
     {
       "hue" => clamp_integer(input["hue"], 0, 360, DEFAULT_APPEARANCE["hue"]),
       "saturation" => clamp_integer(input["saturation"], 0, 100, DEFAULT_APPEARANCE["saturation"]),
@@ -427,57 +287,74 @@ class WorkspacePreferencesController < ApplicationController
     default
   end
 
-  def active_theme_appearance(themes, state)
-    active_theme_id = state["active_theme_id"].presence || DEFAULT_THEME_ID
-    active_theme = themes.find { |theme| theme["id"] == active_theme_id }
-    normalize_appearance(active_theme&.dig("appearance") || DEFAULT_APPEARANCE)
+  def wallpaper_state_slice(state)
+    {
+      "wallpaper_background_kind" => state["wallpaper_background_kind"].presence,
+      "wallpaper_image_document_id" => state["wallpaper_image_document_id"].presence&.to_i
+    }
   end
 
-  def apply_or_clear_custom_theme!(themes, appearance)
-    matching_theme = themes.find do |theme|
-      theme["id"] != CUSTOM_THEME_ID &&
-        !appearance_changed?(appearance, theme["appearance"])
+  def clear_wallpaper_picks!(state)
+    state["wallpaper_background_kind"] = nil
+    state["wallpaper_image_document_id"] = nil
+    state["wallpaper_gradient_theme_id"] = nil
+    state["wallpaper_gradient_theme_name"] = nil
+    state["gradient_source_theme_id"] = nil
+    state["gradient_source_theme_name"] = nil
+  end
+
+  def wallpaper_doc_eligible_for_user?(doc)
+    return false unless current_user && doc&.file? && doc.content_type.to_s == "asset"
+
+    EmbeddedIimageFolder.eligible_asset?(doc) && doc.parent_id == EmbeddedIimageFolder.document_for(current_user)&.id
+  end
+
+  # Kept for WorkspaceThemeBoot compatibility (`send`) and for read-time state repair.
+  def sync_state_wallpaper_from_theme!(_themes, state, _theme, user: current_user)
+    before_wp = wallpaper_state_slice(state)
+    if state["wallpaper_background_kind"].to_s == "image"
+      doc = Document.find_by(id: state["wallpaper_image_document_id"].to_i)
+      folder = EmbeddedIimageFolder.document_for(user)
+      valid = doc&.file? && doc.content_type.to_s == "asset" && folder && doc.parent_id == folder.id &&
+        EmbeddedIimageFolder.eligible_asset?(doc)
+      clear_wallpaper_picks!(state) unless valid
     end
-
-    if matching_theme
-      remove_custom_theme!(themes)
-      return matching_theme["id"]
-    end
-
-    upsert_custom_theme!(themes, appearance)
-    CUSTOM_THEME_ID
+    [wallpaper_state_slice(state) != before_wp, false]
   end
 
-  def upsert_custom_theme!(themes, appearance)
-    custom_theme = themes.find { |theme| theme["id"] == CUSTOM_THEME_ID }
-    if custom_theme
-      custom_theme["name"] = CUSTOM_THEME_NAME
-      custom_theme["locked"] = true
-      custom_theme["appearance"] = normalize_appearance(appearance)
-    else
-      themes << {
-        "id" => CUSTOM_THEME_ID,
-        "name" => CUSTOM_THEME_NAME,
-        "locked" => true,
-        "appearance" => normalize_appearance(appearance)
-      }
-    end
-  end
-
-  def remove_custom_theme!(themes)
-    themes.reject! { |theme| theme["id"] == CUSTOM_THEME_ID }
-  end
-
-  def appearance_changed?(current, baseline)
-    current_hash = normalize_appearance(current || {})
-    baseline_hash = normalize_appearance(baseline || {})
-
-    current_hash.any? do |key, value|
-      if key == "transparency"
-        (value.to_f - baseline_hash[key].to_f).abs > 0.005
+  def wallpaper_apply_image_document_id_param
+    raw = params[:apply_wallpaper_image]
+    hash =
+      if raw.respond_to?(:to_unsafe_h)
+        raw.to_unsafe_h
+      elsif raw.respond_to?(:to_h)
+        raw.to_h
       else
-        value.to_i != baseline_hash[key].to_i
+        {}
       end
-    end
+    hash = hash.transform_keys(&:to_s)
+    id = hash["document_id"]
+    return nil if id.blank?
+
+    id.to_i
+  end
+
+  def apply_wallpaper_image_pick!(state, doc_id)
+    return [false, "Not signed in."] unless current_user
+
+    folder = EmbeddedIimageFolder.document_for(current_user)
+    return [false, "Wallpaper folder not available."] if folder.blank?
+
+    doc = Document.find_by(id: doc_id)
+    return [false, "Wallpaper not found."] unless doc&.file? && doc.parent_id == folder.id
+    return [false, "Invalid wallpaper image."] unless EmbeddedIimageFolder.eligible_asset?(doc)
+
+    state["wallpaper_background_kind"] = "image"
+    state["wallpaper_image_document_id"] = doc.id
+    state["wallpaper_gradient_theme_id"] = nil
+    state["wallpaper_gradient_theme_name"] = nil
+    state["gradient_source_theme_id"] = nil
+    state["gradient_source_theme_name"] = nil
+    [true, nil]
   end
 end

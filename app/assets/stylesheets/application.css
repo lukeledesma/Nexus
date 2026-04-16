@@ -11,7 +11,7 @@
 
 /* Pix Chicago — Etienne Desclides, 100% Free (DaFont). Used only when Classic UI is active.
  * size-adjust: bitmap cell is tall vs system UI at the same font-size — scale metrics so glyphs
- * fit the same rem-based rows/inputs (Launcher label, doc rows, theme names) without shrinking shells. */
+ * fit the same rem-based rows/inputs (side panel labels, doc rows, theme names) without shrinking shells. */
 @font-face {
   font-family: "Pix Chicago";
   /* Served from /public/fonts so the path works in dev + production (Propshaft does not rewrite this url()). */
@@ -26,22 +26,31 @@
   --bg: #0f0f12;
   --surface: #1a1a1f;
   --surface-raised: #232329;
-  --font-1-tone: 89;
+  --font-1-tone: 85;
   --font-1-alpha: 1;
-  --font-2-tone: 63;
+  --font-2-tone: 60;
   --font-2-alpha: 1;
   /* Fixed UI strokes (content chrome, buttons, cards) — not theme-sliders */
   --border: rgba(255, 255, 255, 0.12);
   --border-hairline: rgba(255, 255, 255, 0.08);
   --desktop-card-height: 3.125rem;
   --window-header-band-height: 60px;
-  --scrollbar-thumb: #1d2233;
-  --scrollbar-thumb-hover: #1d2233;
-  --scrollbar-thumb-pane: #2a3246;
-  --scrollbar-thumb-pane-hover: #36415b;
+  /* Scrollbars: derive from shell surfaces (avoids fixed navy that reads “blue” vs window chrome). */
+  --scrollbar-thumb: color-mix(in oklab, var(--surface-raised) 78%, var(--text) 22%);
+  --scrollbar-thumb-hover: color-mix(in oklab, var(--surface-raised) 64%, var(--text) 36%);
+  --scrollbar-thumb-pane: color-mix(in oklab, var(--surface) 76%, var(--text-muted) 24%);
+  --scrollbar-thumb-pane-hover: color-mix(in oklab, var(--surface) 62%, var(--text) 38%);
   --text: hsl(0 0% calc(var(--font-1-tone) * 1%) / var(--font-1-alpha));
   --text-muted: hsl(0 0% calc(var(--font-2-tone) * 1%) / var(--font-2-alpha));
   --muted: hsl(0 0% calc(var(--font-2-tone) * 1%) / var(--font-2-alpha));
+  /* Shared row highlight language (Nexus side panel is the visual source of truth). */
+  --nexus-row-hover-highlight: rgba(255, 255, 255, 0.1);
+  --nexus-row-selected-highlight: rgba(255, 255, 255, 0.14);
+  --nexus-row-subtask-highlight: rgba(255, 255, 255, 0.06);
+  --nexus-row-selected-text: var(--text);
+  /* Finder folder glyphs align with Settings/Nexus panel icon tone. */
+  --nexus-sidebar-folder-icon-color: var(--text-muted);
+  --nexus-sidebar-folder-icon-empty: var(--nexus-sidebar-folder-icon-color);
   --accent: #3b82f6;
   --accent-hover: #2563eb;
   --success: #22c55e;
@@ -51,6 +60,8 @@
   --space-md: 1rem;
   --space-lg: 1.25rem;
   --os-window-padding: 0.75rem;
+  /* Desktop shell inset for clock corner + app window viewport margins. */
+  --nexus-desktop-shell-inset: max(8px, calc(var(--os-window-padding, 0.75rem) * 0.65));
   --os-header-min-height: 1.28rem;
   --os-header-gap: 0.3rem;
   --os-title-size: 0.88rem;
@@ -80,18 +91,22 @@
   --os-standard-card-value-size: 0.82rem;
   --window-bg-h: 180;
   --window-bg-saturation: 0%;
-  --window-bg-brightness: 15%;
-  --window-bg-alpha: 0.15;
+  --window-bg-brightness: 13%;
+  --window-bg-alpha: 0.95;
   --window-ui-hue: 180;
   --window-ui-saturation: 0%;
   --window-ui-brightness: 15%;
-  --desktop-bg-angle: 135deg;
-  --desktop-bg-1-hue: 240;
-  --desktop-bg-1-saturation: 28%;
-  --desktop-bg-1-brightness: 14%;
-  --desktop-bg-2-hue: 213;
-  --desktop-bg-2-saturation: 73%;
-  --desktop-bg-2-brightness: 22%;
+  --desktop-bg-angle: 180deg;
+  --desktop-bg-1-hue: 0;
+  --desktop-bg-1-saturation: 0%;
+  --desktop-bg-1-brightness: 0%;
+  --desktop-bg-2-hue: 0;
+  --desktop-bg-2-saturation: 0%;
+  --desktop-bg-2-brightness: 0%;
+  /* Standard desktop selection box tint (Sundown-derived). */
+  --desktop-selection-hue: 195;
+  --desktop-selection-saturation: 25%;
+  --desktop-selection-brightness: 20%;
   --window-bg: hsl(var(--window-bg-h) var(--window-bg-saturation) var(--window-bg-brightness) / var(--window-bg-alpha));
   --desktop-bg-color-1: hsl(var(--desktop-bg-1-hue) var(--desktop-bg-1-saturation) var(--desktop-bg-1-brightness));
   --desktop-bg-color-2: hsl(var(--desktop-bg-2-hue) var(--desktop-bg-2-saturation) var(--desktop-bg-2-brightness));
@@ -315,183 +330,6 @@ svg.material-icon--lg {
   min-height: 1.05rem;
 }
 
-.organizer-tools-grid.os-window-grid {
-  gap: 0.22rem 0.4rem;
-}
-
-/* Launcher: always two equal columns, wrap rows; minmax(0,…) avoids overflow bugs */
-.organizer-tools-grid.organizer-tools-grid--launcher.os-window-grid--2 {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-flow: row;
-  align-content: start;
-  width: 100%;
-}
-
-.organizer-tools-grid.organizer-tools-grid--launcher.os-window-grid--2 > .launcher-tile-wrap {
-  min-width: 0;
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
-.launcher-tile-wrap {
-  position: relative;
-  display: block;
-}
-
-/* Valid <dl> body: reset UA margins so label/icon stay inside the tile button */
-dl.launcher-tile-body {
-  margin: 0;
-  padding: 0;
-}
-
-dl.launcher-tile-body dd {
-  margin-inline-start: 0;
-}
-
-.os-window-card--launcher-tile.launcher-tile-main {
-  position: static;
-  height: auto;
-  min-height: calc(var(--os-standard-card-height) + 0.35rem);
-  display: flex;
-  align-items: stretch;
-  justify-content: center;
-  padding: 0.42rem 0.34rem;
-  width: 100%;
-}
-
-.os-window-card--launcher-tile .os-window-card-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: flex-start;
-  gap: 0.22rem;
-  width: 100%;
-  min-height: 0;
-}
-
-.os-window-card--launcher-tile .os-window-card-label {
-  font-size: 0.62rem;
-  letter-spacing: 0.03em;
-  line-height: 1.15;
-}
-
-.os-window-card--launcher-tile .os-window-card-value {
-  margin: 0;
-}
-
-.launcher-card-icon {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  margin-top: 0;
-  padding-bottom: 0.12rem;
-  color: var(--text);
-}
-
-.launcher-card-icon svg.material-icon,
-.launcher-card-icon svg.material-icon--lg {
-  width: 1.1rem;
-  height: 1.1rem;
-}
-
-.launcher-dock-pin-btn {
-  position: absolute;
-  top: 0.22rem;
-  right: 0.22rem;
-  z-index: 3;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.12rem;
-  margin: 0;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 180ms ease, visibility 180ms ease, color 0.12s ease, background 0.12s ease;
-}
-
-.launcher-dock-pin-btn:hover,
-.launcher-dock-pin-btn:focus-visible {
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.launcher-dock-pin-btn__glyph {
-  display: none;
-  align-items: center;
-  justify-content: center;
-}
-
-.launcher-dock-pin-btn.is-pinned .launcher-dock-pin-btn__glyph--remove {
-  display: flex;
-}
-
-.launcher-dock-pin-btn:not(.is-pinned) .launcher-dock-pin-btn__glyph--add {
-  display: flex;
-}
-
-.launcher-dock-pin-btn svg.material-icon,
-.launcher-dock-pin-btn svg.material-icon--xs {
-  width: 0.92rem;
-  height: 0.92rem;
-}
-
-.launcher-tile-wrap:hover .launcher-dock-pin-btn,
-.launcher-tile-wrap:focus-within .launcher-dock-pin-btn {
-  opacity: 1;
-  visibility: visible;
-}
-
-.launcher-text-caret {
-  display: inline-block;
-  position: relative;
-  width: 0.7rem;
-  height: 0.82rem;
-  color: var(--text);
-  animation: launcher-caret-flash 1s step-end infinite;
-}
-
-.launcher-text-caret::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  top: 0.08rem;
-  bottom: 0.08rem;
-  width: 0.11rem;
-  background: currentColor;
-}
-
-.launcher-text-caret::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0.08rem;
-  height: 0.11rem;
-  background: currentColor;
-  box-shadow: 0 0.55rem 0 currentColor;
-}
-
-@keyframes launcher-caret-flash {
-  0%,
-  48% {
-    opacity: 1;
-  }
-
-  50%,
-  100% {
-    opacity: 0.2;
-  }
-}
-
 .app-version {
   position: fixed;
   bottom: 0.25rem;
@@ -670,23 +508,35 @@ dl.launcher-tile-body dd {
   overflow-x: hidden;
 }
 
-.db-health-detail-list::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+body.nexus-os .db-health-detail-list {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
 }
 
-.db-health-detail-list::-webkit-scrollbar-track {
+body.nexus-os .db-health-detail-list::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+body.nexus-os .db-health-detail-list::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.db-health-detail-list::-webkit-scrollbar-thumb {
+body.nexus-os .db-health-detail-list::-webkit-scrollbar-thumb {
   background: transparent;
   border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
 }
 
-.db-health-detail-list.is-scrolling::-webkit-scrollbar-thumb,
-.db-health-detail-list:hover::-webkit-scrollbar-thumb {
-  background: rgba(40, 51, 78, 0.98);
+body.nexus-os .db-health-detail-list.is-scrolling,
+body.nexus-os .db-health-detail-list:hover {
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+body.nexus-os .db-health-detail-list.is-scrolling::-webkit-scrollbar-thumb,
+body.nexus-os .db-health-detail-list:hover::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
 }
 
 .db-health-detail-list li {
@@ -1365,26 +1215,25 @@ a:hover { text-decoration: underline; }
 
 .finder-file-row:hover,
 .finder-file-row:focus-within {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--nexus-row-hover-highlight);
 }
 
-/* Tasks: ~50% subtler hover lift than Finder rows (same hue family). */
 .task-item-row.nexus-standard-row:not(.task-item-row--checked):hover,
 .task-item-row.nexus-standard-row:not(.task-item-row--checked):focus-within {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--nexus-row-hover-highlight);
 }
 
 /*
  * Main row with subtasks expanded (JS sets .task-item-group--head when subtasks exist and not collapsed).
  * Slightly darker than plain hover so “expanded” reads as a state; hover/focus deepens further.
  */
-.task-item-row.nexus-standard-row.task-item-row--main.task-item-group--head:not(.task-item-row--checked) {
-  background: rgba(255, 255, 255, 0.14);
-}
-
 .task-item-row.nexus-standard-row.task-item-row--main.task-item-group--head:not(.task-item-row--checked):hover,
 .task-item-row.nexus-standard-row.task-item-row--main.task-item-group--head:not(.task-item-row--checked):focus-within {
-  background: rgba(255, 255, 255, 0.18);
+  background: var(--nexus-row-selected-highlight);
+}
+
+.task-item-row.nexus-standard-row.task-item-row--main.task-item-group--head:not(.task-item-row--checked) {
+  background: var(--nexus-row-selected-highlight);
 }
 
 /* Checked main + expanded subtasks: step above flat checked fill, with clearer hover. */
@@ -1501,8 +1350,10 @@ a:hover { text-decoration: underline; }
   border: 1px solid var(--border);
   border-radius: 8px;
   margin: 0 !important;
+  position: relative;
   touch-action: manipulation;
   transition: background-color 140ms ease, border-color 140ms ease, max-height 220ms ease, opacity 180ms ease, transform 220ms ease, padding 220ms ease, border-width 220ms ease;
+  cursor: grab;
 }
 
 .task-item-row:not(.nexus-standard-row) {
@@ -1563,6 +1414,33 @@ a:hover { text-decoration: underline; }
   border-top-width: 0 !important;
   border-bottom-width: 0 !important;
   pointer-events: none;
+}
+
+.task-item-row--dragging {
+  opacity: 0.48;
+  cursor: grabbing;
+}
+
+.task-item-row--drop-before::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -1px;
+  border-top: 2px dotted color-mix(in srgb, var(--accent) 40%, rgba(255, 255, 255, 0.72));
+  pointer-events: none;
+  z-index: 2;
+}
+
+.task-item-row--drop-after::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  border-bottom: 2px dotted color-mix(in srgb, var(--accent) 40%, rgba(255, 255, 255, 0.72));
+  pointer-events: none;
+  z-index: 2;
 }
 
 .task-item-row--main + .task-item-row--subtask {
@@ -1670,13 +1548,13 @@ a:hover { text-decoration: underline; }
 
 /* Expanded subtasks: same family as main-row tint / checked fill, half opacity so they read as grouped, not top-level. */
 .task-item-row.nexus-standard-row.task-item-row--subtask:not(.is-collapsed):not(.task-item-row--checked) {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--nexus-row-subtask-highlight);
 }
 
 /* Hover/focus: match the standard list-row highlight (same as non-expanded main hover). */
 .task-item-row.nexus-standard-row.task-item-row--subtask:not(.is-collapsed):not(.task-item-row--checked):hover,
 .task-item-row.nexus-standard-row.task-item-row--subtask:not(.is-collapsed):not(.task-item-row--checked):focus-within {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--nexus-row-hover-highlight);
 }
 
 .task-item-row.nexus-standard-row.task-item-row--subtask:not(.is-collapsed).task-item-row--checked {
@@ -2624,92 +2502,6 @@ input.connection-inline {
   letter-spacing: 0.05em;
 }
 
-/* ─────────────────────────────────────────────────────────────────────────── */
-/* Launcher Panel Styling (Matches Settings/DB Health)                        */
-/* ─────────────────────────────────────────────────────────────────────────── */
-
-.organizer-panel {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 100%;
-  padding: var(--os-window-padding);
-  flex-shrink: 0;
-  flex-grow: 0;
-}
-
-/*
- * Launcher inner shell (#organizer): padding is the inset from the window chrome to the grid.
- * Vertical inset matches top and bottom; horizontal uses --launcher-shell-inset-x.
- * --launcher-footer-gap reserved if a footer row is added back (flex gap between grid and footer).
- */
-.organizer-panel--apps {
-  --launcher-shell-inset-top: 0.65rem;
-  --launcher-shell-inset-x: 0.65rem;
-  --launcher-footer-gap: 0.65rem;
-  --launcher-footer-bottom-inset: var(--launcher-shell-inset-top);
-}
-
-.organizer-panel-header {
-  cursor: grab;
-  user-select: none;
-  flex-shrink: 0;
-}
-
-.organizer-panel-header:active {
-  cursor: grabbing;
-}
-
-.tools-close-btn {
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
-  transform: translateY(0);
-  transition: color 0.12s ease, background 0.12s ease, opacity 0.18s ease, visibility 0.18s ease, transform 0.18s ease;
-}
-
-.tools-close-btn--main {
-  position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
-  z-index: 65;
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transform: translateY(-3px);
-}
-
-.window-manager-shell:has(> .organizer-window.pane-open) .tools-close-btn--organizer {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transform: translateY(-3px);
-}
-
-.tools-close-btn--organizer {
-  position: absolute;
-  top: 0.55rem;
-  right: 0.75rem;
-  z-index: 65;
-}
-
-.window-manager-shell:has(> .organizer-window.pane-open) .tools-close-btn--main {
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
-  transform: translateY(0);
-}
-
-.organizer-tools-grid {
-  padding: 0;
-  overflow: hidden;
-  margin: 0;
-  flex-grow: 0;
-  align-content: start;
-  width: 100%;
-  flex-shrink: 0;
-}
-
 .finder-sidebar-header p {
   margin: 0.2rem 0 0;
   color: var(--text-muted);
@@ -3042,6 +2834,7 @@ input.connection-inline {
   position: absolute;
   z-index: 120;
   background: transparent;
+  touch-action: none;
 }
 
 .pane-resize-handle--top,
@@ -3120,628 +2913,10 @@ input.connection-inline {
   font-size: var(--os-title-size);
 }
 
-.app-surface--quill-note {
-  --quill-note-shell-bg: rgba(255, 255, 255, 0.02);
-  --quill-note-border: var(--border);
-}
-
-.quill-note-form {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-}
-
-.quill-note-editor-shell {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  overflow: hidden;
-}
-
-.quill-note-editor {
-  width: 100%;
-  min-height: 0;
-}
-
-.quill-note-editor-shell > .ql-toolbar.ql-snow {
-  border: none;
-  border-bottom: 1px solid var(--quill-note-border);
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.quill-note-editor-shell > .quill-note-editor.ql-container.ql-snow {
-  border: none;
-  font-family: inherit;
-  font-size: var(--app-note-body-font-size, 0.92rem);
-  line-height: 1.6;
-  display: flex;
-  flex: 1;
-  min-height: 0;
-}
-
-.quill-note-editor .ql-editor {
-  color: var(--text);
-  overflow-y: auto;
-}
-
-.quill-note-editor .ql-editor.ql-blank::before {
-  color: var(--text-muted);
-}
-
-.quill-note-editor-shell .ql-snow .ql-stroke {
-  stroke: var(--text-muted);
-}
-
-.quill-note-editor-shell .ql-snow .ql-fill,
-.quill-note-editor-shell .ql-snow .ql-stroke.ql-fill {
-  fill: var(--text-muted);
-}
-
-.quill-note-editor-shell .ql-snow .ql-picker,
-.quill-note-editor-shell .ql-snow .ql-picker-label,
-.quill-note-editor-shell .ql-snow .ql-picker-item,
-.quill-note-editor-shell .ql-snow .ql-picker.ql-expanded .ql-picker-label,
-.quill-note-editor-shell .ql-snow .ql-picker-label::before,
-.quill-note-editor-shell .ql-snow button {
-  color: var(--text-muted);
-  border-color: var(--border);
-}
-
-.quill-note-editor-shell .ql-toolbar .ql-picker-label,
-.quill-note-editor-shell .ql-toolbar button {
-  border-color: var(--border) !important;
-}
-
-.quill-note-editor-shell .ql-snow .ql-picker-options {
-  border: 1px solid var(--border) !important;
-  border-radius: 8px;
-  background: var(--window-bg);
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.24);
-  overflow: hidden;
-  padding: 0;
-}
-
-.quill-note-editor-shell .ql-snow .ql-picker.ql-expanded .ql-picker-options {
-  border-color: var(--border) !important;
-}
-
-.quill-note-editor-shell .ql-snow .ql-picker.ql-expanded .ql-picker-label {
-  border-color: var(--border) !important;
-  background: var(--window-bg);
-}
-
-.quill-note-editor-shell .ql-snow .ql-picker-item:hover,
-.quill-note-editor-shell .ql-snow .ql-picker-item.ql-selected {
-  color: var(--text);
-  background: transparent;
-  border-top-color: var(--border);
-  border-bottom-color: var(--border);
-}
-
-.quill-note-editor-shell .ql-snow .ql-picker-item {
-  margin: 0;
-  border-top: 1px solid transparent;
-  border-bottom: 1px solid transparent;
-  box-sizing: border-box;
-  padding: 0.28rem 0.85rem;
-}
-
-.quill-note-editor-shell .ql-snow .ql-picker.ql-header .ql-picker-options {
-  min-width: 12.5rem;
-}
-
-.quill-note-editor-shell .ql-snow .ql-picker.ql-header .ql-picker-item {
-  padding-right: 1.05rem;
-}
-
-.quill-note-editor-shell .ql-toolbar .ql-picker.ql-align .ql-picker-label,
-.quill-note-editor-shell .ql-toolbar .ql-picker.ql-color .ql-picker-label,
-.quill-note-editor-shell .ql-toolbar .ql-picker.ql-background .ql-picker-label,
-.quill-note-editor-shell .ql-toolbar .ql-picker.ql-align.ql-expanded .ql-picker-label,
-.quill-note-editor-shell .ql-toolbar .ql-picker.ql-color.ql-expanded .ql-picker-label,
-.quill-note-editor-shell .ql-toolbar .ql-picker.ql-background.ql-expanded .ql-picker-label {
-  border: none !important;
-}
-
-.quill-note-editor-shell .ql-snow .ql-tooltip {
-  border: 1px solid var(--border) !important;
-  border-radius: 8px;
-  background: var(--window-bg);
-  color: var(--text-muted);
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.24);
-}
-
-.quill-note-editor-shell .ql-snow .ql-tooltip input[type="text"] {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text);
-}
-
-.quill-note-editor-shell .ql-snow .ql-tooltip a.ql-action,
-.quill-note-editor-shell .ql-snow .ql-tooltip a.ql-remove {
-  color: var(--text-muted);
-}
-
-.quill-note-editor-shell .ql-snow .ql-tooltip a.ql-action:hover,
-.quill-note-editor-shell .ql-snow .ql-tooltip a.ql-remove:hover {
-  color: var(--text);
-}
-
-.quill-note-editor-shell .ql-snow button:hover .ql-stroke,
-.quill-note-editor-shell .ql-snow button:focus .ql-stroke,
-.quill-note-editor-shell .ql-snow button.ql-active .ql-stroke,
-.quill-note-editor-shell .ql-snow .ql-picker-label:hover .ql-stroke,
-.quill-note-editor-shell .ql-snow .ql-picker-label.ql-active .ql-stroke {
-  stroke: var(--text);
-}
-
-.quill-note-editor-shell .ql-snow button:hover .ql-fill,
-.quill-note-editor-shell .ql-snow button:focus .ql-fill,
-.quill-note-editor-shell .ql-snow button.ql-active .ql-fill,
-.quill-note-editor-shell .ql-snow .ql-picker-label:hover .ql-fill,
-.quill-note-editor-shell .ql-snow .ql-picker-label.ql-active .ql-fill {
-  fill: var(--text);
-}
-
-.quill-note-editor-shell .ql-snow button:hover,
-.quill-note-editor-shell .ql-snow button:focus,
-.quill-note-editor-shell .ql-snow button.ql-active,
-.quill-note-editor-shell .ql-snow .ql-picker-label:hover,
-.quill-note-editor-shell .ql-snow .ql-picker-label.ql-active,
-.quill-note-editor-shell .ql-snow .ql-picker-label:hover::before,
-.quill-note-editor-shell .ql-snow .ql-picker-label.ql-active::before {
-  color: var(--text);
-}
-
 .tool-window-subtitle {
   margin-bottom: var(--os-subtitle-gap);
   font-size: var(--os-subtitle-size);
   line-height: 1.5;
-}
-
-.app-surface--sticky-notes {
-  --note-inset: 0.75rem;
-  display: flex;
-  flex-direction: column;
-  padding-right: var(--note-inset);
-  padding-bottom: var(--note-inset);
-  padding-left: var(--note-inset);
-}
-
-/* Thread Board (canvas cards + connections, inside content-window iframe) */
-.app-surface--thread-board {
-  position: relative;
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-  min-height: 360px;
-  height: 100%;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  background: #0d0d12;
-  color: #e8e8f0;
-  overflow: hidden;
-  user-select: none;
-}
-
-.app-surface--thread-board *,
-.app-surface--thread-board *::before,
-.app-surface--thread-board *::after {
-  box-sizing: border-box;
-}
-
-.thread-board-viewport {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-}
-
-.thread-board-grid-canvas {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.thread-board-world {
-  position: absolute;
-  top: 0;
-  left: 0;
-  transform-origin: 0 0;
-  will-change: transform;
-}
-
-.thread-board-conn-svg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  overflow: visible;
-  pointer-events: none;
-}
-
-.thread-board-conn-path {
-  fill: none;
-  stroke: rgba(160, 170, 210, 0.4);
-  stroke-width: 2;
-  pointer-events: stroke;
-  cursor: pointer;
-  transition: stroke 0.15s, stroke-width 0.15s;
-}
-
-.thread-board-conn-path:hover {
-  stroke: rgba(130, 160, 255, 0.8);
-  stroke-width: 2.5;
-}
-
-.thread-board-conn-path.selected {
-  stroke: #7aa4ff;
-  stroke-width: 2.5;
-}
-
-.thread-board-card {
-  position: absolute;
-  border-radius: 14px;
-  padding: 0;
-  cursor: move;
-  box-shadow:
-    0 4px 20px rgba(0, 0, 0, 0.5),
-    0 1px 3px rgba(0, 0, 0, 0.4);
-  transition: box-shadow 0.15s;
-  display: flex;
-  flex-direction: column;
-  overflow: visible;
-}
-
-.thread-board-card:hover {
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.6),
-    0 1px 3px rgba(0, 0, 0, 0.4);
-}
-
-.thread-board-card.selected {
-  box-shadow:
-    0 0 0 2.5px #7aa4ff,
-    0 8px 32px rgba(0, 0, 0, 0.6);
-}
-
-.thread-board-card.dragging {
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
-  z-index: 9000 !important;
-}
-
-.thread-board-card-inner {
-  flex: 1;
-  border-radius: 14px;
-  padding: 13px 15px 15px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  overflow: hidden;
-  min-width: 160px;
-  min-height: 90px;
-}
-
-.thread-board-card-tag {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  opacity: 0.45;
-  line-height: 1;
-  pointer-events: none;
-}
-
-.thread-board-card-text {
-  flex: 1;
-  background: transparent;
-  border: none;
-  outline: none;
-  color: inherit;
-  font-size: 14px;
-  line-height: 1.55;
-  resize: none;
-  cursor: text;
-  min-height: 56px;
-  font-family: inherit;
-  width: 100%;
-}
-
-.thread-board-card-text::placeholder {
-  opacity: 0.35;
-}
-
-.thread-board-card-resize {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 18px;
-  height: 18px;
-  cursor: se-resize;
-  opacity: 0;
-  transition: opacity 0.15s;
-  display: flex;
-  align-items: flex-end;
-  justify-content: flex-end;
-  padding: 4px;
-  z-index: 5;
-}
-
-.thread-board-card:hover .thread-board-card-resize,
-.thread-board-card.selected .thread-board-card-resize {
-  opacity: 0.5;
-}
-
-.thread-board-card-resize svg {
-  pointer-events: none;
-}
-
-.thread-board-card-anchors {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.thread-board-anchor {
-  position: absolute;
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  background: #7aa4ff;
-  border: 2px solid rgba(255, 255, 255, 0.9);
-  cursor: crosshair;
-  pointer-events: all;
-  opacity: 0;
-  transform: translate(-50%, -50%) scale(0.7);
-  transition:
-    opacity 0.15s,
-    transform 0.15s;
-  z-index: 20;
-  box-shadow: 0 0 6px rgba(122, 164, 255, 0.6);
-}
-
-.thread-board-card:hover .thread-board-anchor,
-.thread-board-card.selected .thread-board-anchor {
-  opacity: 1;
-  transform: translate(-50%, -50%) scale(1);
-}
-
-.thread-board-anchor:hover {
-  transform: translate(-50%, -50%) scale(1.3) !important;
-  background: #aac8ff;
-}
-
-.thread-board-anchor-top {
-  top: 0;
-  left: 50%;
-}
-
-.thread-board-anchor-right {
-  top: 50%;
-  left: 100%;
-}
-
-.thread-board-anchor-bottom {
-  top: 100%;
-  left: 50%;
-}
-
-.thread-board-anchor-left {
-  top: 50%;
-  left: 0;
-}
-
-.thread-board-draft-svg {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 8000;
-}
-
-.thread-board-draft-path {
-  fill: none;
-  stroke: rgba(122, 164, 255, 0.55);
-  stroke-width: 2;
-  stroke-dasharray: 7 4;
-  stroke-linecap: round;
-}
-
-.thread-board-toolbar {
-  position: fixed;
-  bottom: 22px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  background: rgba(18, 18, 26, 0.93);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 18px;
-  padding: 9px 14px;
-  box-shadow:
-    0 12px 48px rgba(0, 0, 0, 0.6),
-    0 1px 0 rgba(255, 255, 255, 0.04) inset;
-  z-index: 1000;
-}
-
-.thread-board-tbtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  border: none;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.55);
-  cursor: pointer;
-  transition:
-    background 0.12s,
-    color 0.12s;
-  flex-shrink: 0;
-}
-
-.thread-board-tbtn:hover {
-  background: rgba(255, 255, 255, 0.09);
-  color: #fff;
-}
-
-.thread-board-tbtn.active {
-  background: rgba(122, 164, 255, 0.18);
-  color: #7aa4ff;
-}
-
-.thread-board-tsep {
-  width: 1px;
-  height: 22px;
-  background: rgba(255, 255, 255, 0.08);
-  flex-shrink: 0;
-}
-
-.thread-board-swatch {
-  width: 19px;
-  height: 19px;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  cursor: pointer;
-  transition:
-    transform 0.12s,
-    border-color 0.12s;
-  flex-shrink: 0;
-}
-
-.thread-board-swatch:hover {
-  transform: scale(1.25);
-}
-
-.thread-board-swatch.active {
-  border-color: rgba(255, 255, 255, 0.85);
-}
-
-.thread-board-swatches {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.thread-board-zoom-label {
-  font-size: 11.5px;
-  color: rgba(255, 255, 255, 0.4);
-  min-width: 40px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
-}
-
-.thread-board-minimap {
-  position: fixed;
-  bottom: 82px;
-  right: 18px;
-  width: 154px;
-  height: 96px;
-  background: rgba(14, 14, 22, 0.88);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 10px;
-  overflow: hidden;
-  z-index: 999;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.3s;
-}
-
-.thread-board-minimap--show {
-  opacity: 1;
-}
-
-.thread-board-minimap-canvas {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-.thread-board-minimap-vp {
-  position: absolute;
-  border: 1px solid rgba(122, 164, 255, 0.55);
-  background: rgba(122, 164, 255, 0.07);
-  pointer-events: none;
-}
-
-.thread-board-hint {
-  position: fixed;
-  top: 18px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 11.5px;
-  color: rgba(255, 255, 255, 0.28);
-  pointer-events: none;
-  white-space: nowrap;
-  transition: opacity 0.6s;
-  z-index: 900;
-}
-
-.thread-board-ctx-menu {
-  position: fixed;
-  background: rgba(20, 20, 30, 0.97);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-  padding: 5px;
-  z-index: 9999;
-  min-width: 150px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-}
-
-.thread-board-ctx-menu[hidden] {
-  display: none;
-}
-
-.thread-board-ctx-menu button {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: 100%;
-  padding: 7px 10px;
-  border: none;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.75);
-  font-size: 13px;
-  border-radius: 6px;
-  cursor: pointer;
-  text-align: left;
-  transition:
-    background 0.1s,
-    color 0.1s;
-}
-
-.thread-board-ctx-menu button:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
-}
-
-.thread-board-ctx-menu button.danger:hover {
-  background: rgba(255, 80, 80, 0.12);
-  color: #ff7070;
-}
-
-.thread-board-ctx-label {
-  pointer-events: none;
-  opacity: 0.4;
-  font-size: 11px;
-  padding: 4px 10px;
-}
-
-.thread-board-ctx-colors {
-  display: flex;
-  gap: 6px;
-  padding: 4px 10px 8px;
-}
-
-.thread-board-ctx-sep {
-  height: 1px;
-  background: rgba(255, 255, 255, 0.07);
-  margin: 4px 0;
 }
 
 .app-surface-header h2:not(.os-window-title) {
@@ -4100,361 +3275,6 @@ input.connection-inline {
   box-sizing: border-box;
 }
 
-.sticky-notes-workspace {
-  --sticky-notes-edge-gap: 0.75rem;
-  display: flex;
-  flex: 1;
-  min-height: 0;
-  flex-direction: row;
-  gap: 0.75rem;
-}
-
-.sticky-notes-content-shell {
-  position: relative;
-  padding: 0;
-  overflow: hidden;
-  flex: 1;
-  min-height: 0;
-}
-
-.sticky-notes-content-shell.app-content-shell {
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  padding: 0;
-  resize: none;
-}
-
-.sticky-notes-canvas {
-  position: absolute;
-  inset: var(--sticky-notes-edge-gap) 0 0 0;
-  width: 100%;
-  height: auto;
-  min-height: 0;
-  min-width: 0;
-  z-index: 1;
-  pointer-events: auto;
-  box-sizing: border-box;
-}
-
-.sticky-notes-content-shell--pan-armed {
-  cursor: grab;
-  user-select: none;
-}
-
-.sticky-notes-content-shell--is-panning {
-  cursor: grabbing;
-  user-select: none;
-}
-
-.sticky-notes-marquee {
-  position: absolute;
-  z-index: 6;
-  pointer-events: none;
-  box-sizing: border-box;
-  border: 1px solid color-mix(in oklab, var(--desktop-bg-color-2) 72%, rgba(255, 255, 255, 0.7) 28%);
-  border-radius: 2px;
-  background: color-mix(in oklab, var(--desktop-bg-color-2) 28%, transparent);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2) inset;
-}
-
-.sticky-notes-minimap {
-  position: absolute;
-  right: 0.4rem;
-  bottom: 0.4rem;
-  z-index: 8;
-  width: min(5.75rem, 42vw);
-  height: auto;
-  max-height: min(5rem, 32vh);
-  aspect-ratio: var(--sticky-notes-shell-aspect, 1.15);
-  opacity: 0;
-  pointer-events: none;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(0, 0, 0, 0.45);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
-  overflow: hidden;
-  transition: opacity 0.38s ease;
-}
-
-.sticky-notes-minimap.sticky-notes-minimap--visible {
-  opacity: 1;
-}
-
-.sticky-notes-minimap.sticky-notes-minimap--no-transition {
-  transition: none;
-}
-
-.sticky-notes-minimap__inner {
-  position: absolute;
-  inset: 3px;
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 3px;
-  pointer-events: none;
-}
-
-.sticky-notes-minimap__bitmap {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-  z-index: 0;
-  pointer-events: none;
-  border-radius: 3px;
-}
-
-.sticky-notes-minimap__viewport {
-  position: absolute;
-  box-sizing: border-box;
-  z-index: 1;
-  border: 1.5px solid rgba(248, 113, 113, 0.95);
-  background: rgba(248, 113, 113, 0.12);
-  border-radius: 2px;
-  pointer-events: none;
-}
-
-.sticky-notes-interaction-toggle-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-top: auto;
-  flex-shrink: 0;
-}
-
-.sticky-notes-grid {
-  --sticky-notes-grid-columns: 12;
-  --sticky-notes-grid-rows: 10;
-  --sticky-notes-grid-col-percent: 8.333333%;
-  --sticky-notes-grid-row-percent: 10%;
-  --sticky-notes-grid-cell-width: 32px;
-  --sticky-notes-grid-cell-height: 32px;
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  background-color: rgba(255, 255, 255, 0.015);
-  overflow: hidden;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 1;
-}
-
-.sticky-notes-grid-svg {
-  position: absolute;
-  inset: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-.sticky-notes-grid-lines line {
-  stroke: rgba(255, 255, 255, 0.2);
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
-  shape-rendering: crispEdges;
-}
-
-.sticky-notes-grid--hidden {
-  opacity: 0;
-}
-
-.sticky-notes-action-shell {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 0.35rem;
-  flex: 0 0 auto;
-  align-self: stretch;
-  min-height: 0;
-  position: relative;
-  overflow: visible;
-  padding: var(--sticky-notes-edge-gap) 0 0;
-  background: none;
-  border: none;
-}
-
-.sticky-notes-sticky-color-anchor,
-.sticky-notes-text-color-anchor {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.sticky-notes-grid-toggle-icon,
-.sticky-notes-interaction-toggle-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 0;
-}
-
-/* Author `display` wins over `[hidden]` otherwise — inactive icon must not show. */
-.sticky-notes-action-btn .sticky-notes-grid-toggle-icon[hidden],
-.sticky-notes-action-btn .sticky-notes-interaction-toggle-icon[hidden] {
-  display: none !important;
-}
-
-.sticky-notes-sticky-color-popover {
-  position: absolute;
-  right: calc(100% + 0.45rem);
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 12;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.4rem 0.45rem;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.02);
-  box-shadow: none;
-  min-width: auto;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.32rem;
-}
-
-.sticky-notes-color-swatches {
-  display: grid;
-  grid-template-columns: repeat(5, 1.35rem);
-  gap: 0.28rem;
-  justify-content: center;
-}
-
-.sticky-notes-color-swatch {
-  box-sizing: border-box;
-  width: 1.35rem;
-  height: 1.35rem;
-  margin: 0;
-  padding: 0;
-  border: 1px solid rgba(0, 0, 0, 0.35);
-  border-radius: 3px;
-  cursor: pointer;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
-}
-
-.sticky-notes-color-swatch:hover {
-  filter: brightness(1.08);
-}
-
-.sticky-notes-color-swatch:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-.sticky-notes-color-swatch--selected {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-.sticky-notes-action-btn--text-color {
-  position: relative;
-  color: #ffffff;
-}
-
-.sticky-notes-action-btn--text-color .sticky-notes-toolbar-svg {
-  fill: currentColor;
-}
-
-.sticky-notes-action-btn--hidden {
-  display: none;
-}
-
-/* Later .sticky-notes-action-btn { display: inline-flex } must not show “hidden” controls */
-button.sticky-notes-action-btn.sticky-notes-action-btn--hidden,
-.sticky-notes-sticky-color-anchor.sticky-notes-action-btn--hidden,
-.sticky-notes-text-color-anchor.sticky-notes-action-btn--hidden,
-.sticky-notes-delete-anchor.sticky-notes-action-btn--hidden {
-  display: none !important;
-}
-
-/* Sticky notes */
-.sticky-notes-sticky {
-  position: absolute;
-  left: calc(var(--sticky-col, 0) * var(--sticky-notes-grid-col-percent));
-  top: calc(var(--sticky-row, 0) * var(--sticky-notes-grid-row-percent));
-  width: calc(var(--sticky-cols, 10) * var(--sticky-notes-grid-col-percent));
-  height: calc(var(--sticky-rows, 10) * var(--sticky-notes-grid-row-percent));
-  background: hsl(var(--sticky-hue, 45), calc(var(--sticky-saturation, 92) * 1%), calc(var(--sticky-brightness, 68) * 1%));
-  border: 1px solid rgba(0, 0, 0, 0.45);
-  border-radius: 8px;
-  box-sizing: border-box;
-  cursor: default;
-  user-select: none;
-  z-index: 1;
-  min-width: 0;
-  min-height: 0;
-  transition: box-shadow 0.12s ease, border-color 0.12s ease;
-  overflow: hidden;
-}
-
-/* Selection: same stroke as title chrome → body (.content-window-chrome border-bottom). */
-.sticky-notes-sticky.is-selected {
-  border-color: var(--border-hairline);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-}
-
-.sticky-notes-sticky.is-selected:hover {
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
-}
-
-.sticky-notes-sticky:hover {
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
-}
-
-.sticky-notes-sticky.is-editing {
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
-}
-
-.sticky-notes-sticky.is-dragging {
-  cursor: grabbing;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
-  transition: none;
-}
-
-.sticky-notes-sticky.is-selected.is-dragging {
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
-}
-
-.sticky-notes-sticky.is-resizing {
-  transition: none;
-}
-
-/*
- * Font from grid cell px only (syncGridMetrics: shell × zoom). Scales with window resize + canvas zoom,
- * not when the user resizes a note — multipliers match the old ~10-column note proportions (0.032×10 … 0.08×10).
- */
-.sticky-notes-sticky-content {
-  position: absolute;
-  inset: 5.5%;
-  overflow: hidden;
-  font-size: clamp(
-    calc(0.32 * var(--sticky-notes-grid-cell-width, 32px)),
-    calc(0.54 * var(--sticky-notes-grid-cell-width, 32px)),
-    calc(0.8 * var(--sticky-notes-grid-cell-width, 32px))
-  );
-  line-height: 1.5;
-  color: #ffffff;
-  cursor: default;
-  outline: none;
-  white-space: pre-wrap;
-  overflow-wrap: break-word;
-  word-break: normal;
-  user-select: none;
-  pointer-events: none;
-}
-
-.sticky-notes-sticky.is-editing .sticky-notes-sticky-content {
-  cursor: text;
-  user-select: text;
-  pointer-events: auto;
-  overflow-y: auto;
-}
-
 .note-form-actions {
   display: flex;
   gap: 0.5rem;
@@ -4549,11 +3369,35 @@ button.sticky-notes-action-btn.sticky-notes-action-btn--hidden,
   -webkit-user-select: none;
 }
 
+#desktop-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  overflow: auto;
+}
+
+#desktop-shell-canvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 760px;
+  min-height: 460px;
+}
+
 .desktop-selection-box {
   position: absolute;
   display: none;
-  border: 1px solid color-mix(in oklab, var(--desktop-bg-color-2) 72%, rgba(255, 255, 255, 0.7) 28%);
-  background: color-mix(in oklab, var(--desktop-bg-color-2) 28%, transparent);
+  border: 1px solid
+    color-mix(
+      in oklab,
+      hsl(var(--desktop-selection-hue) var(--desktop-selection-saturation) var(--desktop-selection-brightness)) 72%,
+      rgba(255, 255, 255, 0.7) 28%
+    );
+  background: color-mix(
+    in oklab,
+    hsl(var(--desktop-selection-hue) var(--desktop-selection-saturation) var(--desktop-selection-brightness)) 28%,
+    transparent
+  );
   border-radius: 3px;
   pointer-events: none;
 }
@@ -4562,64 +3406,316 @@ button.sticky-notes-action-btn.sticky-notes-action-btn--hidden,
   display: block;
 }
 
-.nexus-os.is-desktop-selecting {
+/* OS shell + Finder embed: no selecting UI chrome / labels; editors opt back in. */
+body.nexus-os,
+body.nexus-finder-embed {
   user-select: none;
   -webkit-user-select: none;
 }
 
+body.nexus-os input,
+body.nexus-os textarea,
+body.nexus-os select,
+body.nexus-os [contenteditable]:not([contenteditable="false"]),
+body.nexus-finder-embed input,
+body.nexus-finder-embed textarea,
+body.nexus-finder-embed select,
+body.nexus-finder-embed [contenteditable]:not([contenteditable="false"]) {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/*
+ * Thin, shell-toned scrollbars under Nexus chrome (Windows/Edge classic tracks are wide unless styled).
+ * Finder keeps its own fade-in rules via higher-specificity selectors below.
+ */
+body.nexus-os,
+body.nexus-finder-embed {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+body.nexus-os *::-webkit-scrollbar,
+body.nexus-finder-embed *::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+body.nexus-os *::-webkit-scrollbar-track,
+body.nexus-finder-embed *::-webkit-scrollbar-track {
+  background: transparent;
+  margin-block: 6px;
+}
+
+body.nexus-os *::-webkit-scrollbar-thumb,
+body.nexus-finder-embed *::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+body.nexus-os *::-webkit-scrollbar-thumb:hover,
+body.nexus-finder-embed *::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
 .desktop-clock {
   position: fixed;
-  top: 0;
+  top: var(--nexus-desktop-shell-inset);
   left: auto;
-  right: 6px;
+  right: var(--nexus-desktop-shell-inset);
   bottom: auto;
   transform: none;
   z-index: 25;
   pointer-events: none;
   user-select: none;
+  /* No extra box padding — shell inset is the only offset; balance is tuned on the glyph (see .desktop-clock-display). */
+  padding: 0;
+  margin: 0;
 }
 
 .desktop-clock-display {
-  color: var(--text-muted);
-  opacity: 0.6;
-  font-size: 0.84rem;
+  display: block;
+  margin: 0;
+  /* Match .content-window-chrome-title color (not --text-muted). */
+  color: var(--text);
+  opacity: 1;
+  font-size: 0.78rem;
   font-weight: 400;
   letter-spacing: 0.01em;
-  line-height: 1.05;
-  white-space: nowrap;
-}
-
-.app-dock-button[data-hover-label]::after {
-  content: attr(data-hover-label);
-  position: absolute;
-  bottom: calc(100% + 0.28rem);
-  left: 50%;
-  transform: translateX(-50%) translateY(4px);
-  color: rgba(244, 244, 245, 0.96);
-  font-size: 0.74rem;
-  font-weight: 500;
   line-height: 1;
-  letter-spacing: 0.01em;
   white-space: nowrap;
+  /* Line boxes add space above caps; nudge up so top gap matches the right edge gap (shell inset). */
+  margin-top: -0.11em;
+}
+
+/* ── Desktop side panel (top-left toggle → slides with drawer into top-right “close” slot) ── */
+.desktop-side-panel-host {
+  /* Inset from viewport like a macOS window-attached sidebar (top / left / bottom). */
+  --desktop-side-panel-shell-inset: var(--nexus-desktop-shell-inset);
+  --desktop-side-panel-drawer-width: min(
+    220px,
+    calc(100vw - 2 * var(--desktop-side-panel-shell-inset) - 1rem)
+  );
+  --desktop-side-panel-radius: 12px;
+  --desktop-side-panel-edge: var(--desktop-side-panel-shell-inset);
+  --desktop-side-panel-ease: cubic-bezier(0.25, 0.82, 0.2, 1);
+  --desktop-side-panel-slide-duration: 260ms;
+  /* Above app windows + save sheet; below credential modals (60000). */
+  --desktop-side-panel-z-drawer: 21001;
+  --desktop-side-panel-z-toggle: 21002;
+}
+
+/* No drawer/toggle slide while reconciling saved open state (avoids animating on refresh). */
+.desktop-side-panel-host--hydrating .desktop-side-panel-drawer,
+.desktop-side-panel-host--hydrating .desktop-side-panel-toggle {
+  transition: none !important;
+}
+
+/* Square chrome aligned with :root icon buttons */
+.desktop-side-panel-toggle {
+  position: fixed;
+  z-index: var(--desktop-side-panel-z-toggle);
+  top: var(--desktop-side-panel-edge);
+  left: var(--desktop-side-panel-edge);
+  box-sizing: border-box;
+  width: var(--nexus-icon-btn-size);
+  height: var(--nexus-icon-btn-size);
+  min-width: var(--nexus-icon-btn-size);
+  min-height: var(--nexus-icon-btn-size);
+  padding: 0;
+  border: none;
+  border-radius: var(--nexus-icon-btn-radius);
+  background: transparent;
+  color: rgba(228, 228, 231, 0.9);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    left var(--desktop-side-panel-slide-duration) var(--desktop-side-panel-ease),
+    top var(--desktop-side-panel-slide-duration) var(--desktop-side-panel-ease),
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.desktop-side-panel-toggle svg.material-icon {
+  width: var(--nexus-icon-btn-icon);
+  height: var(--nexus-icon-btn-icon);
+}
+
+.desktop-side-panel-toggle:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.desktop-side-panel-toggle:hover,
+.desktop-side-panel-toggle:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.desktop-side-panel-toggle.is-active {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Open: lock to drawer top-right (inset matches header padding). */
+.desktop-side-panel-host--open .desktop-side-panel-toggle {
+  /* Vertically center in title row — same min-height as .content-window-chrome (2.7rem). */
+  top: calc(
+    var(--desktop-side-panel-shell-inset) + (2.7rem - var(--nexus-icon-btn-size)) / 2
+  );
+  /* Match .content-window-chrome horizontal padding (0.75rem) from drawer right edge. */
+  left: calc(
+    var(--desktop-side-panel-shell-inset) + var(--desktop-side-panel-drawer-width) - 0.75rem -
+      var(--nexus-icon-btn-size)
+  );
+}
+
+.desktop-side-panel-drawer {
+  position: fixed;
+  top: var(--desktop-side-panel-shell-inset);
+  left: var(--desktop-side-panel-shell-inset);
+  bottom: var(--desktop-side-panel-shell-inset);
+  z-index: var(--desktop-side-panel-z-drawer);
+  width: var(--desktop-side-panel-drawer-width);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  /* Edge-to-edge title row; body inset matches .finder-shell-pane--contents (12px 10px). */
+  padding: 0;
+  background: var(--window-bg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: var(--desktop-side-panel-radius);
+  overflow: hidden;
+  border: none;
+  box-shadow: none;
+  color: var(--text);
+  transform: translateX(calc(-100% - var(--desktop-side-panel-shell-inset)));
   pointer-events: none;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 140ms ease, transform 140ms ease, visibility 140ms ease;
-  z-index: 5;
+  transition:
+    transform var(--desktop-side-panel-slide-duration) var(--desktop-side-panel-ease),
+    box-shadow var(--desktop-side-panel-slide-duration) var(--desktop-side-panel-ease);
 }
 
-.app-dock-button[data-hover-label]:hover::after,
-.app-dock-button[data-hover-label]:focus-visible::after {
-  opacity: 1;
-  visibility: visible;
-  transform: translateX(-50%) translateY(0);
+.desktop-side-panel-host--open .desktop-side-panel-drawer {
+  transform: translateX(0);
+  pointer-events: auto;
+  /* Match .os-window / .content-window.os-window — no stroke, same drop shadow. */
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 
-body.nexus-os:has(#organizer-window:not(.is-hidden)) .app-dock-button[data-hover-label]:hover::after,
-body.nexus-os:has(#organizer-window:not(.is-hidden)) .app-dock-button[data-hover-label]:focus-visible::after {
-  opacity: 0;
-  visibility: hidden;
-  transform: translateX(-50%) translateY(4px);
+.desktop-side-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.75rem;
+  margin: 0;
+  /* Match .content-window-chrome (title bar shell). */
+  min-height: 2.7rem;
+  padding: 0.4rem 0.75rem 0.35rem;
+  padding-right: calc(0.75rem + var(--nexus-icon-btn-size) + var(--nexus-small-action-gap));
+  border-bottom: 1px solid var(--border-hairline);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Same as .content-window-chrome-title */
+.desktop-side-panel-brand {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text);
+  line-height: 1;
+  text-align: left;
+}
+
+.desktop-side-panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  /* Match .finder-shell-pane--contents / --finder-pane-padding (12px 10px). */
+  padding: 12px 10px;
+  box-sizing: border-box;
+}
+
+.desktop-side-panel-apps {
+  display: flex;
+  flex-direction: column;
+  /* Match .finder-file-list gap */
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+}
+
+.desktop-side-panel-app-row {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  gap: var(--nexus-row-gap, 9px);
+  padding: var(--nexus-row-padding-block, 7px) var(--nexus-row-padding-inline, 9px);
+  min-height: calc(
+    var(--nexus-row-padding-block, 7px) * 2 +
+      var(--nexus-row-min-inner-height, max(18px, calc(0.82rem * 1.2 + 6px + 2px)))
+  );
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--nexus-list-row-label-size, 0.82rem);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-align: left;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.desktop-side-panel-app-row:hover,
+.desktop-side-panel-app-row:focus-visible {
+  background: var(--nexus-row-hover-highlight);
+  color: var(--text);
+  outline: none;
+}
+
+.desktop-side-panel-app-row.is-active {
+  background: var(--nexus-row-selected-highlight);
+  color: var(--text);
+}
+
+.desktop-side-panel-app-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--nexus-list-leading-size, 18px);
+  color: var(--text-muted);
+}
+
+.desktop-side-panel-app-row:hover .desktop-side-panel-app-icon,
+.desktop-side-panel-app-row:focus-visible .desktop-side-panel-app-icon,
+.desktop-side-panel-app-row.is-active .desktop-side-panel-app-icon {
+  color: var(--text);
+}
+
+.desktop-side-panel-app-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-side-panel-drawer,
+  .desktop-side-panel-toggle {
+    transition: none;
+  }
 }
 
 .settings-window {
@@ -5162,6 +4258,42 @@ body.nexus-os:has(#organizer-window:not(.is-hidden)) .app-dock-button[data-hover
   color: #fda4af;
 }
 
+.settings-shell-mode-actions {
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.settings-shell-mode-label {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  display: none;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+}
+
+.settings-themes-item .settings-shell-mode-btn {
+  display: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.settings-themes-item:hover .settings-shell-mode-label,
+.settings-themes-item:focus-within .settings-shell-mode-label {
+  display: inline-flex;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.settings-themes-item:hover .settings-shell-mode-btn,
+.settings-themes-item:focus-within .settings-shell-mode-btn {
+  display: inline-flex;
+  opacity: 1;
+  pointer-events: auto;
+}
+
 /* Chrome tool buttons: sizing lives in :root block; keep flex shrink only */
 .settings-themes-item-action-btn {
   flex: 0 0 auto;
@@ -5194,8 +4326,7 @@ body.nexus-os:has(#organizer-window:not(.is-hidden)) .app-dock-button[data-hover
   pointer-events: none;
 }
 
-.window-manager-shell .os-window,
-.window-manager-shell .app-dock {
+.window-manager-shell .os-window {
   pointer-events: auto;
 }
 
@@ -5243,14 +4374,15 @@ body.nexus-os:has(#organizer-window:not(.is-hidden)) .app-dock-button[data-hover
   background: var(--window-bg);
 }
 
-.organizer-window.os-window {
-  position: fixed;
-  z-index: 1720;
+.content-window.os-window {
+  position: absolute;
+  background: var(--window-bg);
+  /* Default: no left transition (drag/resize set left every frame). */
+  transition: none;
 }
 
-.content-window.os-window {
-  position: fixed;
-  background: var(--window-bg);
+.content-window.os-window.content-window--suppress-position-transition {
+  transition: none !important;
 }
 
 .content-window {
@@ -5261,6 +4393,17 @@ body.nexus-os:has(#organizer-window:not(.is-hidden)) .app-dock-button[data-hover
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+/* Finder: match JS minimum (320×320) so first paint isn’t the generic 550×480 shell. */
+.content-window[data-content-window-app-key-value="finder"] {
+  width: min(320px, calc(100vw - 2rem));
+  height: min(320px, calc(100vh - 2rem));
+}
+
+.content-window[data-content-window-app-key-value="loops"] {
+  width: min(320px, calc(100vw - 2rem));
+  height: min(154px, calc(100vh - 2rem));
 }
 
 @keyframes content-window-focus-pulse {
@@ -5288,6 +4431,7 @@ body.nexus-os:has(#organizer-window:not(.is-hidden)) .app-dock-button[data-hover
 }
 
 .content-window .window-content {
+  position: relative;
   padding: 0;
   overflow: hidden;
   display: flex;
@@ -5303,6 +4447,60 @@ body.nexus-os:has(#organizer-window:not(.is-hidden)) .app-dock-button[data-hover
   display: block;
   height: 100%;
   min-height: 0;
+}
+
+/* Singular save-picker: Finder loads in an overlay iframe; app turbo-frame stays mounted underneath. */
+.content-window-body-stack {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.content-window-app-layer {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.content-window-app-layer .finder-app-frame {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+}
+
+.content-window-save-picker-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: hsl(var(--window-bg-h) var(--window-bg-saturation) var(--window-bg-brightness) / 1);
+}
+
+.content-window-save-picker-layer[hidden] {
+  display: none !important;
+}
+
+.content-window-save-picker-iframe {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  border: 0;
+  display: block;
+}
+
+/* Minimal document for save-picker Finder iframe (full layout not loaded). */
+.nexus-finder-embed {
+  margin: 0;
+  min-height: 100vh;
+  box-sizing: border-box;
+  background: hsl(var(--window-bg-h) var(--window-bg-saturation) var(--window-bg-brightness) / 1);
 }
 
 .content-window--auto-sized .window-content {
@@ -5337,183 +4535,6 @@ body.nexus-os:has(#organizer-window:not(.is-hidden)) .app-dock-button[data-hover
   margin-left: auto;
 }
 
-.app-dock {
-  --app-dock-gap: 0.35rem;
-  position: fixed;
-  left: 50%;
-  top: auto;
-  bottom: 0.38rem;
-  transform: translateX(-50%);
-  z-index: 1700;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: var(--app-dock-gap);
-  width: fit-content;
-  max-width: calc(100vw - 0.75rem);
-  box-sizing: border-box;
-}
-
-.app-dock-group {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: var(--app-dock-gap, 0.35rem);
-}
-
-/* Wrapper border-left would not move with FLIP’d icons (transform-only animation). Launcher↔pinned spacing: .app-dock gap. */
-/* Use gap between pins — not border-left on rounded buttons (border follows border-radius and reads as curved “brackets”, worse with FLIP transforms). */
-.app-dock-group--pinned {
-  gap: var(--app-dock-gap, 0.35rem);
-}
-
-.app-dock-group--running-empty {
-  min-height: 1.5625rem;
-  box-sizing: border-box;
-}
-
-/* Empty strips don’t participate as flex items, so the dock width matches visible icons + dividers only (centering uses real content). */
-#app-dock-pinned:empty {
-  display: contents;
-}
-
-#app-dock-running:not(:has([data-dock-app-key])) {
-  display: contents;
-}
-
-.app-dock-divider {
-  flex: 0 0 auto;
-  width: 1px;
-  height: 1.125rem;
-  align-self: center;
-  background: rgba(255, 255, 255, 0.18);
-  border-radius: 1px;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.14s ease;
-}
-
-.app-dock-divider[hidden] {
-  display: none !important;
-}
-
-/* Dividers are direct flex children, so default layout is [gap][1px][gap] — wider than icon↔icon inside a group. Pull the line into the middle of a single gap. */
-.app-dock > .app-dock-divider:not([hidden]) {
-  margin-left: calc(-1 * var(--app-dock-gap) / 2);
-  margin-right: calc(-1 * var(--app-dock-gap) / 2);
-}
-
-.app-dock.app-dock--drag-active > .app-dock-divider:not([hidden]) {
-  opacity: 1;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .app-dock-divider {
-    transition: none;
-  }
-}
-
-/* Only show between launcher and pinned when there is at least one pin (drag preview counts via :has). */
-#app-dock-launcher-divider {
-  display: none !important;
-}
-
-.app-dock:has(#app-dock-pinned [data-dock-app-key]) #app-dock-launcher-divider {
-  display: block !important;
-}
-
-/* Launcher footer: account + logout left, settings right */
-.launcher-footer-shell {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  flex-shrink: 0;
-  width: 100%;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-.launcher-footer-leading {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 0.38rem;
-  min-width: 0;
-  flex: 1 1 auto;
-  margin-right: 0.45rem;
-}
-
-.launcher-footer-leading .button_to {
-  margin: 0;
-  padding: 0;
-  display: flex;
-  align-items: center;
-}
-
-.launcher-footer-logout-form {
-  appearance: none;
-  margin: 0;
-  padding: 0;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-}
-
-.launcher-footer-logout-icon {
-  width: 0.92rem;
-  height: 0.92rem;
-  flex: 0 0 auto;
-  display: block;
-  pointer-events: none;
-}
-
-.launcher-footer-btn--logout {
-  pointer-events: none;
-}
-
-.launcher-footer-btn {
-  position: relative;
-  flex: 0 0 auto;
-  width: 1.2rem;
-  height: 1.2rem;
-  padding: 0;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: rgba(228, 228, 231, 0.88);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 140ms ease, color 140ms ease;
-}
-
-.launcher-footer-btn:hover,
-.launcher-footer-btn:focus-visible {
-  background: rgba(255, 255, 255, 0.07);
-}
-
-.launcher-footer-btn svg.material-icon,
-.launcher-footer-btn svg.material-icon--sm {
-  width: 0.92rem;
-  height: 0.92rem;
-}
-
-.launcher-footer-account-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-}
-
-.launcher-footer-account-icon {
-  width: 0.95rem;
-  height: 0.95rem;
-  display: block;
-  pointer-events: none;
-}
-
 .app-placeholder-app-body {
   flex: 1 1 auto;
   min-height: 12rem;
@@ -5528,143 +4549,6 @@ body.nexus-os:has(#organizer-window:not(.is-hidden)) .app-dock-button[data-hover
   color: var(--text-muted);
   font-size: 0.85rem;
   text-align: center;
-}
-
-/* Dock + sticky-notes toolbar — same square + glyph size as :root icon buttons */
-.app-dock-button,
-.sticky-notes-action-btn {
-  position: relative;
-  box-sizing: border-box;
-  width: var(--nexus-icon-btn-size);
-  height: var(--nexus-icon-btn-size);
-  min-width: var(--nexus-icon-btn-size);
-  min-height: var(--nexus-icon-btn-size);
-  aspect-ratio: 1;
-  padding: 0;
-  border: none;
-  border-radius: var(--nexus-icon-btn-radius);
-  background: transparent;
-  color: rgba(228, 228, 231, 0.9);
-  font-size: 1.18rem;
-  font-weight: 600;
-  line-height: 1;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 140ms ease, color 140ms ease, filter 140ms ease, box-shadow 140ms ease;
-}
-
-.sticky-notes-action-btn--fill-color {
-  position: relative;
-  color: rgba(228, 228, 231, 0.9);
-}
-
-.sticky-notes-action-btn--fill-color .sticky-notes-toolbar-svg {
-  fill: hsl(var(--sticky-hue, 45), calc(var(--sticky-saturation, 92) * 1%), calc(var(--sticky-brightness, 68) * 1%));
-}
-
-.app-dock-button svg.material-icon,
-.sticky-notes-action-btn svg.material-icon,
-.sticky-notes-action-btn img.sticky-notes-toolbar-svg {
-  width: var(--nexus-icon-btn-icon);
-  height: var(--nexus-icon-btn-icon);
-}
-
-.sticky-notes-toolbar-svg {
-  width: var(--nexus-icon-btn-icon);
-  height: var(--nexus-icon-btn-icon);
-  display: block;
-  flex-shrink: 0;
-}
-
-/* After pointer drag, the button can retain :focus without :focus-visible; hide the default ring (looks like corner brackets). */
-.app-dock-button:focus:not(:focus-visible) {
-  outline: none;
-}
-
-.app-dock-button:hover,
-.app-dock-button:focus-visible,
-.sticky-notes-action-btn:hover,
-.sticky-notes-action-btn:focus-visible {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.app-dock-button.is-active {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.app-dock-button--launcher.is-active {
-  color: rgba(134, 239, 172, 0.95);
-}
-
-/* Pinned strip: blue; running strip: purple (same highlight pattern as before, different hues). */
-.app-dock-button--dock-app.is-active:not(.app-dock-button--running) {
-  color: rgba(147, 197, 253, 0.98);
-}
-
-.app-dock-button--dock-app.app-dock-button--running.is-active {
-  color: rgba(196, 181, 252, 0.98);
-}
-
-.app-dock-button--dock-app {
-  cursor: grab;
-}
-
-.app-dock-button--dock-app:active {
-  cursor: grabbing;
-}
-
-.app-dock-button--dock-ghost-source {
-  opacity: 0 !important;
-  pointer-events: none;
-}
-
-.app-dock-button--dock-ghost-outside {
-  width: 0 !important;
-  min-width: 0 !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  border: none !important;
-  opacity: 0 !important;
-  overflow: hidden !important;
-  transition:
-    width 0.2s cubic-bezier(0.25, 0.82, 0.2, 1),
-    min-width 0.2s cubic-bezier(0.25, 0.82, 0.2, 1),
-    margin 0.2s ease,
-    opacity 0.14s ease;
-}
-
-/* Drag preview: match default dock icon chrome (neutral, no pin/running/launcher tint). */
-.dock-drag-float {
-  position: fixed;
-  z-index: 10080;
-  pointer-events: none;
-  box-sizing: border-box;
-  width: 1.5625rem;
-  height: 1.5625rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(228, 228, 231, 0.9);
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22);
-  transform: scale(1.06);
-}
-
-.dock-drag-float svg.material-icon {
-  width: 1.125rem;
-  height: 1.125rem;
-  color: currentColor;
-  opacity: 0.95;
-}
-
-@media (max-width: 720px) {
-  .app-dock {
-    left: 50%;
-    transform: translateX(-50%);
-  }
 }
 
 /* Window Content — ALL PADDING HERE */
@@ -5703,6 +4587,22 @@ body.nexus-os:has(#organizer-window:not(.is-hidden)) .app-dock-button[data-hover
   gap: var(--nexus-small-action-gap);
   flex-shrink: 0;
   margin-left: auto;
+}
+
+.content-window-chrome-tool-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nexus-small-action-gap);
+}
+
+/* Author `display` wins over `[hidden]` otherwise — tool groups must fully hide when JS sets `hidden`. */
+.content-window-chrome-tool-group[hidden] {
+  display: none !important;
+}
+
+/* Singular save-as: belt-and-suspenders while picker class is on the window. */
+.content-window--singular-save-picker .content-window-chrome-app-tools {
+  display: none !important;
 }
 
 .content-window-chrome-title {
@@ -5754,7 +4654,7 @@ body.nexus-os:has(#organizer-window:not(.is-hidden)) .app-dock-button[data-hover
   flex-shrink: 0;
 }
 
-/* Mini “Save sheet” (Notepad / Tasks) — DOM under body (see layout).
+/* Mini “Save sheet” (Tasks save flow) — DOM under body (see layout).
    Equal distance viewport→modal on all four sides: shell uses identical fixed insets (flex centering cannot match H/V slack on landscape viewports). */
 .app-save-dialog-layer {
   --ad-viewport-gutter: var(--nexus-modal-viewport-gutter);
@@ -6013,6 +4913,46 @@ body.nexus-os:has(#organizer-window:not(.is-hidden)) .app-dock-button[data-hover
   background: rgba(0, 0, 0, 0.15);
 }
 
+/* Save As: full Finder 2 tree (same chrome + tree as main Finder; read-only on server). */
+.app-save-dialog.app-save-dialog--finder-picker {
+  flex-direction: column;
+}
+
+.app-save-dialog--finder-picker .app-save-dialog__finder-chrome {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-hairline, rgba(255, 255, 255, 0.08));
+}
+
+.app-save-dialog__finder-host {
+  flex: 1 1 0%;
+  min-height: min(52vh, 420px);
+  max-height: min(58vh, 480px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.app-save-dialog__finder-host .finder-app-frame {
+  flex: 1 1 0%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-save-dialog__finder-host .finder-app-frame > .app-surface--finder {
+  flex: 1 1 0%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-save-dialog__finder-host .finder-shell--tree-only {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow: auto;
+}
+
 button.app-save-dialog__btn,
 input.app-save-dialog__btn {
   appearance: none;
@@ -6069,9 +5009,10 @@ input.app-save-dialog__btn {
   flex: 1 1 auto;
 }
 
-.theme-builder-view .theme-builder-studio-active.finder-file-row .theme-builder-current-theme-value {
+/* Match Saved Themes: theme name + “(Active)” stay adjacent (label must not flex-grow). */
+.theme-builder-view .theme-builder-studio-active.finder-file-row .theme-builder-current-theme-value .theme-builder-chrome-status-label {
   min-width: 0;
-  max-width: 100%;
+  flex: 0 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -6166,6 +5107,106 @@ input.app-save-dialog__btn {
   min-height: 0;
 }
 
+.content-window[data-content-window-app-key-value="loops"] .pane-resize-handle {
+  display: none;
+}
+
+/* AUDIO: fill the window body — waveform grows, meta row stays at the bottom of the panel. */
+.content-window[data-content-window-app-key-value="loops"] .window-content {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.content-window[data-content-window-app-key-value="loops"] .window-content > .finder-app-frame {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.content-window[data-content-window-app-key-value="loops"] .loops-app {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  gap: 0.32rem;
+  padding: 0.38rem 0.48rem 0.36rem;
+}
+
+.content-window[data-content-window-app-key-value="loops"] .content-window-open-file-separator {
+  display: none !important;
+}
+
+.content-window[data-content-window-app-key-value="loops"] .content-window-open-file-name {
+  margin-inline-start: 0.35rem;
+}
+
+.content-window[data-content-window-app-key-value="loops"] .loops-app__file-input,
+.content-window[data-content-window-app-key-value="loops"] .loops-app audio {
+  display: none;
+}
+
+.content-window[data-content-window-app-key-value="loops"] .loops-app__visual {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  border: 1px solid var(--border-hairline);
+  border-radius: 8px;
+  padding: 0.28rem 0.34rem 0.26rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.015));
+}
+
+.content-window[data-content-window-app-key-value="loops"] .loops-app__waveform {
+  flex: 1 1 auto;
+  min-height: 2.1rem;
+  height: auto;
+  width: 100%;
+  border-radius: 5px;
+  display: block;
+  touch-action: none;
+  cursor: grab;
+}
+
+.content-window[data-content-window-app-key-value="loops"] .loops-app__meta {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.38rem;
+  font-size: 0.58rem;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+
+.content-window[data-content-window-app-key-value="loops"] .loops-app__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.content-window[data-content-window-app-key-value="loops"] .loops-app__time {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.content-window[data-content-window-app-key-value="loops"] .loops-app--drop-target {
+  outline: 1px dashed rgba(130, 214, 255, 0.55);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
 .content-window[data-content-window-app-key-value="settings"] .app-surface--settings {
   flex: 1 1 auto;
   min-height: 0;
@@ -6196,6 +5237,231 @@ input.app-save-dialog__btn {
 }
 
 /* Settings → Theme studio: toolbar + scrollable sliders */
+/* Settings → Wallpaper: same flex/scroll stack as Theme Studio (inset = .finder-shell-pane--contents only). */
+.app-surface--settings .finder-shell-pane--contents.settings-pane-wallpaper {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.028), rgba(255, 255, 255, 0.008));
+}
+
+.app-surface--settings .finder-shell-pane--contents.settings-pane-wallpaper .theme-builder-view.settings-wallpaper-theme-builder {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-surface--settings .finder-shell-pane--contents.settings-pane-wallpaper .theme-builder-main-shell {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.settings-wallpaper-rows {
+  margin: 0;
+}
+
+/* Wallpaper → Gradient: same shell as Image row (flush body, header tint when expanded). */
+.theme-builder-section-body.settings-wallpaper-gradient-body {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  grid-template-columns: unset;
+  min-height: 0;
+  gap: 0;
+}
+
+.theme-builder-view.settings-wallpaper-theme-builder
+  .settings-wallpaper-rows
+  > li.settings-wallpaper-gradient-li:not(.is-collapsed)
+  > .theme-builder-section-body.settings-wallpaper-gradient-body {
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+.theme-builder-view.settings-wallpaper-theme-builder
+  .settings-wallpaper-rows
+  > li.settings-wallpaper-gradient-li:not(.is-collapsed)
+  > .theme-builder-section-title {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.theme-builder-view.settings-wallpaper-theme-builder
+  .settings-wallpaper-rows
+  > li.settings-wallpaper-gradient-li:not(.is-collapsed)
+  > .theme-builder-section-title:hover,
+.theme-builder-view.settings-wallpaper-theme-builder
+  .settings-wallpaper-rows
+  > li.settings-wallpaper-gradient-li:not(.is-collapsed)
+  > .theme-builder-section-title:focus-visible {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.theme-builder-view.settings-wallpaper-theme-builder .settings-wallpaper-gradient-li .theme-builder-section-title {
+  padding-left: 4px;
+}
+
+.settings-gradient-theme-list-mount {
+  width: 100%;
+  min-width: 0;
+}
+
+.settings-gradient-classic-hint,
+.settings-gradient-empty-hint {
+  margin: 0;
+  padding: 0.65rem 0.75rem 0.75rem;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+  box-sizing: border-box;
+}
+
+.settings-gradient-theme-rows.task-list-rows {
+  margin: 0;
+  flex: 0 1 auto;
+  width: 100%;
+  align-self: stretch;
+  box-sizing: border-box;
+  padding: 0 !important;
+}
+
+.settings-gradient-theme-rows .task-toggle {
+  pointer-events: none;
+  cursor: default;
+}
+
+.settings-gradient-theme-rows .task-item-row.nexus-standard-row {
+  padding-left: max(4px, calc(var(--nexus-row-padding-inline, 9px) - 5px));
+  cursor: pointer;
+}
+
+.settings-gradient-theme-line.task-item-text--subtask {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  max-width: 100%;
+  height: auto;
+  line-height: var(--task-text-control-height);
+}
+
+.settings-iimage-file-rows .finder-file-row-main.settings-iimage-file-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  max-width: 100%;
+  height: auto;
+  line-height: var(--task-text-control-height);
+}
+
+.settings-gradient-theme-name {
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.settings-pane-wallpaper.settings-wallpaper-iimage-unavailable .settings-iimage-surface {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.settings-pane-wallpaper .settings-iimage-surface {
+  width: 100%;
+  min-width: 0;
+}
+
+.settings-iimage-finder-panel {
+  min-height: 7.5rem;
+  border-radius: 8px;
+  box-sizing: border-box;
+  background: color-mix(in oklab, var(--text) 6.5%, transparent);
+  border: 1px solid color-mix(in oklab, var(--border-hairline) 75%, transparent);
+}
+
+.settings-iimage-finder-panel--unavailable {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.settings-iimage-surface.finder-tree__row-line--drop-target {
+  outline: 1px dashed color-mix(in oklab, var(--accent) 55%, var(--border) 45%);
+  outline-offset: -2px;
+  border-radius: 8px;
+}
+
+.settings-pane-wallpaper .settings-iimage-finder-panel:not(.settings-iimage-finder-panel--unavailable) {
+  margin: 0;
+  border-radius: 8px;
+  border: none;
+  min-height: 5.25rem;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.settings-pane-wallpaper .settings-iimage-finder-panel--unavailable {
+  margin: 0;
+  border-radius: 8px;
+  border: none;
+  min-height: 4rem;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Wallpaper files: same list rhythm + row chrome as Shell (saved themes). */
+.settings-iimage-file-rows.settings-themes-list {
+  margin: 0;
+  flex: 0 1 auto;
+  width: 100%;
+  align-self: stretch;
+  box-sizing: border-box;
+  padding: 0 !important;
+}
+
+.settings-iimage-file-rows .finder-file-row .organizer-row-right {
+  min-width: 4rem;
+}
+
+.settings-iimage-file-rows .settings-iimage-file-title {
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.settings-iimage-surface.is-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* Wallpaper row action buttons: hover/focus only (no always-on mobile override). */
+.settings-iimage-file-rows .finder-file-row .item-action-btn {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.settings-iimage-file-rows .finder-file-row:hover .item-action-btn,
+.settings-iimage-file-rows .finder-file-row:focus-within .item-action-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (hover: none) {
+  .settings-iimage-file-rows .finder-file-row .item-action-btn {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
 .app-surface--settings .finder-shell-pane--contents.settings-pane-theme-studio {
   flex: 1 1 auto;
   min-height: 0;
@@ -6238,7 +5504,7 @@ input.app-save-dialog__btn {
   flex-shrink: 0;
 }
 
-/* Tasks (dock app): scroll task rows inside the fixed window height. */
+/* Tasks (singular window): scroll task rows inside the fixed window height. */
 .content-window[data-content-window-app-key-value="singular-task-list"] .app-surface.app-surface--tool {
   flex: 1 1 auto;
   min-height: 0;
@@ -6776,459 +6042,35 @@ input.app-save-dialog__btn {
 .resize-handle.bottom-left { bottom: -4px; left: -4px; cursor: nesw-resize; }
 .resize-handle.bottom-right { bottom: -4px; right: -4px; cursor: nwse-resize; }
 
-/* Hide right-side organizer handles when main window is open (collapse state) */
-.window-manager-shell:has(> .main-window.visible) .organizer-window .resize-handle.top-right,
-.window-manager-shell:has(> .main-window.visible) .organizer-window .resize-handle.right,
-.window-manager-shell:has(> .main-window.visible) .organizer-window .resize-handle.bottom-right {
-  pointer-events: none;
-  display: none;
-}
-
-/* Organizer Window (Left) */
-/* Disable vertical resizing for organizer window */
-.organizer-window .resize-handle.top,
-.organizer-window .resize-handle.bottom {
-  pointer-events: none;
-  display: none;
-}
-.organizer-window {
-  display: flex;
-  flex-direction: column;
-  background: var(--window-bg);
-  border-radius: 12px;
-  overflow: hidden;
-  transition: border-radius 0.15s ease;
-  z-index: 12;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-}
-
-.organizer-window .finder-sidebar {
-  background: transparent;
-  padding: 0;
-  overflow: visible;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.organizer-window .window-content {
-  padding: 0;
-  overflow: visible;
-  display: flex;
-  flex-direction: column;
-  /* Hug launcher content; avoid height: 100% + flex:1 chain that stretches the grid when the
-     JS-sized window height updates after Classic font metrics / reflow (tiles looked “sliding” down). */
-  height: auto;
-  min-height: 0;
-  flex: 0 0 auto;
-  align-items: stretch;
-}
-
-/* NEXUS Header (Hidden — Organizer uses original theme) */
-.nexus-header {
-  display: none;
-}
-
-.organizer-window .organizer-panel {
-  flex: 0 0 auto;
-  overflow: visible;
-  height: auto;
-  min-height: 0;
-  max-height: none;
-}
-
-.organizer-window #organizer {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.organizer-window #organizer.organizer-panel--apps {
-  flex: 0 0 auto !important;
-  justify-content: flex-start;
-  align-items: stretch;
-  overflow: visible;
-  height: auto;
-  padding: var(--launcher-shell-inset-top) var(--launcher-shell-inset-x);
-  gap: var(--launcher-footer-gap);
-}
-
-/* Organizer Header (Auth Menu at Top) */
-.organizer-header {
-  min-height: var(--window-header-band-height);
-  padding: 0 16px;
-  margin-bottom: 0;
-  background: transparent;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-}
-
-.organizer-header .auth-menu-wrapper {
-  display: flex;
-  width: 100%;
-  position: relative;
-}
-
-.organizer-header .auth-menu-toggle {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 8px 12px;
-  margin-bottom: 0;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
-  font: inherit;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
-  min-width: 0;
-}
-
-.organizer-header .auth-menu-toggle:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: var(--border);
-}
-
-.organizer-header .auth-menu-dropdown {
-  background: rgba(19, 20, 28, 0.88);
-  border-color: var(--border);
-  backdrop-filter: blur(8px);
-}
-
-.organizer-header .auth-user-email {
-  flex: 1;
-  text-align: left;
-  min-width: 0;
-  max-width: none;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Main Window (Right) — Strict slide reveal from seam using clip-path.
-   clip-path: inset(0 100% 0 0) = fully clipped from the right, revealing nothing.
-   clip-path: inset(0 0% 0 0)   = nothing clipped, full window visible.
-   This unmasks the window from left→right on open, right→left on close.
-   No translate, no opacity — window never paints over the organizer. */
-.main-window {
-  --main-reveal-clip: inset(0 100% 0 0 round 0 12px 12px 0);
-  background: var(--window-bg);
-  border: none;
-  clip-path: var(--main-reveal-clip);
-  transition: clip-path 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  pointer-events: none;
-  z-index: 11;
-  filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.4));
-  border-radius: 12px;
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-  overflow: hidden;
-  visibility: hidden;
-}
-
-.main-window.visible,
-.main-window.is-opening,
-.main-window.is-closing {
-  visibility: visible;
-}
-
-.main-window.visible {
-  --main-reveal-clip: inset(0 0% 0 0 round 0 12px 12px 0);
-  pointer-events: auto;
-}
-
-/* Organizer right corners go flat when pane is open */
-.organizer-window.pane-open {
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-  transition: border-radius 0.15s ease;
-}
-
-.main-window .window-content {
-  position: relative;
-  padding: 0;
-  overflow: auto;
-}
-
-.main-window .finder-app-frame {
-  display: block;
-  width: 100%;
-  height: 100%;
-  min-height: 100%;
-}
-
-/* Seam Lock (Mechanical only) — Corners always rounded */
-/* No visual seam state changes; corners maintained at 12px */
-
-/* Animation Keyframes */
-@keyframes cc-light-sweep {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes app-title-enter {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Launcher Window */
-.launcher-window {
-  position: fixed;
-  top: 60px;
-  left: 40px;
-  width: 300px;
-  height: calc(100vh - 140px);
-  background: var(--window-bg);
-  backdrop-filter: blur(12px);
-  border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  overflow: hidden;
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-}
-
-.launcher-window.is-dragging {
-  transition: none;
-}
-
-.launcher-window.animate-corners {
-  transition: border-top-right-radius 0.4s ease, border-bottom-right-radius 0.4s ease;
-}
-
-.launcher-window.has-open-pane {
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-}
-
-.launcher-brand-header {
-  padding: 14px 16px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  flex-shrink: 0;
-  cursor: move;
-  user-select: none;
-}
-
-.launcher-brand-header .app-title {
-  margin: 0;
-  font-size: 2rem;
-  line-height: 1;
-  pointer-events: none;
-}
-
-.launcher-auth-header {
-  padding: 10px 10px 2px 10px;
-  flex-shrink: 0;
-}
-
-.launcher-auth-footer {
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.launcher-auth-header .auth-menu-wrapper {
-  width: 100%;
-  position: relative;
-}
-
-.launcher-auth-header .auth-menu-toggle {
-  width: 100%;
-  padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
-  font-size: 0.85rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  transition: background 0.15s ease, border-color 0.15s ease;
-}
-
-.launcher-auth-header .auth-menu-toggle:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: var(--border);
-}
-
-.launcher-auth-header .auth-user-email {
-  flex: 1;
-  text-align: left;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: none;
-}
-
-.launcher-auth-header .auth-menu-icon {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-  transition: transform 0.15s ease;
-}
-
-.launcher-auth-header .auth-menu-dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  background: rgba(30, 30, 30, 0.95);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  z-index: 1000;
-  min-width: 150px;
-}
-
-.launcher-auth-footer .auth-menu-dropdown {
-  top: auto;
-  bottom: calc(100% + 4px);
-}
-
-.launcher-auth-header .auth-menu-dropdown.active {
-  display: block;
-}
-
-.launcher-auth-header .auth-menu-item {
-  display: block;
-  width: 100%;
-  padding: 10px 16px;
-  background: none;
-  border: none;
-  color: var(--text);
-  text-align: left;
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.9rem;
-  transition: background 0.12s ease;
-  text-decoration: none;
-}
-
-.launcher-auth-header .auth-menu-item:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-#organizer {
-  flex: 1;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Dock Layer */
-.dock-layer {
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  height: 72px;
-  padding: 8px 16px;
-  background: rgba(30, 30, 30, 0.6);
-  backdrop-filter: blur(16px);
-  border-radius: 16px;
-  display: flex;
-  gap: 24px;
-  align-items: center;
-  z-index: 20;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-}
-
-/* Dock Icons */
-.dock-icons {
-  display: flex;
-  gap: 24px;
-  align-items: center;
-  height: 100%;
-}
-
-.dock-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 56px;
-  height: 56px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: var(--text);
-  text-decoration: none;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.dock-icon:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.2);
-  transform: scale(1.08);
-}
-
-.dock-icon:active {
-  transform: scale(0.95);
-}
-
-.dock-icon-svg {
-  width: 28px;
-  height: 28px;
-  fill: currentColor;
-  transition: transform 0.15s ease;
-}
-
-.dock-icon:hover .dock-icon-svg {
-  transform: scale(1.15);
-}
-
-/* Adjust organizer sidebar to fit inside launcher window */
-#organizer {
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
-/* Subtle theme-matched scrollbars (Safari/Edge/Firefox) */
-.finder-main-pane,
-#organizer,
-.main-window .window-content,
-.finder-app-frame {
+/* Subtle theme-matched scrollbars (Safari/Edge/Firefox) — beat body.nexus-os * base via extra classes. */
+body.nexus-os .finder-main-pane,
+body.nexus-os .finder-app-frame,
+body.nexus-finder-embed .finder-main-pane,
+body.nexus-finder-embed .finder-app-frame {
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
 
-.finder-main-pane::-webkit-scrollbar,
-#organizer::-webkit-scrollbar,
-.main-window .window-content::-webkit-scrollbar,
-.finder-app-frame::-webkit-scrollbar {
+body.nexus-os .finder-main-pane::-webkit-scrollbar,
+body.nexus-os .finder-app-frame::-webkit-scrollbar,
+body.nexus-finder-embed .finder-main-pane::-webkit-scrollbar,
+body.nexus-finder-embed .finder-app-frame::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 
-.finder-main-pane::-webkit-scrollbar-track,
-#organizer::-webkit-scrollbar-track,
-.main-window .window-content::-webkit-scrollbar-track,
-.finder-app-frame::-webkit-scrollbar-track {
+body.nexus-os .finder-main-pane::-webkit-scrollbar-track,
+body.nexus-os .finder-app-frame::-webkit-scrollbar-track,
+body.nexus-finder-embed .finder-main-pane::-webkit-scrollbar-track,
+body.nexus-finder-embed .finder-app-frame::-webkit-scrollbar-track {
   background: transparent;
   margin-block: 10px;
 }
 
-.finder-main-pane::-webkit-scrollbar-thumb,
-#organizer::-webkit-scrollbar-thumb,
-.main-window .window-content::-webkit-scrollbar-thumb,
-.finder-app-frame::-webkit-scrollbar-thumb {
+body.nexus-os .finder-main-pane::-webkit-scrollbar-thumb,
+body.nexus-os .finder-app-frame::-webkit-scrollbar-thumb,
+body.nexus-finder-embed .finder-main-pane::-webkit-scrollbar-thumb,
+body.nexus-finder-embed .finder-app-frame::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
   border-radius: 999px;
   border: 3px solid transparent;
@@ -7237,42 +6079,42 @@ input.app-save-dialog__btn {
   transition: opacity 520ms ease, background-color 160ms ease;
 }
 
-.finder-main-pane.is-scrolling,
-#organizer.is-scrolling,
-.main-window .window-content.is-scrolling,
-.finder-app-frame.is-scrolling {
+body.nexus-os .finder-main-pane.is-scrolling,
+body.nexus-os .finder-app-frame.is-scrolling,
+body.nexus-finder-embed .finder-main-pane.is-scrolling,
+body.nexus-finder-embed .finder-app-frame.is-scrolling {
   scrollbar-color: var(--scrollbar-thumb) transparent;
 }
 
-.finder-main-pane.is-scrolling::-webkit-scrollbar-thumb,
-#organizer.is-scrolling::-webkit-scrollbar-thumb,
-.main-window .window-content.is-scrolling::-webkit-scrollbar-thumb,
-.finder-app-frame.is-scrolling::-webkit-scrollbar-thumb {
+body.nexus-os .finder-main-pane.is-scrolling::-webkit-scrollbar-thumb,
+body.nexus-os .finder-app-frame.is-scrolling::-webkit-scrollbar-thumb,
+body.nexus-finder-embed .finder-main-pane.is-scrolling::-webkit-scrollbar-thumb,
+body.nexus-finder-embed .finder-app-frame.is-scrolling::-webkit-scrollbar-thumb {
   opacity: 0.94;
 }
 
-.finder-main-pane.is-scrolling::-webkit-scrollbar-thumb:hover,
-#organizer.is-scrolling::-webkit-scrollbar-thumb:hover,
-.main-window .window-content.is-scrolling::-webkit-scrollbar-thumb:hover,
-.finder-app-frame.is-scrolling::-webkit-scrollbar-thumb:hover {
+body.nexus-os .finder-main-pane.is-scrolling::-webkit-scrollbar-thumb:hover,
+body.nexus-os .finder-app-frame.is-scrolling::-webkit-scrollbar-thumb:hover,
+body.nexus-finder-embed .finder-main-pane.is-scrolling::-webkit-scrollbar-thumb:hover,
+body.nexus-finder-embed .finder-app-frame.is-scrolling::-webkit-scrollbar-thumb:hover {
   background: var(--scrollbar-thumb-hover);
   border: 3px solid transparent;
   background-clip: padding-box;
 }
 
-/* Task pane uses the restored tinted scrollbar tone. */
-.main-window .window-content::-webkit-scrollbar-thumb,
-.finder-app-frame::-webkit-scrollbar-thumb {
+/* Finder app frame uses the tinted scrollbar tone. */
+body.nexus-os .finder-app-frame::-webkit-scrollbar-thumb,
+body.nexus-finder-embed .finder-app-frame::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb-pane);
 }
 
-.main-window .window-content.is-scrolling,
-.finder-app-frame.is-scrolling {
+body.nexus-os .finder-app-frame.is-scrolling,
+body.nexus-finder-embed .finder-app-frame.is-scrolling {
   scrollbar-color: var(--scrollbar-thumb-pane) transparent;
 }
 
-.main-window .window-content.is-scrolling::-webkit-scrollbar-thumb:hover,
-.finder-app-frame.is-scrolling::-webkit-scrollbar-thumb:hover {
+body.nexus-os .finder-app-frame.is-scrolling::-webkit-scrollbar-thumb:hover,
+body.nexus-finder-embed .finder-app-frame.is-scrolling::-webkit-scrollbar-thumb:hover {
   background: var(--scrollbar-thumb-pane-hover);
 }
 
@@ -7281,6 +6123,356 @@ input.app-save-dialog__btn {
   flex-direction: column;
   min-height: 100%;
   padding: 0;
+}
+
+/* Finder: hierarchical tree in the Finder shell (uses Nexus theme tokens). */
+.finder-tree {
+  /* Match .finder-folder-link row metrics (stable rename height + pane alignment when inside .finder-shell). */
+  --finder-leader-pad: 0px;
+  --finder-tree-row-pad-block: var(--finder-row-padding-block, var(--nexus-row-padding-block, 7px));
+  --finder-tree-row-pad-inline: var(--finder-row-padding-inline, var(--nexus-row-padding-inline, 9px));
+  --finder-tree-gap: var(--finder-row-gap, var(--nexus-row-gap, 9px));
+  --finder-icon-col: 18px;
+  --finder-tree-inner-min: var(
+    --finder-row-min-inner-height,
+    max(18px, var(--finder-rename-input-outer-height, calc(0.82rem * 1.2 + 6px + 2px)))
+  );
+  --finder-tree-row-gap: 4px;
+  --finder-tree-node-gap: 3px;
+  --finder-guide-x: calc(var(--finder-leader-pad) + var(--finder-tree-gap));
+  --finder-spine-x: calc(var(--finder-guide-x) + var(--finder-icon-col) / 2);
+  --finder-indent-step: calc(var(--finder-tree-gap) + var(--finder-icon-col));
+  --finder-guide-color: color-mix(in oklab, var(--border) 78%, var(--text-muted) 22%);
+  --finder-tree-branch-y: calc(var(--finder-tree-row-pad-block) + var(--finder-tree-inner-min) / 2);
+}
+
+.finder-tree,
+.finder-tree ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.finder-tree--root {
+  padding: 0;
+}
+
+.finder-shell .finder-tree--root {
+  /* Same as .finder-folder-list: first row aligns with Finder pane title + pane padding only. */
+  padding: 0;
+}
+
+.finder-shell .finder-tree.finder-tree--root,
+.finder-shell .finder-tree .finder-tree {
+  display: flex;
+  flex-direction: column;
+  gap: var(--finder-tree-row-gap);
+}
+
+.finder-shell .finder-tree__node {
+  display: flex;
+  flex-direction: column;
+  gap: var(--finder-tree-node-gap);
+}
+
+.finder-tree .finder-tree {
+  position: relative;
+  margin: 0;
+  padding: 0 0 0 var(--finder-indent-step);
+  border-left: none;
+  height: fit-content;
+  min-height: 0;
+}
+
+.finder-tree .finder-tree > .finder-tree__node {
+  position: relative;
+  z-index: 0;
+}
+
+.finder-tree .finder-tree > .finder-tree__node::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--finder-spine-x) - var(--finder-indent-step));
+  width: 0;
+  border-left: 1px solid var(--finder-guide-color);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.finder-tree .finder-tree > .finder-tree__node--connector-branch::before {
+  top: 0;
+  bottom: 0;
+}
+
+.finder-tree .finder-tree > .finder-tree__node--connector-end::before {
+  top: 0;
+  height: var(--finder-tree-branch-y, 13px);
+  bottom: auto;
+}
+
+/* Horizontal branch: spine → row; stop at li’s left (row-line “click box” starts at 0), don’t draw into the row chrome. */
+.finder-tree .finder-tree > .finder-tree__node::after {
+  content: "";
+  position: absolute;
+  left: calc(var(--finder-spine-x) - var(--finder-indent-step));
+  top: var(--finder-tree-branch-y, 13px);
+  width: max(0px, calc(var(--finder-indent-step) - var(--finder-spine-x)));
+  min-width: 0;
+  height: 0;
+  margin-top: -0.5px;
+  border-top: 1px solid var(--finder-guide-color);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Bridge flex gap between sibling rows (single downward extension; avoids double-stroke overlap). */
+.finder-shell .finder-tree .finder-tree > .finder-tree__node--connector-branch::before {
+  top: 0;
+  bottom: calc(-1 * var(--finder-tree-row-gap));
+}
+
+/*
+ * Parent folder rows use column gap (node-gap) between .finder-tree__row-line and nested <ul>.
+ * Without this, the first child’s spine starts below that gap. Pull ::before up so the vertical meets the row above.
+ */
+.finder-tree .finder-tree > .finder-tree__node:first-child::before {
+  top: calc(-1 * var(--finder-tree-node-gap));
+}
+
+.finder-tree .finder-tree > .finder-tree__node--connector-end:first-child::before {
+  height: calc(var(--finder-tree-branch-y) + var(--finder-tree-node-gap));
+}
+
+/* .finder-shell … --connector-branch sets top: 0 with higher specificity; keep first-child bridge inside the shell. */
+.finder-shell .finder-tree .finder-tree > .finder-tree__node--connector-branch:first-child::before {
+  top: calc(-1 * var(--finder-tree-node-gap));
+}
+
+.finder-shell .finder-tree .finder-tree > .finder-tree__node--connector-end:first-child::before {
+  top: calc(-1 * var(--finder-tree-node-gap));
+  height: calc(var(--finder-tree-branch-y) + var(--finder-tree-node-gap));
+  bottom: auto;
+}
+
+.finder-shell .finder-tree .finder-tree,
+.finder-shell .finder-tree .finder-tree__node {
+  overflow: visible;
+}
+
+a.finder-tree__row {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* One chrome strip: label + actions; .is-selected is for JS/keyboard only — no fill, hover supplies row chrome. */
+.finder-tree__row-line {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: calc(var(--finder-tree-row-pad-block) * 2 + var(--finder-tree-inner-min));
+  gap: 2px;
+  /* Match inline-end inset to block padding so row actions (save / edit / delete) aren’t tight to the right edge. */
+  padding: var(--finder-tree-row-pad-block) var(--finder-tree-row-pad-block) var(--finder-tree-row-pad-block)
+    var(--finder-guide-x);
+  margin: 0;
+  border-radius: 8px;
+  color: var(--text);
+  font-size: var(--nexus-list-row-label-size, 0.82rem);
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  user-select: none;
+  transition: background 100ms ease, color 100ms ease;
+}
+
+.finder-tree__row-line:hover {
+  background: color-mix(in oklab, var(--text) 6%, transparent);
+  color: var(--text);
+}
+
+.finder-tree__row-line--dragging {
+  opacity: 0.55;
+}
+
+.finder-tree__row-line--drop-target {
+  outline: 1px dashed color-mix(in oklab, var(--accent) 55%, var(--border) 45%);
+  outline-offset: -1px;
+  border-radius: 8px;
+}
+
+.finder-tree__row-line[draggable="true"] {
+  cursor: grab;
+}
+
+.finder-tree__row-line[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.finder-tree__row-line > .finder-tree__row {
+  flex: 1 1 auto;
+  min-width: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: var(--finder-tree-gap);
+}
+
+.finder-tree__row-actions {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  flex-shrink: 0;
+  gap: var(--nexus-small-action-gap);
+  margin-left: auto;
+  padding: 0;
+}
+
+/* Hover only (not :focus-within) so keyboard focus on the row does not pin actions visible like selection. */
+.finder-tree__row-actions .item-action-btn,
+.finder-tree__row-actions .row-plus,
+.finder-tree__row-actions .row-save-here,
+.finder-tree__row-actions .finder-tree__open-in-app {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.finder-tree__row-line:hover .finder-tree__row-actions .item-action-btn,
+.finder-tree__row-line:hover .finder-tree__row-actions .row-plus,
+.finder-tree__row-line:hover .finder-tree__row-actions .row-save-here,
+.finder-tree__row-line:hover .finder-tree__row-actions .finder-tree__open-in-app {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.finder-tree__row-actions .item-action-btn:focus-visible,
+.finder-tree__row-actions .row-plus:focus-visible,
+.finder-tree__row-actions .row-save-here:focus-visible,
+.finder-tree__row-actions .finder-tree__open-in-app:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 45%, transparent);
+}
+
+@media (hover: none) {
+  .finder-tree__row-actions .item-action-btn,
+  .finder-tree__row-actions .row-plus,
+  .finder-tree__row-actions .row-save-here,
+  .finder-tree__row-actions .finder-tree__open-in-app {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+.finder-tree__row-actions--save-here .row-save-here {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.15rem;
+  border-radius: 4px;
+}
+
+.finder-tree__row--pending {
+  cursor: text;
+}
+
+.finder-tree__row--pending .finder-tree__pending-name-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-left: var(--finder-tree-gap);
+}
+
+/* Inner label strip: chrome lives on .finder-tree__row-line */
+.finder-tree__row {
+  box-sizing: border-box;
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  user-select: none;
+  text-decoration: none;
+}
+
+a.finder-tree__row--folder,
+a.finder-tree__row--file {
+  cursor: pointer;
+}
+
+/* Hand stays through mousedown and after focus — WebKit/Blink often use default cursor on :active / :focus for `href="#"` links. */
+a.finder-tree__row--folder:active,
+a.finder-tree__row--folder:focus,
+a.finder-tree__row--folder:focus-visible,
+a.finder-tree__row--file:active,
+a.finder-tree__row--file:focus,
+a.finder-tree__row--file:focus-visible {
+  cursor: pointer;
+}
+
+.finder-tree__row-line:has(> a.finder-tree__row--folder):hover,
+.finder-tree__row-line:has(> a.finder-tree__row--file):hover,
+.finder-tree__row-line:has(> a.finder-tree__row--folder:active),
+.finder-tree__row-line:has(> a.finder-tree__row--file:active),
+.finder-tree__row-line:has(> a.finder-tree__row--folder:focus),
+.finder-tree__row-line:has(> a.finder-tree__row--file:focus) {
+  cursor: pointer;
+}
+
+.finder-tree__row--file-no-app {
+  cursor: default;
+  color: color-mix(in oklab, var(--text) 82%, var(--text-muted) 18%);
+}
+
+.finder-tree__row-line:has(.finder-tree__row--file-no-app):hover .finder-tree__row--file-no-app {
+  color: var(--text);
+}
+
+/* No focus ring on tree links: selection uses .finder-tree__row-line.is-selected; programmatic focus after open would otherwise show a blue box. */
+.finder-tree__row:focus,
+.finder-tree__row:focus-visible {
+  outline: none;
+}
+
+.finder-tree__node--folder.is-collapsed > ul.finder-tree {
+  display: none;
+}
+
+.finder-shell .finder-tree__icon {
+  height: var(--finder-tree-inner-min);
+}
+
+.finder-tree__icon {
+  flex: 0 0 var(--finder-icon-col);
+  width: var(--finder-icon-col);
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.finder-tree__icon--folder .material-icon {
+  color: var(--nexus-sidebar-folder-icon-color);
+}
+
+.finder-tree__icon--folder-empty .material-icon {
+  color: var(--nexus-sidebar-folder-icon-empty);
+}
+
+.finder-tree__icon--file .material-icon {
+  color: var(--text-muted);
+}
+
+.finder-tree__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .finder-shell {
@@ -7302,6 +6494,32 @@ input.app-save-dialog__btn {
   height: 100%;
   border-top: none;
   overflow-x: auto;
+}
+
+.finder-shell.finder-shell--tree-only {
+  grid-template-columns: 1fr;
+}
+
+.finder-shell.finder-shell--tree-only .finder-shell-pane--folders {
+  border-right: none;
+}
+
+.finder-shell-pane--folders:has(ul.finder-tree--root:not(:empty)) .finder-tree-empty-hint {
+  display: none;
+}
+
+.finder-shell-pane--folders:has(ul.finder-tree--root:empty) {
+  position: relative;
+  min-height: 120px;
+}
+
+.finder-shell-pane--folders:has(ul.finder-tree--root:empty) .finder-tree-empty-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
 }
 
 .finder-shell-pane {
@@ -7410,7 +6628,7 @@ input.app-save-dialog__btn {
 }
 
 .finder-folder-item.is-active .finder-folder-link {
-  background: rgba(186, 230, 253, 0.15);
+  background: var(--nexus-row-selected-highlight);
 }
 
 .finder-folder-link {
@@ -7439,11 +6657,11 @@ input.app-save-dialog__btn {
 
 .finder-folder-link:hover,
 .finder-folder-link:focus-visible {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--nexus-row-hover-highlight);
 }
 
 .finder-folder-item.is-active .finder-folder-link {
-  color: rgba(224, 242, 254, 0.98);
+  color: var(--nexus-row-selected-text);
 }
 
 .finder-folder-actions {
@@ -7513,7 +6731,7 @@ input.app-save-dialog__btn {
   width: var(--nexus-list-leading-size, 18px);
   height: var(--nexus-list-leading-size, 18px);
   line-height: 0;
-  color: rgba(125, 211, 252, 0.95);
+  color: var(--nexus-sidebar-folder-icon-color);
 }
 
 .finder-folder-icon svg {
@@ -7584,7 +6802,7 @@ input.app-save-dialog__btn {
   width: var(--nexus-list-leading-size, 18px);
   height: var(--nexus-list-leading-size, 18px);
   line-height: 0;
-  color: rgba(125, 211, 252, 0.95);
+  color: var(--nexus-sidebar-folder-icon-color);
 }
 
 .finder-file-icon--row svg {
@@ -7617,16 +6835,16 @@ input.app-save-dialog__btn {
 }
 
 .finder-file-row.is-selected {
-  background: rgba(186, 230, 253, 0.15);
+  background: var(--nexus-row-selected-highlight);
 }
 
 .finder-file-row.is-selected .finder-file-name {
-  color: rgba(224, 242, 254, 0.98);
+  color: var(--nexus-row-selected-text);
 }
 
 .finder-file-row.is-selected:hover,
 .finder-file-row.is-selected:focus-within {
-  background: rgba(186, 230, 253, 0.2);
+  background: var(--nexus-row-selected-highlight);
 }
 
 /* Theme Studio chrome row: not a real list selection — tint only on hover/focus (saved themes). */
@@ -7636,7 +6854,7 @@ input.app-save-dialog__btn {
 
 .theme-builder-view .theme-builder-studio-active.finder-file-row.is-selected:not(.is-unsaved-custom-theme):hover,
 .theme-builder-view .theme-builder-studio-active.finder-file-row.is-selected:not(.is-unsaved-custom-theme):focus-within {
-  background: rgba(186, 230, 253, 0.2);
+  background: var(--nexus-row-selected-highlight);
 }
 
 /* Saved themes: unsaved row — save-as (name here) + palette (open Theme Studio) */
@@ -7702,10 +6920,53 @@ input.app-save-dialog__btn {
 /* -------------------------------------------------------------------------- */
 /* Classic theme — Mac OS–style platinum chrome (data-nexus-theme on <html>)   */
 /* -------------------------------------------------------------------------- */
+:root[data-nexus-shell-mode="light"] {
+  --border: rgba(15, 23, 42, 0.24);
+  --border-hairline: rgba(15, 23, 42, 0.16);
+  --nexus-row-hover-highlight: rgba(15, 23, 42, 0.09);
+  --nexus-row-selected-highlight: rgba(15, 23, 42, 0.14);
+  --nexus-row-subtask-highlight: rgba(15, 23, 42, 0.06);
+  --nexus-row-selected-text: var(--text);
+}
+
+:root[data-nexus-shell-mode="light"] .finder-shell-pane--folders {
+  border-right: 1px solid var(--border-hairline);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.04), rgba(15, 23, 42, 0.015));
+}
+
+:root[data-nexus-shell-mode="light"] .finder-shell-pane--contents {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.028), rgba(15, 23, 42, 0.01));
+}
+
+:root[data-nexus-shell-mode="light"] .finder-folder-item.is-active .finder-folder-link,
+:root[data-nexus-shell-mode="light"] .finder-file-row.is-selected .finder-file-name,
+:root[data-nexus-shell-mode="light"] .finder-file-row.is-selected .settings-themes-item-meta {
+  color: var(--text);
+}
+
+/* Settings section icons: match desktop side panel behavior (muted idle, stronger on hover/active). */
+:root[data-nexus-shell-mode="light"] .settings-sections-list .finder-folder-icon,
+:root[data-nexus-shell-mode="light"] .settings-sections-list .finder-file-icon--row,
+.settings-sections-list .finder-folder-icon,
+.settings-sections-list .finder-file-icon--row {
+  color: var(--text-muted);
+}
+
+:root[data-nexus-shell-mode="light"] .settings-sections-list .finder-folder-link:hover .finder-folder-icon,
+:root[data-nexus-shell-mode="light"] .settings-sections-list .finder-folder-link:focus-visible .finder-folder-icon,
+:root[data-nexus-shell-mode="light"] .settings-sections-list .finder-folder-item.is-active .finder-folder-icon,
+.settings-sections-list .finder-folder-link:hover .finder-folder-icon,
+.settings-sections-list .finder-folder-link:focus-visible .finder-folder-icon,
+.settings-sections-list .finder-folder-item.is-active .finder-folder-icon {
+  color: var(--text);
+}
+
 :root[data-nexus-theme="classic"] {
   scroll-behavior: auto;
   /* Typography scale for Pix Chicago is tuned via @font-face size-adjust (not html font-size), so rem shells stay unchanged. */
   --nexus-classic-font-stack: "Pix Chicago", "Chicago", "Geneva", system-ui, sans-serif;
+  --nexus-sidebar-folder-icon-color: var(--text-muted);
+  --nexus-sidebar-folder-icon-empty: var(--nexus-sidebar-folder-icon-color);
   --nexus-icon-btn-radius: 0px;
   --os-card-radius: 0px;
   --os-standard-card-radius: 0px;
@@ -7718,10 +6979,10 @@ input.app-save-dialog__btn {
   --accent-hover: #000000;
   --success: #2e2e2e;
   --success-hover: #141414;
-  --scrollbar-thumb: #9e9e9e;
-  --scrollbar-thumb-hover: #858585;
-  --scrollbar-thumb-pane: #b0b0b0;
-  --scrollbar-thumb-pane-hover: #989898;
+  --nexus-row-hover-highlight: rgba(0, 0, 0, 0.09);
+  --nexus-row-selected-highlight: rgba(0, 0, 0, 0.14);
+  --nexus-row-subtask-highlight: rgba(0, 0, 0, 0.06);
+  --nexus-row-selected-text: var(--text);
 }
 
 :root[data-nexus-theme="classic"] [data-settings-section-key="theme_studio"] {
@@ -7746,14 +7007,13 @@ input.app-save-dialog__btn {
 }
 
 :root[data-nexus-theme="classic"] .nexus-os .os-window,
-:root[data-nexus-theme="classic"] .nexus-os .organizer-window,
 :root[data-nexus-theme="classic"] .nexus-os .content-window {
   border: 1px solid var(--border-hairline);
   box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.35);
 }
 
 :root[data-nexus-theme="classic"] .nexus-os .ollama-helper__speech {
-  border: 1px solid var(--border-hairline);
+  border: none;
   box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.35);
 }
 
@@ -7761,15 +7021,6 @@ input.app-save-dialog__btn {
   animation: none !important;
   outline: 2px solid color-mix(in srgb, var(--border) 92%, transparent);
   outline-offset: -2px;
-}
-
-:root[data-nexus-theme="classic"] .nexus-os .app-dock-button[data-hover-label]::after {
-  /* Match default themes: label is plain text, no plaque/border (Classic gray dock → light type). */
-  color: rgba(244, 244, 245, 0.96);
-  background: transparent;
-  border: none;
-  padding: 0;
-  transition: none !important;
 }
 
 :root[data-nexus-theme="classic"] .settings-themes-item.settings-themes-unsaved-row .finder-file-name,
@@ -7871,12 +7122,7 @@ input.app-save-dialog__btn {
   font-synthesis: none;
 }
 
-:root[data-nexus-theme="classic"] .desktop-clock-display {
-  color: #ffffff;
-  opacity: 1;
-}
-
-/* Launcher tiles — active / hover: black chrome (no blue). */
+/* OS window cards — active / hover: black chrome (no blue). */
 :root[data-nexus-theme="classic"] .os-window-card:hover,
 :root[data-nexus-theme="classic"] .os-window-card:focus-visible {
   border-color: #000000;
@@ -7891,18 +7137,18 @@ input.app-save-dialog__btn {
 
 /* Finder sidebar + folder children — selection without blue tint. */
 :root[data-nexus-theme="classic"] .finder-item.is-folder-selected {
-  background: rgba(0, 0, 0, 0.08);
+  background: var(--nexus-row-selected-highlight);
   border-color: #000000;
 }
 
 :root[data-nexus-theme="classic"] .finder-item.is-active {
-  background: rgba(0, 0, 0, 0.08);
+  background: var(--nexus-row-selected-highlight);
   border-color: #000000;
-  color: var(--text);
+  color: var(--nexus-row-selected-text);
 }
 
 :root[data-nexus-theme="classic"] .finder-item:not(.is-active):not(.is-folder-selected):hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--nexus-row-hover-highlight);
   border-color: rgba(0, 0, 0, 0.35);
 }
 
@@ -7911,7 +7157,7 @@ input.app-save-dialog__btn {
 }
 
 :root[data-nexus-theme="classic"] .finder-item[data-folder-id].is-folder-selected + .folder-item-panel:not(.hidden) .finder-item-child:not(.is-active):hover {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--nexus-row-hover-highlight);
   border-left-color: rgba(0, 0, 0, 0.4);
   border-right-color: rgba(0, 0, 0, 0.4);
   border-top-color: rgba(0, 0, 0, 0.4);
@@ -7922,7 +7168,7 @@ input.app-save-dialog__btn {
 }
 
 :root[data-nexus-theme="classic"] .finder-item[data-folder-id].is-folder-selected + .folder-item-panel:not(.hidden) .finder-item-child.is-active {
-  background: rgba(0, 0, 0, 0.1);
+  background: var(--nexus-row-selected-highlight);
   border-left-color: #000000;
   border-right-color: #000000;
   border-top-color: #000000;
@@ -7934,36 +7180,36 @@ input.app-save-dialog__btn {
 }
 
 :root[data-nexus-theme="classic"] .finder-file-row.is-selected {
-  background: rgba(0, 0, 0, 0.12);
+  background: var(--nexus-row-selected-highlight);
 }
 
 :root[data-nexus-theme="classic"] .finder-file-row.is-selected .finder-file-name {
-  color: var(--text);
+  color: var(--nexus-row-selected-text);
 }
 
 :root[data-nexus-theme="classic"] .finder-file-row.is-selected:hover,
 :root[data-nexus-theme="classic"] .finder-file-row.is-selected:focus-within {
-  background: rgba(0, 0, 0, 0.16);
+  background: var(--nexus-row-selected-highlight);
 }
 
 /* Non-selected rows: default rgba(255,255,255,0.1) is nearly invisible on platinum; ~halfway between that and selected (0.12). */
 :root[data-nexus-theme="classic"] .finder-file-row:not(.is-selected):hover,
 :root[data-nexus-theme="classic"] .finder-file-row:not(.is-selected):focus-within {
-  background: rgba(0, 0, 0, 0.09);
+  background: var(--nexus-row-hover-highlight);
 }
 
 :root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row:not(.task-item-row--checked):hover,
 :root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row:not(.task-item-row--checked):focus-within {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--nexus-row-hover-highlight);
 }
 
 :root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row.task-item-row--main.task-item-group--head:not(.task-item-row--checked) {
-  background: rgba(0, 0, 0, 0.15);
+  background: var(--nexus-row-selected-highlight);
 }
 
 :root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row.task-item-row--main.task-item-group--head:not(.task-item-row--checked):hover,
 :root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row.task-item-row--main.task-item-group--head:not(.task-item-row--checked):focus-within {
-  background: rgba(0, 0, 0, 0.175);
+  background: var(--nexus-row-selected-highlight);
 }
 
 :root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row.task-item-row--main.task-item-group--head.task-item-row--checked {
@@ -7977,12 +7223,12 @@ input.app-save-dialog__btn {
 
 /* Expanded subtasks: default rgba(255,255,255,0.05) vanishes on platinum — use same mid tint as Finder non-selected hover (0.09). */
 :root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row.task-item-row--subtask:not(.is-collapsed):not(.task-item-row--checked) {
-  background: rgba(0, 0, 0, 0.09);
+  background: var(--nexus-row-subtask-highlight);
 }
 
 :root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row.task-item-row--subtask:not(.is-collapsed):not(.task-item-row--checked):hover,
 :root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row.task-item-row--subtask:not(.is-collapsed):not(.task-item-row--checked):focus-within {
-  background: rgba(0, 0, 0, 0.12);
+  background: var(--nexus-row-hover-highlight);
 }
 
 /* Checked / completion green: default #22c55e tints wash out on light gray — deeper green + higher alpha. */
@@ -8037,24 +7283,24 @@ input.app-save-dialog__btn {
 
 /* Finder folder list: no sky-blue active row / icon / rename field (new folder + inline rename). */
 :root[data-nexus-theme="classic"] .finder-folder-item.is-active .finder-folder-link {
-  background: rgba(0, 0, 0, 0.1);
-  color: var(--text);
+  background: var(--nexus-row-selected-highlight);
+  color: var(--nexus-row-selected-text);
 }
 
 :root[data-nexus-theme="classic"] .finder-folder-link:hover,
 :root[data-nexus-theme="classic"] .finder-folder-link:focus-visible {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--nexus-row-hover-highlight);
 }
 
 :root[data-nexus-theme="classic"] .finder-folder-item.is-active .finder-folder-link:hover,
 :root[data-nexus-theme="classic"] .finder-folder-item.is-active .finder-folder-link:focus-visible {
-  background: rgba(0, 0, 0, 0.12);
-  color: var(--text);
+  background: var(--nexus-row-selected-highlight);
+  color: var(--nexus-row-selected-text);
 }
 
 :root[data-nexus-theme="classic"] .finder-folder-icon,
 :root[data-nexus-theme="classic"] .finder-file-icon--row {
-  color: #111111;
+  color: var(--nexus-sidebar-folder-icon-color);
 }
 
 :root[data-nexus-theme="classic"] .finder-folder-name-input {
@@ -8069,89 +7315,6 @@ input.app-save-dialog__btn {
 
 :root[data-nexus-theme="classic"] .finder-file-item.finder-file-row:focus-visible {
   box-shadow: 0 0 0 2px #000000;
-}
-
-/* Dock: white icons when idle, black when that app/window is toggled open (no green/blue/purple). */
-:root[data-nexus-theme="classic"] .app-dock-button {
-  color: #ffffff;
-}
-
-:root[data-nexus-theme="classic"] .app-dock-button:hover,
-:root[data-nexus-theme="classic"] .app-dock-button:focus-visible {
-  background: rgba(255, 255, 255, 0.14);
-  color: #ffffff;
-}
-
-:root[data-nexus-theme="classic"] .app-dock-button.is-active,
-:root[data-nexus-theme="classic"] .app-dock-button--launcher.is-active,
-:root[data-nexus-theme="classic"] .app-dock-button--dock-app.is-active:not(.app-dock-button--running),
-:root[data-nexus-theme="classic"] .app-dock-button--dock-app.app-dock-button--running.is-active {
-  color: #000000;
-  background: rgba(0, 0, 0, 0.1);
-}
-
-:root[data-nexus-theme="classic"] .app-dock-button.is-active:hover,
-:root[data-nexus-theme="classic"] .app-dock-button.is-active:focus-visible {
-  background: rgba(0, 0, 0, 0.14);
-  color: #000000;
-}
-
-/* Sticky Notes toolbar — dark glyphs on the app canvas (unchanged from prior Classic polish). */
-:root[data-nexus-theme="classic"] .sticky-notes-action-btn {
-  color: #111111;
-}
-
-:root[data-nexus-theme="classic"] .sticky-notes-action-btn:hover,
-:root[data-nexus-theme="classic"] .sticky-notes-action-btn:focus-visible {
-  background: rgba(0, 0, 0, 0.12);
-  color: #111111;
-}
-
-:root[data-nexus-theme="classic"] .sticky-notes-action-btn--fill-color {
-  background: transparent;
-  box-shadow: none;
-}
-
-/* Sticky notes: solid fill + same hard shadow as OS windows. */
-:root[data-nexus-theme="classic"] .sticky-notes-sticky {
-  background: hsl(var(--sticky-hue, 45), calc(var(--sticky-saturation, 92) * 1%), calc(var(--sticky-brightness, 68) * 1%));
-  border-color: rgba(0, 0, 0, 0.45);
-  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.35);
-}
-
-:root[data-nexus-theme="classic"] .sticky-notes-sticky:hover {
-  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.35);
-}
-
-:root[data-nexus-theme="classic"] .sticky-notes-sticky.is-selected {
-  border-color: var(--border-hairline);
-  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.35);
-}
-
-:root[data-nexus-theme="classic"] .sticky-notes-sticky.is-selected:hover {
-  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.35);
-}
-
-:root[data-nexus-theme="classic"] .sticky-notes-sticky.is-editing {
-  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.35);
-}
-
-:root[data-nexus-theme="classic"] .sticky-notes-sticky.is-dragging,
-:root[data-nexus-theme="classic"] .sticky-notes-sticky.is-resizing {
-  opacity: 1;
-  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.35);
-}
-
-:root[data-nexus-theme="classic"] .sticky-notes-sticky.is-selected.is-dragging {
-  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.35);
-}
-
-:root[data-nexus-theme="classic"] .sticky-notes-grid {
-  background-color: rgba(0, 0, 0, 0.02);
-}
-
-:root[data-nexus-theme="classic"] .sticky-notes-grid-lines line {
-  stroke: rgba(0, 0, 0, 0.15);
 }
 
 /* Chrome + row icon buttons: no light “white” hover wash. */
@@ -8192,189 +7355,6 @@ input.app-save-dialog__btn {
   background: rgba(0, 0, 0, 0.1);
 }
 
-/* Habit Tracker */
-.app-surface--habit-tracker { height: 100%; }
-.habit-tracker-panel-list { margin: 0; }
-.habit-tracker-panel-row { cursor: pointer; }
-.habit-tracker-heatmap-icon svg { width: 100%; height: 100%; display: block; }
-.habit-tracker-main { min-height: 0; min-width: 0; display: flex; flex-direction: column; }
-
-.habit-tracker-content { padding: 0; overflow: auto; min-height: 0; min-width: 0; display: block; }
-.habit-tracker-today-list { margin: 0; }
-.habit-tracker-today-row { cursor: pointer; }
-.habit-tracker-today-row.task-item-row--checked {
-  background: rgba(var(--habit-accent-rgb, 34, 197, 94), 0.18) !important;
-  border: none !important;
-}
-.habit-tracker-today-row.task-item-row--checked:hover,
-.habit-tracker-today-row.task-item-row--checked:focus-within {
-  background: rgba(var(--habit-accent-rgb, 34, 197, 94), 0.21) !important;
-  border: none !important;
-}
-/* Keep Habits completion hover in the habit's own accent, overriding global Tasks checked hover rules. */
-.content-window[data-content-window-app-key-value="habit-tracker"] .habit-tracker-today-row.task-item-row--checked:hover,
-.content-window[data-content-window-app-key-value="habit-tracker"] .habit-tracker-today-row.task-item-row--checked:focus-within,
-.content-window[data-content-window-app-key-value="habit-tracker"] .task-item-row.habit-tracker-today-row.task-item-row--main.task-item-row--checked:hover,
-.content-window[data-content-window-app-key-value="habit-tracker"] .task-item-row.habit-tracker-today-row.task-item-row--main.task-item-row--checked:focus-within {
-  background: rgba(var(--habit-accent-rgb, 34, 197, 94), 0.21) !important;
-  border: none !important;
-  border-color: transparent !important;
-}
-.habit-tracker-today-row.task-item-row--checked .task-toggle,
-.habit-tracker-today-row.task-item-row--checked .habit-tracker-inline-value {
-  color: var(--habit-accent, #22c55e);
-}
-.habit-tracker-inline-value {
-  margin-left: 0.3rem;
-  padding-left: 0.3rem;
-  border-left: 1px solid rgba(255, 255, 255, 0.16);
-  color: var(--text-muted);
-  font-weight: 500;
-  font-size: 0.78em;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  vertical-align: middle;
-}
-.habit-tracker-rename-input {
-  width: 100%;
-  max-width: 24rem;
-  border: 1px solid var(--accent);
-  border-radius: 4px;
-  padding: 0.18rem 0.4rem;
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text);
-  font: inherit;
-  font-size: inherit;
-}
-.habit-tracker-empty-state { color: var(--text-muted); font-size: 0.82rem; padding: 0.6rem; }
-
-.content-window[data-content-window-app-key-value="habit-tracker"] .habit-tracker-content {
-  padding: 12px 10px;
-  box-sizing: border-box;
-}
-
-.content-window[data-content-window-app-key-value="habit-tracker"] .finder-shell-pane--contents {
-  padding: 0;
-}
-
-.content-window[data-content-window-app-key-value="habit-tracker"] .habit-tracker-content .task-list-rows {
-  --organizer-row-width: 100%;
-  --task-list-row-gap: 4px;
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-x: hidden;
-  padding: 0 !important;
-  box-sizing: border-box;
-}
-
-.content-window[data-content-window-app-key-value="habit-tracker"] .habit-tracker-content .task-list-rows > .task-item-row--main:first-child {
-  margin-top: 0 !important;
-}
-
-.habit-tracker-trends-wrap { display: grid; gap: 0.8rem; padding: 0; min-width: 0; }
-.habit-tracker-trends-grid {
-  display: flex;
-  flex-direction: column;
-  flex-wrap: nowrap;
-  gap: 0.5rem;
-  min-width: 0;
-}
-.habit-tracker-trend-card {
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 8px;
-  background: rgba(16, 20, 28, 0.55);
-  padding: 0.42rem 0.5rem 0.45rem;
-  min-width: 0;
-}
-.habit-tracker-trend-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.4rem;
-  margin-bottom: 0.25rem;
-}
-.habit-tracker-card-title { font-size: 0.86rem; font-weight: 600; }
-.habit-tracker-avg {
-  color: var(--text-muted);
-  font-size: 0.67rem;
-  white-space: nowrap;
-}
-.habit-tracker-mini-chart {
-  height: 98px;
-  margin-top: 0.2rem;
-  min-width: 0;
-}
-.habit-tracker-mini-chart canvas {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-.habit-tracker-heatmap-wrap { padding: 0; }
-.habit-tracker-heatmap-list { display: grid; gap: 0.5rem; }
-.habit-tracker-heatmap-card {
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 8px;
-  background: rgba(16, 20, 28, 0.55);
-  padding: 0.42rem 0.5rem 0.45rem;
-}
-.habit-tracker-heatmap-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: 0.25rem;
-}
-.habit-tracker-heatmap-grid {
-  display: grid;
-  grid-template-columns: repeat(53, minmax(0, 1fr));
-  gap: 2px;
-}
-.habit-tracker-heatmap-cell {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  border-radius: 2px;
-  background: rgba(var(--cell-rgb, 139, 92, 246), var(--cell-alpha, 0.08));
-  transition: background 120ms ease, transform 120ms ease, box-shadow 120ms ease;
-}
-.habit-tracker-heatmap-cell:hover {
-  background: rgba(var(--cell-rgb, 139, 92, 246), var(--cell-alpha-hover, 0.24));
-  transform: translateY(-1px);
-  box-shadow: 0 0 0 1px rgba(var(--cell-rgb, 139, 92, 246), 0.3);
-}
-.habit-tracker-heatmap-cell[data-tip]::after {
-  content: attr(data-tip);
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 6px);
-  transform: translateX(-50%);
-  white-space: nowrap;
-  pointer-events: none;
-  opacity: 0;
-  padding: 3px 6px;
-  border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(27, 32, 43, 0.96);
-  color: var(--text);
-  font-size: 0.65rem;
-  z-index: 3;
-}
-.habit-tracker-heatmap-cell[data-tip]:hover::after {
-  opacity: 1;
-}
-
-.habit-tracker-modal-layer { position: absolute; inset: 0; z-index: 40; }
-.habit-tracker-modal-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.45); }
-.habit-tracker-modal { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(340px, calc(100% - 1rem)); border: 1px solid var(--border); border-radius: 8px; background: rgba(28, 28, 32, 0.98); padding: 0.8rem; display: grid; gap: 0.55rem; }
-.habit-tracker-modal-title { margin: 0 0 0.15rem; font-size: 0.86rem; font-weight: 600; letter-spacing: 0.02em; }
-.habit-tracker-field { display: grid; gap: 0.25rem; }
-.habit-tracker-field span { font-size: 0.76rem; color: var(--text-muted); }
-.habit-tracker-field input, .habit-tracker-field select { border: 1px solid var(--border); border-radius: 6px; padding: 0.35rem 0.45rem; background: rgba(255, 255, 255, 0.04); color: var(--text); }
-.habit-tracker-field input[type="color"] { height: 2rem; padding: 0.18rem; border-radius: 6px; cursor: pointer; }
-.habit-tracker-modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
-.habit-tracker-btn { border: 1px solid var(--border); border-radius: 6px; padding: 0.32rem 0.65rem; background: rgba(255, 255, 255, 0.08); color: var(--text); cursor: pointer; }
-.habit-tracker-btn--ghost { background: transparent; }
-
 /* Ollama helper: draggable pet on desktop + speech-bubble chat (panel uses same tokens as .os-window / workspace theme) */
 .ollama-helper {
   /*
@@ -8385,7 +7365,6 @@ input.app-save-dialog__btn {
   --ollama-pet-hit-width: 3.35rem;
   --ollama-pet-hit-height: 3.18rem;
   --ollama-feet-nudge: 0.48rem;
-  --ollama-tail-fill: hsl(var(--window-bg-h) var(--window-bg-saturation) var(--window-bg-brightness) / 0.92);
   position: fixed;
   inset: 0;
   /* Stack with app windows; JS sets inline z-index on focus like content-window */
@@ -8416,43 +7395,18 @@ input.app-save-dialog__btn {
   flex-direction: column;
   left: 0;
   border-radius: 1.35rem;
-  border: 1px solid var(--border-hairline);
-  background: var(--window-bg);
-  backdrop-filter: blur(8px);
+  border: none;
+  /* Frosted fill lives on .ollama-helper__speech-inner. */
+  background: transparent;
+  backdrop-filter: none;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
   transition: opacity 160ms ease, visibility 0s linear 160ms;
   z-index: 1;
-}
-.ollama-helper__speech::after {
-  content: "";
-  position: absolute;
-  left: var(--ollama-tail-x, 50%);
-  transform: translateX(-50%);
-  width: 0;
-  height: 0;
-  pointer-events: none;
-  border-left: 10px solid transparent;
-  border-right: 10px solid transparent;
-}
-.ollama-helper__speech[data-ollama-placement="above"]::after {
-  bottom: -3px;
-  border-top: 5px solid var(--ollama-tail-fill);
-  border-left-width: 5px;
-  border-right-width: 5px;
-  border-bottom: none;
-  filter: drop-shadow(0 1px 0 color-mix(in srgb, var(--text) 14%, transparent));
-}
-.ollama-helper__speech[data-ollama-placement="below"]::after {
-  top: -3px;
-  bottom: auto;
-  border-bottom: 5px solid var(--ollama-tail-fill);
-  border-left-width: 5px;
-  border-right-width: 5px;
-  border-top: none;
-  filter: drop-shadow(0 -1px 0 color-mix(in srgb, var(--text) 12%, transparent));
+  /* visible: preserve box-shadow; inner clips rounded content */
+  overflow: visible;
 }
 .ollama-helper--open .ollama-helper__speech {
   opacity: 1;
@@ -8466,28 +7420,37 @@ input.app-save-dialog__btn {
   min-height: 0;
   flex: 1 1 auto;
   position: relative;
+  z-index: 1;
   border-radius: inherit;
   overflow: hidden;
-}
-.ollama-helper__speech-tools {
-  position: absolute;
-  top: 0.32rem;
-  right: 0.45rem;
-  z-index: 3;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--nexus-small-action-gap);
+  /* Same surface as the shell so theme transparency matches. */
+  background: var(--window-bg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 .ollama-helper__messages {
-  flex: 1 1 auto;
-  min-height: 4.25rem;
+  /* Content-height (capped by max-height); avoid flex-grow empty band above the input. */
+  flex: 0 1 auto;
+  min-height: 0;
   max-height: 14rem;
   overflow-x: hidden;
   overflow-y: auto;
-  padding: 2.15rem 0.65rem 0.4rem;
+  padding: 0.55rem 0.65rem 0.35rem;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+}
+.ollama-helper--no-thread .ollama-helper__messages {
+  display: none;
+}
+.ollama-helper--no-thread .ollama-helper__status:not(:empty) {
+  min-height: 0;
+  padding: 0 0.65rem 0.3rem;
+}
+.ollama-helper--no-thread .ollama-helper__speech-inner {
+  flex: 0 0 auto;
+  /* Single symmetric inset around the input; match +75% vs former 0.32rem form pad (~0.56rem). */
+  padding: 0.56rem 0.55rem 0.56rem;
 }
 .ollama-helper__msg-row {
   display: flex;
@@ -8518,11 +7481,11 @@ input.app-save-dialog__btn {
 .ollama-helper__msg-row--assistant .ollama-helper__msg-bubble {
   background: color-mix(in srgb, var(--text) 10%, transparent);
   color: var(--text);
-  border: 1px solid var(--border-hairline);
+  border: none;
   border-radius: 1.05rem 1.05rem 1.05rem 0.28rem;
 }
 .ollama-helper__msg-bubble--error {
-  border-color: rgba(248, 113, 113, 0.5) !important;
+  border: none;
   background: rgba(248, 113, 113, 0.15) !important;
   color: #fecaca !important;
   border-radius: 1.05rem 1.05rem 1.05rem 0.28rem !important;
@@ -8534,16 +7497,33 @@ input.app-save-dialog__btn {
   font-size: 0.65rem;
   color: var(--text-muted);
 }
+/* No reserved strip when idle (was forcing a gap above the composer). */
+.ollama-helper__status:empty {
+  display: none;
+  min-height: 0;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.ollama-helper__status:not(:empty) {
+  padding-bottom: 0.25rem;
+}
 .ollama-helper__form {
-  padding: 0.28rem 0.55rem 0.45rem;
-  border-top: 1px solid var(--border-hairline);
+  /* was 0.32rem vertical; +75% => 0.56rem */
+  padding: 0.56rem 0.55rem 0.56rem;
+  border-top: none;
+}
+.ollama-helper--no-thread .ollama-helper__form {
+  border-top: none;
+  padding: 0;
 }
 .ollama-helper__input {
   width: 100%;
   resize: none;
   border-radius: 1.1rem;
-  border: 1px solid var(--border);
-  background: color-mix(in srgb, var(--text) 7%, transparent);
+  border: none;
+  background: color-mix(in srgb, var(--text) 11%, transparent);
   color: var(--text);
   padding: 0.32rem 0.65rem;
   font: inherit;
@@ -8552,11 +7532,12 @@ input.app-save-dialog__btn {
   min-height: 0;
   max-height: none;
   box-sizing: border-box;
+  margin: 0;
+  display: block;
 }
 .ollama-helper__input:focus {
   outline: none;
-  border-color: color-mix(in srgb, var(--accent) 52%, var(--border));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 28%, transparent);
 }
 .ollama-helper--loading .ollama-helper__input {
   opacity: 0.65;
@@ -8616,3 +7597,4 @@ input.app-save-dialog__btn {
   image-rendering: crisp-edges;
   transition: transform 140ms ease, filter 140ms ease;
 }
+

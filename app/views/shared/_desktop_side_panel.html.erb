@@ -1,0 +1,68 @@
+<div
+  id="desktop-side-panel-host"
+  class="desktop-side-panel-host"
+  data-controller="side-panel"
+>
+  <button
+    type="button"
+    class="desktop-side-panel-toggle"
+    data-side-panel-target="toggle"
+    data-action="click->side-panel#toggle"
+    aria-expanded="false"
+    aria-controls="desktop-side-panel-drawer"
+    title="Open panel"
+    aria-label="Open side panel"
+  ><%= material_symbol_icon(:dock_to_right, size: :md) %></button>
+
+  <aside
+    id="desktop-side-panel-drawer"
+    class="desktop-side-panel-drawer"
+    data-side-panel-target="drawer"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Nexus apps"
+    aria-hidden="true"
+  >
+    <header class="desktop-side-panel-header">
+      <h1 class="desktop-side-panel-brand">NEXUS</h1>
+    </header>
+
+    <div class="desktop-side-panel-body" data-controller="organizer">
+      <nav class="desktop-side-panel-apps" aria-label="Apps">
+        <% launcher_grid_entries.each do |entry| %>
+          <button
+            type="button"
+            class="desktop-side-panel-app-row"
+            data-window-key="<%= entry[:window_key] %>"
+            data-action="click->organizer#launchApp"
+          >
+            <span class="desktop-side-panel-app-icon" aria-hidden="true">
+              <%= material_symbol_icon(entry[:icon], size: :sm) %>
+            </span>
+            <span class="desktop-side-panel-app-label"><%= entry[:label] %></span>
+          </button>
+        <% end %>
+      </nav>
+    </div>
+  </aside>
+</div>
+<%# Apply saved open state before first paint so the drawer does not animate on refresh. Matches side_panel_controller STORAGE_OPEN_KEY. %>
+<script>
+(function () {
+  try {
+    if (localStorage.getItem("nexus.desktop.sidePanelOpen") !== "1") return
+    var host = document.getElementById("desktop-side-panel-host")
+    if (!host) return
+    host.classList.add("desktop-side-panel-host--open")
+    var btn = host.querySelector(".desktop-side-panel-toggle")
+    var drawer = host.querySelector(".desktop-side-panel-drawer")
+    if (btn) {
+      btn.setAttribute("aria-expanded", "true")
+      btn.setAttribute("aria-label", "Close side panel")
+      btn.setAttribute("title", "Close panel")
+      btn.classList.add("is-active")
+    }
+    if (drawer) drawer.setAttribute("aria-hidden", "false")
+  } catch (e) { /* private mode / disabled storage */ }
+})()
+</script>

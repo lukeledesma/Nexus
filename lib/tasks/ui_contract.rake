@@ -19,28 +19,14 @@ namespace :ui do
 
     required_view_classes = {
       "app/views/layouts/application.html.erb" => [
-        "os-window-header",
-        "os-window-title",
-        "os-window-controls",
-        "os-window-body-start"
+        "content-window",
+        "os-window",
+        "pane-resize-handle"
       ],
-      "app/views/organizer/_sidebar.html.erb" => [
-        "os-window-header",
-        "os-window-title",
-        "os-window-controls",
-        "os-window-body-start",
-        "os-window-grid",
-        "os-window-card",
-        "os-window-card-content",
-        "os-window-card-label",
-        "os-window-card-value"
+      "app/views/shared/_content_window_chrome.html.erb" => [
+        "content-window-chrome"
       ],
       "app/views/apps/singular/task_list.html.erb" => [
-        "os-window-header",
-        "os-window-title",
-        "os-window-body-start"
-      ],
-      "app/views/apps/singular/sticky_notes.html.erb" => [
         "os-window-body-start"
       ]
     }

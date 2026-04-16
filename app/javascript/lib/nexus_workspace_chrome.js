@@ -5,9 +5,66 @@
  */
 
 export const NEXUS_CLASSIC_THEME_ID = "classic"
+export const NEXUS_SHELL_MODE_STORAGE_KEY = "nexus.settings.shellMode"
+const SHELL_MODE_DARK = "dark"
+const SHELL_MODE_LIGHT = "light"
+const SHELL_MODE_SYSTEM = "system"
+const SHELL_MODE_SET = new Set([SHELL_MODE_DARK, SHELL_MODE_LIGHT, SHELL_MODE_SYSTEM])
+
+const LIGHT_APPEARANCE_OVERRIDES = {
+  hue: 212,
+  saturation: 24,
+  brightness: 92,
+  transparency: 0.9,
+  font_1: 14,
+  font_1_alpha: 100,
+  font_2: 34,
+  font_2_alpha: 100
+}
+
+let lastWorkspaceChromeParams = null
+let systemSchemeListenerAttached = false
 
 export function isNexusClassicUiActive() {
   return document.documentElement.dataset.nexusTheme === "classic"
+}
+
+function normalizedShellMode(rawMode) {
+  const mode = String(rawMode || "").trim().toLowerCase()
+  return SHELL_MODE_SET.has(mode) ? mode : SHELL_MODE_DARK
+}
+
+function readStoredShellMode() {
+  try {
+    return normalizedShellMode(window.localStorage.getItem(NEXUS_SHELL_MODE_STORAGE_KEY))
+  } catch (_error) {
+    return SHELL_MODE_DARK
+  }
+}
+
+function prefersDarkSystemMode() {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return true
+  return Boolean(window.matchMedia("(prefers-color-scheme: dark)").matches)
+}
+
+function effectiveShellMode(mode) {
+  const normalized = normalizedShellMode(mode)
+  if (normalized !== SHELL_MODE_SYSTEM) return normalized
+  return prefersDarkSystemMode() ? SHELL_MODE_DARK : SHELL_MODE_LIGHT
+}
+
+function attachSystemSchemeListener() {
+  if (systemSchemeListenerAttached) return
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return
+  const query = window.matchMedia("(prefers-color-scheme: dark)")
+  if (!query || typeof query.addEventListener !== "function") return
+
+  query.addEventListener("change", () => {
+    const requestedMode = normalizedShellMode(lastWorkspaceChromeParams?.shell_mode || readStoredShellMode())
+    if (requestedMode !== SHELL_MODE_SYSTEM) return
+    syncNexusWorkspaceChrome(lastWorkspaceChromeParams || {})
+  })
+  systemSchemeListenerAttached = true
 }
 
 function clampInt(value, min, max, fallback) {
@@ -22,43 +79,44 @@ function clampFloat(value, min, max, fallback) {
   return Math.min(max, Math.max(min, parsed))
 }
 
-/** Flat platinum / gray chrome, dark text on light surfaces. */
+/** Soft light chrome preset for Classic shell. */
 function applyClassicChrome(root) {
-  root.style.setProperty("--window-bg-h", "0")
-  root.style.setProperty("--window-bg-saturation", "0%")
-  root.style.setProperty("--window-bg-brightness", "78%")
-  root.style.setProperty("--window-bg-alpha", "0.98")
-  root.style.setProperty("--window-ui-hue", "0")
-  root.style.setProperty("--window-ui-saturation", "0%")
-  root.style.setProperty("--window-ui-brightness", "70%")
+  root.style.setProperty("--window-bg-h", "214")
+  root.style.setProperty("--window-bg-saturation", "22%")
+  root.style.setProperty("--window-bg-brightness", "92%")
+  root.style.setProperty("--window-bg-alpha", "0.90")
+  root.style.setProperty("--window-ui-hue", "214")
+  root.style.setProperty("--window-ui-saturation", "22%")
+  root.style.setProperty("--window-ui-brightness", "92%")
 
-  root.style.setProperty("--desktop-bg-1-hue", "0")
-  root.style.setProperty("--desktop-bg-1-saturation", "0%")
-  root.style.setProperty("--desktop-bg-1-brightness", "58%")
-  root.style.setProperty("--desktop-bg-2-hue", "0")
-  root.style.setProperty("--desktop-bg-2-saturation", "0%")
-  root.style.setProperty("--desktop-bg-2-brightness", "54%")
+  root.style.setProperty("--desktop-bg-1-hue", "210")
+  root.style.setProperty("--desktop-bg-1-saturation", "16%")
+  root.style.setProperty("--desktop-bg-1-brightness", "93%")
+  root.style.setProperty("--desktop-bg-2-hue", "218")
+  root.style.setProperty("--desktop-bg-2-saturation", "18%")
+  root.style.setProperty("--desktop-bg-2-brightness", "88%")
   root.style.setProperty("--desktop-bg-angle", "180deg")
 
-  root.style.setProperty("--font-1-tone", "16")
+  root.style.setProperty("--font-1-tone", "15")
   root.style.setProperty("--font-1-alpha", "1")
-  root.style.setProperty("--font-2-tone", "36")
+  root.style.setProperty("--font-2-tone", "38")
   root.style.setProperty("--font-2-alpha", "1")
 }
 
 function applyModernAppearance(root, appearance) {
   const hue = clampInt(appearance.hue, 0, 360, 200)
   const saturation = clampInt(appearance.saturation, 0, 100, 5)
-  const brightness = clampInt(appearance.brightness, 0, 100, 20)
-  const alpha = clampFloat(appearance.transparency, 0.15, 1, 0.18)
+  const brightness = clampInt(appearance.brightness, 0, 100, 13)
+  const alpha = clampFloat(appearance.transparency, 0.15, 1, 0.95)
 
-  const color1Hue = clampInt(appearance.color_1_hue, 0, 360, 210)
-  const color1Sat = clampInt(appearance.color_1_saturation, 0, 100, 18)
-  const color1Bri = clampInt(appearance.color_1_brightness, 0, 100, 16)
-  const color2Hue = clampInt(appearance.color_2_hue, 0, 360, 195)
-  const color2Sat = clampInt(appearance.color_2_saturation, 0, 100, 25)
-  const color2Bri = clampInt(appearance.color_2_brightness, 0, 100, 20)
-  const angle = clampInt(appearance.angle, 0, 360, 128)
+  // Wallpaper gradient mode is removed; desktop fallback stays black.
+  const color1Hue = 0
+  const color1Sat = 0
+  const color1Bri = 0
+  const color2Hue = 0
+  const color2Sat = 0
+  const color2Bri = 0
+  const angle = 180
 
   const font1 = clampInt(appearance.font_1, 0, 100, 85)
   const font1Alpha = clampInt(appearance.font_1_alpha, 0, 100, 100)
@@ -85,22 +143,72 @@ function applyModernAppearance(root, appearance) {
   root.style.setProperty("--font-2-alpha", (font2Alpha / 100).toFixed(2))
 }
 
+function applyLightAppearance(root, appearance) {
+  applyModernAppearance(root, {
+    ...(appearance || {}),
+    ...LIGHT_APPEARANCE_OVERRIDES
+  })
+}
+
 /**
  * @param {{ active_theme_id?: string, activeThemeId?: string, appearance?: Record<string, unknown> }} params
  */
 export function syncNexusWorkspaceChrome(params) {
+  attachSystemSchemeListener()
+  lastWorkspaceChromeParams = params || {}
+
   const root = document.documentElement
   const id = String(params?.active_theme_id ?? params?.activeThemeId ?? "default")
   const { appearance } = params || {}
+  const requestedShellMode = normalizedShellMode(params?.shell_mode || readStoredShellMode())
+  const mode = effectiveShellMode(requestedShellMode)
 
   if (id === NEXUS_CLASSIC_THEME_ID) {
+    root.dataset.nexusShellMode = "classic"
     root.dataset.nexusTheme = "classic"
     applyClassicChrome(root)
     return
   }
 
+  root.dataset.nexusShellMode = mode
   delete root.dataset.nexusTheme
+  if (mode === SHELL_MODE_LIGHT) {
+    applyLightAppearance(root, appearance)
+    return
+  }
   if (appearance && typeof appearance === "object") {
     applyModernAppearance(root, appearance)
   }
+}
+
+/**
+ * Desktop `#desktop`: gradient (CSS) or wallpaper image (`background-size: cover`) from `/documents/:id/asset_file`.
+ * @param {{ wallpaper_background_kind?: string | null, wallpaper_image_document_id?: number | string | null }} params
+ */
+export function syncNexusDesktopWallpaper(params) {
+  const el = document.getElementById("desktop")
+  if (!el) return
+
+  const kind = String(params?.wallpaper_background_kind ?? "").toLowerCase()
+  const rawId = params?.wallpaper_image_document_id
+  const n = rawId != null ? Number.parseInt(String(rawId), 10) : 0
+  const docId = Number.isFinite(n) && n > 0 ? n : 0
+
+  if (kind === "image" && docId > 0) {
+    const url = `/documents/${docId}/asset_file`
+    el.style.backgroundColor = "#000"
+    el.style.backgroundImage = `url("${url}")`
+    el.style.backgroundSize = "cover"
+    el.style.backgroundPosition = "center"
+    el.style.backgroundRepeat = "no-repeat"
+    el.dataset.nexusWallpaper = "image"
+    return
+  }
+
+  el.style.removeProperty("background-color")
+  el.style.removeProperty("background-image")
+  el.style.removeProperty("background-size")
+  el.style.removeProperty("background-position")
+  el.style.removeProperty("background-repeat")
+  delete el.dataset.nexusWallpaper
 }

@@ -1,17 +1,14 @@
 <% frame_id = params[:frame_id].presence || "app-pane" %>
-<turbo-frame id="<%= frame_id %>" data-singular-draft-root>
+<turbo-frame id="<%= frame_id %>" data-singular-draft-root data-singular-has-linked-document="<%= @linked_document_id.present? %>">
   <section class="app-surface app-surface--tool" data-controller="title-editor task-list-editor tool-window-status" data-tool-window-status-item-type-value="task_list" data-tool-window-status-updated-at-value="<%= @task_list.updated_at&.utc&.iso8601 %>">
+    <% autosave_form_data = { turbo_frame: frame_id, controller: "autosave", autosave_item_id_value: @task_list.id, autosave_item_type_value: "task_list", autosave_debounce_value: 120 } %>
+    <% autosave_form_data[:autosave_linked_document_id_value] = @linked_document_id if @linked_document_id.present? %>
     <%= form_with model: @task_list, url: apps_task_list_path(@task_list, frame_id: frame_id), method: :patch,
-          data: {
-        turbo_frame: frame_id,
-        controller: "autosave",
-        autosave_item_id_value: @task_list.id,
-        autosave_item_type_value: "task_list"
-          }, class: "task-list-form os-window-body-start" do |f| %>
+          data: autosave_form_data, class: "task-list-form os-window-body-start" do |f| %>
       <input type="hidden" name="item[tasks_payload]" value="" data-task-list-editor-target="payload">
 
       <div class="task-list-content-shell">
-        <ul class="task-list-rows" data-task-list-editor-target="list" data-action="click->task-list-editor#handleListClick keydown->task-list-editor#handleListKeydown">
+        <ul class="task-list-rows" data-task-list-editor-target="list" data-action="click->task-list-editor#handleListClick keydown->task-list-editor#handleListKeydown dragstart->task-list-editor#handleDragStart dragover->task-list-editor#handleDragOver drop->task-list-editor#handleDrop dragend->task-list-editor#handleDragEnd">
           <% @tasks_for_view.each do |task| %>
             <% subtasks = Array(task["subtasks"]) %>
             <% total_subtasks = subtasks.length %>
@@ -21,7 +18,7 @@
             <% main_classes << "task-item-row--checked" if total_subtasks.positive? && completion >= 1.0 %>
             <% main_classes << "task-item-group--head" if total_subtasks.positive? %>
 
-            <li class="<%= main_classes.join(" ") %>" style="--completion: <%= completion %>;" data-role="main-task" data-main-checked="<%= task["checked"] ? "true" : "false" %>" data-collapsed="<%= total_subtasks.positive? ? "true" : "false" %>" data-has-subtasks="<%= total_subtasks.positive? ? "true" : "false" %>">
+            <li class="<%= main_classes.join(" ") %>" style="--completion: <%= completion %>;" data-role="main-task" data-main-checked="<%= task["checked"] ? "true" : "false" %>" data-collapsed="<%= total_subtasks.positive? ? "true" : "false" %>" data-has-subtasks="<%= total_subtasks.positive? ? "true" : "false" %>" draggable="true">
               <div class="organizer-row-left nexus-standard-row__main <%= nexus_clickable_row_main_class %>">
                 <span class="nexus-standard-row__leading"><span class="task-toggle" role="button" tabindex="0" aria-label="Toggle task completion"><%= task["checked"] ? material_symbol_icon(:check, size: :xs) : material_symbol_icon(:circle_outline, size: :xs) %></span></span>
                 <span class="task-item-text" data-role="task-text"><%= task["text"] %></span>
@@ -41,7 +38,7 @@
               <% sub_classes = ["task-item-row", "task-item-row--subtask", "organizer-row", "nexus-standard-row", "task-item-group--child"] %>
               <% sub_classes << "task-item-row--checked" if subtask["checked"] %>
               <% sub_classes << "task-item-group--tail" if index == total_subtasks - 1 %>
-              <li class="<%= sub_classes.join(" ") %>" data-role="subtask">
+              <li class="<%= sub_classes.join(" ") %>" data-role="subtask" draggable="true">
                 <div class="organizer-row-left nexus-standard-row__main <%= nexus_clickable_row_main_class %>">
                   <span class="nexus-standard-row__leading"><span class="task-toggle" role="button" tabindex="0" aria-label="Toggle subtask completion"><%= subtask["checked"] ? material_symbol_icon(:check, size: :xs) : material_symbol_icon(:circle_outline, size: :xs) %></span></span>
                   <span class="task-item-text task-item-text--subtask" data-role="task-text"><%= subtask["text"] %></span>

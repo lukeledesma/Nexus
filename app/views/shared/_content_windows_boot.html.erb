@@ -1,0 +1,146 @@
+<%# Early restore for OS windows: bounds, z-index, visibility, turbo-frame src (matches content_window_controller localStorage keys). %>
+<script>
+(function () {
+  var LAYERS_KEY = "nexus.desktop.windowLayers"
+  var SINGULAR_KEYS = { "singular-task-list": 1 }
+
+  function desktopShellInsetPx() {
+    var root = document.documentElement
+    var v = (getComputedStyle(root).getPropertyValue("--nexus-desktop-shell-inset") || "").trim()
+    if (v.endsWith("px")) {
+      var px = parseFloat(v)
+      if (isFinite(px)) return Math.max(0, Math.round(px))
+    }
+    var s = getComputedStyle(root)
+    var op = (s.getPropertyValue("--os-window-padding") || "").trim()
+    var os = 12
+    if (op.endsWith("rem")) {
+      var rem = parseFloat(op)
+      var fz = parseFloat(s.fontSize) || 16
+      os = rem * fz
+    } else if (op.endsWith("px")) os = parseFloat(op) || 12
+    return Math.max(8, Math.round(os * 0.65))
+  }
+
+  /* Canvas minimum dimensions — must match SHELL_CANVAS_MIN_W/H in content_window_controller.js
+     and #desktop-shell-canvas min-width/height in application.css. */
+  var SHELL_MIN_W = 760
+  var SHELL_MIN_H = 460
+
+  function shellW() {
+    var shell = document.getElementById("desktop-shell")
+    return shell ? Math.max(SHELL_MIN_W, shell.clientWidth) : Math.max(SHELL_MIN_W, window.innerWidth)
+  }
+
+  function shellH() {
+    var shell = document.getElementById("desktop-shell")
+    return shell ? Math.max(SHELL_MIN_H, shell.clientHeight) : Math.max(SHELL_MIN_H, window.innerHeight)
+  }
+
+  function clampBounds(left, top, w, h) {
+    var vw = shellW()
+    var vh = shellH()
+    var margin = desktopShellInsetPx()
+    var bot = margin
+    var dock = margin
+    w = Math.max(44, w)
+    h = Math.max(44, h)
+    left = Math.min(Math.max(left, dock), Math.max(dock, vw - margin - w))
+    top = Math.min(Math.max(top, margin), Math.max(margin, vh - bot - h))
+    return {
+      left: Math.round(left),
+      top: Math.round(top),
+      width: Math.round(w),
+      height: Math.round(h)
+    }
+  }
+
+  function buildFrameSrc(section) {
+    var base = section.getAttribute("data-content-window-app-url-value")
+    var frameId = section.getAttribute("data-content-window-frame-id-value") || ""
+    var appKey = section.getAttribute("data-content-window-app-key-value") || ""
+    if (!base) return null
+    var url
+    try {
+      url = new URL(base, window.location.origin)
+    } catch (e) {
+      return null
+    }
+    if (frameId) url.searchParams.set("frame_id", frameId)
+    if (SINGULAR_KEYS[appKey]) {
+      var linkedId = null
+      try {
+        linkedId = window.sessionStorage.getItem("nexus.singularLinkedDocument." + frameId)
+      } catch (err) { /* private mode */ }
+      if (linkedId) {
+        url.searchParams.set("document_id", String(linkedId))
+      }
+      url.searchParams.delete("blank")
+    } else {
+      url.searchParams.delete("blank")
+      url.searchParams.delete("document_id")
+    }
+    return url.pathname + url.search
+  }
+
+  var layers = null
+  try {
+    var rawLayers = window.localStorage.getItem(LAYERS_KEY)
+    if (rawLayers) layers = JSON.parse(rawLayers)
+  } catch (e) { layers = null }
+
+  var maxZ = 1500
+  var sections = document.querySelectorAll("section.content-window.os-window[data-content-window-storage-key-value]")
+  for (var i = 0; i < sections.length; i++) {
+    var section = sections[i]
+    var storageKey = section.getAttribute("data-content-window-storage-key-value")
+    if (!storageKey) continue
+
+    var boundsRaw = null
+    try {
+      boundsRaw = window.localStorage.getItem(storageKey)
+    } catch (e) { boundsRaw = null }
+    if (boundsRaw) {
+      try {
+        var b = JSON.parse(boundsRaw)
+        if ([b.left, b.top, b.width, b.height].every(function (n) { return typeof n === "number" && isFinite(n) })) {
+          var c = clampBounds(b.left, b.top, b.width, b.height)
+          section.style.left = c.left + "px"
+          section.style.top = c.top + "px"
+          section.style.width = c.width + "px"
+          section.style.height = c.height + "px"
+        }
+      } catch (e) { /* ignore */ }
+    }
+
+    var wantOpen = false
+    try {
+      wantOpen = window.localStorage.getItem(storageKey + ".open") === "1"
+    } catch (e) { wantOpen = false }
+
+    if (!wantOpen) continue
+
+    section.classList.remove("is-hidden")
+
+    var appKey = section.getAttribute("data-content-window-app-key-value") || ""
+    if (layers && typeof layers === "object" && layers !== null) {
+      var z = layers[appKey]
+      if (typeof z === "number" && isFinite(z) && z > 0) {
+        var zi = Math.round(z)
+        section.style.zIndex = String(zi)
+        if (zi > maxZ) maxZ = zi
+      }
+    }
+
+    var frameSrc = buildFrameSrc(section)
+    if (!frameSrc) continue
+    var frame = section.querySelector('turbo-frame[data-content-window-target="frame"]')
+    if (!frame) continue
+    var existing = frame.getAttribute("src")
+    if (existing === frameSrc) continue
+    frame.setAttribute("src", frameSrc)
+  }
+
+  window.__nexusDesktopZIndex = maxZ
+})()
+</script>

@@ -64,9 +64,9 @@ class TaskListEditorBehaviorTest < ApplicationSystemTestCase
 
   private
 
-  def sign_in(email, password)
+  def sign_in(identifier, password)
     visit login_path
-    fill_in "email", with: email
+    fill_in "identifier", with: identifier
     fill_in "password", with: password
     click_on "Sign In"
   end

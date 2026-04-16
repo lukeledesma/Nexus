@@ -1,4 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
+import { getNexusDesktopShellInsetPx } from "lib/desktop_shell_metrics"
+import { syncOrganizerAboveVisibleContentWindows } from "lib/nexus_desktop_layers"
 
 export default class extends Controller {
   static targets = ["window", "tasksSize", "stamp"]
@@ -7,9 +9,10 @@ export default class extends Controller {
     this.windowWidth = 320
     this.minimumWindowHeight = 125
     this.windowHeight = 125
-    this.viewportMargin = 6
-    this.dockLeftBoundary = 6
-    this.bottomDockBoundary = this.viewportMargin
+    const shell = getNexusDesktopShellInsetPx()
+    this.viewportMargin = shell
+    this.dockLeftBoundary = shell
+    this.bottomDockBoundary = shell
     this.activeDrag = null
     this.latestUpdateAt = null
 
@@ -26,7 +29,7 @@ export default class extends Controller {
     window.addEventListener("app-window:state", this.boundAppWindowState)
     this.windowTarget.addEventListener("mousedown", this.boundWindowInteraction)
 
-    this.clearLauncherState()
+    this.clearRowActiveState()
   }
 
   disconnect() {
@@ -101,6 +104,10 @@ export default class extends Controller {
     this.stampTarget.textContent = `${label} Updated ${this.formatTimestamp(timestamp)}`
   }
 
+  effectiveLeftBoundary() {
+    return this.dockLeftBoundary
+  }
+
   // ── Drag ───────────────────────────────────────────────────────────────────
 
   startDrag(event) {
@@ -138,7 +145,8 @@ export default class extends Controller {
     const maxLeft = window.innerWidth - width - margin
     const maxTop = window.innerHeight - height - this.bottomDockBoundary
 
-    const left = Math.min(Math.max(coords.x - this.activeDrag.offsetX, this.dockLeftBoundary), Math.max(this.dockLeftBoundary, maxLeft))
+    const dock = this.effectiveLeftBoundary()
+    const left = Math.min(Math.max(coords.x - this.activeDrag.offsetX, dock), Math.max(dock, maxLeft))
     const top = Math.min(Math.max(coords.y - this.activeDrag.offsetY, margin), Math.max(margin, maxTop))
 
     this.windowTarget.style.left = `${left}px`
@@ -196,12 +204,13 @@ export default class extends Controller {
     const vh = window.innerHeight
     const defaultTop = this.viewportMargin
     const columnGap = 15
-    const leftColumnLeft = this.dockLeftBoundary
+    const dock = this.effectiveLeftBoundary()
+    const leftColumnLeft = dock
     const leftColumnWidth = 320
     const width = Math.min(this.windowWidth, Math.max(260, vw - 40))
     const height = Math.min(this.windowHeight, Math.max(this.minimumWindowHeight, vh - 40))
     const desiredLeft = leftColumnLeft + leftColumnWidth + columnGap
-    const left = Math.max(this.dockLeftBoundary, Math.min(desiredLeft, vw - this.viewportMargin - width))
+    const left = Math.max(dock, Math.min(desiredLeft, vw - this.viewportMargin - width))
     const top = Math.max(this.viewportMargin, Math.min(defaultTop, vh - this.bottomDockBoundary - height))
 
     this.windowTarget.style.width = `${width}px`
@@ -214,6 +223,7 @@ export default class extends Controller {
     const next = Number(window.__nexusDesktopZIndex || 1500) + 1
     window.__nexusDesktopZIndex = next
     this.windowTarget.style.zIndex = String(next)
+    syncOrganizerAboveVisibleContentWindows()
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -231,17 +241,17 @@ export default class extends Controller {
   }
 
   handleAppWindowState(event) {
-    this.updateLauncherState(event.detail?.appKey, Boolean(event.detail?.open))
+    this.updateRowActiveState(event.detail?.appKey, Boolean(event.detail?.open))
   }
 
-  updateLauncherState(appKey, isOpen) {
+  updateRowActiveState(appKey, isOpen) {
     const button = this.element.querySelector(`[data-window-key="${appKey}"]`)
     if (!button) return
     button.classList.toggle("is-active", isOpen)
     button.setAttribute("aria-pressed", isOpen ? "true" : "false")
   }
 
-  clearLauncherState() {
+  clearRowActiveState() {
     this.element.querySelectorAll("[data-window-key]").forEach((button) => {
       button.classList.remove("is-active")
       button.setAttribute("aria-pressed", "false")

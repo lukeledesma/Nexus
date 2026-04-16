@@ -2,11 +2,6 @@
 
 module Apps
   class TaskListsController < BaseController
-    # GET /apps/all_tasks
-    def index
-      @task_lists = Item.task_lists.includes(:folder).ordered
-    end
-
     # GET /apps/task_lists/:id
     def show
       @task_list = Item.task_lists.find(params[:id])
@@ -92,9 +87,6 @@ module Apps
       parsed.filter_map do |task|
         next unless task.is_a?(Hash)
 
-        text = task["text"].to_s.strip
-        next if text.empty?
-
         note = task["note"].to_s
 
         subtasks = Array(task["subtasks"]).filter_map do |subtask|
@@ -109,6 +101,9 @@ module Apps
             "note" => subtask["note"].to_s
           }
         end
+
+        text = task["text"].to_s.strip
+        next if text.empty? && subtasks.empty?
 
         checked = ActiveModel::Type::Boolean.new.cast(task["checked"])
         checked = subtasks.present? ? subtasks.all? { |subtask| subtask["checked"] } : checked
@@ -133,9 +128,6 @@ module Apps
           { "text" => text, "checked" => false, "note" => "", "subtasks" => [] }
         elsif task.respond_to?(:to_h)
           hash = task.to_h
-          text = hash["text"].to_s.strip
-          next if text.empty?
-
           note = hash["note"].to_s
 
           subtasks = Array(hash["subtasks"]).filter_map do |subtask|
@@ -151,6 +143,9 @@ module Apps
               "note" => subtask_hash["note"].to_s
             }
           end
+
+          text = hash["text"].to_s.strip
+          next if text.empty? && subtasks.empty?
 
           checked = ActiveModel::Type::Boolean.new.cast(hash["checked"])
           checked = subtasks.present? ? subtasks.all? { |subtask| subtask["checked"] } : checked

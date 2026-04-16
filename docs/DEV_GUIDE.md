@@ -40,13 +40,12 @@ Nexus_Dev/
 │   │   └── controllers/
 │   │       ├── index.js
 │   │       ├── organizer_controller.js       # Folder tree + item create/delete/rename
-│   │       ├── finder_controller.js          # Item selection, main pane open/close
+│   │       ├── finder_browser_controller.js  # Finder file list behavior + actions
 │   │       ├── window_manager_controller.js  # Resize handles, seam drag, animations
 │   │       ├── autosave_controller.js        # Live save, organizer label refresh
 │   │       ├── title_editor_controller.js    # Click-to-edit title, save trigger
 │   │       ├── task_list_editor_controller.js # Add/remove rows, subtasks, notes
-│   │       ├── task_list_controller.js       # Legacy task list (older view)
-│   │       ├── modal_controller.js           # In-app creation modals
+│   │       ├── task_list_controller.js       # Singular task list interactions
 │   │       ├── auth_menu_controller.js       # Auth dropdown
 │   │       ├── note_editor_controller.js
 │   │       ├── rename_controller.js
@@ -65,13 +64,11 @@ Nexus_Dev/
 │   │   └── item_storage_sync_lite.rb  # Rebuilds storage/workspace from DB
 │   └── views/
 │       ├── layouts/application.html.erb
-│       ├── organizer/_sidebar.html.erb
+│       ├── shared/_desktop_side_panel.html.erb
+│       ├── shared/_content_window_chrome.html.erb
 │       ├── apps/
-│       │   └── task_lists/show.html.erb
-│       └── items/
-│           ├── _new_folder_modal.html.erb
-│           ├── _new_note_modal.html.erb
-│           └── _new_task_list_modal.html.erb
+│       │   └── singular/task_list.html.erb
+│       └── shared/_content_windows_boot.html.erb
 ├── config/
 │   ├── routes.rb
 │   ├── database.yml          # PostgreSQL config, env-driven
@@ -81,7 +78,7 @@ Nexus_Dev/
 │   ├── schema.rb
 │   └── migrate/
 ├── storage/
-│   └── workspace/            # Disk mirror of organizer state (Tasks.txt, stickynotes.txt, user folders)
+│   └── workspace/            # Disk mirror of organizer state (Tasks.txt, user folders)
 └── docs/
     ├── UI_GUIDE.md           # This app's UI behavior reference
     └── DEV_GUIDE.md          # This file
@@ -103,8 +100,8 @@ Nexus_Dev/
 
 ### Item
 - `name` (string)
-- `item_type` (string: one of `"note"`, `"task_list"`, `"stickynotes"`)
-- `body` (text; note HTML, task list / sticky JSON as stored)
+- `item_type` (legacy; modern workspace files use `Document`)
+- `body` (legacy text payload)
 - `tasks` (jsonb; used for task lists)
 - `belongs_to :folder`
 - `after_commit` → `ItemStorageSyncLite.sync`
@@ -136,12 +133,9 @@ Nexus_Dev/
 - Delete: removes item row in place, decrements count, keeps folder open.
 - Folder collapse: closes selected item in main pane if it belongs to the collapsing folder.
 
-### `finder_controller.js`
-- Controls which item is "selected" (open in main pane).
-- Item click → open or close main pane.
-- Re-clicking same item → close.
-- Folder click does NOT trigger finder — folder click is organizer-only.
-- Listens for `finder:close-request` events (used by organizer on folder collapse).
+### `finder_browser_controller.js`
+- Handles Finder file-list interactions and selection/open behavior.
+- Owns Finder row actions (create, delete, rename) and refresh flows.
 
 ### `window_manager_controller.js`
 - Manages resize handles on the main window and organizer seam.
@@ -194,14 +188,14 @@ Primary implementation:
 
 - CSS selector block in `app/assets/stylesheets/application.css` under comment:
   - `Subtle theme-matched scrollbars (Safari/Edge/Firefox)`
-- Runtime state class toggling in `app/javascript/controllers/finder_controller.js`:
+- Runtime state class toggling in `app/javascript/controllers/finder_browser_controller.js`:
   - `handleScrollActivity(event)`
   - applies/removes `.is-scrolling` with timeout (`scrollFadeDelayMs`)
 
 When adding a new scrollable container:
 
 1. Add the container selector to the scrollbar CSS lists (`scrollbar-width`, `::-webkit-scrollbar*`, and `.is-scrolling` variants).
-2. Include the selector in `finder_controller.js` `isTracked` matching logic if fade behavior is desired.
+2. Include the selector in `finder_browser_controller.js` `isTracked` matching logic if fade behavior is desired.
 3. Verify on macOS + non-macOS browsers; keep native overlay behavior where it looks better and remains accessible.
 
 ---
@@ -225,7 +219,6 @@ Pattern:
 - Location: `app/services/item_storage_sync_lite.rb`
 - Root: `storage/workspace/`
   - `Tasks.txt`: Singular task list document
-  - `stickynotes.txt`: Sticky Notes canvas data (JSON array)
   - User folders as subdirectories (no items inside)
 - Triggered: `after_commit` on `Folder` and `Item` models.
 - Behavior: rebuilds folder directories and `.nexus` files from current DB state.

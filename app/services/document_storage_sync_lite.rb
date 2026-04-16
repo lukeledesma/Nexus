@@ -124,7 +124,7 @@ class DocumentStorageSyncLite
     target_relative = File.join(parent_relative, filename)
     target_path = absolute_path_for(target_relative)
 
-    File.write(target_path, item_file_contents)
+    File.binwrite(target_path, item_file_contents)
     persist_storage_path(target_relative)
     persist_title_from_basename(strip_supported_extension(filename))
   end
@@ -175,7 +175,7 @@ class DocumentStorageSyncLite
       FileUtils.mv(previous_path, target_path)
     end
 
-    File.write(target_path, item_file_contents)
+    File.binwrite(target_path, item_file_contents)
     persist_storage_path(target_relative) if previous_relative != target_relative
     persist_title_from_basename(strip_supported_extension(target_filename))
   end
@@ -225,6 +225,9 @@ class DocumentStorageSyncLite
 
   def strip_supported_extension(filename)
     value = filename.to_s
+    base = File.basename(value)
+    ext = File.extname(base)
+    return File.basename(base, ext) if Document::ASSET_FILE_EXTENSIONS.include?(ext.downcase)
     return File.basename(value, ".txt") if value.end_with?(".txt")
     return File.basename(value, ".rtf") if value.end_with?(".rtf")
     return File.basename(value, ".nexus") if value.end_with?(".nexus")
@@ -233,22 +236,49 @@ class DocumentStorageSyncLite
   end
 
   def disk_extension_for_file
-    @document.content_type.to_s == "note" ? ".rtf" : ".txt"
+    case @document.content_type.to_s
+    when "note"
+      ".rtf"
+    when "asset"
+      ext = File.extname(@document.storage_path.to_s).downcase
+      return ext if Document::ASSET_FILE_EXTENSIONS.include?(ext)
+
+      pending = @document.pending_disk_extension.to_s.downcase
+      return pending if pending.present? && Document::ASSET_FILE_EXTENSIONS.include?(pending)
+
+      ".bin"
+    else
+      ".txt"
+    end
   end
 
   def item_file_contents
     case @document.content_type.to_s
     when "task_list"
       unified_task_list_contents
-    when "stickynotes"
-      unified_stickynotes_contents
-    when "thread_board"
-      unified_thread_board_contents
     when "note"
       note_rtf_file_body
+    when "asset"
+      asset_file_body
     else
       unified_note_contents
     end
+  end
+
+  def asset_file_body
+    pending = @document.pending_asset_bytes
+    if pending
+      @document.pending_asset_bytes = nil
+      return pending.to_s.b
+    end
+
+    rel = @document.storage_path.to_s
+    return "".b if rel.blank?
+
+    path = absolute_path_for(rel)
+    return "".b unless path.file?
+
+    File.binread(path)
   end
 
   # Legacy plain-text + NEXUS header (only if a non-note type ever used note body format).
@@ -265,28 +295,6 @@ class DocumentStorageSyncLite
 
   def note_rtf_file_body
     NoteRtfConverter.html_to_rtf(@document.content.to_s)
-  end
-
-  def unified_stickynotes_contents
-    header = NexusFileFormat.unified_header_lines(
-      kind: NexusFileFormat::KIND_STICKYNOTES,
-      title: @document.title,
-      document_id: @document.id,
-      created_at: @document.created_at,
-      updated_at: @document.updated_at
-    )
-    (header + [@document.content.to_s]).join("\n")
-  end
-
-  def unified_thread_board_contents
-    header = NexusFileFormat.unified_header_lines(
-      kind: NexusFileFormat::KIND_THREAD_BOARD,
-      title: @document.title,
-      document_id: @document.id,
-      created_at: @document.created_at,
-      updated_at: @document.updated_at
-    )
-    (header + [@document.content.to_s]).join("\n")
   end
 
   def unified_task_list_contents

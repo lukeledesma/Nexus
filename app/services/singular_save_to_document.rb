@@ -1,12 +1,9 @@
 # frozen_string_literal: true
 
-# Writes the singular App-folder Item (Notepad, Tasks, Sticky Notes) into a user-chosen Finder folder as a Document.
+# Writes the singular App-folder Item (Tasks) into a user-chosen Finder folder as a Document.
 class SingularSaveToDocument
   FRAME_MAP = {
-    "singular-note-pane" => { item_type: "note", content_type: "note" },
-    "singular-task-list-pane" => { item_type: "task_list", content_type: "task_list" },
-    "singular-sticky-notes-pane" => { item_type: "stickynotes", content_type: "stickynotes" },
-    "singular-thread-board-pane" => { item_type: "thread_board", content_type: "thread_board" }
+    "singular-task-list-pane" => { item_type: "task_list", content_type: "task_list" }
   }.freeze
 
   def initialize(user:, folder_id:, frame_id:, filename:, document_id: nil)
@@ -47,7 +44,12 @@ class SingularSaveToDocument
   private
 
   def folder_allowed?(folder)
-    FinderListedFolders.user_folders(@user).exists?(folder.id)
+    root = Apps::FinderController.workspace_finder_root_folder(@user)
+    return false unless root
+    return true if folder.id == root.id
+    return false unless folder.folder?
+
+    Apps::FinderController.document_in_finder_subtree?(root, folder)
   end
 
   def find_or_build_document(folder, content_type, title)
@@ -70,24 +72,9 @@ class SingularSaveToDocument
 
   def assign_from_item(doc, item, content_type)
     case content_type
-    when "note"
-      doc.content = item.body.to_s
-      doc.tasks = []
     when "task_list"
       doc.tasks = item.tasks
       doc.content = nil
-      doc.reset_mode = "none"
-      doc.reset_days = []
-      doc.last_reset_at = nil
-    when "stickynotes"
-      doc.content = item.body.to_s
-      doc.tasks = []
-      doc.reset_mode = "none"
-      doc.reset_days = []
-      doc.last_reset_at = nil
-    when "thread_board"
-      doc.content = item.body.to_s
-      doc.tasks = []
       doc.reset_mode = "none"
       doc.reset_days = []
       doc.last_reset_at = nil
