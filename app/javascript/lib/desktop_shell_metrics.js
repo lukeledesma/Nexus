@@ -25,3 +25,17 @@ export function getNexusDesktopShellInsetPx() {
   const os = getOsWindowPaddingPx()
   return Math.max(8, Math.round(os * 0.65))
 }
+
+export function isDesktopSidePanelOpen() {
+  return Boolean(document.querySelector(".desktop-side-panel-host--open"))
+}
+
+export function getDesktopSidePanelBlockEndPx() {
+  if (!isDesktopSidePanelOpen()) return 0
+  const drawer = document.querySelector(".desktop-side-panel-drawer")
+  if (!drawer) return 0
+  const width = drawer.offsetWidth || parseFloat(getComputedStyle(drawer).width) || 0
+  if (!Number.isFinite(width) || width <= 0) return 0
+  const inset = getNexusDesktopShellInsetPx()
+  return Math.round(inset + width + inset)
+}

@@ -3,11 +3,9 @@ import { Controller } from "@hotwired/stimulus"
 /** App launcher rows (side panel): toggle windows + reflect `app-window:state`. */
 export default class extends Controller {
   connect() {
-    console.log("[organizer] controller connecting")
     this.boundAppWindowState = this.handleAppWindowState.bind(this)
     window.addEventListener("app-window:state", this.boundAppWindowState)
     this.clearRowActiveState()
-    console.log("[organizer] controller connected, listening for app-window:state")
   }
 
   disconnect() {
@@ -16,12 +14,9 @@ export default class extends Controller {
 
   launchApp(event) {
     const appKey = event.currentTarget.dataset.windowKey
-    console.log("[organizer] launchApp clicked:", appKey)
     if (!appKey) {
-      console.log("[organizer] ERROR: no appKey found on button")
       return
     }
-    console.log("[organizer] Dispatching app-window:toggle for:", appKey)
     window.dispatchEvent(new CustomEvent("app-window:toggle", { detail: { appKey } }))
   }
 

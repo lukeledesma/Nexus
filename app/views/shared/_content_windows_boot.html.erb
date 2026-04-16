@@ -29,24 +29,27 @@
 
   function shellW() {
     var shell = document.getElementById("desktop-shell")
-    return shell ? Math.max(SHELL_MIN_W, shell.clientWidth) : Math.max(SHELL_MIN_W, window.innerWidth)
+    var canvas = document.getElementById("desktop-shell-canvas")
+    var shellW = shell ? shell.clientWidth : window.innerWidth
+    var canvasW = canvas ? canvas.offsetWidth : 0
+    return Math.max(SHELL_MIN_W, shellW, canvasW)
   }
 
   function shellH() {
     var shell = document.getElementById("desktop-shell")
-    return shell ? Math.max(SHELL_MIN_H, shell.clientHeight) : Math.max(SHELL_MIN_H, window.innerHeight)
+    var canvas = document.getElementById("desktop-shell-canvas")
+    var shellH = shell ? shell.clientHeight : window.innerHeight
+    var canvasH = canvas ? canvas.offsetHeight : 0
+    return Math.max(SHELL_MIN_H, shellH, canvasH)
   }
 
   function clampBounds(left, top, w, h) {
-    var vw = shellW()
-    var vh = shellH()
     var margin = desktopShellInsetPx()
-    var bot = margin
     var dock = margin
     w = Math.max(44, w)
     h = Math.max(44, h)
-    left = Math.min(Math.max(left, dock), Math.max(dock, vw - margin - w))
-    top = Math.min(Math.max(top, margin), Math.max(margin, vh - bot - h))
+    left = Math.max(left, dock)
+    top = Math.max(top, margin)
     return {
       left: Math.round(left),
       top: Math.round(top),
@@ -90,6 +93,8 @@
   } catch (e) { layers = null }
 
   var maxZ = 1500
+  var maxRight = SHELL_MIN_W
+  var maxBottom = SHELL_MIN_H
   var sections = document.querySelectorAll("section.content-window.os-window[data-content-window-storage-key-value]")
   for (var i = 0; i < sections.length; i++) {
     var section = sections[i]
@@ -109,6 +114,8 @@
           section.style.top = c.top + "px"
           section.style.width = c.width + "px"
           section.style.height = c.height + "px"
+          maxRight = Math.max(maxRight, c.left + c.width + desktopShellInsetPx())
+          maxBottom = Math.max(maxBottom, c.top + c.height + desktopShellInsetPx())
         }
       } catch (e) { /* ignore */ }
     }
@@ -139,6 +146,13 @@
     var existing = frame.getAttribute("src")
     if (existing === frameSrc) continue
     frame.setAttribute("src", frameSrc)
+  }
+
+  var canvas = document.getElementById("desktop-shell-canvas")
+  var shell = document.getElementById("desktop-shell")
+  if (canvas && shell) {
+    canvas.style.width = Math.max(SHELL_MIN_W, shell.clientWidth, Math.ceil(maxRight)) + "px"
+    canvas.style.height = Math.max(SHELL_MIN_H, shell.clientHeight, Math.ceil(maxBottom)) + "px"
   }
 
   window.__nexusDesktopZIndex = maxZ

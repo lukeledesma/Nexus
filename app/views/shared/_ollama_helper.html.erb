@@ -71,33 +71,4 @@
         decoding="async">
     </div>
   </div>
-<%# Position payload stores right/bottom only (left/top is normalized in script right after dock opens). Matches ollama_helper_controller STORAGE_POS. %>
-<script>
-(function () {
-  try {
-    var raw = localStorage.getItem("nexus.ollamaHelper.position")
-    if (!raw) return
-    var dock = document.getElementById("ollama-helper-dock")
-    if (!dock) return
-    var o = JSON.parse(raw)
-    if (typeof o.left === "number" && typeof o.top === "number") return
-    if (typeof o.right !== "number" || typeof o.bottom !== "number" || !isFinite(o.right) || !isFinite(o.bottom)) return
-    function placeLegacy() {
-      var w = dock.offsetWidth
-      var h = dock.offsetHeight
-      if (w < 4 || h < 4) {
-        requestAnimationFrame(placeLegacy)
-        return
-      }
-      var iw = window.innerWidth
-      var ih = window.innerHeight
-      dock.style.left = Math.round(iw - o.right - w) + "px"
-      dock.style.top = Math.round(ih - o.bottom - h) + "px"
-      dock.style.right = "auto"
-      dock.style.bottom = "auto"
-    }
-    requestAnimationFrame(placeLegacy)
-  } catch (e) { /* private mode / bad JSON */ }
-})()
-</script>
 </div>

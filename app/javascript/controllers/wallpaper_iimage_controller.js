@@ -435,18 +435,23 @@ export default class extends Controller {
     const types = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : []
     if (!types.includes("Files")) return
 
-    const row = event.target.closest?.(".settings-iimage-droprow")
-    if (!row || !this.element.contains(row)) {
+    const dropTarget = event.target.closest?.(
+      ".settings-iimage-surface, .settings-iimage-finder-panel, .settings-iimage-file-rows, .settings-iimage-wallpaper-row"
+    )
+    if (!dropTarget || !this.element.contains(dropTarget)) {
       this.clearDropHover()
       return
     }
 
     event.preventDefault()
     event.dataTransfer.dropEffect = "copy"
+    const row = dropTarget.closest?.(".settings-iimage-wallpaper-row") || null
     if (this._dropHoverEl !== row) {
       this.clearDropHover()
-      this._dropHoverEl = row
-      row.classList.add("finder-tree__row-line--drop-target")
+      if (row) {
+        this._dropHoverEl = row
+        row.classList.add("finder-tree__row-line--drop-target")
+      }
     }
   }
 
@@ -455,8 +460,10 @@ export default class extends Controller {
     if (!this.folderOk()) return
 
     const dt = event.dataTransfer
-    const row = event.target.closest?.(".settings-iimage-droprow")
-    if (!row || !this.element.contains(row)) return
+    const dropTarget = event.target.closest?.(
+      ".settings-iimage-surface, .settings-iimage-finder-panel, .settings-iimage-file-rows, .settings-iimage-wallpaper-row"
+    )
+    if (!dropTarget || !this.element.contains(dropTarget)) return
 
     const hasDroppedFiles = dt?.files?.length > 0
     if (!hasDroppedFiles) return

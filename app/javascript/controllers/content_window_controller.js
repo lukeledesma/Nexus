@@ -1,15 +1,11 @@
 import { Controller } from "@hotwired/stimulus"
-import { getNexusDesktopShellInsetPx } from "lib/desktop_shell_metrics"
+import { getDesktopSidePanelBlockEndPx, getNexusDesktopShellInsetPx } from "lib/desktop_shell_metrics"
 import { createOsWindowSizer } from "lib/os_window_sizing"
 import { syncOrganizerAboveVisibleContentWindows } from "lib/nexus_desktop_layers"
 import { clearSingularPickerDraft, SINGULAR_BEFORE_SAVE_PICKER } from "lib/singular_finder_picker_draft"
 
 /** Kept in sync with inline boot script in `shared/_content_windows_boot.html.erb`. */
 const DESKTOP_WINDOW_LAYERS_KEY = "nexus.desktop.windowLayers"
-/** Match ollama crab DOCK_EDGE_HUG_PX: treat as “touching” within this many px of a viewport edge. */
-const BOUNDS_EDGE_HUG_PX = 3
-/** Smallest outer size while viewport is smaller than operational minimum (px). */
-const VIEWPORT_MIN_WINDOW_PX = 44
 /** Treat as “at least operational min” within this many px (subpixel + border rounding). */
 const MIN_SIZE_SLACK_PX = 2
 /** Desktop canvas minimum app area (px): when viewport is smaller, shell scrolls instead of shrinking windows further. */
@@ -73,6 +69,7 @@ export default class extends Controller {
     this.activeResize = null
     this._boundsPinX = "none"
     this._boundsPinY = "none"
+    this._lastSidePanelBlockEnd = getDesktopSidePanelBlockEndPx()
 
     this.boundDragMove = this.handleDragMove.bind(this)
     this.boundDragEnd = this.stopDrag.bind(this)
@@ -94,6 +91,8 @@ export default class extends Controller {
       this.reconcileWindowOnViewportResize({ viewportResize: true })
     }
     window.addEventListener("resize", this.boundViewportResize)
+    this.boundSidePanelLayoutChange = this.handleSidePanelLayoutChange.bind(this)
+    window.addEventListener("nexus:side-panel-layout-change", this.boundSidePanelLayoutChange)
 
     if (this.hasSingularSavePickerValue) {
       this.boundSingularPickerClose = this.handleSingularSavePickerClose.bind(this)
@@ -134,6 +133,7 @@ export default class extends Controller {
     window.removeEventListener("app-window:close", this.boundCloseRequest)
     window.removeEventListener("nexus:singular-disk-saved", this.boundSingularSaved)
     window.removeEventListener("resize", this.boundViewportResize)
+    window.removeEventListener("nexus:side-panel-layout-change", this.boundSidePanelLayoutChange)
     if (this.boundSingularPickerClose) {
       window.removeEventListener("nexus:singular-save-picker-close", this.boundSingularPickerClose)
     }
@@ -575,33 +575,125 @@ export default class extends Controller {
 
   /** Minimum viewport `left` (shell inset + open side panel block). */
   effectiveLeftBoundary() {
-    return this.dockLeftBoundary
+    const panelBlockEnd = getDesktopSidePanelBlockEndPx()
+    return panelBlockEnd > this.dockLeftBoundary ? panelBlockEnd : this.dockLeftBoundary
+  }
+
+  panelIsOpen() {
+    return getDesktopSidePanelBlockEndPx() > this.dockLeftBoundary
   }
 
   desktopShellElement() {
     return document.getElementById("desktop-shell")
   }
 
-  desktopWorkAreaSize() {
+  currentLocalBounds() {
+    const rect = this.element.getBoundingClientRect()
     const shell = this.desktopShellElement()
-    const viewportW = shell ? shell.clientWidth : window.innerWidth
-    const viewportH = shell ? shell.clientHeight : window.innerHeight
-    const minW = this.effectiveLeftBoundary() + this.desktopMinAppWidth
-    const minH = this.desktopMinAppHeight
+    const scrollLeft = shell ? shell.scrollLeft : window.scrollX
+    const scrollTop = shell ? shell.scrollTop : window.scrollY
+    const shellRect = shell ? shell.getBoundingClientRect() : { left: 0, top: 0 }
     return {
-      width: Math.max(minW, viewportW),
-      height: Math.max(minH, viewportH)
+      left: rect.left - shellRect.left + scrollLeft,
+      top: rect.top - shellRect.top + scrollTop,
+      width: rect.width,
+      height: rect.height
     }
+  }
+
+  visibleShellBounds() {
+    const shell = this.desktopShellElement()
+    const scrollLeft = shell ? shell.scrollLeft : window.scrollX
+    const scrollTop = shell ? shell.scrollTop : window.scrollY
+    const clientWidth = shell ? shell.clientWidth : window.innerWidth
+    const clientHeight = shell ? shell.clientHeight : window.innerHeight
+    return {
+      left: scrollLeft,
+      top: scrollTop,
+      right: scrollLeft + clientWidth,
+      bottom: scrollTop + clientHeight
+    }
+  }
+
+  ensureDesktopCanvasContainsBounds(bounds) {
+    const shell = this.desktopShellElement()
+    const canvas = document.getElementById("desktop-shell-canvas")
+    if (!shell || !canvas) return
+    const nextWidth = Math.max(
+      this.desktopMinAppWidth,
+      shell.clientWidth,
+      Math.ceil(bounds.left + bounds.width + this.viewportMargin)
+    )
+    const nextHeight = Math.max(
+      this.desktopMinAppHeight,
+      shell.clientHeight,
+      Math.ceil(bounds.top + bounds.height + this.bottomDockBoundary)
+    )
+    canvas.style.width = `${nextWidth}px`
+    canvas.style.height = `${nextHeight}px`
   }
 
   syncDesktopCanvasDimensions() {
     const shell = this.desktopShellElement()
     const canvas = document.getElementById("desktop-shell-canvas")
     if (!shell || !canvas) return
-    const minW = this.desktopMinAppWidth
-    const minH = this.desktopMinAppHeight
-    canvas.style.minWidth = `${Math.round(minW)}px`
-    canvas.style.minHeight = `${Math.round(minH)}px`
+    let maxRight = this.desktopMinAppWidth
+    let maxBottom = this.desktopMinAppHeight
+    document.querySelectorAll("section.content-window.os-window:not(.is-hidden)").forEach((el) => {
+      const rect = el.getBoundingClientRect()
+      const shellRect = shell.getBoundingClientRect()
+      const left = rect.left - shellRect.left + shell.scrollLeft
+      const top = rect.top - shellRect.top + shell.scrollTop
+      maxRight = Math.max(maxRight, Math.ceil(left + rect.width + this.viewportMargin))
+      maxBottom = Math.max(maxBottom, Math.ceil(top + rect.height + this.bottomDockBoundary))
+    })
+    canvas.style.width = `${Math.max(this.desktopMinAppWidth, shell.clientWidth, maxRight)}px`
+    canvas.style.height = `${Math.max(this.desktopMinAppHeight, shell.clientHeight, maxBottom)}px`
+  }
+
+  handleSidePanelLayoutChange(event) {
+    if (this.element.classList.contains("is-hidden")) return
+    if (this.activeDrag || this.activeResize) return
+
+    const detail = event?.detail || {}
+    const nextBlockEnd = Number.isFinite(detail.blockEnd) ? detail.blockEnd : this.effectiveLeftBoundary()
+    const prevBlockEnd = Number.isFinite(this._lastSidePanelBlockEnd) ? this._lastSidePanelBlockEnd : nextBlockEnd
+    this._lastSidePanelBlockEnd = nextBlockEnd
+
+    const current = this.currentLocalBounds()
+    let left = Math.max(this.dockLeftBoundary, current.left)
+    let top = Math.max(this.viewportMargin, current.top)
+
+    if (detail.open) {
+      if (left < nextBlockEnd) left = nextBlockEnd
+    } else {
+      const visible = this.visibleShellBounds()
+      const targetLeftToFitInView = Math.max(
+        this.dockLeftBoundary,
+        visible.right - this.viewportMargin - current.width
+      )
+      
+      // Check if window currently fits in visible area
+      const windowRight = left + current.width + this.viewportMargin
+      const fitsInView = windowRight <= visible.right
+      
+      if (!fitsInView) {
+        // Window is scrolled off-screen; aggressively pull it left to fit
+        left = targetLeftToFitInView
+      } else {
+        // Window already fits; shift left by reclaimed space if available
+        const reclaimed = Math.max(0, prevBlockEnd - nextBlockEnd)
+        if (reclaimed > 0) {
+          left = Math.max(this.dockLeftBoundary, left - reclaimed)
+        }
+      }
+    }
+
+    this.element.style.left = `${Math.round(left)}px`
+    this.element.style.top = `${Math.round(top)}px`
+    this.ensureDesktopCanvasContainsBounds({ left, top, width: current.width, height: current.height })
+    this.syncDesktopCanvasDimensions()
+    this.saveWindowBounds()
   }
 
   startDrag(event) {
@@ -641,16 +733,13 @@ export default class extends Controller {
     const margin = this.viewportMargin
     const w = this.element.offsetWidth
     const h = this.element.offsetHeight
-    const work = this.desktopWorkAreaSize()
-    const vw = work.width
-    const vh = work.height
-
     const dock = this.effectiveLeftBoundary()
-    const left = Math.min(Math.max(coords.x - this.activeDrag.offsetX, dock), vw - margin - w)
-    const top  = Math.min(Math.max(coords.y - this.activeDrag.offsetY, margin), vh - this.bottomDockBoundary - h)
+    const left = Math.max(coords.x - this.activeDrag.offsetX, dock)
+    const top  = Math.max(coords.y - this.activeDrag.offsetY, margin)
 
     this.element.style.left = `${left}px`
     this.element.style.top = `${top}px`
+    this.ensureDesktopCanvasContainsBounds({ left, top, width: w, height: h })
   }
 
   stopDrag() {
@@ -757,9 +846,6 @@ export default class extends Controller {
     const deltaX = coords.x - this.activeResize.startX
     const deltaY = coords.y - this.activeResize.startY
     const edge = this.activeResize.edge
-    const work = this.desktopWorkAreaSize()
-    const vw = work.width
-    const vh = work.height
     const margin = this.viewportMargin
 
     let left = this.activeResize.startLeft
@@ -779,105 +865,30 @@ export default class extends Controller {
     if (edge.includes("bottom")) height += deltaY
 
     const dockBound = this.effectiveLeftBoundary()
-    const bot = this.bottomDockBoundary
     const minW = this.minWindowWidth
     const minH = this.minWindowHeight
 
     left = Math.max(dockBound, left)
     top = Math.max(margin, top)
-    let maxFitW = vw - margin - left
-    let maxFitH = vh - bot - top
-    width = Math.min(width, maxFitW)
-    height = Math.min(height, maxFitH)
-
-    const viewportFitsMin = maxFitW >= minW && maxFitH >= minH
-
-    if (viewportFitsMin) {
-      const ar = this.activeResize
-      if (width < minW) {
-        if (edge.includes("left")) left = ar.anchorRight - minW
-        else if (edge.includes("right")) left = ar.anchorLeft
-        width = minW
-      }
-      if (height < minH) {
-        if (edge.includes("top")) top = ar.anchorBottom - minH
-        else if (edge.includes("bottom")) top = ar.anchorTop
-        height = minH
-      }
-      left = Math.max(dockBound, left)
-      top = Math.max(margin, top)
-      width = Math.min(Math.max(width, minW), vw - margin - left)
-      height = Math.min(Math.max(height, minH), vh - bot - top)
-      if (left + width > vw - margin) left = vw - margin - width
-      if (top + height > vh - bot) top = vh - bot - height
-      left = Math.max(dockBound, left)
-      top = Math.max(margin, top)
-    } else {
-      /* Viewport slot smaller than min: still never go below operational min while dragging (browser resize may compress later). */
-      width = Math.max(minW, Math.min(width, maxFitW))
-      height = Math.max(minH, Math.min(height, maxFitH))
+    const ar = this.activeResize
+    if (width < minW) {
+      if (edge.includes("left")) left = ar.anchorRight - minW
+      else if (edge.includes("right")) left = ar.anchorLeft
+      width = minW
     }
+    if (height < minH) {
+      if (edge.includes("top")) top = ar.anchorBottom - minH
+      else if (edge.includes("bottom")) top = ar.anchorTop
+      height = minH
+    }
+    left = Math.max(dockBound, left)
+    top = Math.max(margin, top)
 
     this.element.style.left = `${left}px`
     this.element.style.top = `${top}px`
     this.element.style.width = `${width}px`
     this.element.style.height = `${height}px`
-  }
-
-  /**
-   * Fit width/height to the viewport from (left, top). Above operational min (and when the slot
-   * fits minW×minH), clamp independently. Otherwise keep the **operational min aspect ratio**
-   * (minW : minH) so compress/expand tracks the active resize edge instead of freezing one axis.
-   *
-   * @param {string | null} resizeEdge handle edge during live resize ("right", "bottom-right", …); omit for layout-only calls.
-   */
-  viewportFitContentDimensions(left, top, w, h, resizeEdge = null) {
-    const work = this.desktopWorkAreaSize()
-    const iw = work.width
-    const ih = work.height
-    const m = this.viewportMargin
-    const bot = this.bottomDockBoundary
-    const minW = this.minWindowWidth
-    const minH = this.minWindowHeight
-    const slack = MIN_SIZE_SLACK_PX
-
-    /* Transient 0×0 or bad layout during first paint — keep previous size. */
-    if (iw < 64 || ih < 64 || !Number.isFinite(left) || !Number.isFinite(top)) {
-      return { width: w, height: h }
-    }
-
-    const maxFitW = Math.max(VIEWPORT_MIN_WINDOW_PX, iw - m - left)
-    const maxFitH = Math.max(VIEWPORT_MIN_WINDOW_PX, ih - bot - top)
-
-    const canSlotFitMin = maxFitW >= minW && maxFitH >= minH
-    const userAtOrAboveMin = w + slack >= minW && h + slack >= minH
-
-    if (canSlotFitMin && userAtOrAboveMin) {
-      const width = Math.min(Math.max(w, minW), maxFitW)
-      const height = Math.min(Math.max(h, minH), maxFitH)
-      return { width, height }
-    }
-
-    const sMax = Math.min(maxFitW / minW, maxFitH / minH)
-    const sMin = Math.max(VIEWPORT_MIN_WINDOW_PX / minW, VIEWPORT_MIN_WINDOW_PX / minH)
-    const edge = typeof resizeEdge === "string" ? resizeEdge : ""
-    const isCorner = edge.includes("-")
-    let s
-    if (isCorner) {
-      s = Math.min(w / minW, h / minH)
-    } else if (edge === "left" || edge === "right") {
-      s = w / minW
-    } else if (edge === "top" || edge === "bottom") {
-      s = h / minH
-    } else {
-      s = Math.min(w / minW, h / minH)
-    }
-    if (!Number.isFinite(s) || s <= 0) s = sMin
-    s = Math.min(Math.max(s, sMin), sMax)
-
-    const width = minW * s
-    const height = minH * s
-    return { width, height }
+    this.ensureDesktopCanvasContainsBounds({ left, top, width, height })
   }
 
   stopResize() {
@@ -927,25 +938,6 @@ export default class extends Controller {
     }
   }
 
-  /** Shift top-left so a minW×minH rectangle can fit in the viewport when there is enough global room (drag/resize end — not browser viewport squeeze). */
-  nudgePositionForOperationalSlot(left, top, minW, minH, iw, ih, m, dock, bot) {
-    const maxLeft = iw - m - minW
-    const maxTop = ih - bot - minH
-    let l = left
-    let t = top
-    if (maxLeft >= dock) l = Math.min(Math.max(dock, l), maxLeft)
-    else l = dock
-    if (maxTop >= m) t = Math.min(Math.max(m, t), maxTop)
-    else t = m
-    return { left: l, top: t }
-  }
-
-  /**
-   * Float at a fixed viewport position until an edge would clip the window; then stick to that edge
-   * so further viewport resize moves the window with the border. Pins clear when drag/resize starts.
-   *
-   * @param {{ viewportResize?: boolean }} [options] — Pass `viewportResize: true` only from `window.resize` so compress can run. Drag/resize end uses layout-only reconciliation (min size + nudge).
-   */
   reconcileWindowOnViewportResize(options = {}) {
     const viewportResize = options.viewportResize === true
     if (this.element.classList.contains("is-hidden")) return
@@ -953,206 +945,63 @@ export default class extends Controller {
 
     const iwViewport = window.innerWidth
     const ihViewport = window.innerHeight
-    const work = this.desktopWorkAreaSize()
-    const iw = work.width
-    const ih = work.height
-    const prevW = this._viewportResizeW ?? iw
-    const prevH = this._viewportResizeH ?? ih
-    /* Ignore 1px jitter (mobile URL bar, subpixel) so we don’t re-run pin logic and drift saves. */
-    const shrinkX = iwViewport + 2 < prevW
-    const shrinkY = ihViewport + 2 < prevH
+    const prevW = this._viewportResizeW ?? iwViewport
+    const prevH = this._viewportResizeH ?? ihViewport
+    const grewX = iwViewport > prevW + 2
+    const grewY = ihViewport > prevH + 2
     this._viewportResizeW = iwViewport
     this._viewportResizeH = ihViewport
 
-    const dock = this.effectiveLeftBoundary()
-    const m = this.viewportMargin
-    const bot = this.bottomDockBoundary
-    const hug = BOUNDS_EDGE_HUG_PX
+    const bounds = this.currentLocalBounds()
+    let left = Math.max(this.dockLeftBoundary, bounds.left)
+    let top = Math.max(this.viewportMargin, bounds.top)
+    const panelBlockEnd = this.effectiveLeftBoundary()
+    if (this.panelIsOpen() && left < panelBlockEnd) left = panelBlockEnd
 
-    const r = this.element.getBoundingClientRect()
-    const shell = this.desktopShellElement()
-    const scrollLeft = shell ? shell.scrollLeft : window.scrollX
-    const scrollTop = shell ? shell.scrollTop : window.scrollY
-    const shellRect = shell ? shell.getBoundingClientRect() : { left: 0, top: 0 }
-    let w = r.width
-    let h = r.height
-    let left = r.left - shellRect.left + scrollLeft
-    let top = r.top - shellRect.top + scrollTop
-    if (w < 1 || h < 1) return
-
-    const minW = this.minWindowWidth
-    const minH = this.minWindowHeight
-
-    let pinX = this._boundsPinX
-    let pinY = this._boundsPinY
-
-    if (w + dock + m > iw) {
-      left = dock
-      pinX = "left"
-    }
-    if (h + m + bot > ih) {
-      top = m
-      pinY = "top"
-    }
-
-    if (shrinkX) {
-      if (pinX === "right") {
-        left = iw - w - m
-      } else if (pinX === "left") {
-        left = dock
-      } else {
-        const overflowRight = left + w > iw - m
-        const overflowLeft = left < dock
-        const hugLeft = left <= dock + hug
-        const hugRight = left + w >= iw - m - hug
-
-        if (overflowLeft && overflowRight) {
-          const gapL = left - dock
-          const gapR = iw - m - (left + w)
-          if (gapL <= gapR) {
-            left = dock
-            pinX = "left"
-          } else {
-            left = iw - w - m
-            pinX = "right"
-          }
-        } else if (overflowRight && hugLeft) {
-          left = dock
-          pinX = "left"
-        } else if (overflowLeft && hugRight) {
-          left = iw - w - m
-          pinX = "right"
-        } else if (overflowRight) {
-          left = iw - w - m
-          pinX = "right"
-        } else if (overflowLeft) {
-          left = dock
-          pinX = "left"
-        }
+    const visible = this.visibleShellBounds()
+    if (viewportResize && grewX) {
+      const maxVisibleLeft = visible.right - this.viewportMargin - bounds.width
+      if (maxVisibleLeft >= this.dockLeftBoundary && left > maxVisibleLeft) {
+        left = maxVisibleLeft
       }
-    } else {
-      if (left < dock) left = dock
-      if (left + w > iw - m) left = iw - w - m
     }
-
-    if (shrinkY) {
-      if (pinY === "bottom") {
-        top = ih - h - bot
-      } else if (pinY === "top") {
-        top = m
-      } else {
-        const overflowBottom = top + h > ih - bot
-        const overflowTop = top < m
-        const hugTop = top <= m + hug
-        const hugBottom = top + h >= ih - bot - hug
-
-        if (overflowTop && overflowBottom) {
-          const gapT = top - m
-          const gapB = ih - bot - (top + h)
-          if (gapT <= gapB) {
-            top = m
-            pinY = "top"
-          } else {
-            top = ih - h - bot
-            pinY = "bottom"
-          }
-        } else if (overflowBottom && hugTop) {
-          top = m
-          pinY = "top"
-        } else if (overflowTop && hugBottom) {
-          top = ih - h - bot
-          pinY = "bottom"
-        } else if (overflowBottom) {
-          top = ih - h - bot
-          pinY = "bottom"
-        } else if (overflowTop) {
-          top = m
-          pinY = "top"
-        }
+    if (viewportResize && grewY) {
+      const maxVisibleTop = visible.bottom - this.bottomDockBoundary - bounds.height
+      if (maxVisibleTop >= this.viewportMargin && top > maxVisibleTop) {
+        top = maxVisibleTop
       }
-    } else {
-      if (top < m) top = m
-      if (top + h > ih - bot) top = ih - h - bot
     }
-
-    const maxL = Math.max(dock, iw - w - m)
-    const maxT = Math.max(m, ih - h - bot)
-    left = Math.min(Math.max(dock, left), maxL)
-    top = Math.min(Math.max(m, top), maxT)
-
-    const prefW = Math.max(this.preferredWindowWidth, minW)
-    const prefH = Math.max(this.preferredWindowHeight, minH)
-
-    if (viewportResize) {
-      const maxFitW = Math.max(VIEWPORT_MIN_WINDOW_PX, iw - m - left)
-      const maxFitH = Math.max(VIEWPORT_MIN_WINDOW_PX, ih - bot - top)
-      const wTry = Math.min(prefW, maxFitW)
-      const hTry = Math.min(prefH, maxFitH)
-
-      const fit = this.viewportFitContentDimensions(left, top, wTry, hTry, null)
-      w = fit.width
-      h = fit.height
-    } else {
-      const nudged = this.nudgePositionForOperationalSlot(left, top, minW, minH, iw, ih, m, dock, bot)
-      left = nudged.left
-      top = nudged.top
-
-      let maxFw = iw - m - left
-      let maxFh = ih - bot - top
-      w = Math.max(minW, Math.min(prefW, maxFw))
-      h = Math.max(minH, Math.min(prefH, maxFh))
-      left = Math.min(Math.max(dock, left), iw - m - w)
-      top = Math.min(Math.max(m, top), ih - bot - h)
-      maxFw = iw - m - left
-      maxFh = ih - bot - top
-      w = Math.max(minW, Math.min(prefW, maxFw))
-      h = Math.max(minH, Math.min(prefH, maxFh))
-    }
-
-    this._boundsPinX = pinX
-    this._boundsPinY = pinY
 
     this.element.style.left = `${Math.round(left)}px`
     this.element.style.top = `${Math.round(top)}px`
-    if (!this.isAutoSizedWindow) {
-      this.element.style.width = `${Math.round(w)}px`
-      this.element.style.height = `${Math.round(h)}px`
-    }
-
+    this.ensureDesktopCanvasContainsBounds({ left, top, width: bounds.width, height: bounds.height })
+    this.syncDesktopCanvasDimensions()
     this.saveWindowBounds()
   }
 
   positionWindow() {
-    const work = this.desktopWorkAreaSize()
-    const vw = work.width
-    const vh = work.height
-    let width = Math.max(this.minWindowWidth, Math.min(this.windowWidth, vw - 40))
-    let height = Math.max(this.minWindowHeight, Math.min(this.windowHeight, vh - 40))
-
     const shell = this.desktopShellElement()
     const scrollLeft = shell ? shell.scrollLeft : window.scrollX
     const scrollTop = shell ? shell.scrollTop : window.scrollY
+    const clientWidth = shell ? shell.clientWidth : window.innerWidth
+    const clientHeight = shell ? shell.clientHeight : window.innerHeight
+    const width = Math.max(this.minWindowWidth, this.windowWidth)
+    const height = Math.max(this.minWindowHeight, this.windowHeight)
     let centeredLeft = Math.round(scrollLeft + ((shell ? shell.clientWidth : window.innerWidth) - width) / 2)
     let centeredTop = Math.round(scrollTop + ((shell ? shell.clientHeight : window.innerHeight) - height) / 2)
     const dock = this.effectiveLeftBoundary()
-    let maxLeft = Math.max(dock, vw - this.viewportMargin - width)
-    let maxTop = Math.max(this.viewportMargin, vh - this.bottomDockBoundary - height)
-    let left = Math.min(Math.max(centeredLeft, dock), maxLeft)
-    let top = Math.min(Math.max(centeredTop, this.viewportMargin), maxTop)
-
-    const fit = this.viewportFitContentDimensions(left, top, width, height, null)
-    width = fit.width
-    height = fit.height
-    left = Math.min(Math.max(left, dock), vw - this.viewportMargin - width)
-    top = Math.min(Math.max(top, this.viewportMargin), vh - this.bottomDockBoundary - height)
-    const fit2 = this.viewportFitContentDimensions(left, top, width, height, null)
-    width = fit2.width
-    height = fit2.height
+    const maxVisibleLeft = scrollLeft + clientWidth - this.viewportMargin - width
+    const maxVisibleTop = scrollTop + clientHeight - this.bottomDockBoundary - height
+    let left = Math.max(centeredLeft, dock)
+    let top = Math.max(centeredTop, this.viewportMargin)
+    if (maxVisibleLeft >= dock) left = Math.min(left, maxVisibleLeft)
+    if (maxVisibleTop >= this.viewportMargin) top = Math.min(top, maxVisibleTop)
 
     this.element.style.width = `${width}px`
     this.element.style.height = `${height}px`
     this.element.style.left = `${left}px`
     this.element.style.top = `${top}px`
+    this.ensureDesktopCanvasContainsBounds({ left, top, width, height })
   }
 
   restoreWindowBounds() {
@@ -1262,26 +1111,11 @@ export default class extends Controller {
   }
 
   clampBounds(bounds) {
-    const work = this.desktopWorkAreaSize()
-    const vw = work.width
-    const vh = work.height
-    const margin = this.viewportMargin
-    const dock = this.effectiveLeftBoundary()
-    const bot = this.bottomDockBoundary
-    let width = bounds.width
-    let height = bounds.height
-    const maxLeft0 = Math.max(dock, vw - margin - width)
-    const maxTop0 = Math.max(margin, vh - bot - height)
-    let left = Math.min(Math.max(bounds.left, dock), maxLeft0)
-    let top = Math.min(Math.max(bounds.top, margin), maxTop0)
-
-    const fit = this.viewportFitContentDimensions(left, top, width, height, null)
-    width = fit.width
-    height = fit.height
-    left = Math.min(Math.max(left, dock), vw - margin - width)
-    top = Math.min(Math.max(top, margin), vh - bot - height)
-    const fit2 = this.viewportFitContentDimensions(left, top, width, height, null)
-    return { left, top, width: fit2.width, height: fit2.height }
+    const left = Math.max(bounds.left, this.dockLeftBoundary)
+    const top = Math.max(bounds.top, this.viewportMargin)
+    const width = Math.max(bounds.width, this.minWindowWidth)
+    const height = Math.max(bounds.height, this.minWindowHeight)
+    return { left, top, width, height }
   }
 
   applyBounds(bounds) {

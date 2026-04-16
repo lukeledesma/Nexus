@@ -2,7 +2,7 @@ import { Controller } from "@hotwired/stimulus"
 import { getNexusDesktopShellInsetPx } from "lib/desktop_shell_metrics"
 import { syncOrganizerAboveVisibleContentWindows } from "lib/nexus_desktop_layers"
 
-/** Kept in sync with inline boot scripts in `shared/_ollama_helper.html.erb` (early left/top + legacy tail). */
+/** Kept in sync with inline boot script in `shared/_ollama_helper.html.erb` (early left/top). */
 const STORAGE_POS = "nexus.ollamaHelper.position"
 const STORAGE_OPEN = "nexus.ollamaHelper.open"
 const DRAG_THRESHOLD_PX = 6
@@ -68,7 +68,6 @@ export default class extends Controller {
     this._dockPinY = "none"
     this._dockLeft = 0
     this._dockTop = 0
-    this._pendingLegacyRb = null
 
     this._onPetMove = this.handlePetMove.bind(this)
     this._onPetUp = this.handlePetUp.bind(this)
@@ -90,7 +89,6 @@ export default class extends Controller {
     this.bumpActivity()
     this._varietyInterval = window.setInterval(() => this.maybeIdleVariety(), 32_000)
     requestAnimationFrame(() => {
-      this.applyLegacyRightBottomIfPending()
       this.bootstrapDockFromDomIfNeeded()
       this.clampSpawnIfOffScreen()
       this.reconcileDockOnResize()
@@ -99,7 +97,6 @@ export default class extends Controller {
       this.resizeTextarea()
       if (!this._dockPositionReady) {
         requestAnimationFrame(() => {
-          this.applyLegacyRightBottomIfPending()
           this.bootstrapDockFromDomIfNeeded()
           this.clampSpawnIfOffScreen()
           this.reconcileDockOnResize()
@@ -459,31 +456,13 @@ export default class extends Controller {
   }
 
   bootstrapDockFromDomIfNeeded() {
-    if (!this.hasDockTarget || this._dockPositionReady || this._pendingLegacyRb) return
+    if (!this.hasDockTarget || this._dockPositionReady) return
     const r = this.dockTarget.getBoundingClientRect()
     this._dockLeft = r.left
     this._dockTop = r.top
     this._dockPinX = "none"
     this._dockPinY = "none"
     this._dockPositionReady = true
-    this.applyDockPixelPosition()
-  }
-
-  applyLegacyRightBottomIfPending() {
-    if (!this._pendingLegacyRb || !this.hasDockTarget) return
-    const dock = this.dockTarget
-    const w = dock.offsetWidth
-    const h = dock.offsetHeight
-    if (w < 4 || h < 4) return
-    const { right, bottom } = this._pendingLegacyRb
-    const iw = window.innerWidth
-    const ih = window.innerHeight
-    this._dockLeft = iw - right - w
-    this._dockTop = ih - bottom - h
-    this._dockPinX = "none"
-    this._dockPinY = "none"
-    this._dockPositionReady = true
-    this._pendingLegacyRb = null
     this.applyDockPixelPosition()
   }
 
@@ -588,22 +567,18 @@ export default class extends Controller {
           this._dockPinY = o.pinY === "top" || o.pinY === "bottom" ? o.pinY : "none"
           this._dockPositionReady = true
           this.applyDockPixelPosition()
-        } else if (typeof o.right === "number" && typeof o.bottom === "number") {
-          this._pendingLegacyRb = { right: o.right, bottom: o.bottom }
         }
       }
       const open = localStorage.getItem(STORAGE_OPEN) === "1"
       if (open) this.open({ fromRestore: true })
       else this.close({ fromRestore: true })
       requestAnimationFrame(() => {
-        this.applyLegacyRightBottomIfPending()
         this.bootstrapDockFromDomIfNeeded()
         this.clampSpawnIfOffScreen()
         this.reconcileDockOnResize()
         this.scheduleBubblePlacement()
         if (!this._dockPositionReady) {
           requestAnimationFrame(() => {
-            this.applyLegacyRightBottomIfPending()
             this.bootstrapDockFromDomIfNeeded()
             this.clampSpawnIfOffScreen()
             this.reconcileDockOnResize()

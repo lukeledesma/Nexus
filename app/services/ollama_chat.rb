@@ -12,8 +12,9 @@ class OllamaChat
   READ_TIMEOUT = 60
   OPEN_TIMEOUT = 5
   DEFAULT_SYSTEM = "Keep answers short and direct unless the user asks for more detail."
+  DEFAULT_MODEL = "llama3.2:3b"
 
-  # When OLLAMA_MODEL is unset, first installed match wins (small / common names first).
+  # When OLLAMA_MODEL is unset, fallback selection prefers these names.
   PREFERRED_MODELS = %w[
     llama3.2:1b llama3.2:3b llama3.2 llama3.1 llama3
     phi3 phi3:mini gemma2:2b gemma2 qwen2.5:3b qwen2.5 mistral tinyllama
@@ -28,7 +29,13 @@ class OllamaChat
   rescue Error => e
     raise e unless retry_after_model_missing?(e)
 
-    Rails.cache.delete(resolved_model_cache_key)
+    names = fetch_tag_names
+    raise e if names.blank?
+
+    pick = pick_preferred_model(names)
+    raise e if pick.blank?
+
+    Rails.cache.write(resolved_model_cache_key, pick, expires_in: 10.minutes)
     perform_chat(messages)
   end
 
@@ -98,15 +105,7 @@ class OllamaChat
     return explicit if explicit.present?
 
     Rails.cache.fetch(resolved_model_cache_key, expires_in: 10.minutes) do
-      names = fetch_tag_names
-      raise Error, "Cannot reach Ollama at #{base_url} to list models." if names.nil?
-
-      pick = pick_preferred_model(names)
-      if pick.blank?
-        raise Error, "No models installed. Run `ollama pull llama3.2` (or any model), then retry."
-      end
-
-      pick
+      ENV.fetch("OLLAMA_DEFAULT_MODEL", DEFAULT_MODEL).to_s.strip.presence || DEFAULT_MODEL
     end
   end
 
@@ -177,7 +176,7 @@ class OllamaChat
         if explicit_ollama_model?
           " — check OLLAMA_MODEL matches `ollama list`, or run `ollama pull #{model}`."
         else
-          " — run `ollama list` / `ollama pull <name>`, or set OLLAMA_MODEL explicitly."
+          " — run `ollama pull #{DEFAULT_MODEL}` (or set OLLAMA_MODEL), then retry."
         end
       msg += hint
     end

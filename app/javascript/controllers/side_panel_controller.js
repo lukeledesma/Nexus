@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { getDesktopSidePanelBlockEndPx } from "lib/desktop_shell_metrics"
 
 const STORAGE_OPEN_KEY = "nexus.desktop.sidePanelOpen"
 
@@ -20,8 +21,15 @@ export default class extends Controller {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         this.element.classList.remove("desktop-side-panel-host--hydrating")
+        this.scheduleLayoutSync()
       })
     })
+  }
+
+  disconnect() {
+    clearTimeout(this._clearLayoutAnimClass)
+    clearTimeout(this._syncAfterTransition)
+    document.documentElement.classList.remove("nexus-side-panel-layout-animating")
   }
 
   toggle(event) {
@@ -38,6 +46,32 @@ export default class extends Controller {
     if (this.open === next) return
     this.applyOpenDom(next)
     this.persistOpen(next)
+    this.scheduleLayoutSync()
+  }
+
+  scheduleLayoutSync() {
+    document.documentElement.classList.add("nexus-side-panel-layout-animating")
+    clearTimeout(this._clearLayoutAnimClass)
+    clearTimeout(this._syncAfterTransition)
+
+    requestAnimationFrame(() => {
+      this.emitLayoutChange()
+      requestAnimationFrame(() => this.emitLayoutChange())
+    })
+
+    this._syncAfterTransition = setTimeout(() => this.emitLayoutChange(), 300)
+    this._clearLayoutAnimClass = setTimeout(() => {
+      document.documentElement.classList.remove("nexus-side-panel-layout-animating")
+    }, 340)
+  }
+
+  emitLayoutChange() {
+    window.dispatchEvent(new CustomEvent("nexus:side-panel-layout-change", {
+      detail: {
+        open: Boolean(this.open),
+        blockEnd: getDesktopSidePanelBlockEndPx()
+      }
+    }))
   }
 
   applyOpenDom(next) {

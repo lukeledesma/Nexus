@@ -3387,17 +3387,10 @@ input.connection-inline {
 .desktop-selection-box {
   position: absolute;
   display: none;
-  border: 1px solid
-    color-mix(
-      in oklab,
-      hsl(var(--desktop-selection-hue) var(--desktop-selection-saturation) var(--desktop-selection-brightness)) 72%,
-      rgba(255, 255, 255, 0.7) 28%
-    );
-  background: color-mix(
-    in oklab,
-    hsl(var(--desktop-selection-hue) var(--desktop-selection-saturation) var(--desktop-selection-brightness)) 28%,
-    transparent
-  );
+  z-index: 1400;
+  /* TEMPORARY DEBUGGING: Making box very visible */
+  border: 2px solid rgba(255, 0, 0, 0.9) !important;
+  background: rgba(255, 0, 0, 0.15) !important;
   border-radius: 3px;
   pointer-events: none;
 }
@@ -4379,6 +4372,10 @@ body.nexus-finder-embed *::-webkit-scrollbar-thumb:hover {
   background: var(--window-bg);
   /* Default: no left transition (drag/resize set left every frame). */
   transition: none;
+}
+
+html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden) {
+  transition: left 260ms cubic-bezier(0.25, 0.82, 0.2, 1);
 }
 
 .content-window.os-window.content-window--suppress-position-transition {
