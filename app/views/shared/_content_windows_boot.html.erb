@@ -74,6 +74,9 @@
       var linkedId = null
       try {
         linkedId = window.sessionStorage.getItem("nexus.singularLinkedDocument." + frameId)
+          if (!linkedId) {
+            linkedId = window.localStorage.getItem("nexus.singularLinkedDocument." + frameId)
+          }
       } catch (err) { /* private mode */ }
       if (linkedId) {
         url.searchParams.set("document_id", String(linkedId))

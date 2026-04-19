@@ -14,6 +14,8 @@ module Apps
       @tasks_for_view = normalize_tasks(@task_list.tasks) if @task_list
     end
 
+
+
     # POST /apps/singular/save_file
     def save_file
       folder_id = params[:folder_id].presence
@@ -81,6 +83,8 @@ module Apps
         item.body = nil
         item.tasks = []
       end
+
+
 
       # Sync to disk to ensure workspace text files exist.
       # Rare cache-clear reload spikes can trigger transient file races; retry once.

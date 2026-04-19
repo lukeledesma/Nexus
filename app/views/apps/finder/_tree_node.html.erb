@@ -124,17 +124,24 @@
           <span class="finder-tree__label" data-finder-tree-label><%= node[:title] %></span>
         <% end %>
       <% elsif file_linked && read_only %>
-        <span
-          class="finder-tree__row finder-tree__row--file finder-tree__row--file-no-app"
-          role="treeitem"
-          tabindex="0"
-          aria-label="<%= node[:title] %>"
-        >
+        <%= link_to "#",
+              class: "finder-tree__row finder-tree__row--file",
+              draggable: false,
+              data: {
+                turbo: false,
+                document_id: node[:id],
+                content_type: node[:content_type],
+                document_title: finder_open_doc_title,
+                action: "click->finder-browser#openLinkedFileInApp keydown->finder-browser#openLinkedFileInAppKey"
+              },
+              role: "treeitem",
+              tabindex: "0",
+              aria: { label: "Open #{node[:title]}" } do %>
           <span class="finder-tree__icon finder-tree__icon--file" aria-hidden="true">
             <%= material_symbol_icon(finder_file_icon_for_content_type(node[:content_type]), size: :sm) %>
           </span>
           <span class="finder-tree__label" data-finder-tree-label><%= node[:title] %></span>
-        </span>
+        <% end %>
       <% else %>
         <span
           class="finder-tree__row finder-tree__row--file finder-tree__row--file-no-app"
@@ -148,20 +155,7 @@
           <span class="finder-tree__label" data-finder-tree-label><%= node[:title] %></span>
         </span>
       <% end %>
-      <% if show_open_in_app %>
-        <div class="finder-tree__row-actions finder-tree__row-actions--open-in-app">
-          <button
-            type="button"
-            class="finder-tree__open-in-app item-action-btn"
-            title="Open in app"
-            aria-label="Open <%= node[:title] %> in app"
-            data-document-id="<%= node[:id] %>"
-            data-content-type="<%= node[:content_type] %>"
-            data-document-title="<%= finder_open_doc_title %>"
-            data-action="click->finder-browser#openLinkedFileInApp"
-          ><%= material_symbol_icon(:open_in_new, size: :xs) %></button>
-        </div>
-      <% end %>
+
       <% if writable && !read_only %>
         <div class="finder-tree__row-actions">
           <button

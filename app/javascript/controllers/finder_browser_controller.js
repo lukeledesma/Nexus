@@ -9,7 +9,7 @@ import {
   finderWriteExpandedFolderIds
 } from "lib/finder"
 import { materialSymbolSvg } from "lib/material_symbols"
-import { dispatchSingularHostEvent } from "lib/singular_host_events"
+import { dispatchSingularHostEvent, singularHostWindow } from "lib/singular_host_events"
 
 const CONTENT_TYPE_TO_APP_KEY = {
   asset: "loops",
@@ -185,6 +185,11 @@ export default class extends Controller {
           } catch (_e) {
             /* ignore */
           }
+            try {
+              window.localStorage.setItem(`nexus.singularLinkedDocument.${this.frameIdValue}`, String(data.document_id))
+            } catch (_e) {
+              /* ignore */
+            }
         }
 
         dispatchSingularHostEvent("nexus:singular-save-picker-close", {
@@ -233,6 +238,12 @@ export default class extends Controller {
     this.openLinkedFile(event)
   }
 
+  openLinkedFileInAppKey(event) {
+    if (event.key !== "Enter" && event.key !== " ") return
+    event.preventDefault()
+    this.openLinkedFileInApp(event)
+  }
+
   /** Toolbar control: open linked doc in Tasks, optionally close Finder or exit save picker. */
   openLinkedFileInApp(event) {
     if (typeof event.preventDefault === "function") event.preventDefault()
@@ -265,15 +276,6 @@ export default class extends Controller {
     })
     el.closest(".finder-tree__row-line")?.classList.add("is-selected")
 
-    const paneId = SINGULAR_FRAME_ID_BY_APP[appKey]
-    if (paneId) {
-      try {
-        window.sessionStorage.setItem(`nexus.singularLinkedDocument.${paneId}`, String(documentId))
-      } catch (_e) {
-        /* ignore */
-      }
-    }
-
     const documentTitle = (el.dataset.documentTitle || "").trim()
 
     if (options.fromEmbeddedPicker) {
@@ -286,15 +288,21 @@ export default class extends Controller {
       return
     }
 
-    window.dispatchEvent(
-      new CustomEvent("app-window:open", {
-        detail: {
-          appKey,
-          documentId: String(documentId),
-          documentTitle
-        }
-      })
-    )
+    // Dispatch to parent/host window so content-window-controller can receive it.
+    // Try dispatchSingularHostEvent first (escapes iframes), fallback to window dispatch.
+    const event = new CustomEvent("app-window:open", {
+      detail: {
+        appKey,
+        documentId: String(documentId),
+        documentTitle
+      }
+    })
+    const hostWindow = singularHostWindow()
+    if (hostWindow && hostWindow !== window) {
+      hostWindow.dispatchEvent(event)
+    } else {
+      window.dispatchEvent(event)
+    }
 
     if (options.closeFinderWindow) {
       window.dispatchEvent(new CustomEvent("app-window:close", { detail: { appKey: "finder" } }))

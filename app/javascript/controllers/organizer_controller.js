@@ -13,6 +13,12 @@ export default class extends Controller {
   }
 
   launchApp(event) {
+    if (event.target instanceof Element && event.target.closest(".desktop-side-panel-app-action")) {
+      event.preventDefault()
+      event.stopPropagation()
+      return
+    }
+
     const appKey = event.currentTarget.dataset.windowKey
     if (!appKey) {
       return
@@ -20,8 +26,77 @@ export default class extends Controller {
     window.dispatchEvent(new CustomEvent("app-window:toggle", { detail: { appKey } }))
   }
 
+  noopAppAction(event) {
+    event.preventDefault()
+    event.stopPropagation()
+  }
+
+  addTaskFromPanel(event) {
+    event.preventDefault()
+    event.stopPropagation()
+
+    // Step 1: If an unsaved task window is already open, highlight/focus it.
+    const blankWindow = this.findBlankOpenTaskWindow()
+    if (blankWindow) {
+      const appKey = blankWindow.dataset.contentWindowAppKeyValue
+      window.dispatchEvent(new CustomEvent("app-window:toggle", { detail: { appKey } }))
+      return
+    }
+
+    // Step 2: If the primary Tasks window is closed, open it (blank instance).
+    const primaryEl = document.querySelector('[data-content-window-app-key-value="singular-task-list"]')
+    if (!primaryEl || primaryEl.classList.contains("is-hidden")) {
+      window.dispatchEvent(new CustomEvent("app-window:toggle", { detail: { appKey: "singular-task-list" } }))
+      return
+    }
+
+    // Step 3: No unsaved instance is open and primary is in-use with a linked file.
+    // Spawn a fresh unsaved task window instance.
+    window.dispatchEvent(new CustomEvent("nexus:task-list-spawn-blank-window"))
+  }
+
+  /** Returns the first visible task window that has no linked document, or null. */
+  findBlankOpenTaskWindow() {
+    const primaryFrameId = this.primaryTaskFrameId()
+    const primaryEl = document.querySelector('[data-content-window-app-key-value="singular-task-list"]')
+    if (primaryEl && !primaryEl.classList.contains("is-hidden")) {
+      const hasLinkedDoc = Boolean(
+        window.sessionStorage?.getItem(`nexus.singularLinkedDocument.${primaryFrameId}`) ||
+        window.localStorage?.getItem(`nexus.singularLinkedDocument.${primaryFrameId}`)
+      )
+      if (!hasLinkedDoc) return primaryEl
+    }
+
+    const spawnedWindows = document.querySelectorAll('[data-content-window-app-key-value^="task-spawn-"]:not(.is-hidden)')
+    for (const w of spawnedWindows) {
+      const frameId = w.dataset.contentWindowFrameIdValue
+      const hasLinkedDoc = Boolean(
+        window.sessionStorage?.getItem(`nexus.singularLinkedDocument.${frameId}`) ||
+        window.localStorage?.getItem(`nexus.singularLinkedDocument.${frameId}`)
+      )
+      if (!hasLinkedDoc) return w
+    }
+
+    return null
+  }
+
+  primaryTaskFrameId() {
+    const taskWindow = document.querySelector('[data-content-window-app-key-value="singular-task-list"]')
+    return taskWindow?.dataset?.contentWindowFrameIdValue || "singular-task-list-pane"
+  }
   handleAppWindowState(event) {
-    this.updateRowState(event.detail?.appKey, Boolean(event.detail?.open))
+    const appKey = event.detail?.appKey
+    if (appKey === "singular-task-list") {
+      this.updateRowState("singular-task-list", this.anyTaskWindowOpen())
+      return
+    }
+    this.updateRowState(appKey, Boolean(event.detail?.open))
+  }
+
+  anyTaskWindowOpen() {
+    const spawnedOpen = document.querySelector('[data-content-window-app-key-value^="task-spawn-"]:not(.is-hidden)')
+    const primaryOpen = document.querySelector('[data-content-window-app-key-value="singular-task-list"]:not(.is-hidden)')
+    return Boolean(spawnedOpen || primaryOpen)
   }
 
   updateRowState(appKey, isOpen) {

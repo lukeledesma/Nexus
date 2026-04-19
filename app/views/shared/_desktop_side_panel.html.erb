@@ -40,6 +40,13 @@
               <%= material_symbol_icon(entry[:icon], size: :sm) %>
             </span>
             <span class="desktop-side-panel-app-label"><%= entry[:label] %></span>
+            <% if entry[:window_key] == "singular-task-list" %>
+              <span class="desktop-side-panel-app-actions" aria-hidden="true">
+                <span class="row-plus desktop-side-panel-app-action" data-action="click->organizer#addTaskFromPanel mousedown->organizer#noopAppAction">
+                  <%= material_symbol_icon(:add, size: :xs) %>
+                </span>
+              </span>
+            <% end %>
           </button>
         <% end %>
       </nav>

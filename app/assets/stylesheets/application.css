@@ -55,6 +55,8 @@
   --accent-hover: #2563eb;
   --success: #22c55e;
   --success-hover: #16a34a;
+  --task-group-checked-bg: rgba(34, 197, 94, 0.22);
+  --task-group-checked-bg-hover: rgba(34, 197, 94, 0.26);
   --page-padding: 1.25rem;
   --space-sm: 0.75rem;
   --space-md: 1rem;
@@ -126,6 +128,7 @@
 /* Square icon buttons — shared by chrome, Finder rows, Tasks, save dialog (+), … */
 .item-action-btn,
 .row-plus,
+.row-pencil,
 .finder-folder-add-btn,
 .settings-themes-item-action-btn,
 .section-add-btn,
@@ -158,6 +161,7 @@
 
 .item-action-btn svg.material-icon,
 .row-plus svg.material-icon,
+.row-pencil svg.material-icon,
 .finder-folder-add-btn svg.material-icon,
 .settings-themes-item-action-btn svg.material-icon,
 .section-add-btn svg.material-icon,
@@ -170,12 +174,42 @@
   height: var(--nexus-icon-btn-icon);
   flex-shrink: 0;
   display: block;
+  transform-origin: center center;
+  transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.desktop-side-panel-toggle svg.material-icon,
+.row-save-here svg.material-icon,
+.finder-tree__open-in-app svg.material-icon {
+  transform-origin: center center;
+  transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Press feedback for buttons: only the pressed button icon shrinks. */
+.item-action-btn:active svg.material-icon,
+.row-plus:active svg.material-icon,
+.row-pencil:active svg.material-icon,
+.finder-folder-add-btn:active svg.material-icon,
+.settings-themes-item-action-btn:active svg.material-icon,
+.section-add-btn:active svg.material-icon,
+.db-health-back:active svg.material-icon,
+.db-health-close:active svg.material-icon,
+.settings-back:active svg.material-icon,
+.settings-close:active svg.material-icon,
+.tools-close-btn:active svg.material-icon,
+.row-save-here:active svg.material-icon,
+.finder-tree__open-in-app:active svg.material-icon,
+.desktop-side-panel-toggle:active svg.material-icon {
+  transform: scale(0.78);
+  transition: transform 75ms cubic-bezier(0.4, 0, 1, 1);
 }
 
 .item-action-btn:hover,
 .item-action-btn:focus-visible,
 .row-plus:hover,
 .row-plus:focus-visible,
+.row-pencil:hover,
+.row-pencil:focus-visible,
 .finder-folder-add-btn:hover,
 .finder-folder-add-btn:focus-visible,
 .settings-themes-item-action-btn:hover,
@@ -1218,7 +1252,8 @@ a:hover { text-decoration: underline; }
   background: var(--nexus-row-hover-highlight);
 }
 
-.task-item-row.nexus-standard-row:not(.task-item-row--checked):hover,
+.task-item-row.nexus-standard-row.is-hovered:not(.task-item-row--checked),
+.task-item-row.nexus-standard-row:hover:not(.task-item-row--checked),
 .task-item-row.nexus-standard-row:not(.task-item-row--checked):focus-within {
   background: var(--nexus-row-hover-highlight);
 }
@@ -1227,7 +1262,8 @@ a:hover { text-decoration: underline; }
  * Main row with subtasks expanded (JS sets .task-item-group--head when subtasks exist and not collapsed).
  * Slightly darker than plain hover so “expanded” reads as a state; hover/focus deepens further.
  */
-.task-item-row.nexus-standard-row.task-item-row--main.task-item-group--head:not(.task-item-row--checked):hover,
+.task-item-row.nexus-standard-row.task-item-row--main.task-item-group--head.is-hovered:not(.task-item-row--checked),
+.task-item-row.nexus-standard-row.task-item-row--main.task-item-group--head:hover:not(.task-item-row--checked),
 .task-item-row.nexus-standard-row.task-item-row--main.task-item-group--head:not(.task-item-row--checked):focus-within {
   background: var(--nexus-row-selected-highlight);
 }
@@ -1238,12 +1274,13 @@ a:hover { text-decoration: underline; }
 
 /* Checked main + expanded subtasks: step above flat checked fill, with clearer hover. */
 .task-item-row.nexus-standard-row.task-item-row--main.task-item-group--head.task-item-row--checked {
-  background: rgba(34, 197, 94, 0.22) !important;
+  background: var(--task-group-checked-bg) !important;
 }
 
+.task-item-row.nexus-standard-row.task-item-row--main.task-item-group--head.task-item-row--checked.is-hovered,
 .task-item-row.nexus-standard-row.task-item-row--main.task-item-group--head.task-item-row--checked:hover,
 .task-item-row.nexus-standard-row.task-item-row--main.task-item-group--head.task-item-row--checked:focus-within {
-  background: rgba(34, 197, 94, 0.26) !important;
+  background: var(--task-group-checked-bg-hover) !important;
 }
 
 .nexus-standard-row__main {
@@ -1255,6 +1292,34 @@ a:hover { text-decoration: underline; }
   padding-left: 0;
   margin-left: 0;
   text-align: left;
+}
+
+/* Row press feedback: only row text scales (icons/check circles stay static). */
+.task-item-text,
+.finder-file-name,
+.settings-themes-item-meta,
+.settings-themes-item .settings-themes-item-btn,
+.doc-name,
+.file-link,
+.finder-folder-name,
+.finder-tree__label,
+.desktop-side-panel-app-label {
+  transform-origin: left center;
+  transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.nexus-standard-row:active:not(:has(.item-action-btn:active, .row-plus:active, .row-pencil:active, .finder-folder-add-btn:active, .settings-themes-item-action-btn:active)) .task-item-text,
+.nexus-standard-row:active:not(:has(.item-action-btn:active, .row-plus:active, .row-pencil:active, .finder-folder-add-btn:active, .settings-themes-item-action-btn:active)) .finder-file-name,
+.nexus-standard-row:active:not(:has(.item-action-btn:active, .row-plus:active, .row-pencil:active, .finder-folder-add-btn:active, .settings-themes-item-action-btn:active)) .settings-themes-item-meta,
+.nexus-standard-row:active:not(:has(.item-action-btn:active, .row-plus:active, .row-pencil:active, .finder-folder-add-btn:active, .settings-themes-item-action-btn:active)) .settings-themes-item-btn,
+.organizer-row:active:not(:has(.item-action-btn:active, .row-plus:active, .row-pencil:active)) .doc-name,
+.organizer-row:active:not(:has(.item-action-btn:active, .row-plus:active, .row-pencil:active)) .file-link,
+.organizer-row:active:not(:has(.item-action-btn:active, .row-plus:active, .row-pencil:active)) .finder-folder-name,
+.finder-tree__row-line:active:not(:has(.item-action-btn:active, .row-plus:active, .row-save-here:active, .finder-tree__open-in-app:active)) .finder-tree__label,
+.desktop-side-panel-app-row:active:not(:has(.desktop-side-panel-app-action:active)) .desktop-side-panel-app-label,
+.settings-sections-list .finder-folder-link:active .finder-folder-name {
+  transform: scale(0.94);
+  transition: transform 75ms cubic-bezier(0.4, 0, 1, 1);
 }
 
 /* Whole-row main column: pointer + flex fill (Tasks, Finder, Settings saved themes). See NexusUiHelper / lib/nexus_ui.js. */
@@ -1274,6 +1339,8 @@ a:hover { text-decoration: underline; }
   height: var(--nexus-list-leading-size, 18px);
   line-height: 0;
   flex-shrink: 0;
+  position: relative;
+  overflow: visible;
 }
 
 .nexus-standard-row__leading .task-toggle {
@@ -1335,12 +1402,13 @@ a:hover { text-decoration: underline; }
 }
 
 .task-list-rows {
-  --task-text-control-height: 23.5px;
+  /* Whole-pixel row control height avoids 100% zoom seam artifacts from half-pixel accumulation. */
+  --task-text-control-height: 24px;
   --task-list-row-gap: 0.55rem;
   display: flex;
   flex-direction: column;
   list-style: none;
-  padding: var(--task-list-row-gap) var(--task-list-row-gap) 0;
+  padding: var(--task-list-row-gap) var(--task-list-row-gap) var(--task-list-row-gap);
   margin: 0;
   width: 100%;
   gap: 0 !important;
@@ -1421,7 +1489,7 @@ a:hover { text-decoration: underline; }
   cursor: grabbing;
 }
 
-.task-item-row--drop-before::before {
+.task-list-rows--drag-active .task-item-row--drop-before::before {
   content: "";
   position: absolute;
   left: 0;
@@ -1433,14 +1501,57 @@ a:hover { text-decoration: underline; }
 }
 
 .task-item-row--drop-after::after {
+  content: none;
+}
+
+.task-list-rows--drag-active .task-item-row--drop-gap-after::after {
   content: "";
   position: absolute;
   left: 0;
   right: 0;
-  bottom: -1px;
+  bottom: calc((var(--task-list-row-gap, 0.55rem) / -2) - 1px);
   border-bottom: 2px dotted color-mix(in srgb, var(--accent) 40%, rgba(255, 255, 255, 0.72));
   pointer-events: none;
   z-index: 2;
+}
+
+.task-list-content-shell {
+  position: relative;
+}
+
+.task-list-rows {
+  position: relative;
+}
+
+.task-list-rows--drag-active.task-list-rows--drop-tail::after {
+  content: "";
+  position: absolute;
+  left: var(--task-list-row-gap, 0.55rem);
+  right: var(--task-list-row-gap, 0.55rem);
+  bottom: calc((var(--task-list-row-gap, 0.55rem) / 2) - 1px);
+  border-bottom: 2px dotted rgba(255, 255, 255, 0.9);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.task-list-content-shell--drag-active.task-list-content-shell--drop-empty::before {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: 12px;
+  border-top: 2px dotted rgba(255, 255, 255, 0.9);
+  pointer-events: none;
+  z-index: 2;
+}
+
+@keyframes task-row-drop-flash {
+  0% { background: color-mix(in srgb, var(--accent) 30%, rgba(74, 144, 226, 0.55)); }
+  100% { background: transparent; }
+}
+
+.task-item-row--drop-flash {
+  animation: task-row-drop-flash 1s ease-out;
 }
 
 .task-item-row--main + .task-item-row--subtask {
@@ -1485,13 +1596,13 @@ a:hover { text-decoration: underline; }
   border-bottom-right-radius: 8px;
 }
 
-.task-item-row:not(.nexus-standard-row):not(.task-item-row--checked):hover,
+.task-item-row:not(.nexus-standard-row).is-hovered:not(.task-item-row--checked),
 .task-item-row:not(.nexus-standard-row):not(.task-item-row--checked):focus-within {
   background: rgba(148, 163, 184, 0.05);
   border-color: #3b82f6;
 }
 
-.task-item-row--subtask:not(.nexus-standard-row):not(.task-item-row--checked):hover,
+.task-item-row--subtask:not(.nexus-standard-row).is-hovered:not(.task-item-row--checked),
 .task-item-row--subtask:not(.nexus-standard-row):not(.task-item-row--checked):focus-within {
   border-color: #3b82f6;
   box-shadow: none;
@@ -1519,6 +1630,26 @@ a:hover { text-decoration: underline; }
 .task-item-row--subtask:not(.task-item-row--checked):hover:has(+ .task-item-row--subtask.task-item-row--checked:not(.is-collapsed)),
 .task-item-row--subtask:not(.task-item-row--checked):focus-within:has(+ .task-item-row--subtask.task-item-row--checked:not(.is-collapsed)) {
   border-bottom-color: rgba(34, 197, 94, 0.42) !important;
+}
+
+/* Standard task rows intentionally render borderless; suppress legacy border-bottom adjacency paint. */
+.task-item-row.nexus-standard-row,
+.task-item-row.nexus-standard-row:hover,
+.task-item-row.nexus-standard-row:focus-within,
+.task-item-row.nexus-standard-row.task-item-row--checked,
+.task-item-row.nexus-standard-row.task-item-row--checked:hover,
+.task-item-row.nexus-standard-row.task-item-row--checked:focus-within,
+.task-item-row.nexus-standard-row:has(+ .task-item-row--subtask.task-item-row--checked:not(.is-collapsed)),
+.task-item-row.nexus-standard-row:has(+ .task-item-row--subtask.task-item-row--checked:not(.is-collapsed):hover),
+.task-item-row.nexus-standard-row:has(+ .task-item-row--subtask.task-item-row--checked:not(.is-collapsed):focus-within),
+.task-item-row.nexus-standard-row.task-item-row--checked:has(+ .task-item-row--subtask:not(.task-item-row--checked):hover),
+.task-item-row.nexus-standard-row.task-item-row--checked:has(+ .task-item-row--subtask:not(.task-item-row--checked):focus-within),
+.task-item-row--subtask.nexus-standard-row:not(.task-item-row--checked):hover:has(+ .task-item-row--subtask.task-item-row--checked:not(.is-collapsed)),
+.task-item-row--subtask.nexus-standard-row:not(.task-item-row--checked):focus-within:has(+ .task-item-row--subtask.task-item-row--checked:not(.is-collapsed)) {
+  border-style: none !important;
+  border-width: 0 !important;
+  border-color: transparent !important;
+  border-bottom-color: transparent !important;
 }
 
 .task-item-row--checked {
@@ -1590,6 +1721,43 @@ a:hover { text-decoration: underline; }
   color: #22c55e;
 }
 
+/* ── Task toggle confetti burst ─────────────────────────────────────────────
+   JS spawns .task-confetti-particle nodes directly on the toggle.
+   Each particle gets --dx/--dy/--color/--dur/--delay custom props.
+   They radiate outward ~14-22px, shrink, and vanish — a tight micro-burst.
+   ──────────────────────────────────────────────────────────────────────────*/
+/* Short radial strokes that begin at ~midpoint of their travel and slide outward */
+@keyframes task-confetti-ray {
+  0% {
+    transform: translate(-50%, -50%) rotate(var(--angle)) translateX(var(--start));
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(var(--angle)) translateX(var(--end));
+    opacity: 0;
+  }
+}
+
+.task-toggle {
+  position: relative;
+  overflow: visible;
+  isolation: isolate;
+}
+
+.task-confetti-particle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 3px;
+  border-radius: 1px;
+  background: var(--color, #22c55e);
+  pointer-events: none;
+  z-index: 20;
+  will-change: transform, opacity;
+  animation: task-confetti-ray var(--dur, 380ms) cubic-bezier(0.2, 0.8, 0.4, 1) var(--delay, 0ms) both;
+}
+
 .task-item-row:not(.nexus-standard-row) .organizer-row-right {
   gap: var(--nexus-small-action-gap);
   justify-content: flex-end;
@@ -1615,6 +1783,8 @@ a:hover { text-decoration: underline; }
   display: none;
 }
 
+.task-item-row.nexus-standard-row.is-hovered .item-action-btn,
+.task-item-row.nexus-standard-row.is-hovered .row-plus,
 .task-item-row.nexus-standard-row:hover .item-action-btn,
 .task-item-row.nexus-standard-row:hover .row-plus,
 .task-item-row.nexus-standard-row:focus-within .item-action-btn,
@@ -1629,6 +1799,8 @@ a:hover { text-decoration: underline; }
   display: none;
 }
 
+.task-item-row:not(.nexus-standard-row).is-hovered .item-action-btn,
+.task-item-row:not(.nexus-standard-row).is-hovered .row-plus,
 .task-item-row:not(.nexus-standard-row):hover .item-action-btn,
 .task-item-row:not(.nexus-standard-row):hover .row-plus,
 .task-item-row:not(.nexus-standard-row):focus-within .item-action-btn,
@@ -1699,13 +1871,15 @@ a:hover { text-decoration: underline; }
 .task-progress-bar-fill {
   display: block;
   height: 100%;
-  width: 100%;
+  /* width driven by --completion CSS variable set per-row in JS.
+     Using width (layout property) instead of transform: scaleX so that
+     a forced layout flush reliably repaints the bar after DOM mutations.
+     will-change: transform was creating a stale compositor layer that
+     ignored CSS variable updates until hover triggered a style recalc. */
+  width: calc(var(--completion, 0) * 100%);
   background: rgba(34, 197, 94, 0.9);
   border-radius: inherit;
-  transform: scaleX(var(--completion, 0));
-  transform-origin: left center;
-  transition: transform 180ms ease;
-  will-change: transform;
+  transition: width 180ms ease;
 }
 
 .task-progress-label {
@@ -1987,6 +2161,15 @@ input.connection-inline {
 @keyframes row-restored-flash {
   0% { background: rgba(34, 197, 94, 0.45); }
   100% { background: transparent; }
+}
+
+@keyframes content-window-focus-flash {
+  0% { background: rgba(255, 255, 255, 0.7) !important; }
+  100% { background: transparent; }
+}
+
+.content-window--focus-flash {
+  animation: content-window-focus-flash 0.6s ease-out;
 }
 .tag-table tbody tr.tag-row-template { display: none !important; }
 .tag-table .cell { width: 100%; min-width: 3rem; padding: 0.3rem 0.5rem; border: 1px solid transparent; border-radius: 4px; font: inherit; font-size: 0.875rem; background: transparent; color: var(--text); }
@@ -3704,6 +3887,32 @@ body.nexus-finder-embed *::-webkit-scrollbar-thumb:hover {
   min-width: 0;
 }
 
+.desktop-side-panel-app-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nexus-small-action-gap);
+  flex-shrink: 0;
+}
+
+.desktop-side-panel-app-action {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.desktop-side-panel-app-row:hover .desktop-side-panel-app-action {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (hover: none) {
+  .desktop-side-panel-app-action {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .desktop-side-panel-drawer,
   .desktop-side-panel-toggle {
@@ -4405,26 +4614,38 @@ html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden)
 
 @keyframes content-window-focus-pulse {
   0% {
-    outline: 1px solid color-mix(in srgb, var(--border-hairline) 90%, transparent);
-    outline-offset: -1px;
+    opacity: 0.85;
+    border-width: 1px;
   }
   15% {
-    outline: 2px solid color-mix(in srgb, var(--border) 92%, transparent);
-    outline-offset: -2px;
+    opacity: 1;
+    border-width: 2px;
   }
   100% {
-    outline: 1px solid color-mix(in srgb, var(--border-hairline) 82%, transparent);
-    outline-offset: -1px;
+    opacity: 0.85;
+    border-width: 1px;
   }
 }
 
-.content-window--focus-pulse {
+.content-window--focus-pulse::after,
+.content-window--focus-pulse-static::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 60;
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--border) 92%, transparent);
+}
+
+.content-window--focus-pulse::after {
   animation: content-window-focus-pulse 780ms ease-out forwards;
 }
 
-.content-window--focus-pulse-static {
-  outline: 2px solid color-mix(in srgb, var(--border) 92%, transparent);
-  outline-offset: -2px;
+.content-window--focus-pulse-static::after {
+  border-width: 2px;
+  opacity: 1;
 }
 
 .content-window .window-content {
@@ -5502,13 +5723,15 @@ input.app-save-dialog__btn {
 }
 
 /* Tasks (singular window): scroll task rows inside the fixed window height. */
-.content-window[data-content-window-app-key-value="singular-task-list"] .app-surface.app-surface--tool {
+.content-window[data-content-window-app-key-value="singular-task-list"] .app-surface.app-surface--tool,
+.content-window[data-content-window-app-key-value^="task-spawn-"] .app-surface.app-surface--tool {
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
 }
 
-.content-window[data-content-window-app-key-value="singular-task-list"] .task-list-form {
+.content-window[data-content-window-app-key-value="singular-task-list"] .task-list-form,
+.content-window[data-content-window-app-key-value^="task-spawn-"] .task-list-form {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
@@ -5516,7 +5739,8 @@ input.app-save-dialog__btn {
   overflow: hidden;
 }
 
-.content-window[data-content-window-app-key-value="singular-task-list"] .task-list-content-shell {
+.content-window[data-content-window-app-key-value="singular-task-list"] .task-list-content-shell,
+.content-window[data-content-window-app-key-value^="task-spawn-"] .task-list-content-shell {
   flex: 1 1 auto;
   min-height: 0;
   overflow-x: hidden;
@@ -5526,7 +5750,8 @@ input.app-save-dialog__btn {
   box-sizing: border-box;
 }
 
-.content-window[data-content-window-app-key-value="singular-task-list"] .task-list-rows {
+.content-window[data-content-window-app-key-value="singular-task-list"] .task-list-rows,
+.content-window[data-content-window-app-key-value^="task-spawn-"] .task-list-rows {
   --organizer-row-width: 100%;
   /* Match .finder-file-list row rhythm (gap: 4px) */
   --task-list-row-gap: 4px;
@@ -5537,14 +5762,16 @@ input.app-save-dialog__btn {
   box-sizing: border-box;
 }
 
-.content-window[data-content-window-app-key-value="singular-task-list"] .task-list-rows .task-item-row {
+.content-window[data-content-window-app-key-value="singular-task-list"] .task-list-rows .task-item-row,
+.content-window[data-content-window-app-key-value^="task-spawn-"] .task-list-rows .task-item-row {
   margin-left: 0 !important;
   margin-right: 0 !important;
   box-sizing: border-box;
 }
 
 /* First row: inset comes from .task-list-content-shell only (like .finder-file-list under .finder-shell-pane--contents). */
-.content-window[data-content-window-app-key-value="singular-task-list"] .task-list-rows > .task-item-row--main:first-child {
+.content-window[data-content-window-app-key-value="singular-task-list"] .task-list-rows > .task-item-row--main:first-child,
+.content-window[data-content-window-app-key-value^="task-spawn-"] .task-list-rows > .task-item-row--main:first-child {
   margin-top: 0 !important;
 }
 
@@ -7271,6 +7498,26 @@ a.finder-tree__row--file:focus-visible {
 :root[data-nexus-theme="classic"] .task-item-row--subtask:not(.task-item-row--checked):hover:has(+ .task-item-row--subtask.task-item-row--checked:not(.is-collapsed)),
 :root[data-nexus-theme="classic"] .task-item-row--subtask:not(.task-item-row--checked):focus-within:has(+ .task-item-row--subtask.task-item-row--checked:not(.is-collapsed)) {
   border-bottom-color: rgba(21, 128, 61, 0.68) !important;
+}
+
+/* Classic theme: keep standard task rows borderless across all hover/adjacency states. */
+:root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row,
+:root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row:hover,
+:root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row:focus-within,
+:root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row.task-item-row--checked,
+:root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row.task-item-row--checked:hover,
+:root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row.task-item-row--checked:focus-within,
+:root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row:has(+ .task-item-row--subtask.task-item-row--checked:not(.is-collapsed)),
+:root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row:has(+ .task-item-row--subtask.task-item-row--checked:not(.is-collapsed):hover),
+:root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row:has(+ .task-item-row--subtask.task-item-row--checked:not(.is-collapsed):focus-within),
+:root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row.task-item-row--checked:has(+ .task-item-row--subtask:not(.task-item-row--checked):hover),
+:root[data-nexus-theme="classic"] .task-item-row.nexus-standard-row.task-item-row--checked:has(+ .task-item-row--subtask:not(.task-item-row--checked):focus-within),
+:root[data-nexus-theme="classic"] .task-item-row--subtask.nexus-standard-row:not(.task-item-row--checked):hover:has(+ .task-item-row--subtask.task-item-row--checked:not(.is-collapsed)),
+:root[data-nexus-theme="classic"] .task-item-row--subtask.nexus-standard-row:not(.task-item-row--checked):focus-within:has(+ .task-item-row--subtask.task-item-row--checked:not(.is-collapsed)) {
+  border-style: none !important;
+  border-width: 0 !important;
+  border-color: transparent !important;
+  border-bottom-color: transparent !important;
 }
 
 /* Finder split: default rule uses a light hairline (for dark UIs); Classic uses same token as title chrome. */

@@ -53,12 +53,11 @@ class ItemStorageSyncLite
     app_folder = Folder.find_by(name: "App")
     if app_folder
       task_list = app_folder.items.find_by(item_type: "task_list")
-
       # Write TaskList (or empty placeholder if it doesn't exist)
       task_content = task_list ? item_contents(task_list) : empty_task_list_contents
       File.write(temp_root.join("Tasks.txt"), task_content)
     else
-      # Create empty placeholders if App folder doesn't exist yet
+      # Create empty placeholder if App folder doesn't exist yet
       File.write(temp_root.join("Tasks.txt"), empty_task_list_contents)
     end
 
@@ -166,7 +165,6 @@ class ItemStorageSyncLite
 
   def item_contents(item)
     return task_list_contents(item) if item.item_type == "task_list"
-
     ""
   end
 
@@ -231,4 +229,6 @@ class ItemStorageSyncLite
       ""
     ].join("\n")
   end
+
+
 end

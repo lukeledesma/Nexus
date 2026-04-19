@@ -7,8 +7,8 @@
           data: autosave_form_data, class: "task-list-form os-window-body-start" do |f| %>
       <input type="hidden" name="item[tasks_payload]" value="" data-task-list-editor-target="payload">
 
-      <div class="task-list-content-shell">
-        <ul class="task-list-rows" data-task-list-editor-target="list" data-action="click->task-list-editor#handleListClick keydown->task-list-editor#handleListKeydown dragstart->task-list-editor#handleDragStart dragover->task-list-editor#handleDragOver drop->task-list-editor#handleDrop dragend->task-list-editor#handleDragEnd">
+      <div class="task-list-content-shell" data-task-list-editor-target="contentShell" data-action="dragover->task-list-editor#handleDragOver drop->task-list-editor#handleDrop dragleave->task-list-editor#handleDragLeave">
+        <ul class="task-list-rows" data-task-list-editor-target="list" data-action="click->task-list-editor#handleListClick keydown->task-list-editor#handleListKeydown dragstart->task-list-editor#handleDragStart dragend->task-list-editor#handleDragEnd">
           <% @tasks_for_view.each do |task| %>
             <% subtasks = Array(task["subtasks"]) %>
             <% total_subtasks = subtasks.length %>
