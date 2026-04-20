@@ -8,12 +8,9 @@ import {
   writeSingularPickerDraft
 } from "lib/singular_finder_picker_draft"
 
-// MIME marker used to announce task-row drags to sibling lists.
 const TASK_ROW_DRAG_MIME = "application/x-nexus-task-row"
 
-// Module-level drag registry — single source of truth for an in-flight drag.
-// The landing marker is updated by dragover and consumed exactly once by the
-// source controller on dragend.
+// Landing marker is updated in dragover; source commits the move on dragend.
 let activeDrag = null
 
 function taskToggleMarkup(checked) {
@@ -22,10 +19,6 @@ function taskToggleMarkup(checked) {
 
 export default class extends Controller {
   static targets = ["contentShell", "list", "payload"]
-
-  // --------------------------------------------------------------------- //
-  // Lifecycle                                                             //
-  // --------------------------------------------------------------------- //
 
   connect() {
     this.boundWindowState = this.handleWindowState.bind(this)
@@ -37,7 +30,6 @@ export default class extends Controller {
     window.addEventListener("nexus:task-list-add-task", this.boundTaskListAddFromChrome)
     window.addEventListener(SINGULAR_BEFORE_SAVE_PICKER, this.boundBeforeSavePicker)
     document.addEventListener("nexus:request-save", this.boundRequestSave)
-
     if (this.hasListTarget) {
       this.listTarget.addEventListener("input", this.boundSyncPayloadInput, true)
       this.boundListPointerMove = this.handleListPointerMove.bind(this)
@@ -45,23 +37,13 @@ export default class extends Controller {
       this.listTarget.addEventListener("pointermove", this.boundListPointerMove)
       this.listTarget.addEventListener("pointerleave", this.boundListPointerLeave)
     }
-
     this.dragState = null
     this.suppressNextClick = false
     this.hoveredRow = null
-    // Pointer tracking is suspended while WE are actively dragging, and for
-    // a short cleanup window after a drop — during those moments, setting
-    // `is-hovered` would fight DOM mutations.
     this.pointerTrackingSuspended = false
-    // Last observed pointer position (within this list) so we can re-resolve
-    // the hovered row after DOM mutations without waiting for the user to
-    // move the pointer.
     this.lastPointerX = null
     this.lastPointerY = null
-    // After drag/drop DOM mutation, require at least one fresh pointermove
-    // before we allow JS-managed hover class restoration.
     this.awaitingFreshPointerMove = false
-
     if (!this.#restorePickerDraftIfAny()) this.#refreshAll()
     this.#normalizeEmptyMarker()
   }
@@ -83,25 +65,15 @@ export default class extends Controller {
       window.clearTimeout(this.autosaveTimer)
       this.autosaveTimer = null
     }
-    // If we were in the middle of a drag, release the registry so no other
-    // controller tries to call into us after we're gone.
     if (activeDrag && activeDrag.sourceController === this) activeDrag = null
     if (activeDrag?.marker?.controller === this) activeDrag.marker = null
-
     this.#clearHover()
     this.#clearDragVisualState()
     window.removeEventListener("app-window:state", this.boundWindowState)
   }
 
-  // --------------------------------------------------------------------- //
-  // Pointer / hover tracking                                              //
-  // --------------------------------------------------------------------- //
-
   handleListPointerMove(event) {
     if (this.pointerTrackingSuspended) return
-    // Only track pointer coordinates when hover tracking is active.
-    // During drag, rows shift under the pointer; storing those coordinates can
-    // wrongly re-apply hover to a different row after drop.
     if (typeof event?.clientX === "number") this.lastPointerX = event.clientX
     if (typeof event?.clientY === "number") this.lastPointerY = event.clientY
     this.awaitingFreshPointerMove = false
@@ -125,29 +97,19 @@ export default class extends Controller {
 
   #clearHover() {
     if (this.hasListTarget) {
-      this.listTarget.querySelectorAll(".task-item-row.is-hovered").forEach((row) => {
-        row.classList.remove("is-hovered")
+      this.listTarget.querySelectorAll(".task-item-row.is-hovered").forEach((r) => {
+        r.classList.remove("is-hovered")
       })
     }
     this.hoveredRow = null
   }
 
-  // After a DOM mutation (drop, cross-list consume), the element under the
-  // pointer may have changed. `elementFromPoint` tells us what's actually
-  // there now so we can sync `.is-hovered` without waiting for a pointer
-  // event. Also performs a pointer-events flush to dislodge any stale
-  // browser-level `:hover` state on a detached/moved row.
   #reevaluateHoverAtPointer() {
     if (!this.hasListTarget || this.pointerTrackingSuspended) return
-    // Force the browser to re-run :hover resolution by toggling pointer-events.
-    // This is cheap and reliably kicks stale :hover off rows that moved.
     const prev = this.listTarget.style.pointerEvents
     this.listTarget.style.pointerEvents = "none"
-    // Read layout to flush, then restore.
     void this.listTarget.offsetHeight
     this.listTarget.style.pointerEvents = prev
-    // Ignore stale coordinates captured before a cross-list drag. If the
-    // pointer isn't currently over this list shell, there should be no hover.
     if (this.hasContentShellTarget && !this.contentShellTarget.matches(":hover")) {
       this.#setHovered(null)
       return
@@ -160,7 +122,6 @@ export default class extends Controller {
       this.#setHovered(null)
       return
     }
-
     const element = document.elementFromPoint(this.lastPointerX, this.lastPointerY)
     if (!element || !this.listTarget.contains(element)) {
       this.#setHovered(null)
@@ -170,460 +131,16 @@ export default class extends Controller {
     this.#setHovered(row && this.listTarget.contains(row) ? row : null)
   }
 
-  // --------------------------------------------------------------------- //
-  // Drag lifecycle                                                        //
-  // --------------------------------------------------------------------- //
-
-  handleDragStart(event) {
-    // Defensive reset in case a previous drag died without dragend.
-    activeDrag = null
-    this.#ensureRowUids()
-    const row = event.target.closest(".task-item-row")
-    if (!row || row.querySelector(".task-edit-input")) {
-      event.preventDefault()
-      return
-    }
-    // Never start a drag from a control (toggle, add-subtask, rename/delete,
-    // or an open edit input).
-    if (event.target.closest(".task-toggle, .row-plus, .item-action-btn, .task-edit-input")) {
-      event.preventDefault()
-      return
-    }
-
-    const mode = row.matches(".task-item-row--main") ? "main" : "subtask"
-    if (mode === "subtask") {
-      const mainRow = this.#findMainRowForSubtask(row)
-      if (!mainRow) {
-        event.preventDefault()
-        return
-      }
-      this.dragState = { mode, row, mainRow, rows: [row] }
-    } else {
-      this.dragState = { mode, row, rows: this.#mainGroupRows(row) }
-    }
-
-    row.classList.add("task-item-row--dragging")
-    this.#markDragActive()
-    this.pointerTrackingSuspended = true
-    this.lastPointerX = null
-    this.lastPointerY = null
-    this.awaitingFreshPointerMove = true
-    this.#clearHover()
-
-    // Register active drag. Destination lists only contribute landing markers;
-    // source `dragend` performs the actual move using this registry.
-    activeDrag = {
-      sourceController: this,
-      mode,
-      marker: null
-    }
-
-    if (event.dataTransfer) {
-      event.dataTransfer.effectAllowed = "move"
-      // MIME is only a capability flag so sibling lists can accept dragover.
-      event.dataTransfer.setData(TASK_ROW_DRAG_MIME, "1")
-      event.dataTransfer.setData("text/plain", "task-row")
-    }
-  }
-
-  handleDragOver(event) {
-    // WITHIN-LIST preview: we are the source.
-    if (this.dragState) {
-      this.#markDragActive()
-      const drop = this.#resolveDrop(event, this.dragState.rows, this.dragState.mode, false)
-      this.#clearDropIndicators()
-      if (!drop) {
-        this.#clearActiveMarkerForSelf()
-        return
-      }
-      event.preventDefault()
-      this.#renderDropIndicator(drop)
-      this.#setActiveMarkerForSelf(drop)
-      return
-    }
-
-    // EXTERNAL preview: somebody else is dragging a main task over us.
-    if (!this.#canAcceptExternalDrag(event)) return
-    this.#markDragActive()
-    const drop = this.#resolveDrop(event, [], "main", true)
-    this.#clearDropIndicators()
-    if (!drop) {
-      this.#clearActiveMarkerForSelf()
-      return
-    }
-    event.preventDefault()
-    this.#renderDropIndicator(drop)
-    this.#setActiveMarkerForSelf(drop)
-  }
-
   handleDragLeave(event) {
     if (!this.hasContentShellTarget) return
     if (event.currentTarget !== this.contentShellTarget) return
     const nextTarget = event.relatedTarget
     if (nextTarget instanceof Node && this.contentShellTarget.contains(nextTarget)) return
-    // Cursor genuinely left this list's content shell — drop the indicators
-    // and drag-active visual so stale dotted lines don't linger.
     this.#clearDropIndicators()
     this.#clearActiveMarkerForSelf()
     if (!this.dragState) this.#clearDragVisualState()
     this.#setHovered(null)
   }
-
-  handleDrop(event) {
-    // We commit only on source dragend. Prevent default so browser treats
-    // this as a valid drop target and doesn't perform native fallback behavior.
-    if (this.dragState || this.#canAcceptExternalDrag(event)) event.preventDefault()
-    this.#clearDropIndicators()
-  }
-
-  handleDragEnd() {
-    // Source-side single commit point: read latest landing marker and apply.
-    const moved = this.#commitActiveDragMarker()
-    if (moved) {
-      this.suppressNextClick = true
-      this.#refreshAll()
-      this.#triggerAutosave(0)
-    }
-    this.#endSourceDrag({ clearRegistry: true })
-    window.setTimeout(() => {
-      this.pointerTrackingSuspended = false
-      this.awaitingFreshPointerMove = true
-      this.#reevaluateHoverAtPointer()
-    }, 0)
-  }
-
-  // --------------------------------------------------------------------- //
-  // External drop resolution helpers                                      //
-  // --------------------------------------------------------------------- //
-
-  #canAcceptExternalDrag(event) {
-    const mimeAnnounced = event.dataTransfer?.types?.includes(TASK_ROW_DRAG_MIME)
-    return Boolean(
-      mimeAnnounced &&
-      activeDrag &&
-      activeDrag.sourceController !== this &&
-      activeDrag.mode === "main"
-    )
-  }
-
-  // Public: called by the destination controller to remove the moved row
-  // group out of our list. Returns true if something was removed.
-  removeMainGroupByUid(mainUid) {
-    if (!this.hasListTarget || !mainUid) return false
-    const escaped = (typeof CSS !== "undefined" && typeof CSS.escape === "function")
-      ? CSS.escape(mainUid)
-      : String(mainUid).replace(/"/g, "\\\"")
-    const mainRow = this.listTarget.querySelector(`.task-item-row--main[data-row-uid="${escaped}"]`)
-    if (!mainRow) return false
-
-    this.#mainGroupRows(mainRow).forEach((row) => row.remove())
-    // A row being yanked out of this list: reset any drag visuals and hover.
-    this.#clearHover()
-    this.#clearDragVisualState()
-    this.#refreshAll()
-    this.#triggerAutosave(0)
-    // Re-resolve hover — whatever row slid into the vacated space should get
-    // the highlight now.
-    this.pointerTrackingSuspended = false
-    this.awaitingFreshPointerMove = true
-    window.setTimeout(() => this.#reevaluateHoverAtPointer(), 0)
-    return true
-  }
-
-  #setActiveMarkerForSelf(drop) {
-    if (!activeDrag) return
-    activeDrag.marker = {
-      controller: this,
-      where: drop.where,
-      mode: drop.mode,
-      row: drop.row || null,
-      insertBeforeNode: drop.insertBeforeNode || null,
-      isEmpty: Boolean(drop.isEmpty)
-    }
-  }
-
-  #clearActiveMarkerForSelf() {
-    if (!activeDrag?.marker) return
-    if (activeDrag.marker.controller === this) activeDrag.marker = null
-  }
-
-  #commitActiveDragMarker() {
-    if (!this.dragState || !activeDrag || activeDrag.sourceController !== this) return false
-    const marker = activeDrag.marker
-    if (!marker) return false
-    if (marker.mode !== this.dragState.mode) return false
-
-    if (marker.controller === this) {
-      this.#applyWithinListDrop(marker)
-      return true
-    }
-
-    if (this.dragState.mode !== "main") return false
-    const destination = marker.controller
-    if (!destination?.hasListTarget || !destination.element?.isConnected) return false
-    return this.#applyCrossListDrop(destination, marker)
-  }
-
-  #applyCrossListDrop(destination, marker) {
-    if (!this.dragState) return false
-    const rows = [...this.dragState.rows].filter((row) => row && row.isConnected)
-    if (rows.length === 0) return false
-
-    let insertBeforeNode = marker.insertBeforeNode
-    if (!(insertBeforeNode instanceof Node) || insertBeforeNode.parentElement !== destination.listTarget) {
-      insertBeforeNode = null
-    }
-
-    rows.forEach((row) => {
-      row.classList.remove("task-item-row--dragging", "is-hovered")
-      row.remove()
-    })
-    rows.forEach((row) => destination.listTarget.insertBefore(row, insertBeforeNode))
-
-    destination.pointerTrackingSuspended = true
-    destination.#clearHover()
-    destination.#clearDropIndicators()
-    destination.#clearDragVisualState()
-    destination.#refreshAll()
-    destination.#triggerAutosave(0)
-    window.setTimeout(() => {
-      destination.pointerTrackingSuspended = false
-      destination.awaitingFreshPointerMove = true
-      destination.#reevaluateHoverAtPointer()
-    }, 0)
-    return true
-  }
-
-  // --------------------------------------------------------------------- //
-  // Unified drop resolver                                                 //
-  //                                                                       //
-  // One code path for both within-list (excludeRows has the dragged       //
-  // group) and external (excludeRows is empty) drops. Returns either a    //
-  // drop descriptor or null (no-op / not acceptable).                     //
-  // --------------------------------------------------------------------- //
-
-  #resolveDrop(event, excludeRows, mode, external) {
-    if (!this.hasListTarget) return null
-    const target = event.target.closest(".task-item-row")
-    const clientY = event.clientY
-
-    // ----- Subtask mode (within-list only) -----
-    if (mode === "subtask") {
-      if (external) return null
-      if (!target) return null
-
-      if (target.matches(".task-item-row--main")) {
-        const rect = target.getBoundingClientRect()
-        const where = clientY < rect.top + rect.height / 2 ? "before" : "after"
-        if (where === "before") return null
-        const anchor = this.#lastSubtaskFor(target) || target
-        if (anchor === excludeRows[0]) return null
-        return {
-          row: anchor,
-          where: "after",
-          mode: "subtask",
-          insertBeforeNode: anchor.nextElementSibling
-        }
-      }
-
-      if (!target.matches(".task-item-row--subtask")) return null
-      if (target === excludeRows[0]) return null
-
-      const rect = target.getBoundingClientRect()
-      const where = clientY < rect.top + rect.height / 2 ? "before" : "after"
-      const insertBeforeNode = where === "before" ? target : target.nextElementSibling
-      if (insertBeforeNode === excludeRows[0]) return null
-      return { row: target, where, mode: "subtask", insertBeforeNode }
-    }
-
-    // ----- Main mode (within-list or external) -----
-    const allMain = Array.from(this.listTarget.querySelectorAll(".task-item-row--main"))
-    const candidateMain = allMain.filter((row) => !excludeRows.includes(row))
-
-    // Empty list (or emptied by exclusion): append drop.
-    if (candidateMain.length === 0) {
-      return {
-        row: null,
-        where: "empty",
-        mode: "main",
-        insertBeforeNode: null,
-        isEmpty: true
-      }
-    }
-
-    // Prefer the main row under the pointer, else use nearest-by-center.
-    let anchorMain = null
-    if (target) {
-      const targetMain = target.matches(".task-item-row--main")
-        ? target
-        : this.#findMainRowForSubtask(target)
-      if (targetMain && !excludeRows.includes(targetMain)) {
-        anchorMain = targetMain
-      }
-    }
-    if (!anchorMain) {
-      let best = Number.POSITIVE_INFINITY
-      candidateMain.forEach((main) => {
-        const rect = main.getBoundingClientRect()
-        const center = rect.top + rect.height / 2
-        const dist = Math.abs(clientY - center)
-        if (dist < best) {
-          best = dist
-          anchorMain = main
-        }
-      })
-    }
-    if (!anchorMain) return null
-
-    const anchorRect = anchorMain.getBoundingClientRect()
-    const where = clientY < anchorRect.top + anchorRect.height / 2 ? "before" : "after"
-    const tail = this.#mainGroupTail(anchorMain)
-    const nextMain = this.#nextMainRowSkipping(anchorMain, excludeRows)
-
-    let drop
-    if (where === "before") {
-      drop = { row: anchorMain, where: "before", mode: "main", insertBeforeNode: anchorMain }
-    } else if (nextMain) {
-      drop = { row: tail, where: "gap-after", mode: "main", insertBeforeNode: nextMain }
-    } else {
-      drop = { row: tail, where: "tail", mode: "main", insertBeforeNode: null }
-    }
-
-    // Suppress within-list no-ops: dropping a row to exactly its current
-    // position does nothing. Computed AFTER drop selection so the external
-    // path (excludeRows=[]) doesn't trip on these checks.
-    if (!external && excludeRows.length > 0) {
-      const firstExcluded = excludeRows[0]
-      const lastExcluded = excludeRows[excludeRows.length - 1]
-      if (drop.insertBeforeNode === firstExcluded) return null
-      if (drop.insertBeforeNode === lastExcluded.nextElementSibling) return null
-    }
-    return drop
-  }
-
-  // Like #nextMainRow but skips rows in `excludeRows` — so when a main group
-  // is being dragged within its own list, we don't "see" it as a boundary.
-  #nextMainRowSkipping(mainRow, excludeRows) {
-    let cursor = this.#mainGroupTail(mainRow).nextElementSibling
-    while (cursor) {
-      if (cursor.matches(".task-item-row--main") && !excludeRows.includes(cursor)) {
-        return cursor
-      }
-      cursor = cursor.nextElementSibling
-    }
-    return null
-  }
-
-  // --------------------------------------------------------------------- //
-  // Drop indicators + drag-active visuals                                 //
-  // --------------------------------------------------------------------- //
-
-  #markDragActive() {
-    if (this.hasListTarget) this.listTarget.classList.add("task-list-rows--drag-active")
-    if (this.hasContentShellTarget) this.contentShellTarget.classList.add("task-list-content-shell--drag-active")
-  }
-
-  #clearDragVisualState() {
-    if (this.hasListTarget) {
-      this.listTarget.classList.remove("task-list-rows--drag-active", "task-list-rows--drop-tail")
-    }
-    if (this.hasContentShellTarget) {
-      this.contentShellTarget.classList.remove("task-list-content-shell--drag-active", "task-list-content-shell--drop-empty")
-    }
-    this.#normalizeEmptyMarker()
-  }
-
-  #normalizeEmptyMarker() {
-    if (!this.hasListTarget) return
-    const hasRows = Boolean(this.listTarget.querySelector(".task-item-row"))
-    this.listTarget.classList.toggle("task-list-rows--is-empty", !hasRows)
-  }
-
-  #renderDropIndicator(drop) {
-    if (!drop) return
-    if (drop.isEmpty) {
-      if (this.hasContentShellTarget) this.contentShellTarget.classList.add("task-list-content-shell--drop-empty")
-      this.listTarget.classList.add("task-list-rows--drop-tail")
-      return
-    }
-    if (drop.where === "before" && drop.row) {
-      drop.row.classList.add("task-item-row--drop-before")
-      return
-    }
-    if (drop.mode === "subtask" && drop.where === "after" && drop.row) {
-      drop.row.classList.add("task-item-row--drop-gap-after")
-      return
-    }
-    if (drop.where === "gap-after") {
-      const boundary = drop.insertBeforeNode
-      if (boundary && boundary.classList?.contains("task-item-row")) {
-        boundary.classList.add("task-item-row--drop-before")
-      } else if (drop.row) {
-        drop.row.classList.add("task-item-row--drop-gap-after")
-      }
-      return
-    }
-    if (drop.where === "tail") {
-      this.listTarget.classList.add("task-list-rows--drop-tail")
-    }
-  }
-
-  #clearDropIndicators() {
-    if (this.hasContentShellTarget) this.contentShellTarget.classList.remove("task-list-content-shell--drop-empty")
-    if (this.hasListTarget) {
-      this.listTarget.classList.remove("task-list-rows--drop-tail")
-      this.listTarget.querySelectorAll(".task-item-row--drop-before, .task-item-row--drop-after, .task-item-row--drop-gap-after").forEach((row) => {
-        row.classList.remove("task-item-row--drop-before", "task-item-row--drop-after", "task-item-row--drop-gap-after")
-      })
-    }
-  }
-
-  #endSourceDrag({ clearRegistry }) {
-    if (this.dragState?.rows?.length) {
-      this.dragState.rows.forEach((row) => row.classList.remove("task-item-row--dragging", "is-hovered"))
-    }
-    if (this.hasListTarget) {
-      this.listTarget.querySelectorAll(".task-item-row--dragging").forEach((row) => {
-        row.classList.remove("task-item-row--dragging")
-      })
-    }
-    this.#clearDropIndicators()
-    this.#clearDragVisualState()
-    this.#clearHover()
-    this.dragState = null
-    if (clearRegistry && activeDrag && activeDrag.sourceController === this) {
-      activeDrag = null
-    }
-  }
-
-  #applyWithinListDrop(drop) {
-    if (!this.dragState) return
-
-    if (drop.mode === "main") {
-      const rows = [...this.dragState.rows]
-      // Compute insertBefore BEFORE removing; if we're inserting just before
-      // a row we're about to remove, resolve to its next sibling so the
-      // reinsert still lands at the right position.
-      let insertBeforeNode = drop.insertBeforeNode
-      while (insertBeforeNode && rows.includes(insertBeforeNode)) {
-        insertBeforeNode = insertBeforeNode.nextElementSibling
-      }
-      rows.forEach((row) => row.remove())
-      rows.forEach((row) => this.listTarget.insertBefore(row, insertBeforeNode))
-      return
-    }
-
-    // subtask
-    const row = this.dragState.row
-    let insertBeforeNode = drop.insertBeforeNode
-    if (insertBeforeNode === row) insertBeforeNode = row.nextElementSibling
-    row.remove()
-    this.listTarget.insertBefore(row, insertBeforeNode || null)
-  }
-
-  // --------------------------------------------------------------------- //
-  // Non-drag actions (unchanged behavior)                                 //
-  // --------------------------------------------------------------------- //
 
   handleTaskListAddFromChrome(event) {
     const frame = this.element.closest("turbo-frame")
@@ -650,6 +167,56 @@ export default class extends Controller {
     this.#flushAllPendingEdits()
     this.#syncPayload()
     writeSingularPickerDraft(frame.id, { app: "task_list", tasksPayload: this.payloadTarget.value })
+  }
+
+  /** Commit every in-progress row edit (main or subtask) so payload + picker snapshot match the UI. */
+  #flushAllPendingEdits() {
+    if (!this.hasListTarget) return
+    for (let i = 0; i < 32; i += 1) {
+      const input = this.listTarget.querySelector(".task-edit-input")
+      if (!input) break
+      this.#finishEdit(input, true)
+    }
+  }
+
+  #restorePickerDraftIfAny() {
+    const frame = this.element.closest("turbo-frame")
+    if (!frame || !this.hasListTarget || frame.getAttribute("data-singular-has-linked-document") === "true")
+      return false
+    const data = readSingularPickerDraft(frame.id)
+    if (!data || data.app !== "task_list" || data.tasksPayload == null) return false
+    let tasks
+    try {
+      tasks = JSON.parse(data.tasksPayload)
+    } catch (_e) {
+      return false
+    }
+    if (!Array.isArray(tasks)) return false
+
+    clearSingularPickerDraft(frame.id)
+
+    while (this.listTarget.firstChild) this.listTarget.removeChild(this.listTarget.firstChild)
+    tasks.forEach((t) => {
+      const subs = (Array.isArray(t?.subtasks) ? t.subtasks : []).map((s) => ({
+        text: String(s?.text ?? ""),
+        checked: Boolean(s?.checked)
+      }))
+      this.listTarget.appendChild(
+        this.#buildMainTaskRow(String(t?.text ?? ""), Boolean(t?.checked), subs)
+      )
+    })
+    this.#refreshAll()
+    this.#triggerAutosave(0)
+    if (this.#restoredTasksLookSubstantive(tasks)) window.nexusWorkspaceUnsaved = true
+    return true
+  }
+
+  #restoredTasksLookSubstantive(tasks) {
+    return tasks.some((t) => {
+      if (String(t?.text ?? "").trim().length > 0) return true
+      const subs = Array.isArray(t?.subtasks) ? t.subtasks : []
+      return subs.some((s) => String(s?.text ?? "").trim().length > 0)
+    })
   }
 
   handleWindowState(event) {
@@ -707,8 +274,8 @@ export default class extends Controller {
     if (row.querySelector(".task-edit-input")) return
 
     event.preventDefault()
-
-    // For main tasks with subtasks, toggle collapsed state instead of completion.
+    
+    // For main tasks with subtasks, toggle collapsed state instead of completion
     if (row.matches(".task-item-row--main")) {
       const subtasks = this.#subtasksFor(row)
       if (subtasks.length > 0) {
@@ -737,6 +304,395 @@ export default class extends Controller {
       event.preventDefault()
       this.#finishEdit(input, false)
     }
+  }
+
+  handleDragStart(event) {
+    activeDrag = null
+    this.#ensureRowUids()
+    const row = event.target.closest(".task-item-row")
+    if (!row || row.querySelector(".task-edit-input")) {
+      event.preventDefault()
+      return
+    }
+    if (event.target.closest(".task-toggle, .row-plus, .item-action-btn, .task-edit-input")) {
+      event.preventDefault()
+      return
+    }
+
+    const mode = row.matches(".task-item-row--main") ? "main" : "subtask"
+    if (mode === "subtask") {
+      const mainRow = this.#findMainRowForSubtask(row)
+      if (!mainRow) {
+        event.preventDefault()
+        return
+      }
+      this.dragState = { mode, row, mainRow, rows: [row] }
+    } else {
+      this.dragState = { mode, row, rows: this.#mainGroupRows(row) }
+    }
+
+    row.classList.add("task-item-row--dragging")
+    this.#markDragActive()
+    this.pointerTrackingSuspended = true
+    this.lastPointerX = null
+    this.lastPointerY = null
+    this.awaitingFreshPointerMove = true
+    this.#clearHover()
+
+    activeDrag = {
+      sourceController: this,
+      mode,
+      marker: null
+    }
+
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move"
+      event.dataTransfer.setData(TASK_ROW_DRAG_MIME, "1")
+      event.dataTransfer.setData("text/plain", "task-row")
+    }
+  }
+
+  handleDragOver(event) {
+    if (this.dragState) {
+      this.#markDragActive()
+      const drop = this.#resolveDrop(event, this.dragState.rows, this.dragState.mode, false)
+      this.#clearDropIndicators()
+      if (!drop) {
+        this.#clearActiveMarkerForSelf()
+        return
+      }
+      event.preventDefault()
+      this.#renderDropIndicator(drop)
+      this.#setActiveMarkerForSelf(drop)
+      return
+    }
+
+    if (!this.#canAcceptExternalDrag(event)) return
+    this.#markDragActive()
+    const drop = this.#resolveDrop(event, [], "main", true)
+    this.#clearDropIndicators()
+    if (!drop) {
+      this.#clearActiveMarkerForSelf()
+      return
+    }
+    event.preventDefault()
+    this.#renderDropIndicator(drop)
+    this.#setActiveMarkerForSelf(drop)
+  }
+
+  handleDrop(event) {
+    if (this.dragState || this.#canAcceptExternalDrag(event)) event.preventDefault()
+    this.#clearDropIndicators()
+  }
+
+  handleDragEnd() {
+    const moved = this.#commitActiveDragMarker()
+    if (moved) {
+      this.suppressNextClick = true
+      this.#refreshAll()
+      this.#triggerAutosave(0)
+    }
+    this.#endSourceDrag({ clearRegistry: true })
+    window.setTimeout(() => {
+      this.pointerTrackingSuspended = false
+      this.awaitingFreshPointerMove = true
+      this.#reevaluateHoverAtPointer()
+    }, 0)
+  }
+
+  #canAcceptExternalDrag(event) {
+    const mimeAnnounced = event.dataTransfer?.types?.includes(TASK_ROW_DRAG_MIME)
+    return Boolean(
+      mimeAnnounced &&
+      activeDrag &&
+      activeDrag.sourceController !== this &&
+      activeDrag.mode === "main"
+    )
+  }
+
+  removeMainGroupByUid(mainUid) {
+    if (!this.hasListTarget || !mainUid) return false
+    const escaped = (typeof CSS !== "undefined" && typeof CSS.escape === "function")
+      ? CSS.escape(mainUid)
+      : String(mainUid).replace(/"/g, "\\\"")
+    const mainRow = this.listTarget.querySelector(`.task-item-row--main[data-row-uid="${escaped}"]`)
+    if (!mainRow) return false
+
+    this.#mainGroupRows(mainRow).forEach((r) => r.remove())
+    this.#clearHover()
+    this.#clearDragVisualState()
+    this.#refreshAll()
+    this.#triggerAutosave(0)
+    this.pointerTrackingSuspended = false
+    this.awaitingFreshPointerMove = true
+    window.setTimeout(() => this.#reevaluateHoverAtPointer(), 0)
+    return true
+  }
+
+  #setActiveMarkerForSelf(drop) {
+    if (!activeDrag) return
+    activeDrag.marker = {
+      controller: this,
+      where: drop.where,
+      mode: drop.mode,
+      row: drop.row || null,
+      insertBeforeNode: drop.insertBeforeNode || null,
+      isEmpty: Boolean(drop.isEmpty)
+    }
+  }
+
+  #clearActiveMarkerForSelf() {
+    if (!activeDrag?.marker) return
+    if (activeDrag.marker.controller === this) activeDrag.marker = null
+  }
+
+  #commitActiveDragMarker() {
+    if (!this.dragState || !activeDrag || activeDrag.sourceController !== this) return false
+    const marker = activeDrag.marker
+    if (!marker) return false
+    if (marker.mode !== this.dragState.mode) return false
+
+    if (marker.controller === this) {
+      this.#applyWithinListDrop(marker)
+      return true
+    }
+
+    if (this.dragState.mode !== "main") return false
+    const destination = marker.controller
+    if (!destination?.hasListTarget || !destination.element?.isConnected) return false
+    return this.#applyCrossListDrop(destination, marker)
+  }
+
+  #applyCrossListDrop(destination, marker) {
+    if (!this.dragState) return false
+    const rows = [...this.dragState.rows].filter((r) => r && r.isConnected)
+    if (rows.length === 0) return false
+
+    let insertBeforeNode = marker.insertBeforeNode
+    if (!(insertBeforeNode instanceof Node) || insertBeforeNode.parentElement !== destination.listTarget) {
+      insertBeforeNode = null
+    }
+
+    rows.forEach((r) => {
+      r.classList.remove("task-item-row--dragging", "is-hovered")
+      r.remove()
+    })
+    rows.forEach((r) => destination.listTarget.insertBefore(r, insertBeforeNode))
+
+    destination.pointerTrackingSuspended = true
+    destination.#clearHover()
+    destination.#clearDropIndicators()
+    destination.#clearDragVisualState()
+    destination.#refreshAll()
+    destination.#triggerAutosave(0)
+    window.setTimeout(() => {
+      destination.pointerTrackingSuspended = false
+      destination.awaitingFreshPointerMove = true
+      destination.#reevaluateHoverAtPointer()
+    }, 0)
+    return true
+  }
+
+  #resolveDrop(event, excludeRows, mode, external) {
+    if (!this.hasListTarget) return null
+    const target = event.target.closest(".task-item-row")
+    const clientY = event.clientY
+
+    if (mode === "subtask") {
+      if (external) return null
+      if (!target) return null
+
+      if (target.matches(".task-item-row--main")) {
+        const rect = target.getBoundingClientRect()
+        const where = clientY < rect.top + rect.height / 2 ? "before" : "after"
+        if (where === "before") return null
+        const anchor = this.#lastSubtaskFor(target) || target
+        if (anchor === excludeRows[0]) return null
+        return {
+          row: anchor,
+          where: "after",
+          mode: "subtask",
+          insertBeforeNode: anchor.nextElementSibling
+        }
+      }
+
+      if (!target.matches(".task-item-row--subtask")) return null
+      if (target === excludeRows[0]) return null
+
+      const rect = target.getBoundingClientRect()
+      const where = clientY < rect.top + rect.height / 2 ? "before" : "after"
+      const insertBeforeNode = where === "before" ? target : target.nextElementSibling
+      if (insertBeforeNode === excludeRows[0]) return null
+      return { row: target, where, mode: "subtask", insertBeforeNode }
+    }
+
+    const allMain = Array.from(this.listTarget.querySelectorAll(".task-item-row--main"))
+    const candidateMain = allMain.filter((r) => !excludeRows.includes(r))
+
+    if (candidateMain.length === 0) {
+      return {
+        row: null,
+        where: "empty",
+        mode: "main",
+        insertBeforeNode: null,
+        isEmpty: true
+      }
+    }
+
+    let anchorMain = null
+    if (target) {
+      const targetMain = target.matches(".task-item-row--main")
+        ? target
+        : this.#findMainRowForSubtask(target)
+      if (targetMain && !excludeRows.includes(targetMain)) {
+        anchorMain = targetMain
+      }
+    }
+    if (!anchorMain) {
+      let best = Number.POSITIVE_INFINITY
+      candidateMain.forEach((main) => {
+        const rect = main.getBoundingClientRect()
+        const center = rect.top + rect.height / 2
+        const dist = Math.abs(clientY - center)
+        if (dist < best) {
+          best = dist
+          anchorMain = main
+        }
+      })
+    }
+    if (!anchorMain) return null
+
+    const anchorRect = anchorMain.getBoundingClientRect()
+    const where = clientY < anchorRect.top + anchorRect.height / 2 ? "before" : "after"
+    const tail = this.#mainGroupTail(anchorMain)
+    const nextMain = this.#nextMainRowSkipping(anchorMain, excludeRows)
+
+    let drop
+    if (where === "before") {
+      drop = { row: anchorMain, where: "before", mode: "main", insertBeforeNode: anchorMain }
+    } else if (nextMain) {
+      drop = { row: tail, where: "gap-after", mode: "main", insertBeforeNode: nextMain }
+    } else {
+      drop = { row: tail, where: "tail", mode: "main", insertBeforeNode: null }
+    }
+
+    if (!external && excludeRows.length > 0) {
+      const firstExcluded = excludeRows[0]
+      const lastExcluded = excludeRows[excludeRows.length - 1]
+      if (drop.insertBeforeNode === firstExcluded) return null
+      if (drop.insertBeforeNode === lastExcluded.nextElementSibling) return null
+    }
+    return drop
+  }
+
+  #nextMainRowSkipping(mainRow, excludeRows) {
+    let cursor = this.#mainGroupTail(mainRow).nextElementSibling
+    while (cursor) {
+      if (cursor.matches(".task-item-row--main") && !excludeRows.includes(cursor)) {
+        return cursor
+      }
+      cursor = cursor.nextElementSibling
+    }
+    return null
+  }
+
+  #markDragActive() {
+    if (this.hasListTarget) this.listTarget.classList.add("task-list-rows--drag-active")
+    if (this.hasContentShellTarget) this.contentShellTarget.classList.add("task-list-content-shell--drag-active")
+  }
+
+  #clearDragVisualState() {
+    if (this.hasListTarget) {
+      this.listTarget.classList.remove("task-list-rows--drag-active", "task-list-rows--drop-tail")
+    }
+    if (this.hasContentShellTarget) {
+      this.contentShellTarget.classList.remove("task-list-content-shell--drag-active", "task-list-content-shell--drop-empty")
+    }
+    this.#normalizeEmptyMarker()
+  }
+
+  #normalizeEmptyMarker() {
+    if (!this.hasListTarget) return
+    const hasRows = Boolean(this.listTarget.querySelector(".task-item-row"))
+    this.listTarget.classList.toggle("task-list-rows--is-empty", !hasRows)
+  }
+
+  #renderDropIndicator(drop) {
+    if (!drop) return
+    if (drop.isEmpty) {
+      if (this.hasContentShellTarget) this.contentShellTarget.classList.add("task-list-content-shell--drop-empty")
+      this.listTarget.classList.add("task-list-rows--drop-tail")
+      return
+    }
+    if (drop.where === "before" && drop.row) {
+      drop.row.classList.add("task-item-row--drop-before")
+      return
+    }
+    if (drop.mode === "subtask" && drop.where === "after" && drop.row) {
+      drop.row.classList.add("task-item-row--drop-gap-after")
+      return
+    }
+    if (drop.where === "gap-after") {
+      const boundary = drop.insertBeforeNode
+      if (boundary && boundary.classList?.contains("task-item-row")) {
+        boundary.classList.add("task-item-row--drop-before")
+      } else if (drop.row) {
+        drop.row.classList.add("task-item-row--drop-gap-after")
+      }
+      return
+    }
+    if (drop.where === "tail") {
+      this.listTarget.classList.add("task-list-rows--drop-tail")
+    }
+  }
+
+  #clearDropIndicators() {
+    if (this.hasContentShellTarget) this.contentShellTarget.classList.remove("task-list-content-shell--drop-empty")
+    if (this.hasListTarget) {
+      this.listTarget.classList.remove("task-list-rows--drop-tail")
+      this.listTarget.querySelectorAll(".task-item-row--drop-before, .task-item-row--drop-after, .task-item-row--drop-gap-after").forEach((r) => {
+        r.classList.remove("task-item-row--drop-before", "task-item-row--drop-after", "task-item-row--drop-gap-after")
+      })
+    }
+  }
+
+  #endSourceDrag({ clearRegistry }) {
+    if (this.dragState?.rows?.length) {
+      this.dragState.rows.forEach((r) => r.classList.remove("task-item-row--dragging", "is-hovered"))
+    }
+    if (this.hasListTarget) {
+      this.listTarget.querySelectorAll(".task-item-row--dragging").forEach((r) => {
+        r.classList.remove("task-item-row--dragging")
+      })
+    }
+    this.#clearDropIndicators()
+    this.#clearDragVisualState()
+    this.#clearHover()
+    this.dragState = null
+    if (clearRegistry && activeDrag && activeDrag.sourceController === this) {
+      activeDrag = null
+    }
+  }
+
+  #applyWithinListDrop(drop) {
+    if (!this.dragState) return
+
+    if (drop.mode === "main") {
+      const rows = [...this.dragState.rows]
+      let insertBeforeNode = drop.insertBeforeNode
+      while (insertBeforeNode && rows.includes(insertBeforeNode)) {
+        insertBeforeNode = insertBeforeNode.nextElementSibling
+      }
+      rows.forEach((r) => r.remove())
+      rows.forEach((r) => this.listTarget.insertBefore(r, insertBeforeNode))
+      return
+    }
+
+    const row = this.dragState.row
+    let insertBeforeNode = drop.insertBeforeNode
+    if (insertBeforeNode === row) insertBeforeNode = row.nextElementSibling
+    row.remove()
+    this.listTarget.insertBefore(row, insertBeforeNode || null)
   }
 
   startEdit(event) {
@@ -780,7 +736,9 @@ export default class extends Controller {
       mainRow.insertAdjacentElement("afterend", subtaskRow)
     }
 
+    // Always expand parent when adding a subtask so the new row is visible.
     mainRow.dataset.collapsed = "false"
+
 
     this.#startEditRow(subtaskRow)
     this.#refreshAll()
@@ -805,6 +763,7 @@ export default class extends Controller {
         cursor = next
       }
     } else if (row.matches(".task-item-row--subtask")) {
+      // If removing last subtask, remove group classes from main
       const mainRow = this.#findMainRowForSubtask(row)
       row.remove()
       if (mainRow && this.#subtasksFor(mainRow).length === 0) {
@@ -821,19 +780,6 @@ export default class extends Controller {
     this.#triggerAutosave()
   }
 
-  // --------------------------------------------------------------------- //
-  // Edit helpers                                                          //
-  // --------------------------------------------------------------------- //
-
-  #flushAllPendingEdits() {
-    if (!this.hasListTarget) return
-    for (let i = 0; i < 32; i += 1) {
-      const input = this.listTarget.querySelector(".task-edit-input")
-      if (!input) break
-      this.#finishEdit(input, true)
-    }
-  }
-
   #startEditRow(row) {
     const rowInput = row.querySelector(".task-edit-input")
     if (rowInput) {
@@ -843,6 +789,7 @@ export default class extends Controller {
     }
 
     this.#commitActiveEditIfAny(row)
+
     this.#clearEditingState()
     row.classList.add("is-editing")
 
@@ -871,6 +818,10 @@ export default class extends Controller {
     const originalValue = (input.dataset.originalValue || "").trim()
     let value = save ? input.value.trim() : originalValue
 
+    // Finalization rule:
+    // 1) Blank with original -> revert to original
+    // 2) Blank without original (new row) -> delete row
+    // 3) Non-blank -> save new value
     if (save && value.length === 0) {
       value = originalValue
     }
@@ -962,7 +913,9 @@ export default class extends Controller {
 
   #toggleRowComplete(row) {
     if (row.matches(".task-item-row--subtask")) {
+      const isBeingChecked = !row.classList.contains("task-item-row--checked")
       row.classList.toggle("task-item-row--checked")
+      if (isBeingChecked) this.#spawnConfetti(row)
       return
     }
 
@@ -976,73 +929,36 @@ export default class extends Controller {
       if (!allSubtasksFilledAndChecked) return
       row.classList.add("task-item-row--checked")
       row.dataset.mainChecked = "true"
+      this.#spawnConfetti(row)
       return
     }
 
+    const isBeingChecked = row.dataset.mainChecked !== "true"
     row.dataset.mainChecked = row.dataset.mainChecked === "true" ? "false" : "true"
+    
+    if (isBeingChecked) {
+      this.#spawnConfetti(row)
+    }
   }
 
   #toggleCollapsed(row) {
     if (!row.matches(".task-item-row--main")) return
+
     const isCollapsed = row.dataset.collapsed === "true"
     row.dataset.collapsed = isCollapsed ? "false" : "true"
   }
 
-  // --------------------------------------------------------------------- //
-  // Picker-draft restore                                                  //
-  // --------------------------------------------------------------------- //
-
-  #restorePickerDraftIfAny() {
-    const frame = this.element.closest("turbo-frame")
-    if (!frame || !this.hasListTarget || frame.getAttribute("data-singular-has-linked-document") === "true")
-      return false
-    const data = readSingularPickerDraft(frame.id)
-    if (!data || data.app !== "task_list" || data.tasksPayload == null) return false
-    let tasks
-    try {
-      tasks = JSON.parse(data.tasksPayload)
-    } catch (_e) {
-      return false
-    }
-    if (!Array.isArray(tasks)) return false
-
-    clearSingularPickerDraft(frame.id)
-
-    while (this.listTarget.firstChild) this.listTarget.removeChild(this.listTarget.firstChild)
-    tasks.forEach((t) => {
-      const subs = (Array.isArray(t?.subtasks) ? t.subtasks : []).map((s) => ({
-        text: String(s?.text ?? ""),
-        checked: Boolean(s?.checked)
-      }))
-      this.listTarget.appendChild(
-        this.#buildMainTaskRow(String(t?.text ?? ""), Boolean(t?.checked), subs)
-      )
-    })
-    this.#refreshAll()
-    this.#triggerAutosave(0)
-    if (this.#restoredTasksLookSubstantive(tasks)) window.nexusWorkspaceUnsaved = true
-    return true
-  }
-
-  #restoredTasksLookSubstantive(tasks) {
-    return tasks.some((t) => {
-      if (String(t?.text ?? "").trim().length > 0) return true
-      const subs = Array.isArray(t?.subtasks) ? t.subtasks : []
-      return subs.some((s) => String(s?.text ?? "").trim().length > 0)
-    })
-  }
-
-  // --------------------------------------------------------------------- //
-  // Row queries                                                           //
-  // --------------------------------------------------------------------- //
-
   #subtasksFor(mainRow) {
     const subtasks = []
     let cursor = mainRow.nextElementSibling
+
     while (cursor && !cursor.matches(".task-item-row--main")) {
-      if (cursor.matches(".task-item-row--subtask")) subtasks.push(cursor)
+      if (cursor.matches(".task-item-row--subtask")) {
+        subtasks.push(cursor)
+      }
       cursor = cursor.nextElementSibling
     }
+
     return subtasks
   }
 
@@ -1054,29 +970,18 @@ export default class extends Controller {
   #findMainRowForSubtask(subtaskRow) {
     let cursor = subtaskRow.previousElementSibling
     while (cursor) {
-      if (cursor.matches(".task-item-row--main")) return cursor
+      if (cursor.matches(".task-item-row--main")) {
+        return cursor
+      }
       cursor = cursor.previousElementSibling
     }
     return null
   }
 
-  #mainGroupRows(mainRow) {
-    return [mainRow, ...this.#subtasksFor(mainRow)]
-  }
-
-  #mainGroupTail(mainRow) {
-    return this.#lastSubtaskFor(mainRow) || mainRow
-  }
-
-  // --------------------------------------------------------------------- //
-  // DOM builders                                                          //
-  // --------------------------------------------------------------------- //
-
   #buildMainTaskRow(text, checked, subtasks) {
     const row = document.createElement("li")
     row.className = "task-item-row task-item-row--main organizer-row nexus-standard-row"
     row.draggable = true
-    row.dataset.role = "main-task"
     row.dataset.mainChecked = checked ? "true" : "false"
     row.dataset.hasSubtasks = subtasks.length > 0 ? "true" : "false"
 
@@ -1098,28 +1003,6 @@ export default class extends Controller {
     const subtaskRows = subtasks.map((subtask) => this.#buildSubtaskRow(subtask.text, subtask.checked))
     if (subtaskRows.length > 0) row.classList.add("task-item-group--head")
     this.#insertRowsAfter(row, subtaskRows)
-
-    return row
-  }
-
-  #buildSubtaskRow(text, checked) {
-    const row = document.createElement("li")
-    row.className = "task-item-row task-item-row--subtask organizer-row nexus-standard-row task-item-group--child"
-    row.draggable = true
-    row.dataset.role = "subtask"
-    if (checked) row.classList.add("task-item-row--checked")
-
-    row.innerHTML =
-      `<div class="organizer-row-left nexus-standard-row__main ${NEXUS_CLICKABLE_ROW_MAIN_CLASS}">` +
-        '<span class="nexus-standard-row__leading">' +
-          `<span class="task-toggle" role="button" tabindex="0" aria-label="Toggle subtask completion">${taskToggleMarkup(checked)}</span>` +
-        "</span>" +
-        `<span class="task-item-text task-item-text--subtask" data-role="task-text">${this.#escapeHtml(text)}</span>` +
-      "</div>" +
-      '<div class="organizer-row-right">' +
-        `<span class="item-action-btn" title="Rename">${materialSymbolSvg("edit", "xs")}</span>` +
-        `<span class="item-action-btn item-action-delete" title="Delete">${materialSymbolSvg("delete", "xs")}</span>` +
-      "</div>"
 
     return row
   }
@@ -1153,12 +1036,28 @@ export default class extends Controller {
     mainRow.__nexusPendingSubtaskRows = []
   }
 
-  // --------------------------------------------------------------------- //
-  // Refresh / sync / autosave                                             //
-  // --------------------------------------------------------------------- //
+  #buildSubtaskRow(text, checked) {
+    const row = document.createElement("li")
+    row.className = "task-item-row task-item-row--subtask organizer-row nexus-standard-row task-item-group--child"
+    row.draggable = true
+    if (checked) row.classList.add("task-item-row--checked")
+
+    row.innerHTML =
+      `<div class="organizer-row-left nexus-standard-row__main ${NEXUS_CLICKABLE_ROW_MAIN_CLASS}">` +
+        '<span class="nexus-standard-row__leading">' +
+          `<span class="task-toggle" role="button" tabindex="0" aria-label="Toggle subtask completion">${taskToggleMarkup(checked)}</span>` +
+        "</span>" +
+        `<span class="task-item-text task-item-text--subtask" data-role="task-text">${this.#escapeHtml(text)}</span>` +
+      "</div>" +
+      '<div class="organizer-row-right">' +
+        `<span class="item-action-btn" title="Rename">${materialSymbolSvg("edit", "xs")}</span>` +
+        `<span class="item-action-btn item-action-delete" title="Delete">${materialSymbolSvg("delete", "xs")}</span>` +
+      "</div>"
+
+    return row
+  }
 
   #refreshAll() {
-    // Clear hover before mutations; we'll re-resolve after.
     this.#clearHover()
     this.#ensureRowUids()
     const mainRows = Array.from(this.listTarget.querySelectorAll(".task-item-row--main"))
@@ -1228,6 +1127,14 @@ export default class extends Controller {
     })
   }
 
+  #mainGroupRows(mainRow) {
+    return [mainRow, ...this.#subtasksFor(mainRow)]
+  }
+
+  #mainGroupTail(mainRow) {
+    return this.#lastSubtaskFor(mainRow) || mainRow
+  }
+
   #rowTextForSync(row) {
     const input = row.querySelector(".task-edit-input")
     if (input) return input.value.trim()
@@ -1278,5 +1185,56 @@ export default class extends Controller {
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
+  }
+
+  #spawnConfetti(row) {
+    const toggle = row.querySelector(".task-toggle")
+    if (!toggle) {
+      console.warn("No toggle found on row", row)
+      return
+    }
+
+    const colors = ["#ef4444", "#22c55e", "#3b82f6", "#facc15", "#f97316", "#a855f7", "#06b6d4", "#ec4899"]
+    const duration = 375
+    const particleCount = 8
+    const startDist = 1
+    const endDist = 5
+
+    const icon = toggle.querySelector("svg, .material-icon") || toggle
+    const iconRect = icon.getBoundingClientRect()
+    const iconCenterX = iconRect.left + iconRect.width / 2
+    const iconCenterY = iconRect.top + iconRect.height / 2
+
+    colors.forEach((color, i) => {
+      const particle = document.createElement("div")
+      particle.className = "task-confetti-particle"
+
+      const angle = (i / particleCount) * 360
+      const angleRad = (angle * Math.PI) / 180
+
+      const startX = Math.cos(angleRad) * startDist
+      const startY = Math.sin(angleRad) * startDist
+      const endX = Math.cos(angleRad) * endDist
+      const endY = Math.sin(angleRad) * endDist
+
+      particle.style.setProperty("--start-x", `${startX}px`)
+      particle.style.setProperty("--start-y", `${startY}px`)
+      particle.style.setProperty("--end-x", `${endX}px`)
+      particle.style.setProperty("--end-y", `${endY}px`)
+      particle.style.setProperty("--angle", `${angle}deg`)
+      particle.style.setProperty("--dur", `${duration}ms`)
+      particle.style.setProperty("--delay", `${Math.random() * 30}ms`)
+      particle.style.setProperty("--color", color)
+
+      particle.style.position = "fixed"
+      particle.style.left = iconCenterX + "px"
+      particle.style.top = iconCenterY + "px"
+
+      document.body.appendChild(particle)
+
+      setTimeout(() => {
+        particle.remove()
+      }, duration + 50)
+    })
   }
 }
