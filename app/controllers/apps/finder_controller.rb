@@ -12,6 +12,11 @@ module Apps
       { key: "images", title: "Images", icon: "wallpaper" },
       { key: "audio", title: "Audio", icon: "graphic_eq" }
     ].freeze
+    READ_ONLY_FRAME_CONFIG = {
+      "singular-task-list-pane" => { section_key: "documents", content_type: "task_list", allow_save: true },
+      "loops-pane" => { section_key: "audio", content_type: "asset", allow_save: false },
+      "images-pane" => { section_key: "images", content_type: "asset", allow_save: false }
+    }.freeze
     LEGACY_FINDER_WORKSPACE_FOLDER_TITLE = "Finder"
     # Matches file kinds with an opener app (see finder_browser_controller.js).
     LINKED_FILE_CONTENT_TYPES = %w[task_list asset].freeze
@@ -135,15 +140,26 @@ module Apps
     def show
       @finder_read_only = params[:mode].to_s == "save_as"
       @finder_single_section_mode = false
-      read_only_content_type = SingularSaveToDocument::FRAME_MAP[params[:frame_id].to_s]&.[](:content_type)
-      @finder_single_section_mode = @finder_read_only && read_only_content_type.to_s == "task_list"
+      frame_id = params[:frame_id].to_s
+      read_only_config = READ_ONLY_FRAME_CONFIG[frame_id]
+      if read_only_config.nil?
+        read_only_config = READ_ONLY_FRAME_CONFIG["singular-task-list-pane"] if frame_id.start_with?("task-spawn-")
+        read_only_config = READ_ONLY_FRAME_CONFIG["images-pane"] if frame_id.start_with?("image-spawn-")
+      end
+      read_only_content_type = read_only_config&.[](:content_type)
+      @finder_read_only_can_save = @finder_read_only && read_only_config&.[](:allow_save)
+      @finder_single_section_mode = @finder_read_only && read_only_config.present?
 
       section_roots = self.class.workspace_section_roots(current_user)
       browse_doc = params[:browse_id].present? ? Document.find_by(id: params[:browse_id]) : nil
 
       @section_key =
-        self.class.finder_section_key_for_document(current_user, browse_doc) ||
-        self.class.normalized_section_key(params[:section])
+        if @finder_single_section_mode
+          self.class.normalized_section_key(read_only_config[:section_key])
+        else
+          self.class.finder_section_key_for_document(current_user, browse_doc) ||
+            self.class.normalized_section_key(params[:section])
+        end
       @finder_sections = self.class.workspace_section_definitions.map do |definition|
         definition.merge(folder: section_roots[definition[:key]])
       end

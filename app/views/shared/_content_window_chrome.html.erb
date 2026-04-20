@@ -1,4 +1,5 @@
 <% show_save = local_assigns.fetch(:show_save, false) %>
+<% show_open = local_assigns.fetch(:show_open, false) %>
 <% singular_save_flow = local_assigns.fetch(:singular_save_flow, false) %>
 <% open_file_badge = local_assigns.fetch(:open_file_badge, false) %>
 <% show_finder_new_folder = local_assigns.fetch(:show_finder_new_folder, false) %>
@@ -27,6 +28,24 @@
             title="Add task"
             aria-label="Add task"
           ><%= material_symbol_icon(:add, size: :xs) %></button>
+        <% end %>
+        <% if show_set_wallpaper %>
+          <button
+            type="button"
+            class="tools-close-btn content-window-set-wallpaper"
+            data-action="click->content-window#setLinkedImageAsWallpaper"
+            aria-label="Set as wallpaper"
+            title="Set as wallpaper"
+          ><%= material_symbol_icon(:desktop_windows, size: :sm) %></button>
+        <% end %>
+        <% if show_open %>
+          <button
+            type="button"
+            class="content-window-new-folder-btn settings-themes-item-action-btn theme-builder-save-btn"
+            data-action="click->content-window#openSingularSavePicker"
+            title="Open from Finder"
+            aria-label="Open from Finder"
+          ><%= material_symbol_icon(:folder, size: :sm) %></button>
         <% end %>
         <% if show_save %>
           <button
@@ -75,25 +94,15 @@
           aria-label="Save As"
         ><%= material_symbol_icon(:save, size: :sm) %></button>
       <% end %>
-    <% end %>
-    <% if show_loops_play_pause %>
-      <button
-        type="button"
-        class="tools-close-btn content-window-audio-play"
-        data-loops-target="playPauseButton"
-        data-action="click->loops#togglePlayback"
-        aria-label="Play"
-        title="Play"
-      ></button>
-    <% end %>
-    <% if show_set_wallpaper %>
-      <button
-        type="button"
-        class="tools-close-btn content-window-set-wallpaper"
-        data-action="click->content-window#setLinkedImageAsWallpaper"
-        aria-label="Set as wallpaper"
-        title="Set as wallpaper"
-      ><%= material_symbol_icon(:desktop_windows, size: :sm) %></button>
+      <% if show_set_wallpaper %>
+        <button
+          type="button"
+          class="tools-close-btn content-window-set-wallpaper"
+          data-action="click->content-window#setLinkedImageAsWallpaper"
+          aria-label="Set as wallpaper"
+          title="Set as wallpaper"
+        ><%= material_symbol_icon(:desktop_windows, size: :sm) %></button>
+      <% end %>
     <% end %>
     <%= render "shared/content_window_close_button" %>
   </div>

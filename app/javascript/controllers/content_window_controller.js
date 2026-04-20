@@ -45,8 +45,8 @@ export default class extends Controller {
     /* Finder shell + Settings (two-pane layouts) share a minimum so rows don’t collapse. */
     const finderLikeMin = { width: 760, height: 460 }
     const taskListMin = { width: 320, height: 320 }
-    const loopsMin = { width: 320, height: 154 }
-    const imagesMin = { width: 420, height: 320 }
+    const loopsMin = { width: 320, height: 320 }
+      const imagesMin = { width: 320, height: 320 }
     const minByAppKey = {
       "singular-task-list": taskListMin,
       finder: finderLikeMin,
@@ -59,7 +59,7 @@ export default class extends Controller {
     this.minWindowHeight = appMinimum.height
 
     const rect = this.element.getBoundingClientRect()
-    if (this.appKeyValue === "finder" || this.appKeyValue === "loops") {
+    if (this.appKeyValue === "finder") {
       /* Default / first paint: use minimum allowed size (not generic 550×480 .content-window CSS). */
       this.windowWidth = this.minWindowWidth
       this.windowHeight = this.minWindowHeight
@@ -962,6 +962,9 @@ export default class extends Controller {
       if (this.hasChromePickerToolsTarget) this.chromePickerToolsTarget.hidden = true
       this.#dismissSingularSavePickerLayer()
     }
+    if (this.shouldResetLinkedDocumentOnClose()) {
+      this.resetLinkedDocumentSessionState()
+    }
     this.saveOpenState(false)
     this.element.classList.add("is-hidden")
 
@@ -974,10 +977,10 @@ export default class extends Controller {
         if (this.appKeyValue.startsWith("image-spawn-")) delete window.__nexusSpawnedImagesByDocumentId[docId]
       }
       if (this.appKeyValue.startsWith("task-spawn-")) this.removePersistedSpawnedTaskWindow(this.appKeyValue)
-        // Clear localStorage linked doc entry for this spawned window
-        try {
-          window.localStorage.removeItem(`nexus.singularLinkedDocument.${this.frameIdValue}`)
-        } catch (_) {}
+      try {
+        window.localStorage.removeItem(`nexus.singularLinkedDocument.${this.frameIdValue}`)
+        window.sessionStorage.removeItem(`nexus.singularLinkedDocument.${this.frameIdValue}`)
+      } catch (_) {}
       this.element.remove()
       const hasOtherSpawned = this.appKeyValue.startsWith("task-spawn-")
         ? document.querySelectorAll('[data-content-window-app-key-value^="task-spawn-"]:not(.is-hidden)').length > 0
@@ -997,6 +1000,25 @@ export default class extends Controller {
     if (!this.hasFrameTarget) return
     if (this.frameTarget.getAttribute("src") === this.currentUrl) return
     this.frameTarget.src = this.currentUrl
+  }
+
+  shouldResetLinkedDocumentOnClose() {
+    return this.appKeyValue === "loops" || this.appKeyValue === "images"
+  }
+
+  resetLinkedDocumentSessionState() {
+    if (this.hasFrameIdValue) {
+      try {
+        window.sessionStorage.removeItem(`nexus.singularLinkedDocument.${this.frameIdValue}`)
+        window.localStorage.removeItem(`nexus.singularLinkedDocument.${this.frameIdValue}`)
+      } catch (_) {}
+    }
+    this.currentUrl = this.buildAppUrl({ blank: false })
+    this.clearOpenFileBadge()
+    if (this.hasFrameTarget) {
+      this.frameTarget.removeAttribute("src")
+      void this.frameTarget.offsetWidth
+    }
   }
 
   isSingularApp() {
@@ -1170,10 +1192,6 @@ export default class extends Controller {
   }
 
   startResize(event) {
-    if (this.appKeyValue === "loops") {
-      event.preventDefault()
-      return
-    }
     if (this.isAutoSizedWindow) return
     if (this.activeResize) {
       event.preventDefault()

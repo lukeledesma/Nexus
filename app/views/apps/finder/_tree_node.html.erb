@@ -1,5 +1,6 @@
 <%# Recursive tree row. node: { kind:, id?, title, writable, children?, ... }; browse_folder_id + expanded_folder_ids drive open/selected state. %>
 <% read_only = local_assigns.fetch(:read_only, false) %>
+<% read_only_can_save = local_assigns.fetch(:read_only_can_save, false) %>
 <% open_in_app_content_types = local_assigns.fetch(:open_in_app_content_types, %w[task_list]) %>
 <% is_folder = node[:kind] == :folder %>
 <% children = is_folder ? Array(node[:children]) : [] %>
@@ -46,7 +47,7 @@
         </span>
         <span class="finder-tree__label" data-finder-tree-label><%= node[:title] %></span>
       <% end %>
-      <% if read_only && writable %>
+      <% if read_only && read_only_can_save && writable %>
         <div class="finder-tree__row-actions finder-tree__row-actions--save-here">
           <button
             type="button"
@@ -95,6 +96,7 @@
                 expanded_folder_ids: expanded_ids,
                 frame_id: frame_id,
                 read_only: read_only,
+                read_only_can_save: read_only_can_save,
                 open_in_app_content_types: open_in_app_content_types %>
         <% end %>
       </ul>

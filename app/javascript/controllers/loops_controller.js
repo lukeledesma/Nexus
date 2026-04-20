@@ -19,7 +19,7 @@ function formatSeconds(value) {
 }
 
 export default class extends Controller {
-  static targets = ["audio", "waveform", "fileName", "timeLabel", "playPauseButton"]
+  static targets = ["audio", "waveform", "fileName", "timeCurrent", "timeRemaining", "playPauseButton"]
 
   connect() {
     this.objectUrl = null
@@ -38,6 +38,7 @@ export default class extends Controller {
     this.boundAudioError = this.handleAudioError.bind(this)
     this.boundWindowBlur = this.stopRaf.bind(this)
     this.boundVisibility = this.handleVisibilityChange.bind(this)
+    this.boundWorkspaceChromeSynced = this.handleWorkspaceChromeSynced.bind(this)
     this.boundWavePointerMove = this.wavePointerMove.bind(this)
     this.boundWavePointerUp = this.wavePointerUp.bind(this)
     this.boundWaveWheel = this.waveWheel.bind(this)
@@ -50,6 +51,7 @@ export default class extends Controller {
     this.element.addEventListener("turbo:frame-load", this.boundFrameLoad)
     window.addEventListener("resize", this.boundResize)
     window.addEventListener("blur", this.boundWindowBlur)
+    window.addEventListener("nexus:workspace-chrome-synced", this.boundWorkspaceChromeSynced)
     document.addEventListener("visibilitychange", this.boundVisibility)
 
     requestAnimationFrame(() => {
@@ -62,6 +64,7 @@ export default class extends Controller {
     this.element.removeEventListener("turbo:frame-load", this.boundFrameLoad)
     window.removeEventListener("resize", this.boundResize)
     window.removeEventListener("blur", this.boundWindowBlur)
+    window.removeEventListener("nexus:workspace-chrome-synced", this.boundWorkspaceChromeSynced)
     document.removeEventListener("visibilitychange", this.boundVisibility)
     this.detachWavePointerListeners()
     this.detachWaveformWheel()
@@ -80,6 +83,8 @@ export default class extends Controller {
   handleFrameLoad(event) {
     const t = event.target
     if (!(t instanceof HTMLElement) || t.tagName !== "TURBO-FRAME" || t.id !== "loops-pane") return
+    this.revokeObjectUrl({ resetMeta: false })
+    this._initialLinkedPayloadKey = null
     this.hydrateTargets()
     this.tryLoadInitialLinkedDocument()
   }
@@ -384,7 +389,7 @@ export default class extends Controller {
 
   handleAudioError() {
     this.stopRaf()
-    if (this.hasTimeLabelTarget) this.timeLabelTarget.textContent = "Playback error"
+    if (this.hasTimeCurrentTarget) this.timeCurrentTarget.textContent = "Error"
     this.syncChromeTitle("")
   }
 
@@ -399,6 +404,10 @@ export default class extends Controller {
       return
     }
     if (this.audioElement && !this.audioElement.paused) this.scheduleWaveformDraw()
+  }
+
+  handleWorkspaceChromeSynced() {
+    this.drawWaveform()
   }
 
   syncPlayPauseIcon() {
@@ -460,8 +469,12 @@ export default class extends Controller {
     if (!this.audioElement) return
     const current = this.audioElement.currentTime || 0
     const duration = this.durationSafe()
-    if (this.hasTimeLabelTarget) {
-      this.timeLabelTarget.textContent = `${formatSeconds(current)} / ${formatSeconds(duration)}`
+    const remaining = duration > 0 ? duration - current : 0
+    if (this.hasTimeCurrentTarget) {
+      this.timeCurrentTarget.textContent = formatSeconds(current)
+    }
+    if (this.hasTimeRemainingTarget) {
+      this.timeRemainingTarget.textContent = duration > 0 ? `-${formatSeconds(remaining)}` : `-00:00`
     }
   }
 
@@ -557,7 +570,12 @@ export default class extends Controller {
     const w = canvas.width
     const h = canvas.height
     ctx.clearRect(0, 0, w, h)
-    ctx.fillStyle = "rgba(255,255,255,0.04)"
+    const style = getComputedStyle(canvas)
+    const barBg = style.getPropertyValue("--loops-bar-bg").trim() || "rgba(255,255,255,0.04)"
+    const barIdle = style.getPropertyValue("--loops-bar-idle").trim() || "rgba(227,227,227,0.42)"
+    const barPlayed = style.getPropertyValue("--loops-bar-played").trim() || "rgba(130,214,255,0.88)"
+    const barHead = style.getPropertyValue("--loops-bar-head").trim() || "rgba(255,255,255,0.55)"
+    ctx.fillStyle = barBg
     ctx.fillRect(0, 0, w, h)
 
     const d = this.durationSafe()
@@ -574,12 +592,12 @@ export default class extends Controller {
       const bh = Math.max(4, Math.floor(amp * (h * 0.78)))
       const x = Math.floor(i * barW)
       const y = Math.floor(mid - bh / 2)
-      const fill = x <= playedX ? "rgba(130, 214, 255, 0.88)" : "rgba(227, 227, 227, 0.42)"
+      const fill = x <= playedX ? barPlayed : barIdle
       ctx.fillStyle = fill
       ctx.fillRect(x, y, Math.max(1, Math.floor(barW * 0.72)), bh)
     }
 
-    ctx.fillStyle = "rgba(255,255,255,0.55)"
+    ctx.fillStyle = barHead
     ctx.fillRect(playedX, 0, 1, h)
 
     canvas.style.cursor = this.pointerMode === "scrub" ? "grabbing" : "grab"

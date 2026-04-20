@@ -8,6 +8,7 @@
     data-finder-browser-root-folder-id-value="<%= @root_folder&.id %>"
     data-finder-browser-section-key-value="<%= @section_key %>"
     data-finder-browser-read-only-value="<%= @finder_read_only %>"
+    data-finder-browser-read-only-can-save-value="<%= @finder_read_only_can_save %>"
     <% if @finder_read_only %>data-finder-browser-singular-save-icon-value="<%= @singular_save_icon %>"<% end %>
     data-finder-tree-frame-id-value="<%= frame_id %>"
   >
@@ -41,6 +42,7 @@
                         expanded_folder_ids: @expanded_folder_ids,
                         frame_id: frame_id,
                         read_only: @finder_read_only,
+                        read_only_can_save: @finder_read_only_can_save,
                         open_in_app_content_types: @open_in_app_content_types %>
                 <% end %>
               </ul>

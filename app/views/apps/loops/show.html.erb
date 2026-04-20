@@ -8,21 +8,35 @@
     <% end %>
     data-action="dragover->loops#dragOver dragenter->loops#dragEnter dragleave->loops#dragLeave drop->loops#handleDrop">
     <audio data-loops-target="audio" preload="metadata"></audio>
-
-    <div class="loops-app__visual">
-      <canvas
-        class="loops-app__waveform"
-        width="640"
-        height="72"
-        data-loops-target="waveform"
-        data-action="pointerdown->loops#wavePointerDown"
-        role="slider"
-        aria-label="Waveform — drag or scroll to seek"
-        tabindex="0"></canvas>
-      <div class="loops-app__meta">
-        <span class="loops-app__name" data-loops-target="fileName">Drop an MP3 or WAV here</span>
-        <span class="loops-app__time" data-loops-target="timeLabel">00:00 / 00:00</span>
+    <% if @linked_document_id.present? %>
+      <div class="loops-app__visual">
+        <canvas
+          class="loops-app__waveform"
+          width="640"
+          height="72"
+          data-loops-target="waveform"
+          data-action="pointerdown->loops#wavePointerDown"
+          role="slider"
+          aria-label="Waveform — drag or scroll to seek"
+          tabindex="0"></canvas>
       </div>
-    </div>
+
+      <footer class="loops-app__transport">
+        <span class="loops-app__time-current" data-loops-target="timeCurrent">00:00</span>
+        <button
+          type="button"
+          class="tools-close-btn"
+          data-loops-target="playPauseButton"
+          data-action="click->loops#togglePlayback"
+          aria-label="Play"
+          title="Play"
+        ></button>
+        <span class="loops-app__time-remaining" data-loops-target="timeRemaining">-00:00</span>
+      </footer>
+    <% else %>
+      <div class="loops-app__empty-wrap">
+        <p class="loops-app__empty">Select an audio file in Finder to open it here.</p>
+      </div>
+    <% end %>
   </section>
 </turbo-frame>

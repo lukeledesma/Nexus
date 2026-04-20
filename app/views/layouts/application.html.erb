@@ -87,8 +87,9 @@
         data-content-window-app-url-value="/apps/loops"
         data-content-window-storage-key-value="nexus.contentWindow.loops.bounds"
         data-content-window-frame-id-value="loops-pane"
+        data-content-window-has-singular-save-picker-value="true"
         aria-live="polite">
-        <%= render "shared/content_window_chrome", title: "Audio", open_file_badge: true, show_loops_play_pause: true %>
+        <%= render "shared/content_window_chrome", title: "Audio", open_file_badge: true, singular_save_flow: true, show_open: true %>
         <div class="pane-resize-handle pane-resize-handle--top" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
@@ -97,7 +98,7 @@
         <div class="pane-resize-handle pane-resize-handle--top-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <%= content_window_shell do %>
+        <%= content_window_shell(singular_save_picker: true) do %>
           <turbo-frame id="loops-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
         <% end %>
       </section>
@@ -108,8 +109,9 @@
         data-content-window-app-url-value="/apps/images"
         data-content-window-storage-key-value="nexus.contentWindow.images.bounds"
         data-content-window-frame-id-value="images-pane"
+        data-content-window-has-singular-save-picker-value="true"
         aria-live="polite">
-        <%= render "shared/content_window_chrome", title: "Images", open_file_badge: true, show_set_wallpaper: true %>
+        <%= render "shared/content_window_chrome", title: "Images", open_file_badge: true, singular_save_flow: true, show_open: true, show_set_wallpaper: true %>
         <div class="pane-resize-handle pane-resize-handle--top" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
@@ -118,7 +120,7 @@
         <div class="pane-resize-handle pane-resize-handle--top-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <%= content_window_shell do %>
+        <%= content_window_shell(singular_save_picker: true) do %>
           <turbo-frame id="images-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
         <% end %>
       </section>

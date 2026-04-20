@@ -140,11 +140,13 @@ export function syncNexusWorkspaceChrome(params) {
   delete root.dataset.nexusTheme
   if (mode === SHELL_MODE_LIGHT) {
     applyLightAppearance(root, appearance)
+    window.dispatchEvent(new CustomEvent("nexus:workspace-chrome-synced", { detail: { mode } }))
     return
   }
   if (appearance && typeof appearance === "object") {
     applyModernAppearance(root, appearance)
   }
+  window.dispatchEvent(new CustomEvent("nexus:workspace-chrome-synced", { detail: { mode } }))
 }
 
 /**

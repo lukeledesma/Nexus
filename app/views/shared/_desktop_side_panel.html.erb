@@ -83,12 +83,12 @@
               aria-label="Open reset options"
               data-action="click->user-security-modal#openSelectorModalWithConfirm"
             >
-              <%= image_tag "lock_reset_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg", alt: "", class: "desktop-side-panel-action-icon" %>
+              <%= material_symbol_icon(:lock_reset, size: :xs, html_class: "desktop-side-panel-action-icon") %>
             </button>
 
             <%= form_with url: logout_path, method: :delete, local: true, data: { turbo: false }, class: "desktop-side-panel-logout-form" do %>
               <button type="submit" class="item-action-btn" title="Log out" aria-label="Log out">
-                <%= image_tag "logout_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg", alt: "", class: "desktop-side-panel-action-icon" %>
+                <%= material_symbol_icon(:logout, size: :xs, html_class: "desktop-side-panel-action-icon") %>
               </button>
             <% end %>
           </div>
