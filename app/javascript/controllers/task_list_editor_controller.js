@@ -32,8 +32,10 @@ export default class extends Controller {
     document.addEventListener("nexus:request-save", this.boundRequestSave)
     if (this.hasListTarget) {
       this.listTarget.addEventListener("input", this.boundSyncPayloadInput, true)
+      this.boundListPointerDownCapture = this.handleListPointerDownCapture.bind(this)
       this.boundListPointerMove = this.handleListPointerMove.bind(this)
       this.boundListPointerLeave = this.handleListPointerLeave.bind(this)
+      this.listTarget.addEventListener("pointerdown", this.boundListPointerDownCapture, true)
       this.listTarget.addEventListener("pointermove", this.boundListPointerMove)
       this.listTarget.addEventListener("pointerleave", this.boundListPointerLeave)
     }
@@ -54,6 +56,9 @@ export default class extends Controller {
     window.removeEventListener(SINGULAR_BEFORE_SAVE_PICKER, this.boundBeforeSavePicker)
     if (this.hasListTarget && this.boundSyncPayloadInput) {
       this.listTarget.removeEventListener("input", this.boundSyncPayloadInput, true)
+    }
+    if (this.hasListTarget && this.boundListPointerDownCapture) {
+      this.listTarget.removeEventListener("pointerdown", this.boundListPointerDownCapture, true)
     }
     if (this.hasListTarget && this.boundListPointerMove) {
       this.listTarget.removeEventListener("pointermove", this.boundListPointerMove)
@@ -85,6 +90,14 @@ export default class extends Controller {
     this.lastPointerX = null
     this.lastPointerY = null
     this.#setHovered(null)
+  }
+
+  handleListPointerDownCapture(event) {
+    const activeInput = this.#activeEditInput()
+    if (!activeInput) return
+    if (event.target instanceof Element && event.target.closest(".task-edit-input")) return
+    // Allow blur/commit to run, but suppress the click that would otherwise toggle/select the row.
+    this.suppressNextClick = true
   }
 
   #setHovered(row) {
@@ -247,6 +260,7 @@ export default class extends Controller {
     if (this.suppressNextClick) {
       this.suppressNextClick = false
       event.preventDefault()
+      event.stopPropagation()
       return
     }
     const row = event.target.closest(".task-item-row")

@@ -41,11 +41,13 @@ export default class extends Controller {
 
     this.boundSuppressClickAfterDrag = this._onSuppressClickAfterDrag.bind(this)
     this.boundFolderClick = this._onFolderClickCapture.bind(this)
+    this.boundPointerDownCapture = this._onPointerDownCapture.bind(this)
     this.boundDragStart = this._onDragStart.bind(this)
     this.boundDragEnd = this._onDragEnd.bind(this)
     this.boundDragOver = this._onDragOver.bind(this)
     this.boundDrop = this._onDrop.bind(this)
 
+    this.element.addEventListener("pointerdown", this.boundPointerDownCapture, true)
     this.element.addEventListener("click", this.boundSuppressClickAfterDrag, true)
     this.element.addEventListener("click", this.boundFolderClick, true)
     this.element.addEventListener("keydown", this._onKeydown)
@@ -58,6 +60,7 @@ export default class extends Controller {
   }
 
   disconnect() {
+    this.element.removeEventListener("pointerdown", this.boundPointerDownCapture, true)
     this.element.removeEventListener("click", this.boundSuppressClickAfterDrag, true)
     this.element.removeEventListener("click", this.boundFolderClick, true)
     this.element.removeEventListener("keydown", this._onKeydown)
@@ -90,6 +93,15 @@ export default class extends Controller {
 
   _focusIfNeeded(el) {
     if (el && typeof el.focus === "function") el.focus({ preventScroll: true })
+  }
+
+  _onPointerDownCapture(event) {
+    const activeRenameInput = this.element.querySelector(".finder-tree__pending-name-input")
+    if (!activeRenameInput) return
+    // Any click while inline rename is active (inside or outside the input)
+    // should not trigger folder/file row activation in the same interaction.
+    this._suppressNextFolderRowClick = true
+    this._suppressNextFileRowClick = true
   }
 
   _onSuppressClickAfterDrag(event) {

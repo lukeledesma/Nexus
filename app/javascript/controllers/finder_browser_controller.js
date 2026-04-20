@@ -252,6 +252,11 @@ export default class extends Controller {
 
   /** Toolbar control: open linked doc in Tasks, optionally close Finder or exit save picker. */
   openLinkedFileInApp(event) {
+    if (this.element.querySelector(".finder-tree__pending-name-input")) {
+      if (typeof event.preventDefault === "function") event.preventDefault()
+      if (typeof event.stopPropagation === "function") event.stopPropagation()
+      return
+    }
     if (typeof event.preventDefault === "function") event.preventDefault()
     if (typeof event.stopPropagation === "function") event.stopPropagation()
     const el = event.currentTarget
@@ -264,6 +269,11 @@ export default class extends Controller {
 
   openLinkedFile(event) {
     if (this.readOnlyValue) return
+    if (this.element.querySelector(".finder-tree__pending-name-input")) {
+      if (typeof event.preventDefault === "function") event.preventDefault()
+      if (typeof event.stopPropagation === "function") event.stopPropagation()
+      return
+    }
     if (typeof event.preventDefault === "function") event.preventDefault()
     if (typeof event.stopPropagation === "function") event.stopPropagation()
     this.#openLinkedDocumentCommon(event.currentTarget, {})
