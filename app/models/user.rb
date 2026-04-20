@@ -49,9 +49,13 @@ class User < ApplicationRecord
       root_folder.children.create!(is_folder: true, title: "Embedded")
     end
 
-    unless root_folder.children.folders.where("LOWER(title) = ?", "finder").exists?
-      root_folder.children.create!(is_folder: true, title: "Finder")
+    %w[Documents Images Audio].each do |title|
+      next if root_folder.children.folders.where("LOWER(title) = ?", title.downcase).exists?
+
+      root_folder.children.create!(is_folder: true, title: title)
     end
+
+    root_folder.children.folders.where("LOWER(title) = ?", "finder").find_each(&:destroy!)
   end
 
   def sync_workspace_after_username_change

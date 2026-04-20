@@ -112,6 +112,7 @@
                 turbo: false,
                 document_id: node[:id],
                 content_type: node[:content_type],
+                file_kind: node[:file_kind],
                 document_title: finder_open_doc_title,
                 action: "click->finder-browser#openLinkedFile keydown->finder-browser#openLinkedFileKey"
               },
@@ -119,7 +120,7 @@
               tabindex: "0",
               aria: { label: "Open #{node[:title]}" } do %>
           <span class="finder-tree__icon finder-tree__icon--file" aria-hidden="true">
-            <%= material_symbol_icon(finder_file_icon_for_content_type(node[:content_type]), size: :sm) %>
+            <%= material_symbol_icon(finder_file_icon_for_content_type(node[:content_type], source_extension: node[:source_extension]), size: :sm) %>
           </span>
           <span class="finder-tree__label" data-finder-tree-label><%= node[:title] %></span>
         <% end %>
@@ -131,6 +132,7 @@
                 turbo: false,
                 document_id: node[:id],
                 content_type: node[:content_type],
+                file_kind: node[:file_kind],
                 document_title: finder_open_doc_title,
                 action: "click->finder-browser#openLinkedFileInApp keydown->finder-browser#openLinkedFileInAppKey"
               },
@@ -138,7 +140,7 @@
               tabindex: "0",
               aria: { label: "Open #{node[:title]}" } do %>
           <span class="finder-tree__icon finder-tree__icon--file" aria-hidden="true">
-            <%= material_symbol_icon(finder_file_icon_for_content_type(node[:content_type]), size: :sm) %>
+            <%= material_symbol_icon(finder_file_icon_for_content_type(node[:content_type], source_extension: node[:source_extension]), size: :sm) %>
           </span>
           <span class="finder-tree__label" data-finder-tree-label><%= node[:title] %></span>
         <% end %>
@@ -150,7 +152,7 @@
           aria-label="<%= node[:title] %> (no app for this type yet)"
         >
           <span class="finder-tree__icon finder-tree__icon--file" aria-hidden="true">
-            <%= material_symbol_icon(finder_file_icon_for_content_type(node[:content_type]), size: :sm) %>
+            <%= material_symbol_icon(finder_file_icon_for_content_type(node[:content_type], source_extension: node[:source_extension]), size: :sm) %>
           </span>
           <span class="finder-tree__label" data-finder-tree-label><%= node[:title] %></span>
         </span>

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# Ensures each user has Finder/Welcome/Welcome with onboarding text once.
+# Ensures each user has Documents/Welcome/Welcome with onboarding text once.
 class WelcomeWorkspaceSeed
   FOLDER_TITLE = "Welcome"
   DOC_TITLE = "Welcome"
@@ -18,11 +18,11 @@ class WelcomeWorkspaceSeed
   def ensure!
     return unless @user
 
-    finder_root = Apps::FinderController.workspace_finder_root_folder(@user)
-    return unless finder_root
+    documents_root = Apps::FinderController.workspace_section_root(@user, "documents")
+    return unless documents_root
 
-    welcome_folder = finder_root.children.folders.where("LOWER(title) = ?", FOLDER_TITLE.downcase).first
-    welcome_folder ||= finder_root.children.create!(is_folder: true, title: FOLDER_TITLE)
+    welcome_folder = documents_root.children.folders.where("LOWER(title) = ?", FOLDER_TITLE.downcase).first
+    welcome_folder ||= documents_root.children.create!(is_folder: true, title: FOLDER_TITLE)
 
     same_title = welcome_folder.children.files.where("LOWER(title) = ?", DOC_TITLE.downcase).to_a
     return if same_title.any? { |f| f.content_type.to_s == "note" }
@@ -61,7 +61,7 @@ class WelcomeWorkspaceSeed
       <p>Your workspace for task lists and notes, kept in folders so everything stays easy to find.</p>
       <p><strong>Get started</strong></p>
       <ul>
-        <li>Open Finder from the side panel, then use + in the title bar to create folders under your workspace Finder folder.</li>
+        <li>Open Finder from the side panel, then choose Documents, Images, or Audio on the left.</li>
         <li>Open Tasks from the side panel. Use Save to Finder when you want a copy on disk.</li>
         <li>Open Settings anytime to adjust your account and how Nexus looks.</li>
       </ul>

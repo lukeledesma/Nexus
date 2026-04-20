@@ -23,9 +23,7 @@
     aria-label="Nexus apps"
     aria-hidden="true"
   >
-    <header class="desktop-side-panel-header">
-      <h1 class="desktop-side-panel-brand">NEXUS</h1>
-    </header>
+    <header class="desktop-side-panel-header"></header>
 
     <div class="desktop-side-panel-body" data-controller="organizer">
       <nav class="desktop-side-panel-apps" aria-label="Apps">
@@ -50,6 +48,52 @@
           </button>
         <% end %>
       </nav>
+
+      <div class="desktop-side-panel-user-section">
+        <div class="desktop-side-panel-theme-row" data-controller="user-settings">
+          <span class="desktop-side-panel-row-icon" aria-hidden="true">
+            <%= material_symbol_icon(:palette, size: :sm) %>
+          </span>
+          <span class="desktop-side-panel-row-label">Theme</span>
+          <div class="desktop-side-panel-row-actions">
+            <span class="desktop-side-panel-theme-text" data-user-settings-target="themeLabel">System</span>
+            <button
+              type="button"
+              class="item-action-btn"
+              title="Cycle theme"
+              aria-label="Cycle between system, dark, and light theme"
+              data-user-settings-target="themeButton"
+              data-action="click->user-settings#cycleTheme"
+            >
+              <%= material_symbol_icon(:desktop_windows, size: :xs) %>
+            </button>
+          </div>
+        </div>
+
+        <div class="desktop-side-panel-user-row">
+          <span class="desktop-side-panel-row-icon" aria-hidden="true">
+            <%= material_symbol_icon(:account_circle, size: :sm) %>
+          </span>
+          <span class="desktop-side-panel-row-label"><%= current_user.username.presence || "User" %></span>
+          <div class="desktop-side-panel-row-actions">
+            <button
+              type="button"
+              class="item-action-btn"
+              title="Reset password or username"
+              aria-label="Open reset options"
+              data-action="click->user-security-modal#openSelectorModalWithConfirm"
+            >
+              <%= image_tag "lock_reset_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg", alt: "", class: "desktop-side-panel-action-icon" %>
+            </button>
+
+            <%= form_with url: logout_path, method: :delete, local: true, data: { turbo: false }, class: "desktop-side-panel-logout-form" do %>
+              <button type="submit" class="item-action-btn" title="Log out" aria-label="Log out">
+                <%= image_tag "logout_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg", alt: "", class: "desktop-side-panel-action-icon" %>
+              </button>
+            <% end %>
+          </div>
+        </div>
+      </div>
     </div>
   </aside>
 </div>

@@ -11,9 +11,14 @@ import {
 import { materialSymbolSvg } from "lib/material_symbols"
 import { dispatchSingularHostEvent, singularHostWindow } from "lib/singular_host_events"
 
-const CONTENT_TYPE_TO_APP_KEY = {
-  asset: "loops",
-  task_list: "singular-task-list"
+function appKeyForLinkedFile(contentType, fileKind) {
+  const ct = String(contentType || "").toLowerCase()
+  const kind = String(fileKind || "").toLowerCase()
+  if (ct === "task_list") return "singular-task-list"
+  if (ct !== "asset") return null
+  if (kind === "image") return "images"
+  if (kind === "audio") return "loops"
+  return null
 }
 
 const SINGULAR_FRAME_ID_BY_APP = {
@@ -39,6 +44,7 @@ export default class extends Controller {
   static values = {
     frameId: String,
     rootFolderId: Number,
+    sectionKey: { type: String, default: "documents" },
     readOnly: { type: Boolean, default: false },
     singularSaveIcon: { type: String, default: "file_document" }
   }
@@ -266,9 +272,10 @@ export default class extends Controller {
   #openLinkedDocumentCommon(el, options) {
     const documentId = el?.dataset?.documentId
     const contentType = el?.dataset?.contentType
+    const fileKind = el?.dataset?.fileKind
     if (!documentId || !contentType) return
 
-    const appKey = CONTENT_TYPE_TO_APP_KEY[contentType]
+    const appKey = appKeyForLinkedFile(contentType, fileKind)
     if (!appKey) return
 
     this.element.querySelectorAll(".finder-tree__row-line.is-selected").forEach((line) => {
@@ -546,9 +553,8 @@ export default class extends Controller {
     }
 
     const deletedId = li.dataset.finderTreeNodeId
-    const browseParam = new URLSearchParams(window.location.search).get("browse_id")
-    const nextBrowse =
-      browseParam && browseParam === deletedId ? this.rootFolderIdValue : browseParam || this.rootFolderIdValue
+    const currentBrowse = this.selectedBrowseId() || String(this.rootFolderIdValue || "")
+    const nextBrowse = currentBrowse === deletedId ? this.rootFolderIdValue : currentBrowse
     this.reloadFrameWithBrowseId(nextBrowse, { pruneSubtreeLi: li })
   }
 
@@ -558,11 +564,7 @@ export default class extends Controller {
     if (folderLink) {
       return folderLink.closest("li")?.dataset?.finderTreeNodeId ?? null
     }
-    try {
-      return new URL(window.location.href).searchParams.get("browse_id")
-    } catch (_e) {
-      return null
-    }
+    return null
   }
 
   reloadFramePreservingBrowse() {
@@ -594,6 +596,7 @@ export default class extends Controller {
 
     const url = new URL("/apps/finder", window.location.origin)
     url.searchParams.set("frame_id", frameId)
+    if (this.sectionKeyValue) url.searchParams.set("section", this.sectionKeyValue)
     if (this.readOnlyValue) url.searchParams.set("mode", "save_as")
     if (browseId) url.searchParams.set("browse_id", String(browseId))
     if (expanded.size > 0) url.searchParams.set("expanded_ids", [...expanded].sort().join(","))

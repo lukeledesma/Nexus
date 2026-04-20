@@ -23,38 +23,10 @@ const SEL = {
 
 const DRAG_KIND = { FOLDER: "folder", FILE: "file" }
 
-const OS_ASSET_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "audio/mpeg",
-  "audio/mp3",
-  "audio/wav",
-  "audio/x-wav",
-  "audio/wave"
-])
-
-function finderOsAssetFilesFromDataTransfer(dt) {
+function finderDroppedFilesFromDataTransfer(dt) {
   const files = dt?.files
   if (!files?.length) return []
-  const out = []
-  for (let i = 0; i < files.length; i++) {
-    const f = files[i]
-    const t = (f.type || "").toLowerCase()
-    if (OS_ASSET_TYPES.has(t)) {
-      out.push(f)
-      continue
-    }
-    const name = (f.name || "").toLowerCase()
-    if (
-      name.endsWith(".jpg") ||
-      name.endsWith(".jpeg") ||
-      name.endsWith(".png") ||
-      name.endsWith(".mp3") ||
-      name.endsWith(".wav")
-    )
-      out.push(f)
-  }
-  return out
+  return Array.from(files)
 }
 
 export default class extends Controller {
@@ -377,13 +349,16 @@ export default class extends Controller {
 
   _folderDropTargetFromEvent(event) {
     const line = this._rowLineInTree(event.target)
-    if (!line) return null
-    const li = line.parentElement
-    if (!li?.matches?.(SEL.folderLi) || li.dataset.pendingNewFolder === "true") return null
-    const targetId = li.dataset.finderTreeNodeId
-    if (!targetId) return null
-    if (li.dataset.finderFolderWritable === "false") return null
-    return { li, line, targetId }
+    if (line) {
+      const li = line.parentElement
+      if (!li?.matches?.(SEL.folderLi) || li.dataset.pendingNewFolder === "true") return null
+      const targetId = li.dataset.finderTreeNodeId
+      if (!targetId) return null
+      if (li.dataset.finderFolderWritable === "false") return null
+      return { li, line, targetId }
+    }
+
+    return null
   }
 
   _dropWouldReparent(dragKind, dragId, targetId, draggedLi, targetLi) {
@@ -440,7 +415,7 @@ export default class extends Controller {
 
     const dt = event.dataTransfer
     const target = this._folderDropTargetFromEvent(event)
-    const osAssets = finderOsAssetFilesFromDataTransfer(dt)
+    const droppedFiles = finderDroppedFilesFromDataTransfer(dt)
     const hasDroppedFiles = dt?.files?.length > 0
 
     if (hasDroppedFiles) {
@@ -452,13 +427,12 @@ export default class extends Controller {
       event.stopPropagation()
       this._clearDropTargetLine()
 
-      if (osAssets.length === 0) {
-        window.alert("Only JPEG, PNG, MP3, and WAV files can be dropped into Finder folders.")
+      if (droppedFiles.length === 0) {
         return
       }
 
       const formData = new FormData()
-      osAssets.forEach((file) => formData.append("files[]", file))
+      droppedFiles.forEach((file) => formData.append("files[]", file))
 
       const response = await fetch(`/documents/${encodeURIComponent(target.targetId)}/upload_images`, {
         method: "POST",

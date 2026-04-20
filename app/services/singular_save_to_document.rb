@@ -44,12 +44,9 @@ class SingularSaveToDocument
   private
 
   def folder_allowed?(folder)
-    root = Apps::FinderController.workspace_finder_root_folder(@user)
-    return false unless root
-    return true if folder.id == root.id
     return false unless folder.folder?
 
-    Apps::FinderController.document_in_finder_subtree?(root, folder)
+    Apps::FinderController.document_in_any_finder_section?(@user, folder)
   end
 
   def find_or_build_document(folder, content_type, title)

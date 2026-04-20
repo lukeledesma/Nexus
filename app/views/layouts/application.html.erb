@@ -45,7 +45,7 @@
         data-content-window-storage-key-value="nexus.contentWindow.finder.bounds"
         data-content-window-frame-id-value="finder-pane"
         aria-live="polite">
-        <%= render "shared/content_window_chrome", title: "FINDER", show_finder_new_folder: true %>
+        <%= render "shared/content_window_chrome", title: "Finder", show_finder_new_folder: true %>
         <div class="pane-resize-handle pane-resize-handle--top" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
@@ -67,7 +67,7 @@
         data-content-window-frame-id-value="singular-task-list-pane"
         data-content-window-has-singular-save-picker-value="true"
         aria-live="polite">
-        <%= render "shared/content_window_chrome", title: "TASKS", open_file_badge: true, show_task_list_add: true, singular_save_flow: true, show_save: true %>
+        <%= render "shared/content_window_chrome", title: "Tasks", open_file_badge: true, singular_save_flow: true, show_save: true, show_task_list_add: true %>
         <div class="pane-resize-handle pane-resize-handle--top" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
@@ -88,7 +88,7 @@
         data-content-window-storage-key-value="nexus.contentWindow.loops.bounds"
         data-content-window-frame-id-value="loops-pane"
         aria-live="polite">
-        <%= render "shared/content_window_chrome", title: "AUDIO", open_file_badge: true, show_loops_play_pause: true %>
+        <%= render "shared/content_window_chrome", title: "Audio", open_file_badge: true, show_loops_play_pause: true %>
         <div class="pane-resize-handle pane-resize-handle--top" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
@@ -104,12 +104,12 @@
 
       <section class="content-window os-window is-hidden"
         data-controller="content-window"
-        data-content-window-app-key-value="settings"
-        data-content-window-app-url-value="/apps/settings"
-        data-content-window-storage-key-value="nexus.contentWindow.settings.bounds"
-        data-content-window-frame-id-value="settings-pane"
+        data-content-window-app-key-value="images"
+        data-content-window-app-url-value="/apps/images"
+        data-content-window-storage-key-value="nexus.contentWindow.images.bounds"
+        data-content-window-frame-id-value="images-pane"
         aria-live="polite">
-        <%= render "shared/content_window_chrome", title: "SETTINGS" %>
+        <%= render "shared/content_window_chrome", title: "Images", open_file_badge: true, show_set_wallpaper: true %>
         <div class="pane-resize-handle pane-resize-handle--top" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
@@ -119,7 +119,7 @@
         <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <%= content_window_shell do %>
-          <turbo-frame id="settings-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
+          <turbo-frame id="images-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
         <% end %>
       </section>
 
@@ -146,10 +146,8 @@
         </div>
       </div>
 
-      <%= render "apps/user/security_modals", frame_id: "settings-pane" %>
+      <%= render "apps/user/security_modals", frame_id: "user-pane" %>
 
-      <%# Crab before content_windows_boot so the dock isn’t painted at CSS bottom/right after a layout flush from boot. %>
-      <%= render "shared/ollama_helper" %>
       <%= render "shared/content_windows_boot" %>
 
     <% end %>

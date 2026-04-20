@@ -1,8 +1,9 @@
 import { Controller } from "@hotwired/stimulus"
-import { getDesktopSidePanelBlockEndPx, getNexusDesktopShellInsetPx } from "lib/desktop_shell_metrics"
+import { getNexusDesktopShellInsetPx } from "lib/desktop_shell_metrics"
 import { createOsWindowSizer } from "lib/os_window_sizing"
 import { syncOrganizerAboveVisibleContentWindows } from "lib/nexus_desktop_layers"
 import { clearSingularPickerDraft, SINGULAR_BEFORE_SAVE_PICKER } from "lib/singular_finder_picker_draft"
+import { syncNexusDesktopWallpaper } from "lib/nexus_workspace_chrome"
 
 /** Kept in sync with inline boot script in `shared/_content_windows_boot.html.erb`. */
 const DESKTOP_WINDOW_LAYERS_KEY = "nexus.desktop.windowLayers"
@@ -31,6 +32,7 @@ export default class extends Controller {
 
   connect() {
     if (!window.__nexusSpawnedTasksByDocumentId) window.__nexusSpawnedTasksByDocumentId = {}
+    if (!window.__nexusSpawnedImagesByDocumentId) window.__nexusSpawnedImagesByDocumentId = {}
     this.currentUrl = this.buildAppUrl({ blank: this.shouldStartBlank() })
     this.restoreLinkedSingularUrlAndBadge()
     this.isAutoSizedWindow = false
@@ -44,12 +46,12 @@ export default class extends Controller {
     const finderLikeMin = { width: 760, height: 460 }
     const taskListMin = { width: 320, height: 320 }
     const loopsMin = { width: 320, height: 154 }
+    const imagesMin = { width: 420, height: 320 }
     const minByAppKey = {
-      /* Same minimum as Finder (`finder` uses `taskListMin`). */
       "singular-task-list": taskListMin,
-      finder: taskListMin,
+      finder: finderLikeMin,
       loops: loopsMin,
-      "settings": finderLikeMin,
+      images: imagesMin,
       user: { width: 320, height: 220 },
     }
     const appMinimum = minByAppKey[this.appKeyValue] || taskListMin
@@ -71,7 +73,6 @@ export default class extends Controller {
     this.activeResize = null
     this._boundsPinX = "none"
     this._boundsPinY = "none"
-    this._lastSidePanelBlockEnd = getDesktopSidePanelBlockEndPx()
 
     this.boundDragMove = this.handleDragMove.bind(this)
     this.boundDragEnd = this.stopDrag.bind(this)
@@ -95,8 +96,6 @@ export default class extends Controller {
       this.reconcileWindowOnViewportResize({ viewportResize: true })
     }
     window.addEventListener("resize", this.boundViewportResize)
-    this.boundSidePanelLayoutChange = this.handleSidePanelLayoutChange.bind(this)
-    window.addEventListener("nexus:side-panel-layout-change", this.boundSidePanelLayoutChange)
 
     if (this.hasSingularSavePickerValue) {
       this.boundSingularPickerClose = this.handleSingularSavePickerClose.bind(this)
@@ -149,7 +148,6 @@ export default class extends Controller {
     window.removeEventListener("nexus:task-list-spawn-blank-window", this.boundSpawnBlankTaskWindow)
     window.removeEventListener("nexus:singular-disk-saved", this.boundSingularSaved)
     window.removeEventListener("resize", this.boundViewportResize)
-    window.removeEventListener("nexus:side-panel-layout-change", this.boundSidePanelLayoutChange)
     if (this.boundSingularPickerClose) {
       window.removeEventListener("nexus:singular-save-picker-close", this.boundSingularPickerClose)
     }
@@ -268,6 +266,20 @@ export default class extends Controller {
       }
     }
 
+    if (documentId && this.appKeyValue === "images") {
+      const docId = String(documentId)
+      const existingWindow = this.findVisibleImageWindowByDocumentId(docId)
+      if (existingWindow) {
+        this.focusAndFlashWindow(existingWindow)
+        return
+      }
+      const isPrimaryWindowVisible = !this.element.classList.contains("is-hidden")
+      if (isPrimaryWindowVisible) {
+        this.spawnImageWindow(documentId, documentTitle)
+        return
+      }
+    }
+
       // Blank open request while window is already visible — just bring to front
       // without reloading, regardless of whether a file is loaded or not.
       if (!documentId && this.isSingularApp() && !this.element.classList.contains("is-hidden")) {
@@ -364,6 +376,24 @@ export default class extends Controller {
     return null
   }
 
+  findVisibleImageWindowByDocumentId(documentId) {
+    const docId = String(documentId || "")
+    if (!docId) return null
+    const imageWindows = document.querySelectorAll(
+      'section.content-window[data-content-window-app-key-value="images"], section.content-window[data-content-window-app-key-value^="image-spawn-"]'
+    )
+    for (const windowEl of imageWindows) {
+      if (windowEl.classList.contains("is-hidden")) continue
+      const frameId =
+        windowEl.dataset.contentWindowFrameIdValue ||
+        windowEl.querySelector("turbo-frame[data-content-window-target='frame']")?.id ||
+        null
+      const linkedDocId = this.readLinkedDocumentIdForFrame(frameId)
+      if (linkedDocId && linkedDocId === docId) return windowEl
+    }
+    return null
+  }
+
   /** Clone the singular-task-list window shell to display a document in a new, independent window. */
   spawnTaskWindow(documentId, documentTitle) {
     const uid = `task-spawn-${Date.now()}`
@@ -415,6 +445,42 @@ export default class extends Controller {
       documentId: String(documentId),
       documentTitle: title
     })
+
+    this.element.parentElement.appendChild(clone)
+  }
+
+  spawnImageWindow(documentId, documentTitle) {
+    const uid = `image-spawn-${Date.now()}`
+    const title = (documentTitle || "").trim()
+
+    try {
+      window.sessionStorage.setItem(`nexus.singularLinkedDocument.${uid}`, String(documentId))
+      if (title) window.sessionStorage.setItem(`nexus.singularOpenTitle.${uid}`, title)
+    } catch (_) {}
+    try {
+      window.localStorage.setItem(`nexus.singularLinkedDocument.${uid}`, String(documentId))
+      if (title) window.localStorage.setItem(`nexus.singularOpenTitle.${uid}`, title)
+    } catch (_) {}
+
+    window.__nexusSpawnedImagesByDocumentId[String(documentId)] = uid
+
+    const clone = this.element.cloneNode(true)
+    clone.dataset.contentWindowAppKeyValue = uid
+    clone.dataset.contentWindowFrameIdValue = uid
+    clone.dataset.contentWindowStorageKeyValue = uid
+    clone.dataset.openOnConnect = "true"
+    clone.dataset.isSpawnedImageWindow = "true"
+    clone.dataset.spawnedFromDocumentId = String(documentId)
+
+    const frame = clone.querySelector("turbo-frame[data-content-window-target='frame']")
+    if (frame) frame.id = uid
+
+    const rect = this.element.getBoundingClientRect()
+    clone.style.left = `${Math.round(rect.left) + 24}px`
+    clone.style.top = `${Math.round(rect.top) + 24}px`
+    clone.style.width = `${Math.round(rect.width)}px`
+    clone.style.height = `${Math.round(rect.height)}px`
+    this.syncOpenFileBadgeFor(clone, title)
 
     this.element.parentElement.appendChild(clone)
   }
@@ -900,21 +966,26 @@ export default class extends Controller {
     this.element.classList.add("is-hidden")
 
     // Spawned task windows are transient — remove them from DOM when closed.
-    if (this.appKeyValue.startsWith("task-spawn-")) {
+    if (this.appKeyValue.startsWith("task-spawn-") || this.appKeyValue.startsWith("image-spawn-")) {
       // Clean up the global registry
       const docId = this.element.dataset.spawnedFromDocumentId
-      if (docId) delete window.__nexusSpawnedTasksByDocumentId[docId]
-      this.removePersistedSpawnedTaskWindow(this.appKeyValue)
+      if (docId) {
+        if (this.appKeyValue.startsWith("task-spawn-")) delete window.__nexusSpawnedTasksByDocumentId[docId]
+        if (this.appKeyValue.startsWith("image-spawn-")) delete window.__nexusSpawnedImagesByDocumentId[docId]
+      }
+      if (this.appKeyValue.startsWith("task-spawn-")) this.removePersistedSpawnedTaskWindow(this.appKeyValue)
         // Clear localStorage linked doc entry for this spawned window
         try {
           window.localStorage.removeItem(`nexus.singularLinkedDocument.${this.frameIdValue}`)
         } catch (_) {}
       this.element.remove()
-      // Check if there are other task windows still open before emitting closed state
-      const otherTaskWindows = document.querySelectorAll('[data-content-window-app-key-value^="task-spawn-"]:not(.is-hidden)')
-      const mainTaskWindow = document.querySelector('[data-content-window-app-key-value="singular-task-list"]:not(.is-hidden)')
-      if (!otherTaskWindows.length && !mainTaskWindow) {
-        // Only emit false if no other task windows are open
+      const hasOtherSpawned = this.appKeyValue.startsWith("task-spawn-")
+        ? document.querySelectorAll('[data-content-window-app-key-value^="task-spawn-"]:not(.is-hidden)').length > 0
+        : document.querySelectorAll('[data-content-window-app-key-value^="image-spawn-"]:not(.is-hidden)').length > 0
+      const hasPrimaryOpen = this.appKeyValue.startsWith("task-spawn-")
+        ? Boolean(document.querySelector('[data-content-window-app-key-value="singular-task-list"]:not(.is-hidden)'))
+        : Boolean(document.querySelector('[data-content-window-app-key-value="images"]:not(.is-hidden)'))
+      if (!hasOtherSpawned && !hasPrimaryOpen) {
         this.emitWindowState(false)
       }
     } else {
@@ -934,7 +1005,11 @@ export default class extends Controller {
 
   /** Finder-linked document windows (Tasks, Audio) share sessionStorage restore + title badge. */
   isLinkedDocumentApp() {
-    return this.appKeyValue === "singular-task-list" || this.appKeyValue.startsWith("task-spawn-") || this.appKeyValue === "loops"
+    return this.appKeyValue === "singular-task-list" ||
+      this.appKeyValue.startsWith("task-spawn-") ||
+      this.appKeyValue === "loops" ||
+      this.appKeyValue === "images" ||
+      this.appKeyValue.startsWith("image-spawn-")
   }
 
   buildAppUrl(options = {}) {
@@ -956,14 +1031,9 @@ export default class extends Controller {
     this.bottomDockBoundary = m
   }
 
-  /** Minimum viewport `left` (shell inset + open side panel block). */
+  /** Minimum viewport `left` (shell inset only, panel does not constrain windows). */
   effectiveLeftBoundary() {
-    const panelBlockEnd = getDesktopSidePanelBlockEndPx()
-    return panelBlockEnd > this.dockLeftBoundary ? panelBlockEnd : this.dockLeftBoundary
-  }
-
-  panelIsOpen() {
-    return getDesktopSidePanelBlockEndPx() > this.dockLeftBoundary
+    return this.dockLeftBoundary
   }
 
   desktopShellElement() {
@@ -1035,48 +1105,7 @@ export default class extends Controller {
   }
 
   handleSidePanelLayoutChange(event) {
-    if (this.element.classList.contains("is-hidden")) return
-    if (this.activeDrag || this.activeResize) return
-
-    const detail = event?.detail || {}
-    const nextBlockEnd = Number.isFinite(detail.blockEnd) ? detail.blockEnd : this.effectiveLeftBoundary()
-    const prevBlockEnd = Number.isFinite(this._lastSidePanelBlockEnd) ? this._lastSidePanelBlockEnd : nextBlockEnd
-    this._lastSidePanelBlockEnd = nextBlockEnd
-
-    const current = this.currentLocalBounds()
-    let left = Math.max(this.dockLeftBoundary, current.left)
-    let top = Math.max(this.viewportMargin, current.top)
-
-    if (detail.open) {
-      if (left < nextBlockEnd) left = nextBlockEnd
-    } else {
-      const visible = this.visibleShellBounds()
-      const targetLeftToFitInView = Math.max(
-        this.dockLeftBoundary,
-        visible.right - this.viewportMargin - current.width
-      )
-      
-      // Check if window currently fits in visible area
-      const windowRight = left + current.width + this.viewportMargin
-      const fitsInView = windowRight <= visible.right
-      
-      if (!fitsInView) {
-        // Window is scrolled off-screen; aggressively pull it left to fit
-        left = targetLeftToFitInView
-      } else {
-        // Window already fits; shift left by reclaimed space if available
-        const reclaimed = Math.max(0, prevBlockEnd - nextBlockEnd)
-        if (reclaimed > 0) {
-          left = Math.max(this.dockLeftBoundary, left - reclaimed)
-        }
-      }
-    }
-
-    this.element.style.left = `${Math.round(left)}px`
-    this.element.style.top = `${Math.round(top)}px`
-    this.ensureDesktopCanvasContainsBounds({ left, top, width: current.width, height: current.height })
-    this.syncDesktopCanvasDimensions()
-    this.saveWindowBounds()
+    /* Feature disabled: windows no longer auto-reposition when side panel opens/closes */
   }
 
   startDrag(event) {
@@ -1338,8 +1367,6 @@ export default class extends Controller {
     const bounds = this.currentLocalBounds()
     let left = Math.max(this.dockLeftBoundary, bounds.left)
     let top = Math.max(this.viewportMargin, bounds.top)
-    const panelBlockEnd = this.effectiveLeftBoundary()
-    if (this.panelIsOpen() && left < panelBlockEnd) left = panelBlockEnd
 
     const visible = this.visibleShellBounds()
     if (viewportResize && grewX) {
@@ -1602,12 +1629,45 @@ export default class extends Controller {
     )
   }
 
+  async setLinkedImageAsWallpaper(event) {
+    if (event) event.preventDefault()
+    const isImagesWindow = this.appKeyValue === "images" || this.appKeyValue.startsWith("image-spawn-")
+    if (!isImagesWindow) return
+
+    const documentId = this.readLinkedDocumentIdForCurrentFrame()
+    if (!documentId) return
+
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content || ""
+    const response = await fetch("/workspace_preferences", {
+      method: "PATCH",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrf
+      },
+      body: JSON.stringify({ apply_wallpaper_image: { document_id: Number(documentId) } })
+    })
+
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      window.alert(payload.error || "Could not set wallpaper.")
+      return
+    }
+
+    syncNexusDesktopWallpaper(payload || {})
+  }
+
   emitWindowState(isOpen) {
     const rect = this.element.getBoundingClientRect()
     const z = Number.parseInt(this.element.style.zIndex || window.getComputedStyle(this.element).zIndex, 10)
     // Spawned task windows report as "singular-task-list" so the Tasks row highlights,
     // but keep the internal appKey for proper controller identity.
-    const reportedAppKey = this.element.dataset.isSpawnedTaskWindow === "true" ? "singular-task-list" : this.appKeyValue
+    const reportedAppKey =
+      this.element.dataset.isSpawnedTaskWindow === "true"
+        ? "singular-task-list"
+        : this.element.dataset.isSpawnedImageWindow === "true"
+          ? "images"
+          : this.appKeyValue
     window.dispatchEvent(new CustomEvent("app-window:state", {
       detail: {
         appKey: reportedAppKey,

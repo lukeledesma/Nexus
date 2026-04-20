@@ -1,0 +1,20 @@
+<% frame_id = params[:frame_id].presence || turbo_frame_request_id.presence || "images-pane" %>
+<turbo-frame id="<%= frame_id %>">
+  <section class="app-surface app-surface--tool images-app os-window-body-start">
+    <% if @linked_document_id.present? %>
+      <div class="images-app__stage">
+        <img
+          class="images-app__image"
+          src="<%= asset_file_document_path(@linked_document_id) %>"
+          alt="<%= @linked_document_display_title.to_s %>"
+          loading="eager"
+          decoding="async"
+        >
+      </div>
+    <% else %>
+      <div class="images-app__empty-wrap">
+        <p class="images-app__empty">Select an image file in Finder to open it here.</p>
+      </div>
+    <% end %>
+  </section>
+</turbo-frame>

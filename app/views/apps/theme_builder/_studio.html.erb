@@ -1,7 +1,6 @@
 <section
   class="theme-builder-view"
   data-controller="theme-builder"
-  data-theme-builder-settings-url-value="<%= apps_settings_path %>"
 >
   <div class="theme-builder-main-shell os-window-body-start">
   <ul class="finder-file-list settings-themes-list theme-builder-studio-rows" role="list">
@@ -41,14 +40,6 @@
         title="Save As"
         aria-label="Save As"
       ><%= material_symbol_icon(:save, size: :sm) %></button>
-      <button
-        type="button"
-        class="item-action-btn settings-themes-item-action-btn theme-builder-saved-themes-btn"
-        data-theme-studio-chrome="open-saved-themes"
-        data-action="click->theme-builder#openSavedThemes"
-        title="Open Saved Themes"
-        aria-label="Open Saved Themes"
-      ><%= material_symbol_icon(:palette, size: :sm) %></button>
       <button
         type="button"
         class="item-action-btn settings-themes-item-action-btn theme-builder-rename-btn theme-builder-hidden"

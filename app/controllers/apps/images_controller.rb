@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 module Apps
-  class LoopsController < BaseController
-    AUDIO_EXTENSIONS = %w[.wav .aif .aiff .mp3 .m4a .flac .ogg].freeze
+  class ImagesController < BaseController
+    IMAGE_EXTENSIONS = %w[.jpg .jpeg .png .gif .webp .bmp .tif .tiff .svg].freeze
 
     def show
       @linked_document_id = nil
@@ -10,7 +10,7 @@ module Apps
       raw = params[:document_id].to_s.strip
       if raw.match?(/^\d+$/)
         doc = WorkspaceDocumentAccess.openable_document_for(current_user, raw, content_type: "asset")
-        if doc && audio_asset_document?(doc)
+        if doc && image_asset_document?(doc)
           @linked_document_id = doc.id
           @linked_document_display_title = helpers.finder_document_display_title(doc.title.to_s)
         end
@@ -20,13 +20,13 @@ module Apps
 
     private
 
-    def audio_asset_document?(doc)
+    def image_asset_document?(doc)
       ext = if doc.storage_path.present?
         File.extname(doc.storage_path.to_s).downcase
       else
         File.extname(doc.title.to_s).downcase
       end
-      AUDIO_EXTENSIONS.include?(ext)
+      IMAGE_EXTENSIONS.include?(ext)
     end
   end
 end

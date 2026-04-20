@@ -58,19 +58,15 @@ class Document < ApplicationRecord
     User.where("LOWER(username) = ?", value).exists?
   end
 
-  # Finder, Embedded, Desktop, Documents (under user/<username>/Finder) cannot be renamed/deleted from the UI.
+  # Embedded and fixed Finder section roots under the user workspace cannot be renamed/deleted from the UI.
   def protected_workspace_structure?
     return false unless folder?
     return false if user_workspace_root?
 
     p = parent
-    return true if p&.user_workspace_root? && %w[Embedded Finder].include?(title.to_s)
+    return false unless p&.user_workspace_root?
 
-    if p&.title.to_s.casecmp?("finder") && p.parent&.user_workspace_root?
-      return true if %w[Desktop Documents].include?(title.to_s)
-    end
-
-    false
+    %w[Embedded Documents Images Audio].any? { |name| title.to_s.casecmp?(name) }
   end
 
   def sync_create_to_disk

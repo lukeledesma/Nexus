@@ -3,20 +3,18 @@
 require "json"
 
 # Minimal workspace preferences:
-# - Shell choice: default | classic
 # - Wallpaper choice: image | none (black fallback)
 class WorkspacePreferencesController < ApplicationController
   STORAGE_ROOT = Rails.root.join("storage", "workspace").freeze
 
   DEFAULT_THEME_ID = "default"
   DEFAULT_THEME_NAME = "Modern"
-  CLASSIC_THEME_ID = "classic"
-  CLASSIC_THEME_NAME = "Classic"
-  # Legacy id referenced by WorkspaceThemeBoot; workspace is always default/classic now.
+  # Legacy id referenced by WorkspaceThemeBoot; workspace is always default now.
   CUSTOM_THEME_ID = "custom"
   CUSTOM_THEME_NAME = "CUSTOM"
-  ALLOWED_THEME_IDS = [DEFAULT_THEME_ID, CLASSIC_THEME_ID].freeze
+  ALLOWED_THEME_IDS = [DEFAULT_THEME_ID].freeze
 
+  # Forest-like dark shell (desktop fallback gradient is forced to black in chrome sync).
   # Forest-like dark shell (desktop fallback gradient is forced to black in chrome sync).
   DEFAULT_APPEARANCE = {
     "hue" => 200,
@@ -34,24 +32,6 @@ class WorkspacePreferencesController < ApplicationController
     "color_2_saturation" => 25,
     "color_2_brightness" => 20,
     "angle" => 333
-  }.freeze
-
-  CLASSIC_APPEARANCE = {
-    "hue" => 214,
-    "saturation" => 22,
-    "brightness" => 92,
-    "transparency" => 0.9,
-    "font_1" => 15,
-    "font_1_alpha" => 100,
-    "font_2" => 38,
-    "font_2_alpha" => 100,
-    "color_1_hue" => 210,
-    "color_1_saturation" => 16,
-    "color_1_brightness" => 93,
-    "color_2_hue" => 218,
-    "color_2_saturation" => 18,
-    "color_2_brightness" => 88,
-    "angle" => 180
   }.freeze
 
   def show
@@ -74,7 +54,7 @@ class WorkspacePreferencesController < ApplicationController
 
       theme_id = payload["theme_id"].to_s
       unless ALLOWED_THEME_IDS.include?(theme_id)
-        render json: { error: "Only Modern and Classic shells are available." }, status: :unprocessable_entity
+        render json: { error: "Only Modern shell is available." }, status: :unprocessable_entity
         return
       end
       state["active_theme_id"] = theme_id
@@ -183,18 +163,9 @@ class WorkspacePreferencesController < ApplicationController
     }
   end
 
-  def classic_theme_snapshot
-    {
-      "id" => CLASSIC_THEME_ID,
-      "name" => CLASSIC_THEME_NAME,
-      "locked" => true,
-      "appearance" => normalize_appearance(CLASSIC_APPEARANCE)
-    }
-  end
-
-  # Strict shell set: only Default + Classic.
+  # Strict shell set: only Default.
   def ensure_default_theme(_themes)
-    [default_theme_snapshot, classic_theme_snapshot]
+    [default_theme_snapshot]
   end
 
   def ensure_storage_files
@@ -306,7 +277,11 @@ class WorkspacePreferencesController < ApplicationController
   def wallpaper_doc_eligible_for_user?(doc)
     return false unless current_user && doc&.file? && doc.content_type.to_s == "asset"
 
-    EmbeddedIimageFolder.eligible_asset?(doc) && doc.parent_id == EmbeddedIimageFolder.document_for(current_user)&.id
+    return false unless EmbeddedIimageFolder.eligible_asset?(doc)
+
+    in_embedded_wallpaper = doc.parent_id == EmbeddedIimageFolder.document_for(current_user)&.id
+    in_finder_sections = Apps::FinderController.document_in_any_finder_section?(current_user, doc)
+    in_embedded_wallpaper || in_finder_sections
   end
 
   # Kept for WorkspaceThemeBoot compatibility (`send`) and for read-time state repair.
@@ -314,9 +289,9 @@ class WorkspacePreferencesController < ApplicationController
     before_wp = wallpaper_state_slice(state)
     if state["wallpaper_background_kind"].to_s == "image"
       doc = Document.find_by(id: state["wallpaper_image_document_id"].to_i)
-      folder = EmbeddedIimageFolder.document_for(user)
-      valid = doc&.file? && doc.content_type.to_s == "asset" && folder && doc.parent_id == folder.id &&
-        EmbeddedIimageFolder.eligible_asset?(doc)
+      valid = current_user && user&.id == current_user.id ? wallpaper_doc_eligible_for_user?(doc) :
+        doc&.file? && doc.content_type.to_s == "asset" && EmbeddedIimageFolder.eligible_asset?(doc) &&
+          (doc.parent_id == EmbeddedIimageFolder.document_for(user)&.id || Apps::FinderController.document_in_any_finder_section?(user, doc))
       clear_wallpaper_picks!(state) unless valid
     end
     [wallpaper_state_slice(state) != before_wp, false]
@@ -342,12 +317,8 @@ class WorkspacePreferencesController < ApplicationController
   def apply_wallpaper_image_pick!(state, doc_id)
     return [false, "Not signed in."] unless current_user
 
-    folder = EmbeddedIimageFolder.document_for(current_user)
-    return [false, "Wallpaper folder not available."] if folder.blank?
-
     doc = Document.find_by(id: doc_id)
-    return [false, "Wallpaper not found."] unless doc&.file? && doc.parent_id == folder.id
-    return [false, "Invalid wallpaper image."] unless EmbeddedIimageFolder.eligible_asset?(doc)
+    return [false, "Wallpaper not found."] unless wallpaper_doc_eligible_for_user?(doc)
 
     state["wallpaper_background_kind"] = "image"
     state["wallpaper_image_document_id"] = doc.id

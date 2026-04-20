@@ -6,9 +6,7 @@ class WorkspaceDocumentAccess
     doc = Document.find_by(id: document_id.to_i)
     return nil unless doc&.file?
 
-    finder_root = Apps::FinderController.workspace_finder_root_folder(user)
-    return nil unless finder_root
-    return nil unless Apps::FinderController.document_in_finder_subtree?(finder_root, doc)
+    return nil unless Apps::FinderController.document_in_any_finder_section?(user, doc)
     return nil if content_type.present? && doc.content_type.to_s != content_type.to_s
 
     doc

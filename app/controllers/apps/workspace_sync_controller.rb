@@ -11,8 +11,8 @@ module Apps
         ItemStorageSyncLite.sync_all!
       end
 
-      root = Apps::FinderController.workspace_finder_root_folder(current_user)
-      if root
+      roots = Apps::FinderController.workspace_section_roots(current_user).values.compact.uniq(&:id)
+      roots.each do |root|
         stack = [root]
         while (node = stack.pop)
           node.children.files.find_each do |doc|

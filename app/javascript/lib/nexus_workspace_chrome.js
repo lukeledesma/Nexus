@@ -1,10 +1,7 @@
 /**
  * Workspace chrome: ties OS CSS variables to the active saved theme.
- * When `active_theme_id` is `classic`, applies monochrome “Mac Classic” chrome
- * and sets `document.documentElement.dataset.nexusTheme = "classic"` for CSS.
  */
 
-export const NEXUS_CLASSIC_THEME_ID = "classic"
 export const NEXUS_SHELL_MODE_STORAGE_KEY = "nexus.settings.shellMode"
 const SHELL_MODE_DARK = "dark"
 const SHELL_MODE_LIGHT = "light"
@@ -24,10 +21,6 @@ const LIGHT_APPEARANCE_OVERRIDES = {
 
 let lastWorkspaceChromeParams = null
 let systemSchemeListenerAttached = false
-
-export function isNexusClassicUiActive() {
-  return document.documentElement.dataset.nexusTheme === "classic"
-}
 
 function normalizedShellMode(rawMode) {
   const mode = String(rawMode || "").trim().toLowerCase()
@@ -77,30 +70,6 @@ function clampFloat(value, min, max, fallback) {
   const parsed = Number(value)
   if (!Number.isFinite(parsed)) return fallback
   return Math.min(max, Math.max(min, parsed))
-}
-
-/** Soft light chrome preset for Classic shell. */
-function applyClassicChrome(root) {
-  root.style.setProperty("--window-bg-h", "214")
-  root.style.setProperty("--window-bg-saturation", "22%")
-  root.style.setProperty("--window-bg-brightness", "92%")
-  root.style.setProperty("--window-bg-alpha", "0.90")
-  root.style.setProperty("--window-ui-hue", "214")
-  root.style.setProperty("--window-ui-saturation", "22%")
-  root.style.setProperty("--window-ui-brightness", "92%")
-
-  root.style.setProperty("--desktop-bg-1-hue", "210")
-  root.style.setProperty("--desktop-bg-1-saturation", "16%")
-  root.style.setProperty("--desktop-bg-1-brightness", "93%")
-  root.style.setProperty("--desktop-bg-2-hue", "218")
-  root.style.setProperty("--desktop-bg-2-saturation", "18%")
-  root.style.setProperty("--desktop-bg-2-brightness", "88%")
-  root.style.setProperty("--desktop-bg-angle", "180deg")
-
-  root.style.setProperty("--font-1-tone", "15")
-  root.style.setProperty("--font-1-alpha", "1")
-  root.style.setProperty("--font-2-tone", "38")
-  root.style.setProperty("--font-2-alpha", "1")
 }
 
 function applyModernAppearance(root, appearance) {
@@ -155,20 +124,17 @@ function applyLightAppearance(root, appearance) {
  */
 export function syncNexusWorkspaceChrome(params) {
   attachSystemSchemeListener()
-  lastWorkspaceChromeParams = params || {}
+  const nextParams = params || {}
+  const mergedParams = {
+    ...(lastWorkspaceChromeParams || {}),
+    ...nextParams
+  }
+  lastWorkspaceChromeParams = mergedParams
 
   const root = document.documentElement
-  const id = String(params?.active_theme_id ?? params?.activeThemeId ?? "default")
-  const { appearance } = params || {}
-  const requestedShellMode = normalizedShellMode(params?.shell_mode || readStoredShellMode())
+  const { appearance } = mergedParams
+  const requestedShellMode = normalizedShellMode(mergedParams.shell_mode || readStoredShellMode())
   const mode = effectiveShellMode(requestedShellMode)
-
-  if (id === NEXUS_CLASSIC_THEME_ID) {
-    root.dataset.nexusShellMode = "classic"
-    root.dataset.nexusTheme = "classic"
-    applyClassicChrome(root)
-    return
-  }
 
   root.dataset.nexusShellMode = mode
   delete root.dataset.nexusTheme

@@ -196,7 +196,7 @@ class DocumentsController < ApplicationController
       return
     end
 
-    finder_root = Apps::FinderController.workspace_finder_root_folder(current_user)
+    finder_root = Apps::FinderController.finder_section_root_for_document(current_user, @document)
     unless finder_root && Apps::FinderController.document_in_finder_subtree?(finder_root, @document)
       render json: { error: "Folder is not in Finder." }, status: :forbidden
       return
@@ -222,7 +222,7 @@ class DocumentsController < ApplicationController
       return
     end
 
-    finder_root = Apps::FinderController.workspace_finder_root_folder(current_user)
+    finder_root = Apps::FinderController.finder_section_root_for_document(current_user, @document)
     unless finder_root && Apps::FinderController.document_in_finder_subtree?(finder_root, @document)
       render json: { error: "File is not in Finder." }, status: :forbidden
       return
@@ -237,14 +237,14 @@ class DocumentsController < ApplicationController
     finder_apply_reparent_json!(new_parent)
   end
 
-  # Multipart POST: `files` or `files[]` — JPEG/PNG/MP3, into a Finder folder or Embedded/Image.
+  # Multipart POST: `files` or `files[]` — drops into Finder sections or Wallpaper.
   def upload_images
     unless @document.folder?
       render json: { error: "Upload into a folder only." }, status: :unprocessable_entity
       return
     end
 
-    finder_root = Apps::FinderController.workspace_finder_root_folder(current_user)
+    finder_root = Apps::FinderController.finder_section_root_for_document(current_user, @document)
     in_finder = finder_root && Apps::FinderController.document_in_finder_subtree?(finder_root, @document)
     iimage_folder = EmbeddedIimageFolder.document_for(current_user)
     in_iimage = iimage_folder && @document.id == iimage_folder.id
@@ -265,47 +265,28 @@ class DocumentsController < ApplicationController
       return
     end
 
-    allowed_mime = %w[
-      image/jpeg image/png audio/mpeg audio/mp3 audio/wav audio/x-wav audio/wave audio/vnd.wave
-    ].freeze
-    allowed_ext = %w[.jpg .jpeg .png .mp3 .wav].freeze
-
     created_ids = []
     errors = []
 
     list.each do |uploaded|
       ext = File.extname(uploaded.original_filename.to_s).downcase
-      unless allowed_ext.include?(ext)
-        errors << "#{uploaded.original_filename}: only JPG, PNG, MP3, and WAV are allowed."
-        next
+      if in_iimage
+        unless allowed_wallpaper_upload?(uploaded, ext)
+          errors << "#{uploaded.original_filename}: Only JPEG and PNG images are allowed here."
+          next
+        end
+
+        doc, error_message = build_uploaded_asset_document(uploaded, ext)
+      elsif text_like_finder_upload_extension?(ext)
+        doc, error_message = build_uploaded_text_document(uploaded)
+      else
+        doc, error_message = build_uploaded_asset_document(uploaded, ext)
       end
 
-      mime = Marcel::MimeType.for(Pathname.new(uploaded.tempfile.path))
-      unless allowed_mime.include?(mime)
-        errors << "#{uploaded.original_filename}: file is not a valid JPG, PNG, MP3, or WAV."
-        next
-      end
-
-      stem = File.basename(uploaded.original_filename.to_s, ext)
-      stem = stem.gsub(/[^\p{L}\p{N}\s._-]/u, "_").strip
-      stem = "Asset" if stem.blank?
-
-      bytes = uploaded.read
-      uploaded.rewind if uploaded.respond_to?(:rewind)
-
-      doc = Document.new(
-        is_folder: false,
-        parent: @document,
-        title: stem,
-        content_type: "asset",
-        pending_disk_extension: ext,
-        pending_asset_bytes: bytes
-      )
-
-      if doc.save
+      if doc&.save
         created_ids << doc.id
       else
-        errors << "#{uploaded.original_filename}: #{doc.errors.full_messages.to_sentence}"
+        errors << "#{uploaded.original_filename}: #{error_message || doc&.errors&.full_messages&.to_sentence || "Could not upload."}"
       end
     end
 
@@ -548,6 +529,61 @@ class DocumentsController < ApplicationController
 
     arr = raw.is_a?(Array) ? raw.compact : [raw]
     arr.select { |f| f.respond_to?(:tempfile) && f.respond_to?(:read) }
+  end
+
+  def allowed_wallpaper_upload?(uploaded, ext)
+    return false unless %w[.jpg .jpeg .png].include?(ext)
+
+    mime = Marcel::MimeType.for(Pathname.new(uploaded.tempfile.path))
+    %w[image/jpeg image/png].include?(mime)
+  rescue StandardError
+    false
+  end
+
+  def text_like_finder_upload_extension?(ext)
+    %w[.txt .nexus .rtf].include?(ext)
+  end
+
+  def upload_filename_stem(uploaded, fallback: "Untitled")
+    ext = File.extname(uploaded.original_filename.to_s)
+    stem = File.basename(uploaded.original_filename.to_s, ext)
+    stem = stem.gsub(/[^\p{L}\p{N}\s._-]/u, "_").strip
+    stem.presence || fallback
+  end
+
+  def build_uploaded_asset_document(uploaded, ext)
+    bytes = uploaded.read
+    uploaded.rewind if uploaded.respond_to?(:rewind)
+
+    doc = Document.new(
+      is_folder: false,
+      parent: @document,
+      title: upload_filename_stem(uploaded, fallback: "Asset"),
+      content_type: "asset",
+      pending_disk_extension: ext.presence,
+      pending_asset_bytes: bytes
+    )
+    [doc, nil]
+  rescue StandardError
+    [nil, "Could not read file bytes."]
+  end
+
+  def build_uploaded_text_document(uploaded)
+    parsed = DocumentDiskLoader.send(:parse_nexus_file, uploaded.tempfile.path)
+    doc = Document.new(
+      is_folder: false,
+      parent: @document,
+      title: upload_filename_stem(uploaded),
+      content_type: parsed[:content_type].presence || "note",
+      content: parsed[:content],
+      tasks: parsed[:tasks] || [],
+      reset_mode: parsed[:reset_mode].presence || "none",
+      reset_days: parsed[:reset_days] || [],
+      last_reset_at: parsed[:last_reset_at]
+    )
+    [doc, nil]
+  rescue StandardError
+    [nil, "Could not import text file."]
   end
 
   def parse_tasks_payload

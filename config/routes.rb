@@ -7,8 +7,8 @@ Rails.application.routes.draw do
     resources :folders, only: %i[show create update destroy]
     resources :task_lists, only: %i[show create update destroy]
     get "finder", to: "finder#show"
+    get "images", to: "images#show"
     get "loops", to: "loops#show"
-    get "settings", to: "settings#show"
     get "wallpaper_iimage/files", to: "wallpaper_iimage#files"
     get "user", to: "user#show"
     patch "user/username", to: "user#update_username", as: :user_username
@@ -16,7 +16,6 @@ Rails.application.routes.draw do
     get "singular_task_list", to: "singular#task_list"
     post "singular/save_file", to: "singular#save_file"
     post "workspace/flush_disk", to: "workspace_sync#flush_disk"
-    post "ollama_helper/chat", to: "ollama_helper#chat", as: :ollama_helper_chat
   end
 
   resources :folders, only: %i[create update destroy], controller: "apps/folders"

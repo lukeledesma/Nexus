@@ -1,5 +1,37 @@
 <%# locals: frame_id: (default settings turbo frame; synced from panel via JS if different)
     Same outer layer + shell pattern as Save As / credential modals (viewport-fixed, equal insets). %>
+
+<%# Selector modal: choose what to reset %>
+<div
+  class="app-save-dialog-layer settings-user-security-modal"
+  data-user-security-modal-target="selectorModal"
+  hidden
+  aria-hidden="true"
+>
+  <div
+    class="app-save-dialog-backdrop"
+    data-action="click->user-security-modal#backdropCloseSelector"
+    aria-hidden="true"
+  ></div>
+  <div class="app-save-dialog-shell">
+    <div class="nexus-modal-surface settings-user-security-modal-card" role="dialog" aria-modal="true" aria-label="What would you like to reset?">
+      <p class="settings-user-modal-email nexus-modal-meta">
+        <%= current_user.username.present? ? "#{current_user.email} | #{current_user.username}" : current_user.email %>
+      </p>
+
+      <div class="settings-user-security-fields">
+        <p class="settings-user-selector-prompt">What would you like to reset?</p>
+      </div>
+
+      <div class="app-save-dialog__footer settings-user-modal-actions">
+        <button type="button" class="app-save-dialog__btn app-save-dialog__btn--secondary" data-action="click->user-security-modal#closeSelectorModal">Cancel</button>
+        <button type="button" class="app-save-dialog__btn app-save-dialog__btn--primary" data-action="click->user-security-modal#selectPassword">Password</button>
+        <button type="button" class="app-save-dialog__btn app-save-dialog__btn--primary" data-action="click->user-security-modal#selectUsername">Username</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div
   class="app-save-dialog-layer settings-user-security-modal"
   data-user-security-modal-target="credentialsModal"

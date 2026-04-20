@@ -4,6 +4,7 @@
 <% show_finder_new_folder = local_assigns.fetch(:show_finder_new_folder, false) %>
 <% show_task_list_add = local_assigns.fetch(:show_task_list_add, false) %>
 <% show_loops_play_pause = local_assigns.fetch(:show_loops_play_pause, false) %>
+<% show_set_wallpaper = local_assigns.fetch(:show_set_wallpaper, false) %>
 <% chrome_toolbar = show_finder_new_folder || show_task_list_add || singular_save_flow %>
 <header class="content-window-chrome<%= " content-window-chrome--with-save" if show_save %><%= " content-window-chrome--with-open-file" if open_file_badge %><%= " content-window-chrome--with-finder-toolbar" if chrome_toolbar %>">
   <% if open_file_badge %>
@@ -84,6 +85,15 @@
         aria-label="Play"
         title="Play"
       ></button>
+    <% end %>
+    <% if show_set_wallpaper %>
+      <button
+        type="button"
+        class="tools-close-btn content-window-set-wallpaper"
+        data-action="click->content-window#setLinkedImageAsWallpaper"
+        aria-label="Set as wallpaper"
+        title="Set as wallpaper"
+      ><%= material_symbol_icon(:desktop_windows, size: :sm) %></button>
     <% end %>
     <%= render "shared/content_window_close_button" %>
   </div>

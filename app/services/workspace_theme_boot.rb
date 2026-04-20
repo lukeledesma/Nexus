@@ -87,15 +87,10 @@ class WorkspaceThemeBoot
     def root_css_for_payload(payload)
       return +"" unless payload.is_a?(Hash)
 
-      id = payload["active_theme_id"].to_s
-      if id == CTRL::CLASSIC_THEME_ID
-        classic_root_css
-      else
-        modern_root_css(
-          payload["appearance"] || {},
-          wallpaper_image_first_paint: wallpaper_image_boot_active?(payload)
-        )
-      end
+      modern_root_css(
+        payload["appearance"] || {},
+        wallpaper_image_first_paint: wallpaper_image_boot_active?(payload)
+      )
     end
 
     private
@@ -160,31 +155,6 @@ class WorkspaceThemeBoot
           --font-1-alpha: #{format("%.2f", font1_alpha / 100.0)};
           --font-2-tone: #{font2};
           --font-2-alpha: #{format("%.2f", font2_alpha / 100.0)};
-        }
-      CSS
-    end
-
-    def classic_root_css
-      <<~CSS.strip
-        :root {
-          --window-bg-h: 214;
-          --window-bg-saturation: 22%;
-          --window-bg-brightness: 92%;
-          --window-bg-alpha: 0.90;
-          --window-ui-hue: 214;
-          --window-ui-saturation: 22%;
-          --window-ui-brightness: 92%;
-          --desktop-bg-1-hue: 210;
-          --desktop-bg-1-saturation: 16%;
-          --desktop-bg-1-brightness: 93%;
-          --desktop-bg-2-hue: 218;
-          --desktop-bg-2-saturation: 18%;
-          --desktop-bg-2-brightness: 88%;
-          --desktop-bg-angle: 180deg;
-          --font-1-tone: 15;
-          --font-1-alpha: 1;
-          --font-2-tone: 38;
-          --font-2-alpha: 1;
         }
       CSS
     end

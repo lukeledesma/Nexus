@@ -20,18 +20,9 @@
         <button
           type="button"
           class="settings-user-icon-btn"
-          title="Reset username"
-          aria-label="Open username reset"
-          data-action="click->user-security-modal#openUsernameModalWithConfirm"
-        >
-          <%= image_tag "id_card_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg", alt: "", class: "settings-user-icon" %>
-        </button>
-        <button
-          type="button"
-          class="settings-user-icon-btn"
-          title="Reset password"
-          aria-label="Open reset password"
-          data-action="click->user-security-modal#openCredentialsModalWithConfirm"
+          title="Reset password or username"
+          aria-label="Open reset options"
+          data-action="click->user-security-modal#openSelectorModalWithConfirm"
         >
           <%= image_tag "lock_reset_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg", alt: "", class: "settings-user-icon" %>
         </button>

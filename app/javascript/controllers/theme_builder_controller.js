@@ -34,10 +34,6 @@ export default class extends Controller {
     "fontTwoTransparencyValue"
   ]
 
-  static values = {
-    settingsUrl: { type: String, default: "/apps/settings" }
-  }
-
   connect() {
     this.defaultShellModel = {
       hue: 200,
@@ -648,22 +644,6 @@ export default class extends Controller {
       nameInput.removeEventListener("blur", this.boundChromeNameBlur)
       nameInput.removeEventListener("keydown", this.boundChromeNameKeydown)
     }
-  }
-
-  openSavedThemes(event) {
-    if (event) event.preventDefault()
-    const base = (this.settingsUrlValue || "/apps/settings").toString().trim() || "/apps/settings"
-    const frame = this.element.closest("turbo-frame")
-    const url = new URL(base, window.location.origin)
-    url.searchParams.set("section", "saved_themes")
-    if (frame?.id) url.searchParams.set("frame_id", frame.id)
-
-    if (frame?.tagName === "TURBO-FRAME") {
-      frame.src = `${url.pathname}${url.search}`
-      return
-    }
-
-    window.location.assign(`${url.pathname}${url.search}`)
   }
 
   chromeRoot() {

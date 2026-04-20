@@ -4,25 +4,85 @@ require "set"
 
 module Apps
   class FinderController < BaseController
-    FINDER_WORKSPACE_FOLDER_TITLE = "Finder"
-    # Matches app windows that handle `app-window:open` with a document (see finder_browser_controller.js).
-    LINKED_FILE_CONTENT_TYPES = %w[note task_list asset].freeze
+    DEFAULT_SECTION_KEY = "documents"
+    FINDER_SECTION_DEFINITIONS = [
+      { key: "documents", title: "Documents", icon: "file_document" },
+      { key: "images", title: "Images", icon: "wallpaper" },
+      { key: "audio", title: "Audio", icon: "graphic_eq" }
+    ].freeze
+    LEGACY_FINDER_WORKSPACE_FOLDER_TITLE = "Finder"
+    # Matches file kinds with an opener app (see finder_browser_controller.js).
+    LINKED_FILE_CONTENT_TYPES = %w[task_list asset].freeze
 
     class << self
-      # Workspace Finder folder document (child of user root), or nil if there is no workspace root.
-      def workspace_finder_root_folder(user)
-        root = FinderListedFolders.workspace_root_for(user)
-        return nil unless root
+      def workspace_section_definitions
+        FINDER_SECTION_DEFINITIONS
+      end
 
-        existing = root.children.folders.find { |d| d.title.to_s.strip.casecmp?(FINDER_WORKSPACE_FOLDER_TITLE) }
-        return existing if existing
+      def normalized_section_key(raw)
+        key = raw.to_s.strip.downcase
+        return DEFAULT_SECTION_KEY if key.blank?
 
-        root.children.create!(is_folder: true, title: FINDER_WORKSPACE_FOLDER_TITLE)
+        workspace_section_definitions.find { |item| item[:key] == key }&.fetch(:key, DEFAULT_SECTION_KEY) || DEFAULT_SECTION_KEY
+      end
+
+      def finder_section_label(section_key)
+        key = normalized_section_key(section_key)
+        workspace_section_definitions.find { |item| item[:key] == key }&.fetch(:title, "Documents") || "Documents"
+      end
+
+      def workspace_root_folder(user)
+        FinderListedFolders.workspace_root_for(user)
+      end
+
+      def workspace_section_roots(user)
+        root = workspace_root_folder(user)
+        return {} unless root
+
+        cleanup_legacy_finder_root!(root)
+
+        workspace_section_definitions.each_with_object({}) do |definition, out|
+          title = definition[:title]
+          existing = root.children.folders.find { |d| d.title.to_s.strip.casecmp?(title) }
+          out[definition[:key]] = existing || root.children.create!(is_folder: true, title: title)
+        end
       rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid
-        root = FinderListedFolders.workspace_root_for(user)
-        return nil unless root
+        root = workspace_root_folder(user)
+        return {} unless root
 
-        root.children.folders.find { |d| d.title.to_s.strip.casecmp?(FINDER_WORKSPACE_FOLDER_TITLE) }
+        workspace_section_definitions.each_with_object({}) do |definition, out|
+          folder = root.children.folders.find { |d| d.title.to_s.strip.casecmp?(definition[:title]) }
+          out[definition[:key]] = folder if folder
+        end
+      end
+
+      # Legacy alias retained for older callers; Finder now defaults to Documents.
+      def workspace_finder_root_folder(user)
+        workspace_section_root(user, DEFAULT_SECTION_KEY)
+      end
+
+      def workspace_section_root(user, section_key)
+        workspace_section_roots(user)[normalized_section_key(section_key)]
+      end
+
+      def finder_section_key_for_document(user, doc)
+        return nil unless doc
+
+        workspace_section_roots(user).each do |key, root|
+          return key if document_in_finder_subtree?(root, doc)
+        end
+        nil
+      end
+
+      def finder_section_root_for_document(user, doc)
+        key = finder_section_key_for_document(user, doc)
+        return nil unless key
+
+        workspace_section_root(user, key)
+      end
+
+      def document_in_any_finder_section?(user, doc)
+        finder_section_key_for_document(user, doc).present?
       end
 
       # True if +doc+ is +finder_root+ or nested under it (walk ancestors).
@@ -36,18 +96,37 @@ module Apps
         end
         false
       end
+
+      private
+
+      def cleanup_legacy_finder_root!(root)
+        legacy = root.children.folders.find { |d| d.title.to_s.strip.casecmp?(LEGACY_FINDER_WORKSPACE_FOLDER_TITLE) }
+        legacy&.destroy!
+      rescue StandardError
+        nil
+      end
     end
 
     def show
       @finder_read_only = params[:mode].to_s == "save_as"
 
-      @root_folder = finder_folder_for(current_user)
+      section_roots = self.class.workspace_section_roots(current_user)
+      browse_doc = params[:browse_id].present? ? Document.find_by(id: params[:browse_id]) : nil
+
+      @section_key =
+        self.class.finder_section_key_for_document(current_user, browse_doc) ||
+        self.class.normalized_section_key(params[:section])
+      @finder_sections = self.class.workspace_section_definitions.map do |definition|
+        definition.merge(folder: section_roots[definition[:key]])
+      end
+      @root_folder = section_roots[@section_key]
+      @finder_section_label = self.class.finder_section_label(@section_key)
       @finder_empty_message = nil
       @tree_nodes = []
       @browse_folder = nil
       unless @root_folder
         @finder_empty_message =
-          "Your workspace folder could not be found. Set a username so Nexus can create your workspace, then open Finder again."
+          "Your workspace folders could not be found. Set a username so Nexus can create your workspace, then open Finder again."
         render layout: finder_embed_layout?
         return
       end
@@ -111,7 +190,7 @@ module Apps
     end
 
     def finder_folder_for(user)
-      self.class.workspace_finder_root_folder(user)
+      self.class.workspace_section_root(user, @section_key)
     end
 
     def resolve_browse_folder(root_folder, browse_id)
@@ -179,15 +258,26 @@ module Apps
         else
           File.extname(raw_title).downcase
         end
+      file_kind = helpers.finder_asset_file_kind_from_extension(ext)
+      has_linked_app =
+        case doc.content_type.to_s
+        when "task_list"
+          true
+        when "asset"
+          file_kind.in?(%w[image audio])
+        else
+          false
+        end
       {
         kind: :file,
         id: doc.id,
         title: helpers.finder_document_display_title(doc.title),
         storage_name: doc.title.to_s,
         content_type: doc.content_type.to_s,
+        file_kind: file_kind,
         source_extension: ext,
         writable: !doc.protected_workspace_structure?,
-        has_linked_app: LINKED_FILE_CONTENT_TYPES.include?(doc.content_type.to_s)
+        has_linked_app: has_linked_app
       }
     end
   end

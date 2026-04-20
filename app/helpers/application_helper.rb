@@ -2,6 +2,9 @@ module ApplicationHelper
   include NexusUiHelper
   include MaterialIconsHelper
 
+  IMAGE_ASSET_EXTENSIONS = %w[.jpg .jpeg .png .gif .webp .bmp .tif .tiff .svg].freeze
+  AUDIO_ASSET_EXTENSIONS = %w[.wav .aif .aiff .mp3 .m4a .flac .ogg].freeze
+
   # Wraps turbo-frame in .window-content plus the “not enough space” resize overlay (content-window controller).
   # +singular_save_picker:+ when true, stacks an iframe layer for Finder so the app turbo-frame is not replaced.
   def content_window_shell(singular_save_picker: false, &block)
@@ -14,10 +17,10 @@ module ApplicationHelper
   # Add rows here to grow the grid; CSS keeps 2 columns with wrap.
   def launcher_grid_entries
     [
-      { window_key: "singular-task-list", pin_key: "singular-task-list", label: "TASKS", icon: :task_checklist },
-      { window_key: "loops", pin_key: "loops", label: "AUDIO", icon: :graphic_eq },
-      { window_key: "finder", pin_key: "finder", label: "FINDER", icon: :folder },
-      { window_key: "settings", pin_key: "settings", label: "SETTINGS", icon: :settings }
+      { window_key: "singular-task-list", pin_key: "singular-task-list", label: "Tasks", icon: :task_checklist },
+      { window_key: "images", pin_key: "images", label: "Images", icon: :wallpaper },
+      { window_key: "loops", pin_key: "loops", label: "Audio", icon: :graphic_eq },
+      { window_key: "finder", pin_key: "finder", label: "Finder", icon: :folder }
     ].freeze
   end
 
@@ -29,22 +32,31 @@ module ApplicationHelper
     s.sub(/\.(txt|nexus|rtf|wav|aiff?|mp3|m4a|flac|ogg)\z/i, "").strip.presence || "Untitled"
   end
 
-  def finder_file_icon_for_content_type(content_type)
+  def finder_asset_file_kind_from_extension(extension)
+    ext = extension.to_s.downcase
+    return "image" if IMAGE_ASSET_EXTENSIONS.include?(ext)
+    return "audio" if AUDIO_ASSET_EXTENSIONS.include?(ext)
+
+    "other"
+  end
+
+  def finder_file_icon_for_content_type(content_type, source_extension: nil)
     case content_type.to_s
     when "note" then :file_document
     when "task_list" then :task_checklist
-    when "asset" then :graphic_eq
+    when "asset"
+      case finder_asset_file_kind_from_extension(source_extension)
+      when "image" then :wallpaper
+      when "audio" then :graphic_eq
+      else :file_document
+      end
     else :file_document
     end
   end
 
   # First-paint workspace chrome (avoids default theme flash before /workspace_preferences fetch).
   def workspace_theme_boot_html_attributes
-    p = workspace_theme_boot_payload
-    return "".html_safe if p.blank?
-    return "".html_safe unless p["active_theme_id"].to_s == WorkspacePreferencesController::CLASSIC_THEME_ID
-
-    ' data-nexus-theme="classic"'.html_safe
+    "".html_safe
   end
 
   def workspace_theme_boot_style_tag

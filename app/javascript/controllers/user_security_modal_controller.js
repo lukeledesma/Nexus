@@ -2,6 +2,7 @@ import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
   static targets = [
+    "selectorModal",
     "credentialsModal",
     "credentialsForm",
     "credentialsInlineError",
@@ -36,6 +37,35 @@ export default class extends Controller {
     event.preventDefault()
     if (!window.confirm("Are you sure you want to reset your username?")) return
     this.openModal(this.usernameModalTarget)
+  }
+
+  openSelectorModalWithConfirm(event) {
+    event.preventDefault()
+    this.openModal(this.selectorModalTarget)
+  }
+
+  closeSelectorModal(event) {
+    if (event) event.preventDefault()
+    this.closeModal(this.selectorModalTarget)
+  }
+
+  selectPassword(event) {
+    if (event) event.preventDefault()
+    this.closeModal(this.selectorModalTarget)
+    if (!window.confirm("Are you sure you want to reset your password?")) return
+    this.openModal(this.credentialsModalTarget)
+  }
+
+  selectUsername(event) {
+    if (event) event.preventDefault()
+    this.closeModal(this.selectorModalTarget)
+    if (!window.confirm("Are you sure you want to reset your username?")) return
+    this.openModal(this.usernameModalTarget)
+  }
+
+  backdropCloseSelector(event) {
+    if (event.target !== event.currentTarget) return
+    this.closeSelectorModal(event)
   }
 
   closeCredentialsModal(event) {
@@ -360,10 +390,10 @@ export default class extends Controller {
   }
 
   refreshSettingsFrame(form) {
-    const frameId = form?.querySelector("input[name='frame_id']")?.value || "settings-pane"
+    const frameId = form?.querySelector("input[name='frame_id']")?.value || "user-pane"
     const frame = document.getElementById(frameId)
     if (frame && frame.tagName === "TURBO-FRAME") {
-      frame.src = `/apps/settings?section=user&frame_id=${encodeURIComponent(frameId)}`
+      frame.src = `/apps/user?frame_id=${encodeURIComponent(frameId)}`
     }
   }
 }
