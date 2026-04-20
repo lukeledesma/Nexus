@@ -17,10 +17,10 @@ module ApplicationHelper
   # Add rows here to grow the grid; CSS keeps 2 columns with wrap.
   def launcher_grid_entries
     [
+      { window_key: "finder", pin_key: "finder", label: "Finder", icon: :folder },
       { window_key: "singular-task-list", pin_key: "singular-task-list", label: "Tasks", icon: :task_checklist },
       { window_key: "images", pin_key: "images", label: "Images", icon: :wallpaper },
-      { window_key: "loops", pin_key: "loops", label: "Audio", icon: :graphic_eq },
-      { window_key: "finder", pin_key: "finder", label: "Finder", icon: :folder }
+      { window_key: "loops", pin_key: "loops", label: "Audio", icon: :graphic_eq }
     ].freeze
   end
 

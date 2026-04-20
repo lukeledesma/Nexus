@@ -66,7 +66,7 @@ class Document < ApplicationRecord
     p = parent
     return false unless p&.user_workspace_root?
 
-    %w[Embedded Documents Images Audio].any? { |name| title.to_s.casecmp?(name) }
+    %w[Embedded Documents Tasks Images Audio].any? { |name| title.to_s.casecmp?(name) }
   end
 
   def sync_create_to_disk

@@ -5,8 +5,10 @@ require "set"
 module Apps
   class FinderController < BaseController
     DEFAULT_SECTION_KEY = "documents"
+    LEGACY_DOCUMENTS_SECTION_TITLE = "Documents"
+    TASKS_SECTION_TITLE = "Tasks"
     FINDER_SECTION_DEFINITIONS = [
-      { key: "documents", title: "Documents", icon: "file_document" },
+      { key: "documents", title: TASKS_SECTION_TITLE, icon: "task_checklist" },
       { key: "images", title: "Images", icon: "wallpaper" },
       { key: "audio", title: "Audio", icon: "graphic_eq" }
     ].freeze
@@ -28,7 +30,7 @@ module Apps
 
       def finder_section_label(section_key)
         key = normalized_section_key(section_key)
-        workspace_section_definitions.find { |item| item[:key] == key }&.fetch(:title, "Documents") || "Documents"
+        workspace_section_definitions.find { |item| item[:key] == key }&.fetch(:title, TASKS_SECTION_TITLE) || TASKS_SECTION_TITLE
       end
 
       def workspace_root_folder(user)
@@ -40,6 +42,7 @@ module Apps
         return {} unless root
 
         cleanup_legacy_finder_root!(root)
+        migrate_documents_section_to_tasks!(root)
 
         workspace_section_definitions.each_with_object({}) do |definition, out|
           title = definition[:title]
@@ -105,10 +108,35 @@ module Apps
       rescue StandardError
         nil
       end
+
+      # One-time migration: the legacy "Documents" section root is now named "Tasks".
+      # Update the existing folder record so storage sync renames disk paths under storage/workspace/<user>/.
+      def migrate_documents_section_to_tasks!(root)
+        documents_folder = root.children.folders.find { |d| d.title.to_s.strip.casecmp?(LEGACY_DOCUMENTS_SECTION_TITLE) }
+        return unless documents_folder
+
+        tasks_folder = root.children.folders.find { |d| d.title.to_s.strip.casecmp?(TASKS_SECTION_TITLE) }
+        return if tasks_folder && tasks_folder.id == documents_folder.id
+
+        if tasks_folder
+          Document.transaction do
+            documents_folder.children.find_each { |child| child.update!(parent: tasks_folder) }
+            documents_folder.destroy!
+          end
+          return
+        end
+
+        documents_folder.update!(title: TASKS_SECTION_TITLE)
+      rescue StandardError
+        nil
+      end
     end
 
     def show
       @finder_read_only = params[:mode].to_s == "save_as"
+      @finder_single_section_mode = false
+      read_only_content_type = SingularSaveToDocument::FRAME_MAP[params[:frame_id].to_s]&.[](:content_type)
+      @finder_single_section_mode = @finder_read_only && read_only_content_type.to_s == "task_list"
 
       section_roots = self.class.workspace_section_roots(current_user)
       browse_doc = params[:browse_id].present? ? Document.find_by(id: params[:browse_id]) : nil
@@ -139,14 +167,12 @@ module Apps
 
       @singular_save_icon =
         if @finder_read_only
-          ct = SingularSaveToDocument::FRAME_MAP[params[:frame_id].to_s]&.[](:content_type)
-          ct ? helpers.finder_file_icon_for_content_type(ct).to_s : "file_document"
+          read_only_content_type ? helpers.finder_file_icon_for_content_type(read_only_content_type).to_s : "file_document"
         end
 
       @open_in_app_content_types =
         if @finder_read_only
-          ct = SingularSaveToDocument::FRAME_MAP[params[:frame_id].to_s]&.[](:content_type)
-          ct.present? ? [ct.to_s] : []
+          read_only_content_type.present? ? [read_only_content_type.to_s] : []
         else
           %w[task_list asset]
         end

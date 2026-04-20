@@ -4,6 +4,70 @@
     <meta charset="utf-8">
     <title>Finder</title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
+    <script>
+      (function () {
+        var SHELL_MODE_KEY = "nexus.settings.shellMode"
+        var LIGHT_OVERRIDES = {
+          "--window-bg-h": "212",
+          "--window-bg-saturation": "24%",
+          "--window-bg-brightness": "92%",
+          "--window-bg-alpha": "0.90",
+          "--window-ui-hue": "212",
+          "--window-ui-saturation": "24%",
+          "--window-ui-brightness": "92%",
+          "--font-1-tone": "14",
+          "--font-1-alpha": "1.00",
+          "--font-2-tone": "34",
+          "--font-2-alpha": "1.00"
+        }
+
+        function resolveMode(rawMode) {
+          var mode = String(rawMode || "").toLowerCase()
+          if (mode === "system") {
+            return (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light"
+          }
+          return mode === "light" ? "light" : "dark"
+        }
+
+        function readShellMode() {
+          try {
+            return localStorage.getItem(SHELL_MODE_KEY) || "dark"
+          } catch (_e) {
+            return "dark"
+          }
+        }
+
+        function applyShellMode() {
+          var root = document.documentElement
+          var mode = resolveMode(readShellMode())
+          root.dataset.nexusShellMode = mode
+
+          Object.keys(LIGHT_OVERRIDES).forEach(function (name) {
+            if (mode === "light") {
+              root.style.setProperty(name, LIGHT_OVERRIDES[name])
+            } else {
+              root.style.removeProperty(name)
+            }
+          })
+        }
+
+        applyShellMode()
+
+        window.addEventListener("storage", function (event) {
+          if (!event || event.key !== SHELL_MODE_KEY) return
+          applyShellMode()
+        })
+
+        if (window.matchMedia) {
+          var media = window.matchMedia("(prefers-color-scheme: dark)")
+          if (media && typeof media.addEventListener === "function") {
+            media.addEventListener("change", function () {
+              if (String(readShellMode()).toLowerCase() === "system") applyShellMode()
+            })
+          }
+        }
+      })()
+    </script>
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
     <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>

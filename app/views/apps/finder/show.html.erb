@@ -11,20 +11,22 @@
     <% if @finder_read_only %>data-finder-browser-singular-save-icon-value="<%= @singular_save_icon %>"<% end %>
     data-finder-tree-frame-id-value="<%= frame_id %>"
   >
-    <div class="finder-shell os-window-body-start">
-      <aside class="finder-shell-pane finder-shell-pane--folders" aria-label="Finder sections">
-        <ul class="finder-folder-list settings-sections-list">
-          <% @finder_sections.each do |section| %>
-            <% active = section[:key] == @section_key %>
-            <li class="finder-folder-item<%= " is-active" if active %>" data-finder-section-key="<%= section[:key] %>">
-              <%= link_to apps_finder_path({ section: section[:key], frame_id: frame_id }.merge(@finder_read_only ? { mode: "save_as" } : {})), class: "finder-folder-link", data: { turbo_frame: frame_id }, aria: { label: "Open #{section[:title]}" } do %>
-                <span class="finder-folder-icon" aria-hidden="true"><%= material_symbol_icon(section[:icon], size: :md) %></span>
-                <span class="finder-folder-name"><%= section[:title] %></span>
-              <% end %>
-            </li>
-          <% end %>
-        </ul>
-      </aside>
+    <div class="finder-shell os-window-body-start<%= " finder-shell--tree-only" if @finder_single_section_mode %>">
+      <% unless @finder_single_section_mode %>
+        <aside class="finder-shell-pane finder-shell-pane--folders" aria-label="Finder sections">
+          <ul class="finder-folder-list settings-sections-list">
+            <% @finder_sections.each do |section| %>
+              <% active = section[:key] == @section_key %>
+              <li class="finder-folder-item<%= " is-active" if active %>" data-finder-section-key="<%= section[:key] %>">
+                <%= link_to apps_finder_path({ section: section[:key], frame_id: frame_id }.merge(@finder_read_only ? { mode: "save_as" } : {})), class: "finder-folder-link", data: { turbo_frame: frame_id }, aria: { label: "Open #{section[:title]}" } do %>
+                  <span class="finder-folder-icon" aria-hidden="true"><%= material_symbol_icon(section[:icon], size: :md) %></span>
+                  <span class="finder-folder-name"><%= section[:title] %></span>
+                <% end %>
+              </li>
+            <% end %>
+          </ul>
+        </aside>
+      <% end %>
 
       <section class="finder-shell-pane finder-shell-pane--contents" aria-label="<%= @finder_section_label %> content">
         <% if @root_folder %>
