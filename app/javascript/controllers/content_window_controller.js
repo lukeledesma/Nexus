@@ -364,44 +364,18 @@ export default class extends Controller {
     return null
   }
 
-  syncSpawnedTaskDocumentRegistration(documentId) {
-    if (!this.appKeyValue.startsWith("task-spawn-")) return
-    if (!window.__nexusSpawnedTasksByDocumentId) window.__nexusSpawnedTasksByDocumentId = {}
-
-    const map = window.__nexusSpawnedTasksByDocumentId
-    const nextDocId = String(documentId || "")
-
-    Object.keys(map).forEach((docId) => {
-      if (map[docId] === this.appKeyValue && docId !== nextDocId) delete map[docId]
-    })
-
-    if (!nextDocId) {
-      delete this.element.dataset.spawnedFromDocumentId
-      return
-    }
-
-    map[nextDocId] = this.appKeyValue
-    this.element.dataset.spawnedFromDocumentId = nextDocId
-    this.persistSpawnedTaskWindow({
-      appKey: this.appKeyValue,
-      frameId: this.frameIdValue,
-      storageKey: this.storageKeyValue,
-      documentId: nextDocId,
-      documentTitle: ""
-    })
-  }
-
   /** Clone the singular-task-list window shell to display a document in a new, independent window. */
   spawnTaskWindow(documentId, documentTitle) {
     const uid = `task-spawn-${Date.now()}`
+    const title = (documentTitle || "").trim()
 
     try {
       window.sessionStorage.setItem(`nexus.singularLinkedDocument.${uid}`, String(documentId))
-      const t = (documentTitle || "").trim()
-      if (t) window.sessionStorage.setItem(`nexus.singularOpenTitle.${uid}`, t)
+      if (title) window.sessionStorage.setItem(`nexus.singularOpenTitle.${uid}`, title)
     } catch (_) {}
       try {
         window.localStorage.setItem(`nexus.singularLinkedDocument.${uid}`, String(documentId))
+        if (title) window.localStorage.setItem(`nexus.singularOpenTitle.${uid}`, title)
       } catch (_) {}
 
     // Register documentId → spawned appKey so we can detect duplicates
@@ -432,13 +406,14 @@ export default class extends Controller {
     clone.style.top = `${Math.round(rect.top) + 24}px`
     clone.style.width = `${Math.round(rect.width)}px`
     clone.style.height = `${Math.round(rect.height)}px`
+    this.syncOpenFileBadgeFor(clone, title)
 
     this.persistSpawnedTaskWindow({
       appKey: uid,
       frameId: uid,
       storageKey: uid,
       documentId: String(documentId),
-      documentTitle: (documentTitle || "").trim()
+      documentTitle: title
     })
 
     this.element.parentElement.appendChild(clone)
@@ -452,12 +427,18 @@ export default class extends Controller {
     const entries = this.readPersistedSpawnedTaskWindows()
     entries.forEach((entry) => {
       if (!entry?.appKey || !entry?.documentId) return
-        // Always restore sessionStorage from registry so restoreLinkedSingularUrlAndBadge
-        // works even after a logout where sessionStorage is cleared.
-        const restoredFrameId = String(entry.frameId || entry.appKey)
-        try {
-          window.sessionStorage.setItem(`nexus.singularLinkedDocument.${restoredFrameId}`, String(entry.documentId))
-        } catch (_) {}
+      const restoredFrameId = String(entry.frameId || entry.appKey)
+      const restoredTitle = (entry.documentTitle || "").trim()
+      // Always restore sessionStorage from registry so restoreLinkedSingularUrlAndBadge
+      // works even after a logout where sessionStorage is cleared.
+      try {
+        window.sessionStorage.setItem(`nexus.singularLinkedDocument.${restoredFrameId}`, String(entry.documentId))
+        if (restoredTitle) window.sessionStorage.setItem(`nexus.singularOpenTitle.${restoredFrameId}`, restoredTitle)
+      } catch (_) {}
+      try {
+        window.localStorage.setItem(`nexus.singularLinkedDocument.${restoredFrameId}`, String(entry.documentId))
+        if (restoredTitle) window.localStorage.setItem(`nexus.singularOpenTitle.${restoredFrameId}`, restoredTitle)
+      } catch (_) {}
 
       if (document.querySelector(`[data-content-window-app-key-value="${entry.appKey}"]`)) {
         window.__nexusSpawnedTasksByDocumentId[String(entry.documentId)] = entry.appKey
@@ -474,6 +455,7 @@ export default class extends Controller {
 
       const frame = clone.querySelector("turbo-frame[data-content-window-target='frame']")
       if (frame) frame.id = String(entry.frameId || entry.appKey)
+      this.syncOpenFileBadgeFor(clone, restoredTitle)
 
       window.__nexusSpawnedTasksByDocumentId[String(entry.documentId)] = String(entry.appKey)
       this.element.parentElement.appendChild(clone)
@@ -511,8 +493,13 @@ export default class extends Controller {
   }
 
   syncOpenFileBadge(title) {
-    const sep = this.element.querySelector("[data-nexus-open-file-separator]")
-    const nameEl = this.element.querySelector("[data-nexus-open-file-name]")
+    this.syncOpenFileBadgeFor(this.element, title)
+  }
+
+  syncOpenFileBadgeFor(windowEl, title) {
+    if (!windowEl) return
+    const sep = windowEl.querySelector("[data-nexus-open-file-separator]")
+    const nameEl = windowEl.querySelector("[data-nexus-open-file-name]")
     if (!sep || !nameEl) return
     const t = (title || "").trim()
     if (!t) {
@@ -526,6 +513,78 @@ export default class extends Controller {
     nameEl.hidden = false
     nameEl.textContent = t
     nameEl.setAttribute("title", t)
+  }
+
+  readOpenTitleForFrame(frameId) {
+    if (!frameId) return ""
+    const key = `nexus.singularOpenTitle.${frameId}`
+    let title = ""
+    try {
+      title = window.sessionStorage.getItem(key) || ""
+    } catch (_error) {
+      // non-blocking
+    }
+    if (title.trim().length > 0) return title.trim()
+    try {
+      title = window.localStorage.getItem(key) || ""
+    } catch (_error) {
+      // non-blocking
+    }
+    return (title || "").trim()
+  }
+
+  syncOpenTitleStorageForFrame(frameId, title) {
+    if (!frameId) return
+    const key = `nexus.singularOpenTitle.${frameId}`
+    const t = (title || "").trim()
+    if (!t) return
+    try {
+      window.sessionStorage.setItem(key, t)
+    } catch (_error) {
+      // non-blocking
+    }
+    try {
+      window.localStorage.setItem(key, t)
+    } catch (_error) {
+      // non-blocking
+    }
+  }
+
+  syncPersistedSpawnedTaskTitle(documentTitle) {
+    if (!this.appKeyValue.startsWith("task-spawn-")) return
+    const entries = this.readPersistedSpawnedTaskWindows()
+    const next = entries.map((item) => {
+      if (item?.appKey !== this.appKeyValue) return item
+      return { ...item, documentTitle: (documentTitle || "").trim() }
+    })
+    this.writePersistedSpawnedTaskWindows(next)
+  }
+
+  syncSpawnedTaskDocumentRegistration(documentId) {
+    if (!this.appKeyValue.startsWith("task-spawn-")) return
+    if (!window.__nexusSpawnedTasksByDocumentId) window.__nexusSpawnedTasksByDocumentId = {}
+
+    const map = window.__nexusSpawnedTasksByDocumentId
+    const nextDocId = String(documentId || "")
+
+    Object.keys(map).forEach((docId) => {
+      if (map[docId] === this.appKeyValue && docId !== nextDocId) delete map[docId]
+    })
+
+    if (!nextDocId) {
+      delete this.element.dataset.spawnedFromDocumentId
+      return
+    }
+
+    map[nextDocId] = this.appKeyValue
+    this.element.dataset.spawnedFromDocumentId = nextDocId
+    this.persistSpawnedTaskWindow({
+      appKey: this.appKeyValue,
+      frameId: this.frameIdValue,
+      storageKey: this.storageKeyValue,
+      documentId: nextDocId,
+      documentTitle: this.readOpenTitleForFrame(this.frameIdValue)
+    })
   }
 
   clearOpenFileBadge() {
@@ -556,6 +615,12 @@ export default class extends Controller {
     } catch (_error) {
       // non-blocking
     }
+    try {
+      window.localStorage.setItem(key, t)
+    } catch (_error) {
+      // non-blocking
+    }
+    this.syncPersistedSpawnedTaskTitle(t)
   }
 
   clearSingularOpenTitleStorage() {
@@ -566,6 +631,12 @@ export default class extends Controller {
     } catch (_error) {
       // non-blocking
     }
+    try {
+      window.localStorage.removeItem(key)
+    } catch (_error) {
+      // non-blocking
+    }
+    this.syncPersistedSpawnedTaskTitle("")
   }
 
   /** After reload, reattach document_id to the iframe URL and title chrome from sessionStorage. */
@@ -602,9 +673,17 @@ export default class extends Controller {
       } catch (_error) {
         // ignore
       }
+      if (!openTitle) {
+        try {
+          openTitle = window.localStorage.getItem(titleKey) || ""
+        } catch (_error) {
+          // ignore
+        }
+      }
     }
     const t = openTitle.trim()
     if (t) this.syncOpenFileBadge(t)
+    else this.syncOpenFileBadge("")
   }
 
   onSingularDiskSaved(event) {
