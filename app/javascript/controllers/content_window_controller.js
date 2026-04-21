@@ -19,6 +19,8 @@ export default class extends Controller {
     "frame",
     "chromeAppTools",
     "chromePickerTools",
+    "chromeWorkTimerCopy",
+    "chromeWorkTimerClear",
     "savePickerLayer",
     "savePickerIframe"
   ]
@@ -33,6 +35,7 @@ export default class extends Controller {
   connect() {
     if (!window.__nexusSpawnedTasksByDocumentId) window.__nexusSpawnedTasksByDocumentId = {}
     if (!window.__nexusSpawnedImagesByDocumentId) window.__nexusSpawnedImagesByDocumentId = {}
+    if (!window.__nexusSpawnedNotesByDocumentId) window.__nexusSpawnedNotesByDocumentId = {}
     this.currentUrl = this.buildAppUrl({ blank: this.shouldStartBlank() })
     this.restoreLinkedSingularUrlAndBadge()
     this.isAutoSizedWindow = false
@@ -47,11 +50,15 @@ export default class extends Controller {
     const taskListMin = { width: 320, height: 320 }
     const loopsMin = { width: 320, height: 320 }
       const imagesMin = { width: 320, height: 320 }
+      const notesMin = { width: 320, height: 320 }
+      const workTimerMin = { width: 320, height: 320 }
     const minByAppKey = {
       "singular-task-list": taskListMin,
       finder: finderLikeMin,
       loops: loopsMin,
       images: imagesMin,
+      notes: notesMin,
+      "work-timer": workTimerMin,
       user: { width: 320, height: 220 },
     }
     const appMinimum = minByAppKey[this.appKeyValue] || taskListMin
@@ -86,10 +93,16 @@ export default class extends Controller {
     window.addEventListener("app-window:open", this.boundOpenRequest)
     this.boundSpawnBlankTaskWindow = this.handleSpawnBlankTaskWindow.bind(this)
     window.addEventListener("nexus:task-list-spawn-blank-window", this.boundSpawnBlankTaskWindow)
+    this.boundSpawnBlankNoteWindow = this.handleSpawnBlankNoteWindow.bind(this)
+    window.addEventListener("nexus:notes-spawn-blank-window", this.boundSpawnBlankNoteWindow)
     this.boundCloseRequest = this.handleCloseRequest.bind(this)
     window.addEventListener("app-window:close", this.boundCloseRequest)
     this.boundSingularSaved = this.onSingularDiskSaved.bind(this)
     window.addEventListener("nexus:singular-disk-saved", this.boundSingularSaved)
+    this.boundWorkTimerCopyState = this.handleWorkTimerCopyState.bind(this)
+    window.addEventListener("nexus:work-timer-copy-state", this.boundWorkTimerCopyState)
+    this.boundWorkTimerClearState = this.handleWorkTimerClearState.bind(this)
+    window.addEventListener("nexus:work-timer-clear-state", this.boundWorkTimerClearState)
     this.boundViewportResize = () => {
       this.syncViewportShellMargins()
       this.syncDesktopCanvasDimensions()
@@ -146,7 +159,10 @@ export default class extends Controller {
     window.removeEventListener("app-window:open", this.boundOpenRequest)
     window.removeEventListener("app-window:close", this.boundCloseRequest)
     window.removeEventListener("nexus:task-list-spawn-blank-window", this.boundSpawnBlankTaskWindow)
+    window.removeEventListener("nexus:notes-spawn-blank-window", this.boundSpawnBlankNoteWindow)
     window.removeEventListener("nexus:singular-disk-saved", this.boundSingularSaved)
+    window.removeEventListener("nexus:work-timer-copy-state", this.boundWorkTimerCopyState)
+    window.removeEventListener("nexus:work-timer-clear-state", this.boundWorkTimerClearState)
     window.removeEventListener("resize", this.boundViewportResize)
     if (this.boundSingularPickerClose) {
       window.removeEventListener("nexus:singular-save-picker-close", this.boundSingularPickerClose)
@@ -179,20 +195,48 @@ export default class extends Controller {
     this.close()
   }
 
+  handleWorkTimerCopyState(event) {
+    if (this.appKeyValue !== "work-timer") return
+    if (!this.hasChromeWorkTimerCopyTarget) return
+    const { frameId, show } = event.detail || {}
+    if (frameId !== this.frameIdValue) return
+    this.chromeWorkTimerCopyTarget.hidden = !Boolean(show)
+  }
+
+  handleWorkTimerClearState(event) {
+    if (this.appKeyValue !== "work-timer") return
+    if (!this.hasChromeWorkTimerClearTarget) return
+    const { frameId, show } = event.detail || {}
+    if (frameId !== this.frameIdValue) return
+    this.chromeWorkTimerClearTarget.hidden = !Boolean(show)
+  }
+
   /** Open linked doc from Finder save-picker tree (same window, exit picker chrome). */
   handleEmbeddedSingularOpen(event) {
     const { frameId, appKey, documentId, documentTitle } = event.detail || {}
     if (!this.hasSingularSavePickerValue || !this.hasFrameIdValue) return
     const canHandleEmbeddedTaskOpen =
       this.appKeyValue === "singular-task-list" || this.appKeyValue.startsWith("task-spawn-")
+    const canHandleEmbeddedNotesOpen =
+      this.appKeyValue === "notes" || this.appKeyValue.startsWith("note-spawn-")
     const appKeyMatches =
-      appKey === this.appKeyValue || (canHandleEmbeddedTaskOpen && appKey === "singular-task-list")
+      appKey === this.appKeyValue ||
+      (canHandleEmbeddedTaskOpen && appKey === "singular-task-list") ||
+      (canHandleEmbeddedNotesOpen && appKey === "notes")
     if (frameId !== this.frameIdValue || !appKeyMatches) return
 
     // Enforce one-open-instance for saved task documents when opened from the embedded picker.
     if (documentId && this.isSingularApp()) {
       const docId = String(documentId)
       const existingWindow = this.findVisibleTaskWindowByDocumentId(docId)
+      if (existingWindow) {
+        this.focusAndFlashWindow(existingWindow)
+        return
+      }
+    }
+    if (documentId && (this.appKeyValue === "notes" || this.appKeyValue.startsWith("note-spawn-"))) {
+      const docId = String(documentId)
+      const existingWindow = this.findVisibleNoteWindowByDocumentId(docId)
       if (existingWindow) {
         this.focusAndFlashWindow(existingWindow)
         return
@@ -276,6 +320,20 @@ export default class extends Controller {
       const isPrimaryWindowVisible = !this.element.classList.contains("is-hidden")
       if (isPrimaryWindowVisible) {
         this.spawnImageWindow(documentId, documentTitle)
+        return
+      }
+    }
+
+    if (documentId && this.appKeyValue === "notes") {
+      const docId = String(documentId)
+      const existingWindow = this.findVisibleNoteWindowByDocumentId(docId)
+      if (existingWindow) {
+        this.focusAndFlashWindow(existingWindow)
+        return
+      }
+      const isPrimaryWindowVisible = !this.element.classList.contains("is-hidden")
+      if (isPrimaryWindowVisible) {
+        this.spawnNoteWindow(documentId, documentTitle)
         return
       }
     }
@@ -394,6 +452,24 @@ export default class extends Controller {
     return null
   }
 
+  findVisibleNoteWindowByDocumentId(documentId) {
+    const docId = String(documentId || "")
+    if (!docId) return null
+    const noteWindows = document.querySelectorAll(
+      'section.content-window[data-content-window-app-key-value="notes"], section.content-window[data-content-window-app-key-value^="note-spawn-"]'
+    )
+    for (const windowEl of noteWindows) {
+      if (windowEl.classList.contains("is-hidden")) continue
+      const frameId =
+        windowEl.dataset.contentWindowFrameIdValue ||
+        windowEl.querySelector("turbo-frame[data-content-window-target='frame']")?.id ||
+        null
+      const linkedDocId = this.readLinkedDocumentIdForFrame(frameId)
+      if (linkedDocId && linkedDocId === docId) return windowEl
+    }
+    return null
+  }
+
   /** Clone the singular-task-list window shell to display a document in a new, independent window. */
   spawnTaskWindow(documentId, documentTitle) {
     const uid = `task-spawn-${Date.now()}`
@@ -470,6 +546,43 @@ export default class extends Controller {
     clone.dataset.contentWindowStorageKeyValue = uid
     clone.dataset.openOnConnect = "true"
     clone.dataset.isSpawnedImageWindow = "true"
+    clone.dataset.spawnedFromDocumentId = String(documentId)
+
+    const frame = clone.querySelector("turbo-frame[data-content-window-target='frame']")
+    if (frame) frame.id = uid
+
+    const rect = this.element.getBoundingClientRect()
+    clone.style.left = `${Math.round(rect.left) + 24}px`
+    clone.style.top = `${Math.round(rect.top) + 24}px`
+    clone.style.width = `${Math.round(rect.width)}px`
+    clone.style.height = `${Math.round(rect.height)}px`
+    this.syncOpenFileBadgeFor(clone, title)
+
+    this.element.parentElement.appendChild(clone)
+  }
+
+  spawnNoteWindow(documentId, documentTitle) {
+    const uid = `note-spawn-${Date.now()}`
+    const title = (documentTitle || "").trim()
+
+    try {
+      window.sessionStorage.setItem(`nexus.singularLinkedDocument.${uid}`, String(documentId))
+      if (title) window.sessionStorage.setItem(`nexus.singularOpenTitle.${uid}`, title)
+    } catch (_) {}
+    try {
+      window.localStorage.setItem(`nexus.singularLinkedDocument.${uid}`, String(documentId))
+      if (title) window.localStorage.setItem(`nexus.singularOpenTitle.${uid}`, title)
+    } catch (_) {}
+
+    window.__nexusSpawnedNotesByDocumentId[String(documentId)] = uid
+
+    const clone = this.element.cloneNode(true)
+    clone.dataset.contentWindowAppKeyValue = uid
+    clone.dataset.contentWindowFrameIdValue = uid
+    clone.dataset.contentWindowStorageKeyValue = uid
+    clone.dataset.contentWindowHasSingularSavePickerValue = "true"
+    clone.dataset.openOnConnect = "true"
+    clone.dataset.isSpawnedNoteWindow = "true"
     clone.dataset.spawnedFromDocumentId = String(documentId)
 
     const frame = clone.querySelector("turbo-frame[data-content-window-target='frame']")
@@ -968,13 +1081,18 @@ export default class extends Controller {
     this.saveOpenState(false)
     this.element.classList.add("is-hidden")
 
-    // Spawned task windows are transient — remove them from DOM when closed.
-    if (this.appKeyValue.startsWith("task-spawn-") || this.appKeyValue.startsWith("image-spawn-")) {
+    // Spawned linked-doc windows are transient — remove them from DOM when closed.
+    if (
+      this.appKeyValue.startsWith("task-spawn-") ||
+      this.appKeyValue.startsWith("image-spawn-") ||
+      this.appKeyValue.startsWith("note-spawn-")
+    ) {
       // Clean up the global registry
       const docId = this.element.dataset.spawnedFromDocumentId
       if (docId) {
         if (this.appKeyValue.startsWith("task-spawn-")) delete window.__nexusSpawnedTasksByDocumentId[docId]
         if (this.appKeyValue.startsWith("image-spawn-")) delete window.__nexusSpawnedImagesByDocumentId[docId]
+        if (this.appKeyValue.startsWith("note-spawn-")) delete window.__nexusSpawnedNotesByDocumentId[docId]
       }
       if (this.appKeyValue.startsWith("task-spawn-")) this.removePersistedSpawnedTaskWindow(this.appKeyValue)
       try {
@@ -984,10 +1102,14 @@ export default class extends Controller {
       this.element.remove()
       const hasOtherSpawned = this.appKeyValue.startsWith("task-spawn-")
         ? document.querySelectorAll('[data-content-window-app-key-value^="task-spawn-"]:not(.is-hidden)').length > 0
-        : document.querySelectorAll('[data-content-window-app-key-value^="image-spawn-"]:not(.is-hidden)').length > 0
+        : this.appKeyValue.startsWith("image-spawn-")
+          ? document.querySelectorAll('[data-content-window-app-key-value^="image-spawn-"]:not(.is-hidden)').length > 0
+          : document.querySelectorAll('[data-content-window-app-key-value^="note-spawn-"]:not(.is-hidden)').length > 0
       const hasPrimaryOpen = this.appKeyValue.startsWith("task-spawn-")
         ? Boolean(document.querySelector('[data-content-window-app-key-value="singular-task-list"]:not(.is-hidden)'))
-        : Boolean(document.querySelector('[data-content-window-app-key-value="images"]:not(.is-hidden)'))
+        : this.appKeyValue.startsWith("image-spawn-")
+          ? Boolean(document.querySelector('[data-content-window-app-key-value="images"]:not(.is-hidden)'))
+          : Boolean(document.querySelector('[data-content-window-app-key-value="notes"]:not(.is-hidden)'))
       if (!hasOtherSpawned && !hasPrimaryOpen) {
         this.emitWindowState(false)
       }
@@ -1031,7 +1153,9 @@ export default class extends Controller {
       this.appKeyValue.startsWith("task-spawn-") ||
       this.appKeyValue === "loops" ||
       this.appKeyValue === "images" ||
-      this.appKeyValue.startsWith("image-spawn-")
+      this.appKeyValue.startsWith("image-spawn-") ||
+      this.appKeyValue === "notes" ||
+      this.appKeyValue.startsWith("note-spawn-")
   }
 
   buildAppUrl(options = {}) {
@@ -1601,6 +1725,12 @@ export default class extends Controller {
     this.spawnBlankTaskWindow()
   }
 
+  /** Spawns a new blank notes window instance (unsaved). */
+  handleSpawnBlankNoteWindow() {
+    if (this.appKeyValue !== "notes") return
+    this.spawnBlankNoteWindow()
+  }
+
   /** Clone the primary window shell into a new blank (unsaved) task window and open it. */
   spawnBlankTaskWindow() {
     const uid = `task-spawn-${Date.now()}`
@@ -1635,6 +1765,40 @@ export default class extends Controller {
     return uid
   }
 
+  /** Clone the primary notes window shell into a new blank (unsaved) notes window and open it. */
+  spawnBlankNoteWindow() {
+    const uid = `note-spawn-${Date.now()}`
+    const clone = this.element.cloneNode(true)
+    clone.dataset.contentWindowAppKeyValue = uid
+    clone.dataset.contentWindowFrameIdValue = uid
+    clone.dataset.contentWindowStorageKeyValue = uid
+    clone.dataset.contentWindowHasSingularSavePickerValue = "true"
+    clone.dataset.openOnConnect = "true"
+    clone.dataset.isSpawnedNoteWindow = "true"
+    // No spawnedFromDocumentId — blank window hasn't been saved yet
+    const frame = clone.querySelector("turbo-frame[data-content-window-target='frame']")
+    if (frame) {
+      frame.id = uid
+      frame.removeAttribute("src")
+    }
+
+    const sep = clone.querySelector("[data-nexus-open-file-separator]")
+    const nameEl = clone.querySelector("[data-nexus-open-file-name]")
+    if (sep) sep.hidden = true
+    if (nameEl) {
+      nameEl.hidden = true
+      nameEl.textContent = ""
+      nameEl.removeAttribute("title")
+    }
+    const rect = this.element.getBoundingClientRect()
+    clone.style.left = `${Math.round(rect.left) + 24}px`
+    clone.style.top  = `${Math.round(rect.top)  + 24}px`
+    clone.style.width  = `${Math.round(rect.width)}px`
+    clone.style.height = `${Math.round(rect.height)}px`
+    this.element.parentElement.appendChild(clone)
+    return uid
+  }
+
   emitTaskListAddTask(event) {
     if (event) event.preventDefault()
     // Allow task add in both the primary singular-task-list and spawned task windows
@@ -1645,6 +1809,23 @@ export default class extends Controller {
         detail: { frameId: this.hasFrameIdValue ? this.frameIdValue : "singular-task-list-pane" }
       })
     )
+  }
+
+  emitWorkTimerCopyRequest(event) {
+    if (event) event.preventDefault()
+    if (this.appKeyValue !== "work-timer") return
+    window.dispatchEvent(new CustomEvent("nexus:work-timer-copy-request", {
+      detail: { frameId: this.frameIdValue }
+    }))
+  }
+
+  emitWorkTimerClearRequest(event) {
+    if (event) event.preventDefault()
+    if (this.appKeyValue !== "work-timer") return
+    if (!window.confirm("Clear all time card data? This cannot be undone.")) return
+    window.dispatchEvent(new CustomEvent("nexus:work-timer-clear-request", {
+      detail: { frameId: this.frameIdValue }
+    }))
   }
 
   async setLinkedImageAsWallpaper(event) {
@@ -1685,6 +1866,8 @@ export default class extends Controller {
         ? "singular-task-list"
         : this.element.dataset.isSpawnedImageWindow === "true"
           ? "images"
+          : this.element.dataset.isSpawnedNoteWindow === "true"
+            ? "notes"
           : this.appKeyValue
     window.dispatchEvent(new CustomEvent("app-window:state", {
       detail: {

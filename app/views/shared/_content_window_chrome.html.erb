@@ -6,6 +6,8 @@
 <% show_task_list_add = local_assigns.fetch(:show_task_list_add, false) %>
 <% show_loops_play_pause = local_assigns.fetch(:show_loops_play_pause, false) %>
 <% show_set_wallpaper = local_assigns.fetch(:show_set_wallpaper, false) %>
+<% show_work_timer_copy = local_assigns.fetch(:show_work_timer_copy, false) %>
+<% show_work_timer_clear = local_assigns.fetch(:show_work_timer_clear, false) %>
 <% chrome_toolbar = show_finder_new_folder || show_task_list_add || singular_save_flow %>
 <header class="content-window-chrome<%= " content-window-chrome--with-save" if show_save %><%= " content-window-chrome--with-open-file" if open_file_badge %><%= " content-window-chrome--with-finder-toolbar" if chrome_toolbar %>">
   <% if open_file_badge %>
@@ -103,6 +105,28 @@
           title="Set as wallpaper"
         ><%= material_symbol_icon(:desktop_windows, size: :sm) %></button>
       <% end %>
+    <% end %>
+    <% if show_work_timer_copy %>
+      <button
+        type="button"
+        class="tools-close-btn content-window-work-timer-copy"
+        data-content-window-target="chromeWorkTimerCopy"
+        data-action="click->content-window#emitWorkTimerCopyRequest"
+        aria-label="Copy time card session"
+        title="Copy time card session"
+        hidden
+      ><%= material_symbol_icon(:content_copy, size: :xs) %></button>
+    <% end %>
+    <% if show_work_timer_clear %>
+      <button
+        type="button"
+        class="tools-close-btn content-window-work-timer-clear"
+        data-content-window-target="chromeWorkTimerClear"
+        data-action="click->content-window#emitWorkTimerClearRequest"
+        aria-label="Clear time card session"
+        title="Clear time card session"
+        hidden
+      ><%= material_symbol_icon(:ink_eraser, size: :xs) %></button>
     <% end %>
     <%= render "shared/content_window_close_button" %>
   </div>

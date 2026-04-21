@@ -6,6 +6,7 @@ require "tmpdir"
 # Rebuilds storage/workspace from Folder + Item records.
 # This keeps filesystem state aligned with the app's organizer model.
 class ItemStorageSyncLite
+  TASK_LIST_FILENAME = "Tasks.md".freeze
   WORKSPACE_STATE_FILENAME = "WorkspaceState.txt".freeze
   LAYOUT_THEMES_FILENAME = "LayoutThemes.txt".freeze
   LEGACY_WINDOWS_FILENAME = "Windows.txt".freeze
@@ -55,10 +56,10 @@ class ItemStorageSyncLite
       task_list = app_folder.items.find_by(item_type: "task_list")
       # Write TaskList (or empty placeholder if it doesn't exist)
       task_content = task_list ? item_contents(task_list) : empty_task_list_contents
-      File.write(temp_root.join("Tasks.txt"), task_content)
+      File.write(temp_root.join(TASK_LIST_FILENAME), task_content)
     else
       # Create empty placeholder if App folder doesn't exist yet
-      File.write(temp_root.join("Tasks.txt"), empty_task_list_contents)
+      File.write(temp_root.join(TASK_LIST_FILENAME), empty_task_list_contents)
     end
 
     # Write user folders as subdirectories (without items inside them)

@@ -7,19 +7,26 @@ module Apps
     DEFAULT_SECTION_KEY = "documents"
     LEGACY_DOCUMENTS_SECTION_TITLE = "Documents"
     TASKS_SECTION_TITLE = "Tasks"
+    NOTES_SECTION_TITLE = "Notes"
     FINDER_SECTION_DEFINITIONS = [
       { key: "documents", title: TASKS_SECTION_TITLE, icon: "task_checklist" },
+      { key: "notes", title: NOTES_SECTION_TITLE, icon: "edit_note" },
       { key: "images", title: "Images", icon: "wallpaper" },
       { key: "audio", title: "Audio", icon: "graphic_eq" }
     ].freeze
     READ_ONLY_FRAME_CONFIG = {
       "singular-task-list-pane" => { section_key: "documents", content_type: "task_list", allow_save: true },
+      "notes-pane" => {
+        section_key: "notes",
+        content_type: "note",
+        allow_save: true
+      },
       "loops-pane" => { section_key: "audio", content_type: "asset", allow_save: false },
       "images-pane" => { section_key: "images", content_type: "asset", allow_save: false }
     }.freeze
     LEGACY_FINDER_WORKSPACE_FOLDER_TITLE = "Finder"
     # Matches file kinds with an opener app (see finder_browser_controller.js).
-    LINKED_FILE_CONTENT_TYPES = %w[task_list asset].freeze
+    LINKED_FILE_CONTENT_TYPES = %w[note task_list asset].freeze
 
     class << self
       def workspace_section_definitions
@@ -62,6 +69,11 @@ module Apps
           folder = root.children.folders.find { |d| d.title.to_s.strip.casecmp?(definition[:title]) }
           out[definition[:key]] = folder if folder
         end
+      ensure
+        roots = workspace_section_definitions.each_with_object({}) do |definition, out|
+          out[definition[:key]] ||= root&.children&.folders&.find { |d| d.title.to_s.strip.casecmp?(definition[:title]) }
+        end
+        migrate_legacy_notes_folder_from_tasks!(roots["documents"], roots["notes"])
       end
 
       # Legacy alias retained for older callers; Finder now defaults to Documents.
@@ -71,6 +83,17 @@ module Apps
 
       def workspace_section_root(user, section_key)
         workspace_section_roots(user)[normalized_section_key(section_key)]
+      end
+
+      def workspace_designated_folder(user, section_key, folder_title)
+        root = workspace_section_root(user, section_key)
+        return nil unless root
+
+        existing = root.children.folders.find { |d| d.title.to_s.strip.casecmp?(folder_title.to_s.strip) }
+        existing || root.children.create!(is_folder: true, title: folder_title)
+      rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid
+        root = workspace_section_root(user, section_key)
+        root&.children&.folders&.find { |d| d.title.to_s.strip.casecmp?(folder_title.to_s.strip) }
       end
 
       def finder_section_key_for_document(user, doc)
@@ -135,6 +158,21 @@ module Apps
       rescue StandardError
         nil
       end
+
+      # One-time migration: old Notes folder nested under Tasks becomes top-level Notes section.
+      def migrate_legacy_notes_folder_from_tasks!(tasks_root, notes_root)
+        return unless tasks_root&.folder? && notes_root&.folder?
+
+        legacy_notes = tasks_root.children.folders.find { |d| d.title.to_s.strip.casecmp?(NOTES_SECTION_TITLE) }
+        return unless legacy_notes
+
+        Document.transaction do
+          legacy_notes.children.find_each { |child| child.update!(parent: notes_root) }
+          legacy_notes.destroy!
+        end
+      rescue StandardError
+        nil
+      end
     end
 
     def show
@@ -144,6 +182,7 @@ module Apps
       read_only_config = READ_ONLY_FRAME_CONFIG[frame_id]
       if read_only_config.nil?
         read_only_config = READ_ONLY_FRAME_CONFIG["singular-task-list-pane"] if frame_id.start_with?("task-spawn-")
+        read_only_config = READ_ONLY_FRAME_CONFIG["notes-pane"] if frame_id.start_with?("note-spawn-")
         read_only_config = READ_ONLY_FRAME_CONFIG["images-pane"] if frame_id.start_with?("image-spawn-")
       end
       read_only_content_type = read_only_config&.[](:content_type)
@@ -190,7 +229,7 @@ module Apps
         if @finder_read_only
           read_only_content_type.present? ? [read_only_content_type.to_s] : []
         else
-          %w[task_list asset]
+          %w[note task_list asset]
         end
 
       render layout: finder_embed_layout?
@@ -303,6 +342,8 @@ module Apps
       file_kind = helpers.finder_asset_file_kind_from_extension(ext)
       has_linked_app =
         case doc.content_type.to_s
+        when "note"
+          true
         when "task_list"
           true
         when "asset"

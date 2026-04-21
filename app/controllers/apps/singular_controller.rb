@@ -33,7 +33,8 @@ module Apps
         folder_id: folder_id,
         frame_id: frame_id,
         filename: filename,
-        document_id: document_id
+        document_id: document_id,
+        note_text: params[:note_text]
       ).call
 
       case result

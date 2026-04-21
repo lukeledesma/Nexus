@@ -19,17 +19,19 @@ module ApplicationHelper
     [
       { window_key: "finder", pin_key: "finder", label: "Finder", icon: :folder },
       { window_key: "singular-task-list", pin_key: "singular-task-list", label: "Tasks", icon: :task_checklist },
+      { window_key: "notes", pin_key: "notes", label: "Notes", icon: :edit_note },
+      { window_key: "work-timer", pin_key: "work-timer", label: "Time Card", icon: :overview },
       { window_key: "images", pin_key: "images", label: "Images", icon: :wallpaper },
       { window_key: "loops", pin_key: "loops", label: "Audio", icon: :graphic_eq }
     ].freeze
   end
 
-  # Finder / title bar: show names without .txt/.rtf/.nexus (on-disk type is implicit).
+  # Finder / title bar: show names without known content extensions (on-disk type is implicit).
   def finder_document_display_title(title)
     s = title.to_s.strip
     return "Untitled" if s.blank?
 
-    s.sub(/\.(txt|nexus|rtf|wav|aiff?|mp3|m4a|flac|ogg)\z/i, "").strip.presence || "Untitled"
+    s.sub(/\.(txt|md|nexus|rtf|wav|aiff?|mp3|m4a|flac|ogg)\z/i, "").strip.presence || "Untitled"
   end
 
   def finder_asset_file_kind_from_extension(extension)

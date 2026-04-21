@@ -180,7 +180,7 @@ class DocumentDiskLoader
 
     def supported_file_extension?(path)
       ext = File.extname(path.to_s).downcase
-      path.end_with?(".nexus") || path.end_with?(".txt") || path.end_with?(".rtf") ||
+      path.end_with?(".nexus") || path.end_with?(".txt") || path.end_with?(".md") || path.end_with?(".rtf") ||
         Document::ASSET_FILE_EXTENSIONS.include?(ext)
     end
 
@@ -191,6 +191,7 @@ class DocumentDiskLoader
       return File.basename(base, ext) if Document::ASSET_FILE_EXTENSIONS.include?(ext_down)
       return File.basename(base, ".nexus") if base.end_with?(".nexus")
       return File.basename(base, ".txt") if base.end_with?(".txt")
+      return File.basename(base, ".md") if base.end_with?(".md")
       return File.basename(base, ".rtf") if base.end_with?(".rtf")
 
       base

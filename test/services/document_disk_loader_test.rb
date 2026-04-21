@@ -53,6 +53,11 @@ class DocumentDiskLoaderTest < ActiveSupport::TestCase
     assert_nil attrs[:content]
   end
 
+  test "markdown task files are supported and title strips md extension" do
+    assert DocumentDiskLoader.send(:supported_file_extension?, "/tmp/Kanban/Backlog.md")
+    assert_equal "Backlog", DocumentDiskLoader.send(:basename_without_supported_extension, "/tmp/Kanban/Backlog.md")
+  end
+
   test "purge removes missing folders and files" do
     stale_folder = Document.create!(is_folder: true, title: "Stale Folder", storage_path: "stale-folder")
     stale_file = Document.create!(is_folder: false, title: "Stale", content_type: "note", content: "<p>x</p>", storage_path: "stale.rtf")

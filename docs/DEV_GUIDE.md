@@ -78,7 +78,7 @@ Nexus_Dev/
 │   ├── schema.rb
 │   └── migrate/
 ├── storage/
-│   └── workspace/            # Disk mirror of organizer state (Tasks.txt, user folders)
+│   └── workspace/            # Disk mirror of organizer state (Tasks.md, user folders)
 └── docs/
     ├── UI_GUIDE.md           # This app's UI behavior reference
     └── DEV_GUIDE.md          # This file
@@ -218,7 +218,7 @@ Pattern:
 
 - Location: `app/services/item_storage_sync_lite.rb`
 - Root: `storage/workspace/`
-  - `Tasks.txt`: Singular task list document
+  - `Tasks.md`: Singular task list document
   - User folders as subdirectories (no items inside)
 - Triggered: `after_commit` on `Folder` and `Item` models.
 - Behavior: rebuilds folder directories and `.nexus` files from current DB state.

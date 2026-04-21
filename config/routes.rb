@@ -7,6 +7,9 @@ Rails.application.routes.draw do
     resources :folders, only: %i[show create update destroy]
     resources :task_lists, only: %i[show create update destroy]
     get "finder", to: "finder#show"
+    get "notes", to: "notes#show"
+    get "work_timer", to: "work_timer#show"
+    patch "work_timer/notes", to: "work_timer#save_notes", as: :work_timer_notes
     get "images", to: "images#show"
     get "loops", to: "loops#show"
     get "wallpaper_iimage/files", to: "wallpaper_iimage#files"

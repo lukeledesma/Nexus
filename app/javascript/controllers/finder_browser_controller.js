@@ -10,10 +10,12 @@ import {
 } from "lib/finder"
 import { materialSymbolSvg } from "lib/material_symbols"
 import { dispatchSingularHostEvent, singularHostWindow } from "lib/singular_host_events"
+import { readSingularPickerDraft } from "lib/singular_finder_picker_draft"
 
 function appKeyForLinkedFile(contentType, fileKind) {
   const ct = String(contentType || "").toLowerCase()
   const kind = String(fileKind || "").toLowerCase()
+  if (ct === "note") return "notes"
   if (ct === "task_list") return "singular-task-list"
   if (ct !== "asset") return null
   if (kind === "image") return "images"
@@ -34,7 +36,7 @@ const SINGULAR_APP_LABEL = {
 function finderDisplayTitleFromStorageName(title) {
   const s = String(title || "").trim()
   if (!s) return "Untitled"
-  return s.replace(/\.(txt|nexus)$/i, "").trim() || "Untitled"
+  return s.replace(/\.(txt|md|nexus|rtf)$/i, "").trim() || "Untitled"
 }
 
 /**
@@ -164,6 +166,29 @@ export default class extends Controller {
       body.set("frame_id", this.frameIdValue)
       body.set("filename", trimmed)
       if (documentId) body.set("document_id", documentId)
+
+      const isNotesFrame =
+        this.frameIdValue === "notes-pane" || String(this.frameIdValue || "").startsWith("note-spawn-")
+      if (isNotesFrame) {
+        let noteText = ""
+        try {
+          const draft = readSingularPickerDraft(this.frameIdValue)
+          if (draft?.app === "notes") noteText = String(draft.noteText || "")
+        } catch (_e) {
+          // non-blocking
+        }
+        if (!noteText) {
+          try {
+            const host = singularHostWindow()
+            const frame = host?.document?.getElementById(this.frameIdValue)
+            const textarea = frame?.querySelector(".notes-app__textarea")
+            noteText = (textarea?.value || "").toString()
+          } catch (_e) {
+            // non-blocking
+          }
+        }
+        body.set("note_text", noteText)
+      }
 
       try {
         const response = await fetch("/apps/singular/save_file", {

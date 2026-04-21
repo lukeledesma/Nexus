@@ -5016,6 +5016,11 @@ html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden)
   flex-shrink: 0;
 }
 
+.content-window-work-timer-copy[hidden],
+.content-window-work-timer-clear[hidden] {
+  display: none !important;
+}
+
 /* Mini “Save sheet” (Tasks save flow) — DOM under body (see layout).
    Equal distance viewport→modal on all four sides: shell uses identical fixed insets (flex centering cannot match H/V slack on landscape viewports). */
 .app-save-dialog-layer {
@@ -5646,6 +5651,334 @@ input.app-save-dialog__btn {
   color: var(--text-muted);
   text-align: center;
 }
+
+.content-window[data-content-window-app-key-value="notes"] .window-content > .finder-app-frame,
+.content-window[data-content-window-app-key-value^="note-spawn-"] .window-content > .finder-app-frame {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.notes-app {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem;
+}
+
+.notes-app__form {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+}
+
+.notes-app__textarea {
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  border: 1px solid var(--border-hairline);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.14);
+  color: var(--text);
+  padding: 0.75rem;
+  resize: none;
+  line-height: 1.45;
+}
+
+.notes-app__textarea:focus {
+  outline: 1px solid rgba(130, 214, 255, 0.5);
+  border-color: rgba(130, 214, 255, 0.45);
+}
+
+.notes-app__empty-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  border: 1px dashed var(--border-hairline);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.notes-app__empty {
+  margin: 0;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.content-window[data-content-window-app-key-value="work-timer"] .window-content > .finder-app-frame {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.work-timer-app {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  container-type: size;
+  position: relative;
+}
+
+.work-timer-app__header {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0.45rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex: 0 0 auto;
+}
+
+.work-timer-app__clockin-group,
+.work-timer-app__clockout-group,
+.work-timer-app__elapsed-group {
+  border: 1px solid var(--border-hairline);
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.14);
+  padding: 0.35rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.work-timer-app__clockin-group,
+.work-timer-app__clockout-group {
+  width: auto;
+}
+
+.work-timer-app__elapsed-group {
+  width: auto;
+}
+
+.work-timer-app__label {
+  margin: 0 0 0.2rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.work-timer-app__time-input {
+  width: 100%;
+  border: 1px solid var(--border-hairline);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  padding: 0.2rem 0.35rem;
+  font-size: 0.82rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
+  letter-spacing: 0.02em;
+}
+
+.work-timer-app__time-input::placeholder,
+.work-timer-app__time-input::placeholder {
+  color: color-mix(in srgb, var(--text) 72%, var(--text-muted) 28%);
+  opacity: 1;
+}
+
+.work-timer-app__elapsed {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
+}
+
+
+/* Keep controls in one row at all sizes; never hide or wrap. */
+
+.work-timer-app__status {
+  border: 1px solid var(--border-hairline);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 0.4rem 0.45rem;
+  flex: 0 0 auto;
+}
+
+.work-timer-app__status-line {
+  margin: 0;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.work-timer-app__progress {
+  margin-top: 0.32rem;
+  height: 0.35rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.work-timer-app__progress-fill {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(127, 211, 255, 0.8), rgba(68, 172, 255, 0.85));
+  transition: width 180ms ease;
+}
+
+.work-timer-app__progress-fill.is-danger {
+  background: linear-gradient(90deg, rgba(248, 113, 113, 0.9), rgba(220, 38, 38, 0.9));
+}
+
+.work-timer-app__status-foot {
+  margin-top: 0.25rem;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.work-timer-app__status-line--alert {
+  margin-top: 0;
+  color: #f87171;
+  opacity: 0.4;
+}
+
+.work-timer-app__status-line--alert.is-visible {
+  opacity: 1;
+}
+
+.work-timer-app__status-line--alert.is-good {
+  color: #4ade80;
+  opacity: 1;
+}
+
+.work-timer-app__status-line--ratio {
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.work-timer-app__status-line--ratio.is-danger {
+  color: #f87171;
+}
+
+.time-card-app__entries {
+  flex: 1 1 auto;
+  min-height: 0;
+  border: 1px solid var(--border-hairline);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+/* Shell — positions backdrop + textarea on top of each other */
+.time-card-notes-shell {
+  /* Grid stack: both children share the same cell so they overlap.
+     This keeps them in normal flow — shell gets height from the flex parent,
+     avoiding the collapsed-shell / escape-to-wallpaper problem. */
+  display: grid;
+  grid-template-rows: 1fr;
+  flex: 1 1 auto;
+  min-height: 0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+/* Shared layout for both layers — must be pixel-identical */
+.time-card-notes-backdrop,
+.time-card-notes-textarea {
+  grid-area: 1 / 1;
+  margin: 0;
+  padding: 0.5rem;
+  border: 1px solid var(--border-hairline);
+  border-radius: 6px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 0.76rem;
+  font-weight: normal;
+  line-height: 1.35;
+  letter-spacing: normal;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  overflow: auto;
+  scrollbar-gutter: stable;
+  tab-size: 2;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 0;
+}
+
+/* Backdrop — renders the styled HTML behind the transparent textarea */
+.time-card-notes-backdrop {
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.14);
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.time-card-notes-backdrop::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.time-card-notes-backdrop::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+
+.time-card-notes-backdrop::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Textarea — sits on top, transparent text so backdrop shows through */
+.time-card-notes-textarea {
+  color: transparent;
+  caret-color: var(--text, #e5e7eb);
+  background: transparent;
+  resize: none;
+  z-index: 1;
+  outline: none;
+  scrollbar-width: thin;
+}
+
+.time-card-notes-textarea::placeholder {
+  color: rgba(156, 163, 175, 0.45);
+}
+
+.time-card-notes-textarea:focus {
+  border-color: rgba(130, 214, 255, 0.45);
+  box-shadow: 0 0 0 1px rgba(130, 214, 255, 0.5);
+  outline: none;
+}
+
+/* Green H-prefix spans rendered in the backdrop */
+.time-card-app__notes-prefix {
+  font-weight: inherit;
+}
+
+.time-card-app__notes-prefix--done {
+  color: #34d399;
+}
+
+.time-card-app__notes-prefix--pending {
+  color: #fbbf24;
+}
+
+.time-card-app__notes-prefix--missing {
+  color: #f87171;
+}
+
 
 /* List rows keep natural height; flex parent scrolls (same idea as Tasks — expanded rows don’t compress). */
 .theme-builder-view .theme-builder-main-shell > .theme-builder-studio-rows {

@@ -38,9 +38,9 @@
               <%= material_symbol_icon(entry[:icon], size: :sm) %>
             </span>
             <span class="desktop-side-panel-app-label"><%= entry[:label] %></span>
-            <% if entry[:window_key] == "singular-task-list" %>
+            <% if entry[:window_key] == "singular-task-list" || entry[:window_key] == "notes" %>
               <span class="desktop-side-panel-app-actions" aria-hidden="true">
-                <span class="row-plus desktop-side-panel-app-action" data-action="click->organizer#addTaskFromPanel mousedown->organizer#noopAppAction">
+                <span class="row-plus desktop-side-panel-app-action" data-action="<%= entry[:window_key] == "notes" ? "click->organizer#addNoteFromPanel mousedown->organizer#noopAppAction" : "click->organizer#addTaskFromPanel mousedown->organizer#noopAppAction" %>">
                   <%= material_symbol_icon(:add, size: :xs) %>
                 </span>
               </span>
