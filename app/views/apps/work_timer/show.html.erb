@@ -5,7 +5,7 @@
     data-work-timer-notes-url-value="<%= apps_work_timer_notes_path %>">
     <header class="work-timer-app__header">
       <div class="work-timer-app__clockin-group">
-        <p class="work-timer-app__label">Clocked In</p>
+        <p class="work-timer-app__label">Start Time</p>
         <input id="work-timer-clockin-input" type="text" inputmode="numeric" maxlength="5" class="work-timer-app__time-input"
           placeholder="--:--" aria-label="Clocked in time"
           data-work-timer-target="clockInInput"
@@ -13,7 +13,7 @@
       </div>
 
       <div class="work-timer-app__clockout-group">
-        <p class="work-timer-app__label">Clocked Out</p>
+        <p class="work-timer-app__label">End Time</p>
         <input id="work-timer-clockout-input" type="text" inputmode="numeric" maxlength="5" class="work-timer-app__time-input"
           placeholder="--:--" aria-label="Clocked out time"
           data-work-timer-target="clockOutInput"
@@ -21,7 +21,7 @@
       </div>
 
       <div class="work-timer-app__elapsed-group">
-        <p class="work-timer-app__label">Elapsed Time</p>
+        <p class="work-timer-app__label">Total</p>
         <p class="work-timer-app__elapsed" data-work-timer-target="elapsedText">00:00:00</p>
       </div>
 
