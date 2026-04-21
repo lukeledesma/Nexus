@@ -5880,19 +5880,6 @@ input.app-save-dialog__btn {
   gap: 0.35rem;
 }
 
-.time-card-app__next-required-hint {
-  margin: 0;
-  font-size: 0.62rem;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-  opacity: 0.55;
-  min-height: 0.9rem;
-}
-
-.time-card-app__next-required-hint:empty {
-  display: none;
-}
-
 /* Shell — positions backdrop + textarea on top of each other */
 .time-card-notes-shell {
   /* Grid stack: both children share the same cell so they overlap.
