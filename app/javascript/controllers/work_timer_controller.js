@@ -132,6 +132,35 @@ function buildNotesHtml(text, requiredCount) {
   }).join('\n')
 }
 
+async function playOverdueAlertTone(controller) {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext
+  if (!AudioContextClass) return
+
+  controller.audioCtx ||= new AudioContextClass()
+  if (controller.audioCtx.state === "suspended") {
+    try {
+      await controller.audioCtx.resume()
+    } catch (_e) {
+      return
+    }
+  }
+
+  const now = controller.audioCtx.currentTime
+  const oscillator = controller.audioCtx.createOscillator()
+  const gain = controller.audioCtx.createGain()
+
+  oscillator.type = "sine"
+  oscillator.frequency.setValueAtTime(659.25, now)
+  gain.gain.setValueAtTime(0.0001, now)
+  gain.gain.exponentialRampToValueAtTime(0.07, now + 0.01)
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16)
+
+  oscillator.connect(gain)
+  gain.connect(controller.audioCtx.destination)
+  oscillator.start(now)
+  oscillator.stop(now + 0.18)
+}
+
 export default class extends Controller {
   static targets = [
     "clockInInput",
@@ -152,6 +181,7 @@ export default class extends Controller {
   connect() {
     this.boundChromeClearRequest = this.handleChromeClearRequest.bind(this)
     window.addEventListener("nexus:work-timer-clear-request", this.boundChromeClearRequest)
+    this.hasPlayedOverdueAlert = false
     this.state = this.loadState()
 
     // If localStorage has no notes but the server rendered some (via @notes_text in ERB), adopt them.
@@ -407,10 +437,15 @@ export default class extends Controller {
       this.alertTextTarget.textContent = `Missing ${missing} entr${missing === 1 ? "y" : "ies"} for current hours.`
       this.alertTextTarget.classList.add("is-visible")
       this.alertTextTarget.classList.remove("is-good")
+      if (!this.hasPlayedOverdueAlert) {
+        this.hasPlayedOverdueAlert = true
+        playOverdueAlertTone(this)
+      }
     } else {
       this.alertTextTarget.textContent = "All caught up!"
       this.alertTextTarget.classList.remove("is-visible")
       this.alertTextTarget.classList.add("is-good")
+      this.hasPlayedOverdueAlert = false
     }
 
     // Re-render backdrop so prefix colors update as hours tick over.
