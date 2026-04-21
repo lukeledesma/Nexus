@@ -40,11 +40,12 @@
     </section>
 
     <section class="time-card-app__entries">
+      <p class="time-card-app__next-required-hint" data-work-timer-target="nextRequiredHint" aria-live="polite"></p>
       <div class="time-card-notes-shell">
         <div class="time-card-notes-backdrop" aria-hidden="true" data-work-timer-target="notesBackdrop"></div>
         <textarea class="time-card-notes-textarea"
           data-work-timer-target="notesInput"
-          data-action="input->work-timer#updateNotes scroll->work-timer#syncBackdropScroll"
+          data-action="input->work-timer#updateNotes keydown->work-timer#handleNotesKeydown scroll->work-timer#syncBackdropScroll"
           placeholder="Write your entry..."
           autocomplete="off"
           spellcheck="true"><%= @notes_text %></textarea>

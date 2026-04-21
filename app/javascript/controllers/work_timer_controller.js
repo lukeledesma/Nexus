@@ -132,6 +132,28 @@ function buildNotesHtml(text, requiredCount) {
   }).join('\n')
 }
 
+function nextMissingRequiredPrefixNumber(text, requiredCount) {
+  if (!Number.isFinite(requiredCount) || requiredCount <= 0) return null
+
+  const lines = String(text || "").replaceAll("\r", "").split("\n")
+  const completed = new Set()
+
+  for (const line of lines) {
+    const m = /^\s*h(\d+)\s*:\s*(.*)$/i.exec(line)
+    if (!m) continue
+
+    const hNum = parseInt(m[1], 10)
+    if (!Number.isFinite(hNum) || hNum < 1 || hNum > requiredCount) continue
+    if (/\S/.test(m[2] || "")) completed.add(hNum)
+  }
+
+  for (let i = 1; i <= requiredCount; i += 1) {
+    if (!completed.has(i)) return i
+  }
+
+  return null
+}
+
 export default class extends Controller {
   static targets = [
     "clockInInput",
@@ -142,7 +164,8 @@ export default class extends Controller {
     "alertText",
     "ratioText",
     "notesInput",
-    "notesBackdrop"
+    "notesBackdrop",
+    "nextRequiredHint"
   ]
 
   static values = {
@@ -257,6 +280,42 @@ export default class extends Controller {
     this.updateStatus()
     this.renderBackdrop(text)
     this.scheduleServerSave(text)
+  }
+
+  handleNotesKeydown(event) {
+    if (event.isComposing) return
+    if (event.key !== "Enter") return
+    if (!(event.metaKey || event.ctrlKey)) return
+
+    event.preventDefault()
+    const required = this.requiredSentenceCount()
+    const missingPrefix = nextMissingRequiredPrefixNumber(this.state.notesText, required)
+    const targetPrefix = missingPrefix ?? Math.max(1, required + 1)
+    this.focusOrInsertPrefixLine(targetPrefix)
+  }
+
+  focusOrInsertPrefixLine(prefixNumber) {
+    const input = this.notesInputTarget
+    const text = String(input.value || "")
+    const existing = new RegExp(`^\\s*h${prefixNumber}\\s*:.*$`, "im").exec(text)
+
+    if (existing) {
+      const lineStart = existing.index
+      const lineEnd = text.indexOf("\n", lineStart)
+      const caret = lineEnd === -1 ? text.length : lineEnd
+      input.focus()
+      input.setSelectionRange(caret, caret)
+      return
+    }
+
+    const needsNewline = text.length > 0 && !text.endsWith("\n")
+    const insert = `${needsNewline ? "\n" : ""}H${prefixNumber}: `
+    const newText = text + insert
+
+    input.value = newText
+    input.focus()
+    input.setSelectionRange(newText.length, newText.length)
+    this.updateNotes()
   }
 
   syncBackdropScroll() {
@@ -412,6 +471,14 @@ export default class extends Controller {
       this.alertTextTarget.classList.remove("is-visible")
       this.alertTextTarget.classList.add("is-good")
     }
+
+    if (this.hasNextRequiredHintTarget) {
+      const missingPrefix = nextMissingRequiredPrefixNumber(this.state.notesText, required)
+      this.nextRequiredHintTarget.textContent = missingPrefix
+        ? `Required now: H${missingPrefix}:`
+        : ""
+    }
+
     // Re-render backdrop so prefix colors update as hours tick over.
     this.renderBackdrop(this.state.notesText)
   }
