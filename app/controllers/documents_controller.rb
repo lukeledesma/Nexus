@@ -4,7 +4,7 @@ require "marcel"
 
 class DocumentsController < ApplicationController
   before_action :sync_from_disk, only: %i[index organizer_fragment]
-  before_action :set_document, only: %i[show edit update destroy create_file create_subfolder move_folder move_file upload_images rename file_list asset_file]
+  before_action :set_document, only: %i[show edit update destroy create_file create_subfolder move_folder move_file upload_images rename toggle_favorite file_list asset_file]
 
   def index
     set_no_cache_headers
@@ -345,6 +345,21 @@ class DocumentsController < ApplicationController
     end
   end
 
+  def toggle_favorite
+    if @document.user_workspace_root?
+      render json: { error: "This item cannot be favorited." }, status: :forbidden
+      return
+    end
+
+    unless @document.file?
+      render json: { error: "Only files can be favorited." }, status: :unprocessable_entity
+      return
+    end
+
+    @document.toggle!(:is_favorited)
+    render json: { is_favorited: @document.is_favorited? }, status: :ok
+  end
+
   def destroy
     if @document.user_workspace_root?
       message = "User root folders are protected."
@@ -617,3 +632,8 @@ class DocumentsController < ApplicationController
   end
 
 end
+  def toggle_favorite
+    @document.toggle!(:is_favorited)
+    render json: { is_favorited: @document.is_favorited? }, status: :ok
+  end
+

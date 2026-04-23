@@ -1,14 +1,12 @@
 <% show_save = local_assigns.fetch(:show_save, false) %>
 <% show_open = local_assigns.fetch(:show_open, false) %>
-<% singular_save_flow = local_assigns.fetch(:singular_save_flow, false) %>
+<% linked_app_save_flow = local_assigns.fetch(:linked_app_save_flow, false) %>
 <% open_file_badge = local_assigns.fetch(:open_file_badge, false) %>
 <% show_finder_new_folder = local_assigns.fetch(:show_finder_new_folder, false) %>
 <% show_task_list_add = local_assigns.fetch(:show_task_list_add, false) %>
-<% show_loops_play_pause = local_assigns.fetch(:show_loops_play_pause, false) %>
 <% show_set_wallpaper = local_assigns.fetch(:show_set_wallpaper, false) %>
-<% show_work_timer_copy = local_assigns.fetch(:show_work_timer_copy, false) %>
-<% show_work_timer_clear = local_assigns.fetch(:show_work_timer_clear, false) %>
-<% chrome_toolbar = show_finder_new_folder || show_task_list_add || singular_save_flow %>
+<% show_time_card_clear = local_assigns.fetch(:show_time_card_clear, false) %>
+<% chrome_toolbar = show_finder_new_folder || show_task_list_add || linked_app_save_flow %>
 <header class="content-window-chrome<%= " content-window-chrome--with-save" if show_save %><%= " content-window-chrome--with-open-file" if open_file_badge %><%= " content-window-chrome--with-finder-toolbar" if chrome_toolbar %>">
   <% if open_file_badge %>
     <div class="content-window-title-shell">
@@ -20,7 +18,7 @@
     <h2 class="content-window-chrome-title"><%= title %></h2>
   <% end %>
   <div class="content-window-chrome-actions">
-    <% if singular_save_flow %>
+    <% if linked_app_save_flow %>
       <div data-content-window-target="chromeAppTools" class="content-window-chrome-tool-group">
         <% if show_task_list_add %>
           <button
@@ -44,7 +42,7 @@
           <button
             type="button"
             class="content-window-new-folder-btn settings-themes-item-action-btn theme-builder-save-btn"
-            data-action="click->content-window#openSingularSavePicker"
+            data-action="click->content-window#openLinkedAppSavePicker"
             title="Open from Finder"
             aria-label="Open from Finder"
           ><%= material_symbol_icon(:folder, size: :sm) %></button>
@@ -53,7 +51,7 @@
           <button
             type="button"
             class="content-window-save-btn settings-themes-item-action-btn theme-builder-save-btn"
-            data-action="click->content-window#openSingularSavePicker"
+            data-action="click->content-window#openLinkedAppSavePicker"
             title="Save/Open"
             aria-label="Save/Open"
           ><%= material_symbol_icon(:folder, size: :sm) %></button>
@@ -63,7 +61,7 @@
         <button
           type="button"
           class="content-window-new-folder-btn settings-themes-item-action-btn theme-builder-save-btn content-window-back-btn"
-          data-action="click->content-window#closeSingularSavePicker"
+          data-action="click->content-window#closeLinkedAppSavePicker"
           title="Back"
           aria-label="Back to app"
         ><%= material_symbol_icon(:arrow_back, size: :sm) %></button>
@@ -106,23 +104,12 @@
         ><%= material_symbol_icon(:desktop_windows, size: :sm) %></button>
       <% end %>
     <% end %>
-    <% if show_work_timer_copy %>
+    <% if show_time_card_clear %>
       <button
         type="button"
-        class="tools-close-btn content-window-work-timer-copy"
-        data-content-window-target="chromeWorkTimerCopy"
-        data-action="click->content-window#emitWorkTimerCopyRequest"
-        aria-label="Copy time card session"
-        title="Copy time card session"
-        hidden
-      ><%= material_symbol_icon(:content_copy, size: :xs) %></button>
-    <% end %>
-    <% if show_work_timer_clear %>
-      <button
-        type="button"
-        class="tools-close-btn content-window-work-timer-clear"
-        data-content-window-target="chromeWorkTimerClear"
-        data-action="click->content-window#emitWorkTimerClearRequest"
+        class="tools-close-btn content-window-time-card-clear"
+        data-content-window-target="chromeTimeCardClear"
+        data-action="click->content-window#emitTimeCardClearRequest"
         aria-label="Clear time card session"
         title="Clear time card session"
         hidden

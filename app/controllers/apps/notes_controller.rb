@@ -12,7 +12,9 @@ module Apps
       raw = params[:document_id].to_s.strip
       if raw.match?(/^\d+$/)
         doc = WorkspaceDocumentAccess.openable_document_for(current_user, raw, content_type: "note")
-        if doc && notes_root && Apps::FinderController.document_in_finder_subtree?(notes_root, doc)
+        in_notes_section = doc && notes_root && Apps::FinderController.document_in_finder_subtree?(notes_root, doc)
+        in_embedded = doc && WorkspaceDocumentAccess.document_in_embedded_subtree?(current_user, doc)
+        if in_notes_section || in_embedded
           @linked_document_id = doc.id
           @linked_document_display_title = helpers.finder_document_display_title(doc.title.to_s)
           @note_text = plain_text_from_note_html(doc.content.to_s)

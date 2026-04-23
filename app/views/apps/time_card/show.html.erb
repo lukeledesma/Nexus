@@ -1,0 +1,109 @@
+<% frame_id = params[:frame_id].presence || turbo_frame_request_id.presence || "time-card-pane" %>
+<turbo-frame id="<%= frame_id %>" data-linked-app-draft-root data-linked-app-has-linked-document="<%= @linked_document_id.present? %>">
+  <section class="app-surface app-surface--tool time-card-app os-window-body-start"
+    data-controller="time-card"
+    data-time-card-linked-document-id-value="<%= @linked_document_id || 0 %>"
+    data-time-card-initial-state-value="<%= json_escape(@initial_state.to_json) %>">
+    <% if @linked_document_id.present? %>
+      <%= form_with url: document_path(@linked_document_id), method: :patch,
+        data: { turbo: false, controller: "autosave", autosave_debounce_value: 180 },
+        html: { class: "time-card-app__form" } do %>
+        <input type="hidden" name="document[content]" value="<%= @serialized_document_content %>" data-time-card-target="serializedContent">
+        <header class="time-card-app__header">
+          <div class="time-card-app__clockin-group">
+            <p class="time-card-app__label">Start Time</p>
+            <input id="time-card-clockin-input" type="text" inputmode="numeric" maxlength="5" class="time-card-app__time-input"
+              placeholder="--:--" aria-label="Start time"
+              data-time-card-target="clockInInput"
+              data-action="change->time-card#updateClockInManual keydown->time-card#applyClockInOnEnter" />
+          </div>
+
+          <div class="time-card-app__clockout-group">
+            <p class="time-card-app__label">End Time</p>
+            <input id="time-card-clockout-input" type="text" inputmode="numeric" maxlength="5" class="time-card-app__time-input"
+              placeholder="--:--" aria-label="End time"
+              data-time-card-target="clockOutInput"
+              data-action="change->time-card#updateClockOutManual keydown->time-card#applyClockOutOnEnter" />
+          </div>
+
+          <div class="time-card-app__elapsed-group">
+            <p class="time-card-app__label">Total</p>
+            <p class="time-card-app__elapsed" data-time-card-target="elapsedText">00:00:00</p>
+          </div>
+        </header>
+
+        <section class="time-card-app__status">
+          <p class="time-card-app__status-line" data-time-card-target="nextDueText"></p>
+          <div class="time-card-app__progress" role="progressbar" aria-label="Progress to next required entry">
+            <div class="time-card-app__progress-fill" data-time-card-target="progressFill"></div>
+          </div>
+          <div class="time-card-app__status-foot">
+            <p class="time-card-app__status-line time-card-app__status-line--alert" data-time-card-target="alertText"></p>
+            <p class="time-card-app__status-line time-card-app__status-line--ratio" data-time-card-target="ratioText">0/0</p>
+          </div>
+        </section>
+
+        <section class="time-card-app__entries">
+          <div class="time-card-notes-shell">
+            <div class="time-card-notes-backdrop" aria-hidden="true" data-time-card-target="notesBackdrop"></div>
+            <textarea class="time-card-notes-textarea"
+              data-time-card-target="notesInput"
+              data-action="input->time-card#updateNotes scroll->time-card#syncBackdropScroll"
+              placeholder="Write your entry..."
+              autocomplete="off"
+              spellcheck="true"></textarea>
+          </div>
+        </section>
+      <% end %>
+    <% else %>
+      <div class="time-card-app__form">
+        <input type="hidden" value="" data-time-card-target="serializedContent">
+        <header class="time-card-app__header">
+          <div class="time-card-app__clockin-group">
+            <p class="time-card-app__label">Start Time</p>
+            <input id="time-card-clockin-input" type="text" inputmode="numeric" maxlength="5" class="time-card-app__time-input"
+              placeholder="--:--" aria-label="Start time"
+              data-time-card-target="clockInInput"
+              data-action="change->time-card#updateClockInManual keydown->time-card#applyClockInOnEnter" />
+          </div>
+
+          <div class="time-card-app__clockout-group">
+            <p class="time-card-app__label">End Time</p>
+            <input id="time-card-clockout-input" type="text" inputmode="numeric" maxlength="5" class="time-card-app__time-input"
+              placeholder="--:--" aria-label="End time"
+              data-time-card-target="clockOutInput"
+              data-action="change->time-card#updateClockOutManual keydown->time-card#applyClockOutOnEnter" />
+          </div>
+
+          <div class="time-card-app__elapsed-group">
+            <p class="time-card-app__label">Total</p>
+            <p class="time-card-app__elapsed" data-time-card-target="elapsedText">00:00:00</p>
+          </div>
+        </header>
+
+        <section class="time-card-app__status">
+          <p class="time-card-app__status-line" data-time-card-target="nextDueText"></p>
+          <div class="time-card-app__progress" role="progressbar" aria-label="Progress to next required entry">
+            <div class="time-card-app__progress-fill" data-time-card-target="progressFill"></div>
+          </div>
+          <div class="time-card-app__status-foot">
+            <p class="time-card-app__status-line time-card-app__status-line--alert" data-time-card-target="alertText"></p>
+            <p class="time-card-app__status-line time-card-app__status-line--ratio" data-time-card-target="ratioText">0/0</p>
+          </div>
+        </section>
+
+        <section class="time-card-app__entries">
+          <div class="time-card-notes-shell">
+            <div class="time-card-notes-backdrop" aria-hidden="true" data-time-card-target="notesBackdrop"></div>
+            <textarea class="time-card-notes-textarea"
+              data-time-card-target="notesInput"
+              data-action="input->time-card#updateNotes scroll->time-card#syncBackdropScroll"
+              placeholder="Write your entry..."
+              autocomplete="off"
+              spellcheck="true"></textarea>
+          </div>
+        </section>
+      </div>
+    <% end %>
+  </section>
+</turbo-frame>

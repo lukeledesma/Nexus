@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 
 /**
- * Tracks “not saved to a Finder file yet” for Tasks when no linked document.
+ * Tracks “not saved to a Finder file yet” for linked-app drafts when no linked document.
  * Linked files rely on autosave (item + document); switching files is safe without a prompt.
  */
 export default class extends Controller {
@@ -17,14 +17,14 @@ export default class extends Controller {
 
     this.doc.addEventListener("input", this.markDirty, true)
     this.doc.addEventListener("change", this.markDirty, true)
-    window.addEventListener("nexus:singular-disk-saved", this.clearAfterFinderSave)
+    window.addEventListener("nexus:linked-app-document-saved", this.clearAfterFinderSave)
     this.doc.addEventListener("turbo:frame-load", this.resetAfterFrameLoad)
   }
 
   disconnect() {
     this.doc.removeEventListener("input", this.markDirty, true)
     this.doc.removeEventListener("change", this.markDirty, true)
-    window.removeEventListener("nexus:singular-disk-saved", this.clearAfterFinderSave)
+    window.removeEventListener("nexus:linked-app-document-saved", this.clearAfterFinderSave)
     this.doc.removeEventListener("turbo:frame-load", this.resetAfterFrameLoad)
     delete window.nexusWorkspaceHasSubstantiveContent
     delete window.nexusWorkspaceSubstantiveForFrameId
@@ -33,9 +33,9 @@ export default class extends Controller {
   markDirty(event) {
     const t = event.target
     if (!t || typeof t.closest !== "function") return
-    const root = t.closest("[data-singular-draft-root]")
+    const root = t.closest("[data-linked-app-draft-root]")
     if (!root) return
-    if (root.getAttribute("data-singular-has-linked-document") === "true") {
+    if (root.getAttribute("data-linked-app-has-linked-document") === "true") {
       window.nexusWorkspaceUnsaved = false
       return
     }
@@ -48,29 +48,29 @@ export default class extends Controller {
     window.nexusWorkspaceUnsaved = false
     if (!frameId) return
     const frame = this.doc.getElementById(frameId)
-    if (frame?.hasAttribute?.("data-singular-draft-root")) {
-      frame.setAttribute("data-singular-has-linked-document", "true")
+    if (frame?.hasAttribute?.("data-linked-app-draft-root")) {
+      frame.setAttribute("data-linked-app-has-linked-document", "true")
     }
   }
 
   resetAfterFrameLoad(event) {
     const frame = event.target
     if (!(frame instanceof HTMLElement)) return
-    if (!frame.hasAttribute("data-singular-draft-root")) return
+    if (!frame.hasAttribute("data-linked-app-draft-root")) return
     requestAnimationFrame(() => {
       window.nexusWorkspaceUnsaved = false
     })
   }
 
   #hasSubstantiveContent() {
-    const root = this.doc.querySelector("[data-singular-draft-root]")
+    const root = this.doc.querySelector("[data-linked-app-draft-root]")
     return root ? this.#rootHasSubstantiveContent(root) : false
   }
 
   #substantiveContentForFrameId(frameId) {
     if (!frameId) return false
     const root = this.doc.getElementById(frameId)
-    if (!root?.hasAttribute("data-singular-draft-root")) return false
+    if (!root?.hasAttribute("data-linked-app-draft-root")) return false
     return this.#rootHasSubstantiveContent(root)
   }
 
@@ -113,6 +113,12 @@ export default class extends Controller {
         return false
       })
     }
+
+    const notesArea = root.querySelector(".notes-app__textarea")
+    if (notesArea && String(notesArea.value || "").trim().length > 0) return true
+
+    const timeCardNotes = root.querySelector(".time-card-notes-textarea")
+    if (timeCardNotes && String(timeCardNotes.value || "").trim().length > 0) return true
 
     return false
   }

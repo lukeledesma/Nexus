@@ -82,7 +82,7 @@ export default class extends Controller {
 
   handleFrameLoad(event) {
     const t = event.target
-    if (!(t instanceof HTMLElement) || t.tagName !== "TURBO-FRAME" || t.id !== "loops-pane") return
+    if (!(t instanceof HTMLElement) || t.tagName !== "TURBO-FRAME" || t.id !== "audio-pane") return
     this.revokeObjectUrl({ resetMeta: false })
     this._initialLinkedPayloadKey = null
     this.hydrateTargets()
@@ -143,13 +143,13 @@ export default class extends Controller {
 
   dragEnter(event) {
     event.preventDefault()
-    event.currentTarget?.classList?.add("loops-app--drop-target")
+    event.currentTarget?.classList?.add("audio-app--drop-target")
   }
 
   dragLeave(event) {
     const el = event.currentTarget
     if (el && event.relatedTarget && el.contains(event.relatedTarget)) return
-    el?.classList?.remove("loops-app--drop-target")
+    el?.classList?.remove("audio-app--drop-target")
   }
 
   dragOver(event) {
@@ -182,8 +182,8 @@ export default class extends Controller {
   }
 
   _clearDropTargetClass() {
-    const el = this.element.querySelector(".loops-app")
-    el?.classList.remove("loops-app--drop-target")
+    const el = this.element.querySelector(".audio-app")
+    el?.classList.remove("audio-app--drop-target")
   }
 
   audioFilesFromDataTransfer(dt) {
@@ -202,10 +202,10 @@ export default class extends Controller {
    * because loadFile() calls hydrateTargets() and would re-enter forever.
    */
   tryLoadInitialLinkedDocument() {
-    const app = this.element.querySelector(".loops-app")
-    const id = app?.dataset?.loopsInitialDocumentId || ""
+    const app = this.element.querySelector(".audio-app")
+    const id = app?.dataset?.audioInitialDocumentId || ""
     if (!id) return
-    const title = app?.dataset?.loopsInitialDocumentTitle || ""
+    const title = app?.dataset?.audioInitialDocumentTitle || ""
     const key = `${id}\t${title}`
     if (this._initialLinkedPayloadKey === key) return
     this._initialLinkedPayloadKey = key
@@ -571,10 +571,10 @@ export default class extends Controller {
     const h = canvas.height
     ctx.clearRect(0, 0, w, h)
     const style = getComputedStyle(canvas)
-    const barBg = style.getPropertyValue("--loops-bar-bg").trim() || "rgba(255,255,255,0.04)"
-    const barIdle = style.getPropertyValue("--loops-bar-idle").trim() || "rgba(227,227,227,0.42)"
-    const barPlayed = style.getPropertyValue("--loops-bar-played").trim() || "rgba(130,214,255,0.88)"
-    const barHead = style.getPropertyValue("--loops-bar-head").trim() || "rgba(255,255,255,0.55)"
+    const barBg = style.getPropertyValue("--audio-bar-bg").trim() || "rgba(255,255,255,0.04)"
+    const barIdle = style.getPropertyValue("--audio-bar-idle").trim() || "rgba(227,227,227,0.42)"
+    const barPlayed = style.getPropertyValue("--audio-bar-played").trim() || "rgba(130,214,255,0.88)"
+    const barHead = style.getPropertyValue("--audio-bar-head").trim() || "rgba(255,255,255,0.55)"
     ctx.fillStyle = barBg
     ctx.fillRect(0, 0, w, h)
 

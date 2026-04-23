@@ -12,7 +12,7 @@ export default class extends Controller {
     window.removeEventListener("app-window:state", this.boundAppWindowState)
   }
 
-  launchApp(event) {
+  async launchApp(event) {
     if (event.target instanceof Element && event.target.closest(".desktop-side-panel-app-action")) {
       event.preventDefault()
       event.stopPropagation()
@@ -23,7 +23,70 @@ export default class extends Controller {
     if (!appKey) {
       return
     }
-    window.dispatchEvent(new CustomEvent("app-window:toggle", { detail: { appKey } }))
+
+    await this.launchAppKey(appKey)
+  }
+
+  async launchAppKey(appKey) {
+    if (!appKey) return
+
+    const draftOnFirstOpenKeys = new Set([
+      "tasks",
+      "notes",
+      "time-card"
+    ])
+
+    const blankOnFirstOpenKeys = new Set([
+      "images",
+      "audio"
+    ])
+
+    if (!draftOnFirstOpenKeys.has(appKey) && !blankOnFirstOpenKeys.has(appKey)) {
+      window.dispatchEvent(new CustomEvent("app-window:toggle", { detail: { appKey } }))
+      return
+    }
+
+    const visibleInstance = this.findVisibleInstanceForAppRow(appKey)
+    if (visibleInstance) {
+      const targetAppKey = visibleInstance.dataset.contentWindowAppKeyValue || appKey
+      window.dispatchEvent(new CustomEvent("app-window:toggle", { detail: { appKey: targetAppKey } }))
+      return
+    }
+
+    if (draftOnFirstOpenKeys.has(appKey)) {
+      await this.openEmbeddedDraft(appKey)
+      return
+    }
+
+    // No instance is open: launch an empty/blank instance for the row app.
+    window.dispatchEvent(new CustomEvent("app-window:open", {
+      detail: { appKey, forceBlank: true }
+    }))
+  }
+
+  findVisibleInstanceForAppRow(appKey) {
+    const selectorByApp = {
+      "tasks": 'section.content-window[data-content-window-app-key-value="tasks"], section.content-window[data-content-window-app-key-value^="task-spawn-"]',
+      "notes": 'section.content-window[data-content-window-app-key-value="notes"], section.content-window[data-content-window-app-key-value^="note-spawn-"]',
+      "time-card": 'section.content-window[data-content-window-app-key-value="time-card"], section.content-window[data-content-window-app-key-value^="time-card-spawn-"]',
+      "images": 'section.content-window[data-content-window-app-key-value="images"], section.content-window[data-content-window-app-key-value^="image-spawn-"]',
+      "audio": 'section.content-window[data-content-window-app-key-value="audio"]'
+    }
+
+    const selector = selectorByApp[appKey]
+    if (!selector) return null
+
+    const nodes = Array.from(document.querySelectorAll(selector)).filter((el) => !el.classList.contains("is-hidden"))
+    if (!nodes.length) return null
+
+    // Prefer top-most visible window for this app group.
+    nodes.sort((a, b) => {
+      const za = Number.parseInt(a.style.zIndex || window.getComputedStyle(a).zIndex || "0", 10)
+      const zb = Number.parseInt(b.style.zIndex || window.getComputedStyle(b).zIndex || "0", 10)
+      return (Number.isFinite(zb) ? zb : 0) - (Number.isFinite(za) ? za : 0)
+    })
+
+    return nodes[0] || null
   }
 
   noopAppAction(event) {
@@ -31,121 +94,62 @@ export default class extends Controller {
     event.stopPropagation()
   }
 
-  addTaskFromPanel(event) {
+  async addTaskFromPanel(event) {
     event.preventDefault()
     event.stopPropagation()
-
-    // Step 1: If an unsaved task window is already open, highlight/focus it.
-    const blankWindow = this.findBlankOpenTaskWindow()
-    if (blankWindow) {
-      const appKey = blankWindow.dataset.contentWindowAppKeyValue
-      window.dispatchEvent(new CustomEvent("app-window:toggle", { detail: { appKey } }))
-      return
-    }
-
-    // Step 2: If the primary Tasks window is closed, open it (blank instance).
-    const primaryEl = document.querySelector('[data-content-window-app-key-value="singular-task-list"]')
-    if (!primaryEl || primaryEl.classList.contains("is-hidden")) {
-      window.dispatchEvent(new CustomEvent("app-window:toggle", { detail: { appKey: "singular-task-list" } }))
-      return
-    }
-
-    // Step 3: No unsaved instance is open and primary is in-use with a linked file.
-    // Spawn a fresh unsaved task window instance.
-    window.dispatchEvent(new CustomEvent("nexus:task-list-spawn-blank-window"))
+    await this.openEmbeddedDraft("tasks")
   }
 
-  addNoteFromPanel(event) {
+  async addNoteFromPanel(event) {
     event.preventDefault()
     event.stopPropagation()
-
-    // Step 1: If an unsaved note window is already open, highlight/focus it.
-    const blankWindow = this.findBlankOpenNoteWindow()
-    if (blankWindow) {
-      const appKey = blankWindow.dataset.contentWindowAppKeyValue
-      window.dispatchEvent(new CustomEvent("app-window:toggle", { detail: { appKey } }))
-      return
-    }
-
-    // Step 2: If the primary Notes window is closed, open it (blank instance).
-    const primaryEl = document.querySelector('[data-content-window-app-key-value="notes"]')
-    if (!primaryEl || primaryEl.classList.contains("is-hidden")) {
-      window.dispatchEvent(new CustomEvent("app-window:toggle", { detail: { appKey: "notes" } }))
-      return
-    }
-
-    // Step 3: No unsaved instance is open and primary is in-use with a linked file.
-    // Spawn a fresh unsaved note window instance.
-    window.dispatchEvent(new CustomEvent("nexus:notes-spawn-blank-window"))
+    await this.openEmbeddedDraft("notes")
   }
 
-  /** Returns the first visible task window that has no linked document, or null. */
-  findBlankOpenTaskWindow() {
-    const primaryFrameId = this.primaryTaskFrameId()
-    const primaryEl = document.querySelector('[data-content-window-app-key-value="singular-task-list"]')
-    if (primaryEl && !primaryEl.classList.contains("is-hidden")) {
-      const hasLinkedDoc = Boolean(
-        window.sessionStorage?.getItem(`nexus.singularLinkedDocument.${primaryFrameId}`) ||
-        window.localStorage?.getItem(`nexus.singularLinkedDocument.${primaryFrameId}`)
-      )
-      if (!hasLinkedDoc) return primaryEl
-    }
-
-    const spawnedWindows = document.querySelectorAll('[data-content-window-app-key-value^="task-spawn-"]:not(.is-hidden)')
-    for (const w of spawnedWindows) {
-      const frameId = w.dataset.contentWindowFrameIdValue
-      const hasLinkedDoc = Boolean(
-        window.sessionStorage?.getItem(`nexus.singularLinkedDocument.${frameId}`) ||
-        window.localStorage?.getItem(`nexus.singularLinkedDocument.${frameId}`)
-      )
-      if (!hasLinkedDoc) return w
-    }
-
-    return null
+  async addTimeCardFromPanel(event) {
+    event.preventDefault()
+    event.stopPropagation()
+    await this.openEmbeddedDraft("time-card")
   }
 
-  primaryTaskFrameId() {
-    const taskWindow = document.querySelector('[data-content-window-app-key-value="singular-task-list"]')
-    return taskWindow?.dataset?.contentWindowFrameIdValue || "singular-task-list-pane"
+  async openEmbeddedDraft(appKey) {
+    const draft = await this.fetchDraftFile(appKey)
+    if (!draft?.document_id) return
+
+    window.dispatchEvent(new CustomEvent("app-window:open", {
+      detail: {
+        appKey,
+        documentId: String(draft.document_id),
+        documentTitle: draft.display_title || draft.title || "Draft",
+        isDraft: true
+      }
+    }))
   }
 
-  /** Returns the first visible notes window that has no linked document, or null. */
-  findBlankOpenNoteWindow() {
-    const primaryFrameId = this.primaryNotesFrameId()
-    const primaryEl = document.querySelector('[data-content-window-app-key-value="notes"]')
-    if (primaryEl && !primaryEl.classList.contains("is-hidden")) {
-      const hasLinkedDoc = Boolean(
-        window.sessionStorage?.getItem(`nexus.singularLinkedDocument.${primaryFrameId}`) ||
-        window.localStorage?.getItem(`nexus.singularLinkedDocument.${primaryFrameId}`)
-      )
-      if (!hasLinkedDoc) return primaryEl
+  async fetchDraftFile(appKey) {
+    try {
+      const url = `/apps/tasks/draft_file?app_key=${encodeURIComponent(appKey)}`
+      const response = await fetch(url, { headers: { Accept: "application/json" }, credentials: "same-origin" })
+      if (!response.ok) return null
+      const payload = await response.json().catch(() => null)
+      return payload && payload.ok ? payload : null
+    } catch (_error) {
+      return null
     }
-
-    const spawnedWindows = document.querySelectorAll('[data-content-window-app-key-value^="note-spawn-"]:not(.is-hidden)')
-    for (const w of spawnedWindows) {
-      const frameId = w.dataset.contentWindowFrameIdValue
-      const hasLinkedDoc = Boolean(
-        window.sessionStorage?.getItem(`nexus.singularLinkedDocument.${frameId}`) ||
-        window.localStorage?.getItem(`nexus.singularLinkedDocument.${frameId}`)
-      )
-      if (!hasLinkedDoc) return w
-    }
-
-    return null
   }
 
-  primaryNotesFrameId() {
-    const notesWindow = document.querySelector('[data-content-window-app-key-value="notes"]')
-    return notesWindow?.dataset?.contentWindowFrameIdValue || "notes-pane"
-  }
   handleAppWindowState(event) {
     const appKey = event.detail?.appKey
-    if (appKey === "singular-task-list") {
-      this.updateRowState("singular-task-list", this.anyTaskWindowOpen())
+    if (appKey === "tasks") {
+      this.updateRowState("tasks", this.anyTaskWindowOpen())
       return
     }
     if (appKey === "notes") {
       this.updateRowState("notes", this.anyNoteWindowOpen())
+      return
+    }
+    if (appKey === "time-card") {
+      this.updateRowState("time-card", this.anyTimeCardWindowOpen())
       return
     }
     this.updateRowState(appKey, Boolean(event.detail?.open))
@@ -153,13 +157,19 @@ export default class extends Controller {
 
   anyTaskWindowOpen() {
     const spawnedOpen = document.querySelector('[data-content-window-app-key-value^="task-spawn-"]:not(.is-hidden)')
-    const primaryOpen = document.querySelector('[data-content-window-app-key-value="singular-task-list"]:not(.is-hidden)')
+    const primaryOpen = document.querySelector('[data-content-window-app-key-value="tasks"]:not(.is-hidden)')
     return Boolean(spawnedOpen || primaryOpen)
   }
 
   anyNoteWindowOpen() {
     const spawnedOpen = document.querySelector('[data-content-window-app-key-value^="note-spawn-"]:not(.is-hidden)')
     const primaryOpen = document.querySelector('[data-content-window-app-key-value="notes"]:not(.is-hidden)')
+    return Boolean(spawnedOpen || primaryOpen)
+  }
+
+  anyTimeCardWindowOpen() {
+    const spawnedOpen = document.querySelector('[data-content-window-app-key-value^="time-card-spawn-"]:not(.is-hidden)')
+    const primaryOpen = document.querySelector('[data-content-window-app-key-value="time-card"]:not(.is-hidden)')
     return Boolean(spawnedOpen || primaryOpen)
   }
 

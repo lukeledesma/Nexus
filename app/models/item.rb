@@ -2,7 +2,7 @@
 class Item < ApplicationRecord
   belongs_to :folder
 
-  TYPES = %w[task_list work_timer].freeze
+  TYPES = %w[task_list].freeze
 
   validates :name, presence: true
   validates :item_type, inclusion: { in: TYPES }

@@ -1,9 +1,9 @@
 import { Controller } from "@hotwired/stimulus"
 import {
-  SINGULAR_BEFORE_SAVE_PICKER,
-  clearSingularPickerDraft,
-  writeSingularPickerDraft
-} from "lib/singular_finder_picker_draft"
+  LINKED_APP_BEFORE_SAVE_PICKER,
+  clearLinkedAppPickerDraft,
+  writeLinkedAppPickerDraft
+} from "lib/linked_app_picker_draft"
 
 export default class extends Controller {
   static values = {
@@ -12,37 +12,11 @@ export default class extends Controller {
 
   connect() {
     this.boundBeforeSavePicker = this.handleBeforeSavePicker.bind(this)
-    window.addEventListener(SINGULAR_BEFORE_SAVE_PICKER, this.boundBeforeSavePicker)
-    this.restoreDraft()
-    this.element.addEventListener("input", this.persistDraft)
+    window.addEventListener(LINKED_APP_BEFORE_SAVE_PICKER, this.boundBeforeSavePicker)
   }
 
   disconnect() {
-    window.removeEventListener(SINGULAR_BEFORE_SAVE_PICKER, this.boundBeforeSavePicker)
-    this.element.removeEventListener("input", this.persistDraft)
-  }
-
-  persistDraft = () => {
-    const frameId = this.frameIdValue || this.closestFrameId()
-    if (!frameId) return
-
-    try {
-      window.sessionStorage.setItem(`nexus.notesDraft.${frameId}`, this.element.value || "")
-    } catch (_e) {
-      // non-blocking
-    }
-  }
-
-  restoreDraft() {
-    const frameId = this.frameIdValue || this.closestFrameId()
-    if (!frameId) return
-
-    try {
-      const value = window.sessionStorage.getItem(`nexus.notesDraft.${frameId}`)
-      if (typeof value === "string" && value.length > 0) this.element.value = value
-    } catch (_e) {
-      // non-blocking
-    }
+    window.removeEventListener(LINKED_APP_BEFORE_SAVE_PICKER, this.boundBeforeSavePicker)
   }
 
   handleBeforeSavePicker(event) {
@@ -51,11 +25,11 @@ export default class extends Controller {
 
     const noteText = (this.element.value || "").toString()
     if (!noteText.trim()) {
-      clearSingularPickerDraft(frameId)
+      clearLinkedAppPickerDraft(frameId)
       return
     }
 
-    writeSingularPickerDraft(frameId, { app: "notes", noteText })
+    writeLinkedAppPickerDraft(frameId, { app: "notes", noteText })
   }
 
   closestFrameId() {

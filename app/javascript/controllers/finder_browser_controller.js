@@ -9,28 +9,28 @@ import {
   finderWriteExpandedFolderIds
 } from "lib/finder"
 import { materialSymbolSvg } from "lib/material_symbols"
-import { dispatchSingularHostEvent, singularHostWindow } from "lib/singular_host_events"
-import { readSingularPickerDraft } from "lib/singular_finder_picker_draft"
+import { dispatchLinkedAppHostEvent, linkedAppHostWindow } from "lib/linked_app_host_events"
+import { readLinkedAppPickerDraft } from "lib/linked_app_picker_draft"
 
-function appKeyForLinkedFile(contentType, fileKind) {
+function appKeyForLinkedFile(contentType, fileKind, sectionKey = "") {
   const ct = String(contentType || "").toLowerCase()
   const kind = String(fileKind || "").toLowerCase()
-  if (ct === "note") return "notes"
-  if (ct === "task_list") return "singular-task-list"
+  const section = String(sectionKey || "").toLowerCase()
+  if (ct === "note") return section === "time_card" ? "time-card" : "notes"
+  if (ct === "task_list") return "tasks"
   if (ct !== "asset") return null
   if (kind === "image") return "images"
-  if (kind === "audio") return "loops"
+  if (kind === "audio") return "audio"
   return null
 }
-
-const SINGULAR_FRAME_ID_BY_APP = {
-  loops: "loops-pane",
-  "singular-task-list": "singular-task-list-pane"
+const LINKED_APP_FRAME_ID_BY_APP = {
+  audio: "audio-pane",
+  tasks: "tasks-pane"
 }
 
-const SINGULAR_APP_LABEL = {
-  loops: "Audio",
-  "singular-task-list": "Tasks"
+const LINKED_APP_LABEL = {
+  audio: "Audio",
+  tasks: "Tasks"
 }
 
 function finderDisplayTitleFromStorageName(title) {
@@ -40,7 +40,7 @@ function finderDisplayTitleFromStorageName(title) {
 }
 
 /**
- * Finder tree: create/rename/delete, open linked docs, Turbo frame refresh; read-only save-as flow for singular apps.
+ * Finder tree: create/rename/delete, open linked docs, Turbo frame refresh; read-only save-as flow for linked apps.
  */
 export default class extends Controller {
   static values = {
@@ -48,7 +48,7 @@ export default class extends Controller {
     rootFolderId: Number,
     sectionKey: { type: String, default: "documents" },
     readOnly: { type: Boolean, default: false },
-    singularSaveIcon: { type: String, default: "file_document" }
+    linkedAppSaveIcon: { type: String, default: "file_document" }
   }
 
   connect() {
@@ -118,7 +118,7 @@ export default class extends Controller {
     const icon = document.createElement("span")
     icon.className = "finder-tree__icon finder-tree__icon--file"
     icon.setAttribute("aria-hidden", "true")
-    const iconKey = this.singularSaveIconValue || "file_document"
+    const iconKey = this.linkedAppSaveIconValue || "file_document"
     icon.innerHTML = materialSymbolSvg(iconKey, "sm") || materialSymbolSvg("file_document", "sm")
 
     const input = document.createElement("input")
@@ -156,7 +156,7 @@ export default class extends Controller {
 
       let documentId = null
       try {
-        documentId = window.sessionStorage.getItem(`nexus.singularLinkedDocument.${this.frameIdValue}`)
+        documentId = window.sessionStorage.getItem(`nexus.linkedAppDocument.${this.frameIdValue}`)
       } catch (_e) {
         /* ignore */
       }
@@ -169,20 +169,27 @@ export default class extends Controller {
 
       const isNotesFrame =
         this.frameIdValue === "notes-pane" || String(this.frameIdValue || "").startsWith("note-spawn-")
-      if (isNotesFrame) {
+      const isTimeCardFrame = this.frameIdValue === "time-card-pane"
+      if (isNotesFrame || isTimeCardFrame) {
         let noteText = ""
         try {
-          const draft = readSingularPickerDraft(this.frameIdValue)
+          const draft = readLinkedAppPickerDraft(this.frameIdValue)
           if (draft?.app === "notes") noteText = String(draft.noteText || "")
+          if (draft?.app === "time_card") noteText = String(draft.noteText || "")
         } catch (_e) {
           // non-blocking
         }
         if (!noteText) {
           try {
-            const host = singularHostWindow()
+            const host = linkedAppHostWindow()
             const frame = host?.document?.getElementById(this.frameIdValue)
-            const textarea = frame?.querySelector(".notes-app__textarea")
-            noteText = (textarea?.value || "").toString()
+            if (isNotesFrame) {
+              const textarea = frame?.querySelector(".notes-app__textarea")
+              noteText = (textarea?.value || "").toString()
+            } else if (isTimeCardFrame) {
+              const contentInput = frame?.querySelector('[data-time-card-target="serializedContent"]')
+              noteText = (contentInput?.value || "").toString()
+            }
           } catch (_e) {
             // non-blocking
           }
@@ -191,7 +198,7 @@ export default class extends Controller {
       }
 
       try {
-        const response = await fetch("/apps/singular/save_file", {
+        const response = await fetch("/apps/tasks/save_file", {
           method: "POST",
           headers: { "X-CSRF-Token": finderCsrfToken() },
           body
@@ -206,24 +213,24 @@ export default class extends Controller {
         finished = true
         li.remove()
 
-        dispatchSingularHostEvent("nexus:singular-disk-saved", {
+        dispatchLinkedAppHostEvent("nexus:linked-app-document-saved", {
           frameId: this.frameIdValue,
           title: data.display_title || data.title || trimmed
         })
         if (data.document_id != null) {
           try {
-            window.sessionStorage.setItem(`nexus.singularLinkedDocument.${this.frameIdValue}`, String(data.document_id))
+            window.sessionStorage.setItem(`nexus.linkedAppDocument.${this.frameIdValue}`, String(data.document_id))
           } catch (_e) {
             /* ignore */
           }
             try {
-              window.localStorage.setItem(`nexus.singularLinkedDocument.${this.frameIdValue}`, String(data.document_id))
+              window.localStorage.setItem(`nexus.linkedAppDocument.${this.frameIdValue}`, String(data.document_id))
             } catch (_e) {
               /* ignore */
             }
         }
 
-        dispatchSingularHostEvent("nexus:singular-save-picker-close", {
+        dispatchLinkedAppHostEvent("nexus:linked-app-save-picker-close", {
           frameId: this.frameIdValue,
           saved: true,
           documentId: data.document_id
@@ -310,7 +317,8 @@ export default class extends Controller {
     const fileKind = el?.dataset?.fileKind
     if (!documentId || !contentType) return
 
-    const appKey = appKeyForLinkedFile(contentType, fileKind)
+    const sectionKey = el?.dataset?.sectionKey || this.sectionKeyValue
+    const appKey = appKeyForLinkedFile(contentType, fileKind, sectionKey)
     if (!appKey) return
 
     this.element.querySelectorAll(".finder-tree__row-line.is-selected").forEach((line) => {
@@ -321,7 +329,7 @@ export default class extends Controller {
     const documentTitle = (el.dataset.documentTitle || "").trim()
 
     if (options.fromEmbeddedPicker) {
-      dispatchSingularHostEvent("nexus:singular-open-from-embedded-finder", {
+      dispatchLinkedAppHostEvent("nexus:linked-app-open-from-embedded-finder", {
         frameId: this.frameIdValue,
         appKey,
         documentId: String(documentId),
@@ -331,7 +339,7 @@ export default class extends Controller {
     }
 
     // Dispatch to parent/host window so content-window-controller can receive it.
-    // Try dispatchSingularHostEvent first (escapes iframes), fallback to window dispatch.
+    // Try dispatchLinkedAppHostEvent first (escapes iframes), fallback to window dispatch.
     const event = new CustomEvent("app-window:open", {
       detail: {
         appKey,
@@ -339,7 +347,7 @@ export default class extends Controller {
         documentTitle
       }
     })
-    const hostWindow = singularHostWindow()
+    const hostWindow = linkedAppHostWindow()
     if (hostWindow && hostWindow !== window) {
       hostWindow.dispatchEvent(event)
     } else {
@@ -642,6 +650,38 @@ export default class extends Controller {
       return
     }
     Turbo.visit(next, { frame: frameId })
+  }
+
+  async toggleFavorite(event) {
+    if (this.readOnlyValue) return
+    event.preventDefault()
+    event.stopPropagation()
+
+    const button = event.currentTarget
+    const documentId = button?.dataset?.documentId
+    if (!documentId) return
+
+    try {
+      const response = await fetch(`/documents/${documentId}/toggle_favorite`, {
+        method: "PATCH",
+        headers: finderApiHeaders({ jsonBody: false })
+      })
+
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        window.alert(payload.error || "Could not update favorite status.")
+        return
+      }
+
+      const isFavorited = payload.is_favorited === true
+      button.dataset.isFavorited = String(isFavorited)
+
+      const actionLabel = isFavorited ? "Remove from Favorites" : "Add to Favorites"
+      button.title = actionLabel
+      button.setAttribute("aria-label", actionLabel)
+    } catch (_error) {
+      window.alert("Could not update favorite status.")
+    }
   }
 
   csrfToken() {

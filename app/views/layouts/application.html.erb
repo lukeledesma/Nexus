@@ -61,13 +61,13 @@
 
       <section class="content-window os-window is-hidden"
         data-controller="content-window"
-        data-content-window-app-key-value="singular-task-list"
-        data-content-window-app-url-value="/apps/singular_task_list"
-        data-content-window-storage-key-value="nexus.contentWindow.singularTaskList.bounds"
-        data-content-window-frame-id-value="singular-task-list-pane"
-        data-content-window-has-singular-save-picker-value="true"
+        data-content-window-app-key-value="tasks"
+        data-content-window-app-url-value="/apps/tasks"
+        data-content-window-storage-key-value="nexus.contentWindow.tasks.bounds"
+        data-content-window-frame-id-value="tasks-pane"
+        data-content-window-has-linked-app-save-picker-value="true"
         aria-live="polite">
-        <%= render "shared/content_window_chrome", title: "Tasks", open_file_badge: true, singular_save_flow: true, show_save: true, show_task_list_add: true %>
+        <%= render "shared/content_window_chrome", title: "Tasks", open_file_badge: true, linked_app_save_flow: true, show_save: true, show_task_list_add: true %>
         <div class="pane-resize-handle pane-resize-handle--top" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
@@ -76,20 +76,20 @@
         <div class="pane-resize-handle pane-resize-handle--top-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <%= content_window_shell singular_save_picker: true do %>
-          <turbo-frame id="singular-task-list-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
+        <%= content_window_shell linked_app_save_picker: true do %>
+          <turbo-frame id="tasks-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
         <% end %>
       </section>
 
       <section class="content-window os-window is-hidden"
-        data-controller="content-window loops"
-        data-content-window-app-key-value="loops"
-        data-content-window-app-url-value="/apps/loops"
-        data-content-window-storage-key-value="nexus.contentWindow.loops.bounds"
-        data-content-window-frame-id-value="loops-pane"
-        data-content-window-has-singular-save-picker-value="true"
+        data-controller="content-window audio"
+        data-content-window-app-key-value="audio"
+        data-content-window-app-url-value="/apps/audio"
+        data-content-window-storage-key-value="nexus.contentWindow.audio.bounds"
+        data-content-window-frame-id-value="audio-pane"
+        data-content-window-has-linked-app-save-picker-value="true"
         aria-live="polite">
-        <%= render "shared/content_window_chrome", title: "Audio", open_file_badge: true, singular_save_flow: true, show_open: true %>
+        <%= render "shared/content_window_chrome", title: "Audio", open_file_badge: true, linked_app_save_flow: true, show_open: true %>
         <div class="pane-resize-handle pane-resize-handle--top" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
@@ -98,8 +98,8 @@
         <div class="pane-resize-handle pane-resize-handle--top-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <%= content_window_shell(singular_save_picker: true) do %>
-          <turbo-frame id="loops-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
+        <%= content_window_shell(linked_app_save_picker: true) do %>
+          <turbo-frame id="audio-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
         <% end %>
       </section>
 
@@ -109,9 +109,9 @@
         data-content-window-app-url-value="/apps/images"
         data-content-window-storage-key-value="nexus.contentWindow.images.bounds"
         data-content-window-frame-id-value="images-pane"
-        data-content-window-has-singular-save-picker-value="true"
+        data-content-window-has-linked-app-save-picker-value="true"
         aria-live="polite">
-        <%= render "shared/content_window_chrome", title: "Images", open_file_badge: true, singular_save_flow: true, show_open: true, show_set_wallpaper: true %>
+        <%= render "shared/content_window_chrome", title: "Images", open_file_badge: true, linked_app_save_flow: true, show_open: true, show_set_wallpaper: true %>
         <div class="pane-resize-handle pane-resize-handle--top" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
@@ -120,7 +120,7 @@
         <div class="pane-resize-handle pane-resize-handle--top-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <%= content_window_shell(singular_save_picker: true) do %>
+        <%= content_window_shell(linked_app_save_picker: true) do %>
           <turbo-frame id="images-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
         <% end %>
       </section>
@@ -131,9 +131,9 @@
         data-content-window-app-url-value="/apps/notes"
         data-content-window-storage-key-value="nexus.contentWindow.notes.bounds"
         data-content-window-frame-id-value="notes-pane"
-        data-content-window-has-singular-save-picker-value="true"
+        data-content-window-has-linked-app-save-picker-value="true"
         aria-live="polite">
-        <%= render "shared/content_window_chrome", title: "Notes", open_file_badge: true, singular_save_flow: true, show_open: true %>
+        <%= render "shared/content_window_chrome", title: "Notes", open_file_badge: true, linked_app_save_flow: true, show_open: true %>
         <div class="pane-resize-handle pane-resize-handle--top" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
@@ -142,19 +142,20 @@
         <div class="pane-resize-handle pane-resize-handle--top-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <%= content_window_shell(singular_save_picker: true) do %>
+        <%= content_window_shell(linked_app_save_picker: true) do %>
           <turbo-frame id="notes-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
         <% end %>
       </section>
 
       <section class="content-window os-window is-hidden"
         data-controller="content-window"
-        data-content-window-app-key-value="work-timer"
-        data-content-window-app-url-value="/apps/work_timer"
-        data-content-window-storage-key-value="nexus.contentWindow.workTimer.bounds"
-        data-content-window-frame-id-value="work-timer-pane"
+        data-content-window-app-key-value="time-card"
+        data-content-window-app-url-value="/apps/time_card"
+        data-content-window-storage-key-value="nexus.contentWindow.timeCard.bounds"
+        data-content-window-frame-id-value="time-card-pane"
+        data-content-window-has-linked-app-save-picker-value="true"
         aria-live="polite">
-        <%= render "shared/content_window_chrome", title: "Time Card", show_work_timer_clear: true %>
+        <%= render "shared/content_window_chrome", title: "Time Card", open_file_badge: true, linked_app_save_flow: true, show_open: true, show_time_card_clear: true %>
         <div class="pane-resize-handle pane-resize-handle--top" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
@@ -163,8 +164,8 @@
         <div class="pane-resize-handle pane-resize-handle--top-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <%= content_window_shell do %>
-          <turbo-frame id="work-timer-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
+        <%= content_window_shell(linked_app_save_picker: true) do %>
+          <turbo-frame id="time-card-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
         <% end %>
       </section>
 

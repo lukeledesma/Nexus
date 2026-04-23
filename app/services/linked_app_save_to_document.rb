@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-# Writes the singular App-folder Item (Tasks) into a user-chosen Finder folder as a Document.
-class SingularSaveToDocument
+# Writes a linked app document into a user-chosen Finder folder.
+class LinkedAppSaveToDocument
   FRAME_MAP = {
     "tasks-pane" => { item_type: "task_list", content_type: "task_list" },
     "notes-pane" => { item_type: nil, content_type: "note" },

@@ -1,5 +1,5 @@
 <% frame_id = params[:frame_id].presence || turbo_frame_request_id.presence || "notes-pane" %>
-<turbo-frame id="<%= frame_id %>">
+<turbo-frame id="<%= frame_id %>" data-linked-app-draft-root data-linked-app-has-linked-document="<%= @linked_document_id.present? %>">
   <section class="app-surface app-surface--tool notes-app os-window-body-start">
     <% if @linked_document_id.present? %>
       <%= form_with url: document_path(@linked_document_id), method: :patch,

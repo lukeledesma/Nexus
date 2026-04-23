@@ -2,7 +2,7 @@
 <script>
 (function () {
   var LAYERS_KEY = "nexus.desktop.windowLayers"
-  var SINGULAR_KEYS = { "singular-task-list": 1, "notes": 1 }
+  var LINKED_APP_KEYS = { "tasks": 1, "notes": 1 }
 
   function desktopShellInsetPx() {
     var root = document.documentElement
@@ -70,12 +70,12 @@
       return null
     }
     if (frameId) url.searchParams.set("frame_id", frameId)
-    if (SINGULAR_KEYS[appKey]) {
+    if (LINKED_APP_KEYS[appKey]) {
       var linkedId = null
       try {
-        linkedId = window.sessionStorage.getItem("nexus.singularLinkedDocument." + frameId)
+        linkedId = window.sessionStorage.getItem("nexus.linkedAppDocument." + frameId)
           if (!linkedId) {
-            linkedId = window.localStorage.getItem("nexus.singularLinkedDocument." + frameId)
+            linkedId = window.localStorage.getItem("nexus.linkedAppDocument." + frameId)
           }
       } catch (err) { /* private mode */ }
       if (linkedId) {

@@ -6,7 +6,6 @@ require "tmpdir"
 # Rebuilds storage/workspace from Folder + Item records.
 # This keeps filesystem state aligned with the app's organizer model.
 class ItemStorageSyncLite
-  TASK_LIST_FILENAME = "Tasks.md".freeze
   WORKSPACE_STATE_FILENAME = "WorkspaceState.txt".freeze
   LAYOUT_THEMES_FILENAME = "LayoutThemes.txt".freeze
   LEGACY_WINDOWS_FILENAME = "Windows.txt".freeze
@@ -49,18 +48,6 @@ class ItemStorageSyncLite
     FileUtils.mkdir_p(scoped_storage_root)
 
     temp_root = Pathname.new(Dir.mktmpdir(".sync_tmp-", scoped_storage_root.to_s))
-
-    # Write singular app files from the App folder at the root.
-    app_folder = Folder.find_by(name: "App")
-    if app_folder
-      task_list = app_folder.items.find_by(item_type: "task_list")
-      # Write TaskList (or empty placeholder if it doesn't exist)
-      task_content = task_list ? item_contents(task_list) : empty_task_list_contents
-      File.write(temp_root.join(TASK_LIST_FILENAME), task_content)
-    else
-      # Create empty placeholder if App folder doesn't exist yet
-      File.write(temp_root.join(TASK_LIST_FILENAME), empty_task_list_contents)
-    end
 
     # Write user folders as subdirectories (without items inside them)
     used_folder_names = {}
@@ -129,10 +116,20 @@ class ItemStorageSyncLite
   end
 
   def document_embedded_tree_to_preserve?(entry, path)
+    return true if linked_app_draft_file_to_preserve?(entry, path)
     return false unless File.directory?(path)
 
     names = ["Finder"] + EmbeddedIimageFolder::KNOWN_FOLDER_NAMES
     names.uniq.any? { |n| entry.to_s.casecmp?(n) }
+  end
+
+  def linked_app_draft_file_to_preserve?(entry, path)
+    return false unless File.file?(path)
+
+    stem = File.basename(entry.to_s, File.extname(entry.to_s)).to_s.strip
+    return false if stem.empty?
+
+    EmbeddedDraftDocument::APP_CONFIG.values.any? { |config| stem.casecmp?(config[:title].to_s) }
   end
 
   def next_available_name(raw, used, extension: "")
@@ -163,73 +160,5 @@ class ItemStorageSyncLite
     value = "Untitled" if value.empty?
     value
   end
-
-  def item_contents(item)
-    return task_list_contents(item) if item.item_type == "task_list"
-    ""
-  end
-
-  def task_list_contents(item)
-    task_groups = Array(item.tasks).filter_map do |task|
-      if task.respond_to?(:to_h)
-        value = task.to_h
-        text = value["text"].to_s.strip
-        next if text.empty?
-
-        lines = [task_line(text, value["checked"], subtask: false)]
-
-        Array(value["subtasks"]).each do |subtask|
-          next unless subtask.respond_to?(:to_h)
-
-          subtask_value = subtask.to_h
-          subtask_text = subtask_value["text"].to_s.strip
-          next if subtask_text.empty?
-
-          lines << task_line(subtask_text, subtask_value["checked"], subtask: true)
-        end
-
-        lines
-      else
-        text = task.to_s.strip
-        next if text.empty?
-
-        [task_line(text, false, subtask: false)]
-      end
-    end
-
-    task_lines = task_groups.flat_map.with_index do |group, index|
-      index < task_groups.length - 1 ? (group + [""]) : group
-    end
-
-    [
-      "# NEXUS_TASK_LIST",
-      "# name: #{item.name}",
-      "# item_id: #{item.id}",
-      "# updated_at: #{iso8601_or_nil(item.updated_at)}",
-      "",
-      *task_lines
-    ].join("\n")
-  end
-
-  def iso8601_or_nil(value)
-    value&.iso8601 || "null"
-  end
-
-  def task_line(text, checked, subtask: false)
-    marker = ActiveModel::Type::Boolean.new.cast(checked) ? "x" : " "
-    prefix = subtask ? "- " : ""
-    "#{prefix}[#{marker}] #{text}"
-  end
-
-  def empty_task_list_contents
-    [
-      "# NEXUS_TASK_LIST",
-      "# name: Tasks",
-      "# item_id: ",
-      "# updated_at: null",
-      ""
-    ].join("\n")
-  end
-
 
 end

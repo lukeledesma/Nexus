@@ -1,13 +1,22 @@
 # Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
 
 one:
-  metadata_ip: MyString
-  metadata_protocol: MyString
-  metadata_filename: MyString
-  records: 
+  is_folder: true
+  title: Fixture Folder
+  content_type: note
+  content:
+  tasks: []
+  reset_mode: none
+  reset_days: []
+  storage_path: fixture-folder
 
 two:
-  metadata_ip: MyString
-  metadata_protocol: MyString
-  metadata_filename: MyString
-  records: 
+  is_folder: false
+  parent: one
+  title: Fixture Note
+  content_type: note
+  content: "<p>Fixture</p>"
+  tasks: []
+  reset_mode: none
+  reset_days: []
+  storage_path: fixture-folder/fixture-note.rtf

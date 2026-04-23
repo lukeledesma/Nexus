@@ -1,75 +1,64 @@
 require "test_helper"
-require "rubygems/package"
-require "stringio"
-require "zlib"
 
 class DocumentsImportTest < ActionDispatch::IntegrationTest
-  test "imports xml from xml.tar.gz upload" do
-    archive = build_xml_tar_gz("sample_export.xml")
-    folder = Document.create!(is_folder: true, metadata_filename: "Folder A", storage_path: "Folder A", records: [])
+  setup do
+    @user = User.create!(
+      email: "documents_import_test@example.com",
+      password: "password123",
+      password_confirmation: "password123"
+    )
+    post login_path, params: { identifier: @user.email, password: "password123" }
+  end
 
-    assert_difference -> { Document.files.count }, 1 do
-      post documents_path, params: {
-        parent_id: folder.id,
-        xml_file: Rack::Test::UploadedFile.new(
-          archive.path,
-          "application/gzip",
-          original_filename: "sample_export.xml.tar.gz"
+  teardown do
+    Document.delete_all
+    User.where(id: @user&.id).delete_all
+  end
+
+  test "creates a note file inside a folder" do
+    documents_root = Apps::FinderController.workspace_section_root(@user, "documents")
+    assert_not_nil documents_root
+    folder = Document.create!(is_folder: true, parent: documents_root, title: "Uploads")
+
+    assert_difference -> { Document.where(parent_id: folder.id, is_folder: false).count }, 1 do
+      post create_file_document_path(folder), params: { content_type: "note" }
+    end
+
+    assert_redirected_to root_path
+
+    created = Document.where(parent_id: folder.id, is_folder: false).order(:id).last
+    assert_not_nil created
+    assert_equal "note", created.content_type
+  end
+
+  test "rejects upload when destination is not a folder" do
+    folder = Document.create!(is_folder: true, title: "Parent", storage_path: "Parent")
+    file_doc = Document.create!(
+      is_folder: false,
+      parent: folder,
+      title: "Existing",
+      content_type: "note",
+      content: "<p>existing</p>",
+      storage_path: "Parent/existing.rtf"
+    )
+
+    upload_file = Tempfile.new(["bad_upload", ".txt"])
+    upload_file.binmode
+    upload_file.write("should fail")
+    upload_file.rewind
+
+    assert_no_difference -> { Document.where(parent_id: file_doc.id, is_folder: false).count } do
+      post upload_images_document_path(file_doc), params: {
+        files: Rack::Test::UploadedFile.new(
+          upload_file.path,
+          "text/plain",
+          original_filename: "bad_upload.txt"
         )
       }
     end
 
-    assert_redirected_to root_path
-
-    imported = Document.files.order(:id).last
-    assert_match(/\Asample_export(?: \d+)?\.xml\z/, imported.metadata_filename)
-    assert_equal "192.168.1.1", imported.metadata_ip
-    assert_equal "TCP", imported.metadata_protocol
-    assert_equal folder.id, imported.parent_id
-    assert imported.records.any?
+    assert_response :unprocessable_entity
   ensure
-    archive&.close!
-  end
-
-  test "rejects import without destination folder" do
-    archive = build_xml_tar_gz("sample_export.xml")
-
-    assert_no_difference -> { Document.files.count } do
-      assert_no_difference -> { Document.folders.where(metadata_filename: "Imported").count } do
-        post documents_path, params: {
-          xml_file: Rack::Test::UploadedFile.new(
-            archive.path,
-            "application/gzip",
-            original_filename: "sample_export.xml.tar.gz"
-          )
-        }
-      end
-    end
-
-    assert_redirected_to root_path
-  ensure
-    archive&.close!
-  end
-
-  private
-
-  def build_xml_tar_gz(fixture_name)
-    xml_content = File.binread(Rails.root.join("test/fixtures", fixture_name))
-
-    tar_data = StringIO.new("".b)
-    Gem::Package::TarWriter.new(tar_data) do |tar|
-      tar.add_file_simple("inside.xml", 0o644, xml_content.bytesize) do |entry|
-        entry.write(xml_content)
-      end
-    end
-
-    tar_data.rewind
-    tempfile = Tempfile.new(["alchemy_import", ".xml.tar.gz"])
-    tempfile.binmode
-    gz_data = StringIO.new("".b)
-    Zlib::GzipWriter.wrap(gz_data) { |gzip| gzip.write(tar_data.string) }
-    tempfile.write(gz_data.string)
-    tempfile.rewind
-    tempfile
+    upload_file&.close!
   end
 end

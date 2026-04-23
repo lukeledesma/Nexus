@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Apps
-  class LoopsController < BaseController
+  class AudioController < BaseController
     AUDIO_EXTENSIONS = %w[.wav .aif .aiff .mp3 .m4a .flac .ogg].freeze
 
     def show

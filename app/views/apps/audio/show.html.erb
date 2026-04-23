@@ -1,0 +1,42 @@
+<% frame_id = params[:frame_id].presence || turbo_frame_request_id.presence || "audio-pane" %>
+<turbo-frame id="<%= frame_id %>">
+  <section
+    class="app-surface app-surface--tool audio-app os-window-body-start"
+    <% if @linked_document_id.present? %>
+      data-audio-initial-document-id="<%= @linked_document_id %>"
+      data-audio-initial-document-title="<%= @linked_document_display_title.to_s %>"
+    <% end %>
+    data-action="dragover->audio#dragOver dragenter->audio#dragEnter dragleave->audio#dragLeave drop->audio#handleDrop">
+    <audio data-audio-target="audio" preload="metadata"></audio>
+    <% if @linked_document_id.present? %>
+      <div class="audio-app__visual">
+        <canvas
+          class="audio-app__waveform"
+          width="640"
+          height="72"
+          data-audio-target="waveform"
+          data-action="pointerdown->audio#wavePointerDown"
+          role="slider"
+          aria-label="Waveform — drag or scroll to seek"
+          tabindex="0"></canvas>
+      </div>
+
+      <footer class="audio-app__transport">
+        <span class="audio-app__time-current" data-audio-target="timeCurrent">00:00</span>
+        <button
+          type="button"
+          class="tools-close-btn"
+          data-audio-target="playPauseButton"
+          data-action="click->audio#togglePlayback"
+          aria-label="Play"
+          title="Play"
+        ></button>
+        <span class="audio-app__time-remaining" data-audio-target="timeRemaining">-00:00</span>
+      </footer>
+    <% else %>
+      <div class="audio-app__empty-wrap">
+        <p class="audio-app__empty">Select an audio file in Finder to open it here.</p>
+      </div>
+    <% end %>
+  </section>
+</turbo-frame>

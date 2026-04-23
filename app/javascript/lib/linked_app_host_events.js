@@ -3,7 +3,7 @@
  * Custom events and unsaved state must use the OS shell window that runs `workspace-draft-tracker`
  * (not the Finder embed document, and not a nested iframe that is not the shell).
  */
-export function singularHostWindow() {
+export function linkedAppHostWindow() {
   try {
     let candidate = typeof window !== "undefined" ? window : null
     for (let i = 0; i < 8 && candidate; i += 1) {
@@ -24,13 +24,13 @@ export function singularHostWindow() {
   return typeof window !== "undefined" ? window : globalThis
 }
 
-export function dispatchSingularHostEvent(name, detail = {}) {
-  singularHostWindow().dispatchEvent(new CustomEvent(name, { detail }))
+export function dispatchLinkedAppHostEvent(name, detail = {}) {
+  linkedAppHostWindow().dispatchEvent(new CustomEvent(name, { detail }))
 }
 
 /** `window.confirm` from an embedded Finder iframe is easy to miss; run the dialog on the OS shell. */
-export function confirmOnSingularHost(message) {
-  const host = singularHostWindow()
+export function confirmOnLinkedAppHost(message) {
+  const host = linkedAppHostWindow()
   if (host && typeof host.confirm === "function") return host.confirm(message)
   return typeof window !== "undefined" && typeof window.confirm === "function"
     ? window.confirm(message)

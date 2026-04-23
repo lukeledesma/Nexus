@@ -1,22 +1,35 @@
 # frozen_string_literal: true
 
 module Apps
-  class SingularController < BaseController
-    before_action :redirect_top_level_frame_requests, only: %i[task_list]
+  class TasksController < BaseController
+    before_action :redirect_top_level_frame_requests, only: %i[show]
 
-    before_action :ensure_singular_items
+    before_action :ensure_task_items
 
-    # GET /apps/singular_task_list
-    def task_list
+    # GET /apps/tasks
+    def show
       @task_list = @app_folder.items.find_by(item_type: "task_list")
-      @linked_document_id = openable_linked_document_id("task_list")
-      apply_singular_document_or_blank(@task_list, "task_list")
-      @tasks_for_view = normalize_tasks(@task_list.tasks) if @task_list
+      @linked_document_id = resolved_task_list_document_id
+      @task_list_updated_at = @task_list&.updated_at
+
+      if @linked_document_id.present?
+        doc = WorkspaceDocumentAccess.openable_document_for(
+          current_user,
+          @linked_document_id,
+          content_type: "task_list"
+        )
+        @tasks_for_view = normalize_tasks(doc&.tasks || [])
+        @linked_document_display_title = helpers.finder_document_display_title(doc&.title.to_s)
+        @task_list_updated_at = doc&.updated_at || @task_list_updated_at
+      else
+        apply_linked_document_or_blank(@task_list, "task_list")
+        @tasks_for_view = normalize_tasks(@task_list&.tasks || [])
+      end
     end
 
 
 
-    # POST /apps/singular/save_file
+    # POST /apps/tasks/save_file
     def save_file
       folder_id = params[:folder_id].presence
       frame_id = params[:frame_id].to_s
@@ -28,7 +41,7 @@ module Apps
         return
       end
 
-      result, payload = SingularSaveToDocument.new(
+      result, payload = LinkedAppSaveToDocument.new(
         user: current_user,
         folder_id: folder_id,
         frame_id: frame_id,
@@ -54,7 +67,36 @@ module Apps
       end
     end
 
+    # GET /apps/tasks/draft_file?app_key=notes|time-card|tasks
+    def draft_file
+      app_key = params[:app_key].to_s
+      doc = EmbeddedDraftDocument.fetch_or_create(user: current_user, app_key: app_key)
+      if doc
+        render json: {
+          ok: true,
+          document_id: doc.id,
+          title: doc.title.to_s,
+          display_title: helpers.finder_document_display_title(doc.title.to_s),
+          content_type: doc.content_type.to_s
+        }
+      else
+        render json: { error: "Unsupported draft app or missing Embedded folder." }, status: :unprocessable_entity
+      end
+    end
+
     private
+
+    # Tasks treat the embedded draft as a canonical saved document.
+    # If the requested linked document is stale/missing, fall back to the draft
+    # so refresh never drops the UI into transient Item mode.
+    def resolved_task_list_document_id
+      linked = openable_linked_document_id("task_list")
+      return linked if linked.present?
+
+      EmbeddedDraftDocument.fetch_or_create(user: current_user, app_key: "tasks")&.id
+    rescue StandardError
+      nil
+    end
 
     def openable_linked_document_id(expected_content_type)
       did = params[:document_id].presence
@@ -71,7 +113,7 @@ module Apps
       redirect_to root_path
     end
 
-    def ensure_singular_items
+    def ensure_task_items
       @app_folder = Folder.find_or_create_by!(name: "App") do |folder|
         folder.name = "App"
       end
@@ -87,7 +129,7 @@ module Apps
 
 
 
-      # Sync to disk to ensure workspace text files exist.
+      # Sync legacy workspace shells/config files without regenerating linked-app draft files.
       # Rare cache-clear reload spikes can trigger transient file races; retry once.
       begin
         ItemStorageSyncLite.sync_all!(username: current_user&.username)
@@ -96,7 +138,7 @@ module Apps
         ItemStorageSyncLite.sync_all!(username: current_user&.username)
       end
     rescue StandardError => e
-      Rails.logger.error("[SingularController] ensure_singular_items failed: #{e.class}: #{e.message}")
+      Rails.logger.error("[TasksController] ensure_task_items failed: #{e.class}: #{e.message}")
       raise
     end
 
@@ -141,13 +183,13 @@ module Apps
       end
     end
 
-    def apply_singular_document_or_blank(item, expected_type)
+    def apply_linked_document_or_blank(item, expected_type)
       return unless item
 
       if params[:document_id].present?
         hydrate_item_from_finder_document(item, expected_type)
       elsif params[:blank].to_s == "1"
-        reset_singular_item_to_blank(item, expected_type)
+        reset_linked_item_to_blank(item, expected_type)
       end
     end
 
@@ -160,11 +202,15 @@ module Apps
 
       case expected_type
       when "task_list"
+        # Linked task-list views now render directly from Document and no longer
+        # overwrite the shared linked-app Item cache.
+        return
+      else
         item.update!(tasks: doc.tasks || [])
       end
     end
 
-    def reset_singular_item_to_blank(item, expected_type)
+    def reset_linked_item_to_blank(item, expected_type)
       case expected_type
       when "task_list"
         item.update!(tasks: [])

@@ -7,21 +7,30 @@ module Apps
     DEFAULT_SECTION_KEY = "documents"
     LEGACY_DOCUMENTS_SECTION_TITLE = "Documents"
     TASKS_SECTION_TITLE = "Tasks"
+    TIME_CARD_SECTION_TITLE = "Time Card"
     NOTES_SECTION_TITLE = "Notes"
+    FAVORITES_SECTION_TITLE = "Favorites"
     FINDER_SECTION_DEFINITIONS = [
       { key: "documents", title: TASKS_SECTION_TITLE, icon: "task_checklist" },
       { key: "notes", title: NOTES_SECTION_TITLE, icon: "edit_note" },
+      { key: "time_card", title: TIME_CARD_SECTION_TITLE, icon: "overview" },
       { key: "images", title: "Images", icon: "wallpaper" },
-      { key: "audio", title: "Audio", icon: "graphic_eq" }
+      { key: "audio", title: "Audio", icon: "graphic_eq" },
+      { key: "favorites", title: FAVORITES_SECTION_TITLE, icon: "star_rounded" }
     ].freeze
     READ_ONLY_FRAME_CONFIG = {
-      "singular-task-list-pane" => { section_key: "documents", content_type: "task_list", allow_save: true },
+      "tasks-pane" => { section_key: "documents", content_type: "task_list", allow_save: true },
       "notes-pane" => {
         section_key: "notes",
         content_type: "note",
         allow_save: true
       },
-      "loops-pane" => { section_key: "audio", content_type: "asset", allow_save: false },
+      "time-card-pane" => {
+        section_key: "time_card",
+        content_type: "note",
+        allow_save: true
+      },
+      "audio-pane" => { section_key: "audio", content_type: "asset", allow_save: false },
       "images-pane" => { section_key: "images", content_type: "asset", allow_save: false }
     }.freeze
     LEGACY_FINDER_WORKSPACE_FOLDER_TITLE = "Finder"
@@ -45,6 +54,19 @@ module Apps
         workspace_section_definitions.find { |item| item[:key] == key }&.fetch(:title, TASKS_SECTION_TITLE) || TASKS_SECTION_TITLE
       end
 
+      # Derives the originating section key from a document's storage_path.
+      # Path format: "Username/Finder/SectionTitle/..."
+      # Returns nil when the path doesn't match or the section is unknown.
+      def origin_section_key_from_storage_path(storage_path)
+        parts = storage_path.to_s.split("/")
+        section_title = parts[2] # index 0=user, 1=Finder, 2=section title
+        return nil if section_title.blank?
+
+        workspace_section_definitions
+          .reject { |d| d[:key] == "favorites" }
+          .find { |d| d[:title].casecmp?(section_title) }&.fetch(:key, nil)
+      end
+
       def workspace_root_folder(user)
         FinderListedFolders.workspace_root_for(user)
       end
@@ -53,27 +75,48 @@ module Apps
         root = workspace_root_folder(user)
         return {} unless root
 
-        cleanup_legacy_finder_root!(root)
-        migrate_documents_section_to_tasks!(root)
+        finder_root = workspace_finder_container!(root)
+        return {} unless finder_root
+
+        migrate_documents_section_to_tasks!(finder_root)
 
         workspace_section_definitions.each_with_object({}) do |definition, out|
+          if definition[:key] == "favorites"
+            out[definition[:key]] = nil
+            next
+          end
+
           title = definition[:title]
-          existing = root.children.folders.find { |d| d.title.to_s.strip.casecmp?(title) }
-          out[definition[:key]] = existing || root.children.create!(is_folder: true, title: title)
+          existing = finder_root.children.folders.find { |d| d.title.to_s.strip.casecmp?(title) }
+          out[definition[:key]] = existing || finder_root.children.create!(is_folder: true, title: title)
         end
       rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid
         root = workspace_root_folder(user)
+        finder_root = workspace_finder_container!(root)
         return {} unless root
+        return {} unless finder_root
 
         workspace_section_definitions.each_with_object({}) do |definition, out|
-          folder = root.children.folders.find { |d| d.title.to_s.strip.casecmp?(definition[:title]) }
+          if definition[:key] == "favorites"
+            out[definition[:key]] = nil
+            next
+          end
+
+          folder = finder_root.children.folders.find { |d| d.title.to_s.strip.casecmp?(definition[:title]) }
           out[definition[:key]] = folder if folder
         end
       ensure
+        finder_root ||= workspace_finder_container!(root)
         roots = workspace_section_definitions.each_with_object({}) do |definition, out|
-          out[definition[:key]] ||= root&.children&.folders&.find { |d| d.title.to_s.strip.casecmp?(definition[:title]) }
+          if definition[:key] == "favorites"
+            out[definition[:key]] = nil
+            next
+          end
+
+          out[definition[:key]] ||= finder_root&.children&.folders&.find { |d| d.title.to_s.strip.casecmp?(definition[:title]) }
         end
         migrate_legacy_notes_folder_from_tasks!(roots["documents"], roots["notes"])
+        migrate_legacy_favorites_folder!(finder_root, roots["documents"])
       end
 
       # Legacy alias retained for older callers; Finder now defaults to Documents.
@@ -130,9 +173,23 @@ module Apps
 
       private
 
-      def cleanup_legacy_finder_root!(root)
-        legacy = root.children.folders.find { |d| d.title.to_s.strip.casecmp?(LEGACY_FINDER_WORKSPACE_FOLDER_TITLE) }
-        legacy&.destroy!
+      def workspace_finder_container!(root)
+        return nil unless root
+
+        finder_root = root.children.folders.find { |d| d.title.to_s.strip.casecmp?(LEGACY_FINDER_WORKSPACE_FOLDER_TITLE) }
+        finder_root ||= root.children.create!(is_folder: true, title: LEGACY_FINDER_WORKSPACE_FOLDER_TITLE)
+
+        section_titles = workspace_section_definitions.reject { |definition| definition[:key] == "favorites" }.map { |definition| definition[:title] } + [LEGACY_DOCUMENTS_SECTION_TITLE]
+        root.children.folders.each do |folder|
+          next if folder.id == finder_root.id
+          title = folder.title.to_s.strip
+          next if title.casecmp?("Embedded")
+          next unless section_titles.any? { |candidate| title.casecmp?(candidate) }
+
+          folder.update!(parent: finder_root)
+        end
+
+        finder_root
       rescue StandardError
         nil
       end
@@ -173,6 +230,45 @@ module Apps
       rescue StandardError
         nil
       end
+
+      # One-time migration: legacy physical "Favorites" folder is deprecated.
+      # Keep content accessible by moving children into Tasks and rely on `is_favorited` for the virtual Favorites section.
+      def migrate_legacy_favorites_folder!(finder_root, tasks_root)
+        return unless finder_root&.folder?
+
+        legacy_favorites = finder_root.children.folders.find { |d| d.title.to_s.strip.casecmp?(FAVORITES_SECTION_TITLE) }
+        return unless legacy_favorites
+
+        Document.transaction do
+          mark_files_favorited_in_subtree!(legacy_favorites)
+
+          target_parent = tasks_root&.folder? ? tasks_root : finder_root
+          legacy_favorites.children.find_each { |child| child.update!(parent: target_parent) }
+          legacy_favorites.destroy!
+        end
+      rescue StandardError
+        nil
+      end
+
+      def mark_files_favorited_in_subtree!(root)
+        stack = [root]
+        visited = Set.new
+
+        until stack.empty?
+          node = stack.pop
+          next unless node
+          next if visited.include?(node.id)
+
+          visited.add(node.id)
+          node.children.find_each do |child|
+            if child.folder?
+              stack << child
+            else
+              child.update!(is_favorited: true)
+            end
+          end
+        end
+      end
     end
 
     def show
@@ -181,8 +277,9 @@ module Apps
       frame_id = params[:frame_id].to_s
       read_only_config = READ_ONLY_FRAME_CONFIG[frame_id]
       if read_only_config.nil?
-        read_only_config = READ_ONLY_FRAME_CONFIG["singular-task-list-pane"] if frame_id.start_with?("task-spawn-")
+        read_only_config = READ_ONLY_FRAME_CONFIG["tasks-pane"] if frame_id.start_with?("task-spawn-")
         read_only_config = READ_ONLY_FRAME_CONFIG["notes-pane"] if frame_id.start_with?("note-spawn-")
+        read_only_config = READ_ONLY_FRAME_CONFIG["time-card-pane"] if frame_id.start_with?("time-card-spawn-")
         read_only_config = READ_ONLY_FRAME_CONFIG["images-pane"] if frame_id.start_with?("image-spawn-")
       end
       read_only_content_type = read_only_config&.[](:content_type)
@@ -202,11 +299,14 @@ module Apps
       @finder_sections = self.class.workspace_section_definitions.map do |definition|
         definition.merge(folder: section_roots[definition[:key]])
       end
-      @root_folder = section_roots[@section_key]
+
+      workspace_root = self.class.workspace_root_folder(current_user)
+      @root_folder = @section_key == "favorites" ? workspace_root : section_roots[@section_key]
       @finder_section_label = self.class.finder_section_label(@section_key)
       @finder_empty_message = nil
       @tree_nodes = []
       @browse_folder = nil
+
       unless @root_folder
         @finder_empty_message =
           "Your workspace folders could not be found. Set a username so Nexus can create your workspace, then open Finder again."
@@ -214,15 +314,25 @@ module Apps
         return
       end
 
-      @browse_folder = resolve_browse_folder(@root_folder, params[:browse_id])
-      allowed_folder_ids = finder_folder_ids_in_subtree(@root_folder)
-      extra_expanded = Set.new(parse_expanded_folder_ids_param) & allowed_folder_ids
-      @expanded_folder_ids = expanded_folder_ids_on_path(@root_folder, @browse_folder) | extra_expanded
-      @tree_nodes = build_tree_nodes(@root_folder)
+      if @section_key == "favorites"
+        @browse_folder = @root_folder
+        @expanded_folder_ids = Set.new
+        @tree_nodes = build_favorites_tree_nodes(@root_folder)
+      else
+        @browse_folder = resolve_browse_folder(@root_folder, params[:browse_id])
+        allowed_folder_ids = finder_folder_ids_in_subtree(@root_folder)
+        extra_expanded = Set.new(parse_expanded_folder_ids_param) & allowed_folder_ids
+        @expanded_folder_ids = expanded_folder_ids_on_path(@root_folder, @browse_folder) | extra_expanded
+        @tree_nodes = build_tree_nodes(@root_folder)
+      end
 
-      @singular_save_icon =
+      @linked_app_save_icon =
         if @finder_read_only
-          read_only_content_type ? helpers.finder_file_icon_for_content_type(read_only_content_type).to_s : "file_document"
+          if read_only_content_type
+            helpers.finder_file_icon_for_content_type(read_only_content_type, section_key: @section_key).to_s
+          else
+            "file_document"
+          end
         end
 
       @open_in_app_content_types =
@@ -289,6 +399,35 @@ module Apps
       build_tree_nodes_from_rows(root_folder, rows)
     end
 
+    def build_favorites_tree_nodes(workspace_root)
+      sql = <<~SQL.squish
+        WITH RECURSIVE subtree AS (
+          SELECT documents.*
+          FROM documents
+          WHERE parent_id = ?
+          UNION ALL
+          SELECT d.*
+          FROM documents d
+          INNER JOIN subtree t ON d.parent_id = t.id
+        )
+        SELECT *
+        FROM subtree
+        WHERE is_favorited = TRUE AND is_folder = FALSE
+        ORDER BY LOWER(title) ASC
+      SQL
+
+      docs = Document.find_by_sql(Document.sanitize_sql_array([sql, workspace_root.id]))
+      docs.map { |doc| tree_node_for_favorite(doc) }
+    end
+
+    def tree_node_for_favorite(doc)
+      origin_key = self.class.origin_section_key_from_storage_path(doc.storage_path)
+      tree_node_for_file(doc).merge(
+        is_favorited: true,
+        origin_section_key: origin_key
+      )
+    end
+
     def descendant_documents_for_finder_tree(root_folder)
       sql = <<~SQL.squish
         WITH RECURSIVE subtree AS (
@@ -324,7 +463,8 @@ module Apps
           id: doc.id,
           title: doc.title.to_s,
           writable: !doc.protected_workspace_structure?,
-          children: sf.map { |c| tree_node_from_doc(c, children_by_parent) } + fi.map { |f| tree_node_for_file(f) }
+          children: sf.map { |c| tree_node_from_doc(c, children_by_parent) } + fi.map { |f| tree_node_for_file(f) },
+          is_favorited: doc.is_favorited?
         }
       else
         tree_node_for_file(doc)
@@ -360,8 +500,10 @@ module Apps
         file_kind: file_kind,
         source_extension: ext,
         writable: !doc.protected_workspace_structure?,
-        has_linked_app: has_linked_app
+        has_linked_app: has_linked_app,
+        is_favorited: doc.is_favorited?
       }
     end
   end
 end
+

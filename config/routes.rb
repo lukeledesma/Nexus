@@ -8,16 +8,16 @@ Rails.application.routes.draw do
     resources :task_lists, only: %i[show create update destroy]
     get "finder", to: "finder#show"
     get "notes", to: "notes#show"
-    get "work_timer", to: "work_timer#show"
-    patch "work_timer/notes", to: "work_timer#save_notes", as: :work_timer_notes
+    get "time_card", to: "time_card#show"
     get "images", to: "images#show"
-    get "loops", to: "loops#show"
+    get "audio", to: "audio#show"
     get "wallpaper_iimage/files", to: "wallpaper_iimage#files"
     get "user", to: "user#show"
     patch "user/username", to: "user#update_username", as: :user_username
     patch "user/password", to: "user#update_password", as: :user_password
-    get "singular_task_list", to: "singular#task_list"
-    post "singular/save_file", to: "singular#save_file"
+    get "tasks", to: "tasks#show"
+    post "tasks/save_file", to: "tasks#save_file"
+    get "tasks/draft_file", to: "tasks#draft_file"
     post "workspace/flush_disk", to: "workspace_sync#flush_disk"
   end
 
@@ -48,6 +48,7 @@ Rails.application.routes.draw do
       post :move_file
       post :upload_images
       patch :rename
+      patch :toggle_favorite
       get :file_list
       get :asset_file
     end

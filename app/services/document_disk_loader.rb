@@ -141,6 +141,11 @@ class DocumentDiskLoader
       # A folder path can be "wrong" (rename drift Embedded/Image vs IImage) while child file paths
       # are still valid; one refresh then deleted everything under both DB and disk.
       Document.where(is_folder: false).where.not(storage_path: [nil, ""]).find_each do |doc|
+        # Embedded drafts are virtual saved documents and may not have a synced
+        # on-disk file at all times. Never purge them from DB on path-missing checks,
+        # otherwise their IDs rotate and window dedupe by document_id breaks.
+        next if protected_embedded_draft?(doc)
+
         rel = doc.storage_path.to_s
         next if keep.include?(rel)
 
@@ -161,6 +166,19 @@ class DocumentDiskLoader
 
         doc.destroy
       end
+    end
+
+    def protected_embedded_draft?(doc)
+      return false unless doc&.file?
+
+      draft_titles = ["Task Draft", "Note Draft", "Time Card Draft"]
+      return false unless draft_titles.include?(doc.title.to_s)
+
+      parent_title = doc.parent&.title.to_s
+      return true if parent_title.casecmp?("Embedded")
+
+      rel = doc.storage_path.to_s
+      rel.start_with?("Admin/Embedded/") || rel.start_with?("Embedded/")
     end
 
     def find_or_initialize_by_storage_path(storage_path, is_folder:)

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_14_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_23_054209) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -18,6 +18,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_14_120000) do
     t.text "content"
     t.string "content_type", default: "note", null: false
     t.datetime "created_at", null: false
+    t.boolean "is_favorited", default: false, null: false
     t.boolean "is_folder", default: false, null: false
     t.datetime "last_reset_at"
     t.integer "parent_id"

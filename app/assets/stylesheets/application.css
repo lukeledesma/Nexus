@@ -3256,6 +3256,20 @@ input.connection-inline {
   background: rgba(239, 68, 68, 0.12);
 }
 
+.item-action-favorite__filled,
+.item-action-favorite__outline {
+  display: contents;
+}
+
+.item-action-favorite[data-is-favorited="false"] .item-action-favorite__filled,
+.item-action-favorite:not([data-is-favorited]) .item-action-favorite__filled {
+  display: none;
+}
+
+.item-action-favorite[data-is-favorited="true"] .item-action-favorite__outline {
+  display: none;
+}
+
 /* Inline rename input (replaces label text in-place) */
 .finder-rename-input {
   background: rgba(255, 255, 255, 0.07);
@@ -4725,6 +4739,10 @@ html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden)
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  transform: translateY(0) scale(1);
+  transform-origin: center center;
+  transition: transform 420ms cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 420ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  will-change: transform;
 }
 
 /* Finder: match JS minimum (760×460) so first paint lines up with Settings. */
@@ -4733,7 +4751,7 @@ html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden)
   height: min(460px, calc(100vh - 2rem));
 }
 
-.content-window[data-content-window-app-key-value="loops"] {
+.content-window[data-content-window-app-key-value="audio"] {
   width: min(320px, calc(100vw - 2rem));
   height: min(320px, calc(100vh - 2rem));
 }
@@ -4745,16 +4763,16 @@ html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden)
 
 /* Waveform canvas colors — readable in both dark and light modes. */
 :root {
-  --loops-bar-bg: rgba(255, 255, 255, 0.04);
-  --loops-bar-idle: rgba(227, 227, 227, 0.42);
-  --loops-bar-played: rgba(130, 214, 255, 0.88);
-  --loops-bar-head: rgba(255, 255, 255, 0.55);
+  --audio-bar-bg: rgba(255, 255, 255, 0.04);
+  --audio-bar-idle: rgba(227, 227, 227, 0.42);
+  --audio-bar-played: rgba(130, 214, 255, 0.88);
+  --audio-bar-head: rgba(255, 255, 255, 0.55);
 }
 :root[data-nexus-shell-mode="light"] {
-  --loops-bar-bg: rgba(15, 23, 42, 0.05);
-  --loops-bar-idle: rgba(15, 23, 42, 0.28);
-  --loops-bar-played: rgba(59, 130, 246, 0.8);
-  --loops-bar-head: rgba(15, 23, 42, 0.45);
+  --audio-bar-bg: rgba(15, 23, 42, 0.05);
+  --audio-bar-idle: rgba(15, 23, 42, 0.28);
+  --audio-bar-played: rgba(59, 130, 246, 0.8);
+  --audio-bar-head: rgba(15, 23, 42, 0.45);
 }
 
 @keyframes content-window-focus-pulse {
@@ -4780,17 +4798,38 @@ html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden)
   border-radius: inherit;
   pointer-events: none;
   z-index: 60;
-  border-style: solid;
-  border-color: color-mix(in srgb, var(--border) 92%, transparent);
+  border: 0;
 }
 
 .content-window--focus-pulse::after {
   animation: content-window-focus-pulse 780ms ease-out forwards;
 }
 
+.content-window--focus-pulse,
+.content-window--focus-pulse-static {
+  transform: translateY(-1.3px) scale(1.0105);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.56), 0 0 0 1px rgba(130, 214, 255, 0.18);
+}
+
 .content-window--focus-pulse-static::after {
-  border-width: 2px;
-  opacity: 1;
+  opacity: 0;
+}
+
+.content-window[data-content-window-app-key-value="notes"]:focus-within,
+.content-window[data-content-window-app-key-value^="note-spawn-"]:focus-within {
+  transform: translateY(-0.95px) scale(1.0082);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.54), 0 0 0 1px rgba(130, 214, 255, 0.14);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content-window {
+    transition: none;
+  }
+
+  .content-window--focus-pulse,
+  .content-window--focus-pulse-static {
+    animation: none;
+  }
 }
 
 .content-window .window-content {
@@ -4812,7 +4851,7 @@ html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden)
   min-height: 0;
 }
 
-/* Singular save-picker: Finder loads in an overlay iframe; app turbo-frame stays mounted underneath. */
+/* Linked-app save-picker: Finder loads in an overlay iframe; app turbo-frame stays mounted underneath. */
 .content-window-body-stack {
   position: relative;
   flex: 1 1 auto;
@@ -4963,8 +5002,8 @@ html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden)
   display: none !important;
 }
 
-/* Singular save-as: belt-and-suspenders while picker class is on the window. */
-.content-window--singular-save-picker .content-window-chrome-app-tools {
+/* Linked-app save-as: belt-and-suspenders while picker class is on the window. */
+.content-window--linked-app-save-picker .content-window-chrome-app-tools {
   display: none !important;
 }
 
@@ -5016,8 +5055,7 @@ html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden)
   flex-shrink: 0;
 }
 
-.content-window-work-timer-copy[hidden],
-.content-window-work-timer-clear[hidden] {
+.content-window-time-card-clear[hidden] {
   display: none !important;
 }
 
@@ -5462,10 +5500,10 @@ input.app-save-dialog__btn {
   -webkit-overflow-scrolling: touch;
 }
 
-/* loops resize handles are enabled — no override needed */
+/* audio resize handles are enabled — no override needed */
 
 /* AUDIO: fill the window body — waveform grows, transport bar sits flush at the bottom. */
-.content-window[data-content-window-app-key-value="loops"] .window-content {
+.content-window[data-content-window-app-key-value="audio"] .window-content {
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -5476,7 +5514,7 @@ input.app-save-dialog__btn {
   -webkit-overflow-scrolling: touch;
 }
 
-.content-window[data-content-window-app-key-value="loops"] .window-content > .finder-app-frame {
+.content-window[data-content-window-app-key-value="audio"] .window-content > .finder-app-frame {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
@@ -5484,7 +5522,7 @@ input.app-save-dialog__btn {
   height: 100%;
 }
 
-.content-window[data-content-window-app-key-value="loops"] .loops-app {
+.content-window[data-content-window-app-key-value="audio"] .audio-app {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
@@ -5494,20 +5532,20 @@ input.app-save-dialog__btn {
   padding: 0;
 }
 
-.content-window[data-content-window-app-key-value="loops"] .content-window-open-file-separator {
+.content-window[data-content-window-app-key-value="audio"] .content-window-open-file-separator {
   display: none !important;
 }
 
-.content-window[data-content-window-app-key-value="loops"] .content-window-open-file-name {
+.content-window[data-content-window-app-key-value="audio"] .content-window-open-file-name {
   margin-inline-start: 0.35rem;
 }
 
-.content-window[data-content-window-app-key-value="loops"] .loops-app__file-input,
-.content-window[data-content-window-app-key-value="loops"] .loops-app audio {
+.content-window[data-content-window-app-key-value="audio"] .audio-app__file-input,
+.content-window[data-content-window-app-key-value="audio"] .audio-app audio {
   display: none;
 }
 
-.content-window[data-content-window-app-key-value="loops"] .loops-app__visual {
+.content-window[data-content-window-app-key-value="audio"] .audio-app__visual {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
@@ -5520,7 +5558,7 @@ input.app-save-dialog__btn {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.015));
 }
 
-.content-window[data-content-window-app-key-value="loops"] .loops-app__waveform {
+.content-window[data-content-window-app-key-value="audio"] .audio-app__waveform {
   flex: 1 1 auto;
   min-height: 2.1rem;
   height: auto;
@@ -5532,7 +5570,7 @@ input.app-save-dialog__btn {
 }
 
 /* Transport bar — mirrors the chrome header but at the bottom. */
-.content-window[data-content-window-app-key-value="loops"] .loops-app__transport {
+.content-window[data-content-window-app-key-value="audio"] .audio-app__transport {
   flex-shrink: 0;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -5545,7 +5583,7 @@ input.app-save-dialog__btn {
   -webkit-user-select: none;
 }
 
-.content-window[data-content-window-app-key-value="loops"] .loops-app__empty-wrap {
+.content-window[data-content-window-app-key-value="audio"] .audio-app__empty-wrap {
   flex: 1 1 auto;
   min-height: 0;
   border: 1px dashed var(--border-hairline);
@@ -5557,14 +5595,14 @@ input.app-save-dialog__btn {
   margin: 0.5rem;
 }
 
-.content-window[data-content-window-app-key-value="loops"] .loops-app__empty {
+.content-window[data-content-window-app-key-value="audio"] .audio-app__empty {
   margin: 0;
   font-size: 0.76rem;
   color: var(--text-muted);
   text-align: center;
 }
 
-.content-window[data-content-window-app-key-value="loops"] .loops-app__time-current {
+.content-window[data-content-window-app-key-value="audio"] .audio-app__time-current {
   font-size: 0.62rem;
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
@@ -5572,7 +5610,7 @@ input.app-save-dialog__btn {
   justify-self: start;
 }
 
-.content-window[data-content-window-app-key-value="loops"] .loops-app__time-remaining {
+.content-window[data-content-window-app-key-value="audio"] .audio-app__time-remaining {
   font-size: 0.62rem;
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
@@ -5580,7 +5618,7 @@ input.app-save-dialog__btn {
   justify-self: end;
 }
 
-.content-window[data-content-window-app-key-value="loops"] .loops-app--drop-target {
+.content-window[data-content-window-app-key-value="audio"] .audio-app--drop-target {
   outline: 1px dashed rgba(130, 214, 255, 0.55);
   outline-offset: 2px;
   border-radius: 6px;
@@ -5689,8 +5727,8 @@ input.app-save-dialog__btn {
 }
 
 .notes-app__textarea:focus {
-  outline: 1px solid rgba(130, 214, 255, 0.5);
-  border-color: rgba(130, 214, 255, 0.45);
+  outline: none;
+  border-color: var(--border-hairline);
 }
 
 .notes-app__empty-wrap {
@@ -5711,7 +5749,7 @@ input.app-save-dialog__btn {
   text-align: center;
 }
 
-.content-window[data-content-window-app-key-value="work-timer"] .window-content > .finder-app-frame {
+.content-window[data-content-window-app-key-value="time-card"] .window-content > .finder-app-frame {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
@@ -5719,7 +5757,7 @@ input.app-save-dialog__btn {
   height: 100%;
 }
 
-.work-timer-app {
+.time-card-app {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
@@ -5730,7 +5768,15 @@ input.app-save-dialog__btn {
   position: relative;
 }
 
-.work-timer-app__header {
+.time-card-app__form {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.time-card-app__header {
   display: flex;
   flex-wrap: nowrap;
   align-items: stretch;
@@ -5740,9 +5786,9 @@ input.app-save-dialog__btn {
   flex: 0 0 auto;
 }
 
-.work-timer-app__clockin-group,
-.work-timer-app__clockout-group,
-.work-timer-app__elapsed-group {
+.time-card-app__clockin-group,
+.time-card-app__clockout-group,
+.time-card-app__elapsed-group {
   border: 1px solid var(--border-hairline);
   border-radius: 7px;
   background: rgba(255, 255, 255, 0.02);
@@ -5754,16 +5800,16 @@ input.app-save-dialog__btn {
   flex: 1 1 0;
 }
 
-.work-timer-app__clockin-group,
-.work-timer-app__clockout-group {
+.time-card-app__clockin-group,
+.time-card-app__clockout-group {
   width: auto;
 }
 
-.work-timer-app__elapsed-group {
+.time-card-app__elapsed-group {
   width: auto;
 }
 
-.work-timer-app__label {
+.time-card-app__label {
   margin: 0 0 0.2rem;
   font-size: 0.62rem;
   letter-spacing: 0.08em;
@@ -5771,7 +5817,7 @@ input.app-save-dialog__btn {
   color: var(--text-muted);
 }
 
-.work-timer-app__time-input {
+.time-card-app__time-input {
   width: 100%;
   border: 1px solid var(--border-hairline);
   border-radius: 5px;
@@ -5783,13 +5829,12 @@ input.app-save-dialog__btn {
   letter-spacing: 0.02em;
 }
 
-.work-timer-app__time-input::placeholder,
-.work-timer-app__time-input::placeholder {
+.time-card-app__time-input::placeholder {
   color: color-mix(in srgb, var(--text) 72%, var(--text-muted) 28%);
   opacity: 1;
 }
 
-.work-timer-app__elapsed {
+.time-card-app__elapsed {
   margin: 0;
   font-size: 0.82rem;
   font-weight: 600;
@@ -5800,7 +5845,7 @@ input.app-save-dialog__btn {
 
 /* Keep controls in one row at all sizes; never hide or wrap. */
 
-.work-timer-app__status {
+.time-card-app__status {
   border: 1px solid var(--border-hairline);
   border-radius: 7px;
   background: rgba(255, 255, 255, 0.02);
@@ -5808,13 +5853,13 @@ input.app-save-dialog__btn {
   flex: 0 0 auto;
 }
 
-.work-timer-app__status-line {
+.time-card-app__status-line {
   margin: 0;
   font-size: 0.7rem;
   color: var(--text-muted);
 }
 
-.work-timer-app__progress {
+.time-card-app__progress {
   margin-top: 0.32rem;
   height: 0.35rem;
   border-radius: 999px;
@@ -5822,7 +5867,7 @@ input.app-save-dialog__btn {
   overflow: hidden;
 }
 
-.work-timer-app__progress-fill {
+.time-card-app__progress-fill {
   width: 0;
   height: 100%;
   border-radius: inherit;
@@ -5830,11 +5875,11 @@ input.app-save-dialog__btn {
   transition: width 180ms ease;
 }
 
-.work-timer-app__progress-fill.is-danger {
+.time-card-app__progress-fill.is-danger {
   background: linear-gradient(90deg, rgba(248, 113, 113, 0.9), rgba(220, 38, 38, 0.9));
 }
 
-.work-timer-app__status-foot {
+.time-card-app__status-foot {
   margin-top: 0.25rem;
   display: flex;
   align-items: baseline;
@@ -5842,33 +5887,33 @@ input.app-save-dialog__btn {
   gap: 0.5rem;
 }
 
-.work-timer-app__status-line--alert {
+.time-card-app__status-line--alert {
   margin-top: 0;
   color: #f87171;
   opacity: 0.4;
 }
 
-.work-timer-app__status-line--alert.is-visible {
+.time-card-app__status-line--alert.is-visible {
   opacity: 1;
 }
 
-.work-timer-app__status-line--alert.is-good {
+.time-card-app__status-line--alert.is-good {
   color: #34d399;
   opacity: 1;
 }
 
-:root[data-nexus-shell-mode="light"] .work-timer-app__status-line--alert.is-good {
+:root[data-nexus-shell-mode="light"] .time-card-app__status-line--alert.is-good {
   color: #15803d;
 }
 
-.work-timer-app__status-line--ratio {
+.time-card-app__status-line--ratio {
   color: var(--text-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
   font-weight: 600;
   white-space: nowrap;
 }
 
-.work-timer-app__status-line--ratio.is-danger {
+.time-card-app__status-line--ratio.is-danger {
   color: #f87171;
 }
 
@@ -6001,15 +6046,15 @@ input.app-save-dialog__btn {
   flex-shrink: 0;
 }
 
-/* Tasks (singular window): scroll task rows inside the fixed window height. */
-.content-window[data-content-window-app-key-value="singular-task-list"] .app-surface.app-surface--tool,
+/* Tasks window: scroll task rows inside the fixed window height. */
+.content-window[data-content-window-app-key-value="tasks"] .app-surface.app-surface--tool,
 .content-window[data-content-window-app-key-value^="task-spawn-"] .app-surface.app-surface--tool {
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
 }
 
-.content-window[data-content-window-app-key-value="singular-task-list"] .task-list-form,
+.content-window[data-content-window-app-key-value="tasks"] .task-list-form,
 .content-window[data-content-window-app-key-value^="task-spawn-"] .task-list-form {
   flex: 1 1 auto;
   min-height: 0;
@@ -6018,7 +6063,7 @@ input.app-save-dialog__btn {
   overflow: hidden;
 }
 
-.content-window[data-content-window-app-key-value="singular-task-list"] .task-list-content-shell,
+.content-window[data-content-window-app-key-value="tasks"] .task-list-content-shell,
 .content-window[data-content-window-app-key-value^="task-spawn-"] .task-list-content-shell {
   flex: 1 1 auto;
   min-height: 0;
@@ -6029,7 +6074,7 @@ input.app-save-dialog__btn {
   box-sizing: border-box;
 }
 
-.content-window[data-content-window-app-key-value="singular-task-list"] .task-list-rows,
+.content-window[data-content-window-app-key-value="tasks"] .task-list-rows,
 .content-window[data-content-window-app-key-value^="task-spawn-"] .task-list-rows {
   --organizer-row-width: 100%;
   /* Match .finder-file-list row rhythm (gap: 4px) */
@@ -6041,7 +6086,7 @@ input.app-save-dialog__btn {
   box-sizing: border-box;
 }
 
-.content-window[data-content-window-app-key-value="singular-task-list"] .task-list-rows .task-item-row,
+.content-window[data-content-window-app-key-value="tasks"] .task-list-rows .task-item-row,
 .content-window[data-content-window-app-key-value^="task-spawn-"] .task-list-rows .task-item-row {
   margin-left: 0 !important;
   margin-right: 0 !important;
@@ -6049,7 +6094,7 @@ input.app-save-dialog__btn {
 }
 
 /* First row: inset comes from .task-list-content-shell only (like .finder-file-list under .finder-shell-pane--contents). */
-.content-window[data-content-window-app-key-value="singular-task-list"] .task-list-rows > .task-item-row--main:first-child,
+.content-window[data-content-window-app-key-value="tasks"] .task-list-rows > .task-item-row--main:first-child,
 .content-window[data-content-window-app-key-value^="task-spawn-"] .task-list-rows > .task-item-row--main:first-child {
   margin-top: 0 !important;
 }
@@ -7024,6 +7069,12 @@ a.finder-tree__row--file:focus-visible {
   border-radius: 8px;
 }
 
+.finder-folder-item--separator {
+  border-top: 1px solid var(--border-hairline);
+  padding-top: 4px;
+  margin-top: 4px;
+}
+
 .finder-folder-item.is-active .finder-folder-link {
   background: var(--nexus-row-selected-highlight);
 }
@@ -7305,7 +7356,8 @@ a.finder-tree__row--file:focus-visible {
 }
 
 .finder-empty-wrap--content {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .finder-empty-state {

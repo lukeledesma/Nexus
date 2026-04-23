@@ -2,11 +2,11 @@ import { Controller } from "@hotwired/stimulus"
 import { materialSymbolSvg } from "lib/material_symbols"
 import { NEXUS_CLICKABLE_ROW_MAIN_CLASS } from "lib/nexus_ui"
 import {
-  clearSingularPickerDraft,
-  readSingularPickerDraft,
-  SINGULAR_BEFORE_SAVE_PICKER,
-  writeSingularPickerDraft
-} from "lib/singular_finder_picker_draft"
+  clearLinkedAppPickerDraft,
+  readLinkedAppPickerDraft,
+  LINKED_APP_BEFORE_SAVE_PICKER,
+  writeLinkedAppPickerDraft
+} from "lib/linked_app_picker_draft"
 
 const TASK_ROW_DRAG_MIME = "application/x-nexus-task-row"
 
@@ -28,7 +28,7 @@ export default class extends Controller {
     this.boundSyncPayloadInput = () => this.#syncPayload()
     window.addEventListener("app-window:state", this.boundWindowState)
     window.addEventListener("nexus:task-list-add-task", this.boundTaskListAddFromChrome)
-    window.addEventListener(SINGULAR_BEFORE_SAVE_PICKER, this.boundBeforeSavePicker)
+    window.addEventListener(LINKED_APP_BEFORE_SAVE_PICKER, this.boundBeforeSavePicker)
     document.addEventListener("nexus:request-save", this.boundRequestSave)
     if (this.hasListTarget) {
       this.listTarget.addEventListener("input", this.boundSyncPayloadInput, true)
@@ -53,7 +53,7 @@ export default class extends Controller {
   disconnect() {
     document.removeEventListener("nexus:request-save", this.boundRequestSave)
     window.removeEventListener("nexus:task-list-add-task", this.boundTaskListAddFromChrome)
-    window.removeEventListener(SINGULAR_BEFORE_SAVE_PICKER, this.boundBeforeSavePicker)
+    window.removeEventListener(LINKED_APP_BEFORE_SAVE_PICKER, this.boundBeforeSavePicker)
     if (this.hasListTarget && this.boundSyncPayloadInput) {
       this.listTarget.removeEventListener("input", this.boundSyncPayloadInput, true)
     }
@@ -173,13 +173,13 @@ export default class extends Controller {
   handleBeforeSavePicker(event) {
     const frame = this.element.closest("turbo-frame")
     if (!frame || event.detail?.frameId !== frame.id || !this.hasListTarget || !this.hasPayloadTarget) return
-    if (frame.getAttribute("data-singular-has-linked-document") === "true") {
-      clearSingularPickerDraft(frame.id)
+    if (frame.getAttribute("data-linked-app-has-linked-document") === "true") {
+      clearLinkedAppPickerDraft(frame.id)
       return
     }
     this.#flushAllPendingEdits()
     this.#syncPayload()
-    writeSingularPickerDraft(frame.id, { app: "task_list", tasksPayload: this.payloadTarget.value })
+    writeLinkedAppPickerDraft(frame.id, { app: "task_list", tasksPayload: this.payloadTarget.value })
   }
 
   /** Commit every in-progress row edit (main or subtask) so payload + picker snapshot match the UI. */
@@ -194,9 +194,9 @@ export default class extends Controller {
 
   #restorePickerDraftIfAny() {
     const frame = this.element.closest("turbo-frame")
-    if (!frame || !this.hasListTarget || frame.getAttribute("data-singular-has-linked-document") === "true")
+    if (!frame || !this.hasListTarget || frame.getAttribute("data-linked-app-has-linked-document") === "true")
       return false
-    const data = readSingularPickerDraft(frame.id)
+    const data = readLinkedAppPickerDraft(frame.id)
     if (!data || data.app !== "task_list" || data.tasksPayload == null) return false
     let tasks
     try {
@@ -206,7 +206,7 @@ export default class extends Controller {
     }
     if (!Array.isArray(tasks)) return false
 
-    clearSingularPickerDraft(frame.id)
+    clearLinkedAppPickerDraft(frame.id)
 
     while (this.listTarget.firstChild) this.listTarget.removeChild(this.listTarget.firstChild)
     tasks.forEach((t) => {
@@ -233,7 +233,7 @@ export default class extends Controller {
   }
 
   handleWindowState(event) {
-    if (event.detail?.appKey !== "singular-task-list") return
+    if (event.detail?.appKey !== "tasks") return
     if (event.detail?.open !== false) return
     this.#flushAllPendingEdits()
   }

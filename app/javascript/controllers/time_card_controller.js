@@ -1,4 +1,9 @@
 import { Controller } from "@hotwired/stimulus"
+import {
+  clearLinkedAppPickerDraft,
+  LINKED_APP_BEFORE_SAVE_PICKER,
+  writeLinkedAppPickerDraft
+} from "lib/linked_app_picker_draft"
 
 const STORAGE_KEY = "nexus.workTimer.v1"
 const HOUR_MS = 3600000
@@ -132,6 +137,71 @@ function buildNotesHtml(text, requiredCount) {
   }).join('\n')
 }
 
+function serializeTimeCardDocument(state) {
+  const notes = String(state.notesText || "")
+  const startTime = Number.isInteger(state.clockInMinutes) ? minutesToTimeString(state.clockInMinutes) : ""
+  const endTime = Number.isInteger(state.clockOutMinutes) ? minutesToTimeString(state.clockOutMinutes) : ""
+  const clockInAtMs = Number.isFinite(Number(state.clockInAtMs)) && Number(state.clockInAtMs) > 0 ? String(Number(state.clockInAtMs)) : ""
+  const clockOutAtMs = Number.isFinite(Number(state.clockOutAtMs)) && Number(state.clockOutAtMs) > 0 ? String(Number(state.clockOutAtMs)) : ""
+
+  return [
+    "# NEXUS_FILE v1",
+    "# kind: time_card",
+    "# title: Time Card",
+    `# start_time: ${startTime}`,
+    `# end_time: ${endTime}`,
+    `# running: ${state.running === true}`,
+    `# clock_in_at_ms: ${clockInAtMs}`,
+    `# clock_out_at_ms: ${clockOutAtMs}`,
+    "",
+    notes
+  ].join("\n")
+}
+
+function buildDefaultState() {
+  return {
+    clockInMinutes: null,
+    clockInAtMs: null,
+    clockOutAtMs: null,
+    clockOutMinutes: null,
+    running: false,
+    notesText: ""
+  }
+}
+
+function normalizeState(raw, fallbackClockIn = null, defaultRunning = false) {
+  const base = {
+    clockInMinutes: fallbackClockIn,
+    clockInAtMs: defaultRunning && fallbackClockIn != null ? Date.now() : null,
+    clockOutAtMs: null,
+    clockOutMinutes: null,
+    running: defaultRunning,
+    notesText: ""
+  }
+  const parsed = raw && typeof raw === "object" ? raw : {}
+  const clockInMinutes = parsed?.clockInMinutes == null
+    ? base.clockInMinutes
+    : Number.isInteger(parsed?.clockInMinutes)
+      ? Math.max(0, Math.min(23 * 60 + 59, parsed.clockInMinutes))
+      : base.clockInMinutes
+  const clockInAtMs = Number.isFinite(parsed?.clockInAtMs)
+    ? Number(parsed.clockInAtMs)
+    : (clockInMinutes != null && base.running ? startTimestampFromClockInMinutes(clockInMinutes) : base.clockInAtMs)
+  const clockOutAtMs = Number.isFinite(parsed?.clockOutAtMs) ? Number(parsed.clockOutAtMs) : null
+  const clockOutMinutes = Number.isInteger(parsed?.clockOutMinutes) ? parsed.clockOutMinutes : null
+  const running = clockInMinutes == null ? false : parsed?.running === false ? false : Boolean(parsed?.running ?? base.running)
+  const notesText = String(parsed?.notesText || "")
+
+  return {
+    clockInMinutes,
+    clockInAtMs,
+    clockOutAtMs,
+    clockOutMinutes,
+    running,
+    notesText
+  }
+}
+
 async function playOverdueAlertTone(controller) {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext
   if (!AudioContextClass) return
@@ -171,24 +241,24 @@ export default class extends Controller {
     "alertText",
     "ratioText",
     "notesInput",
-    "notesBackdrop"
+    "notesBackdrop",
+    "serializedContent"
   ]
 
   static values = {
-    notesUrl: String
+    linkedDocumentId: Number,
+    initialState: Object
   }
 
   connect() {
     this.boundChromeClearRequest = this.handleChromeClearRequest.bind(this)
-    window.addEventListener("nexus:work-timer-clear-request", this.boundChromeClearRequest)
+    this.boundBeforeSavePicker = this.handleBeforeSavePicker.bind(this)
+    window.addEventListener("nexus:time-card-clear-request", this.boundChromeClearRequest)
+    window.addEventListener(LINKED_APP_BEFORE_SAVE_PICKER, this.boundBeforeSavePicker)
     this.hasPlayedOverdueAlert = false
-    this.state = this.loadState()
-
-    // If localStorage has no notes but the server rendered some (via @notes_text in ERB), adopt them.
-    const serverNotes = this.notesInputTarget.value
-    if (!this.state.notesText && serverNotes) {
-      this.state.notesText = serverNotes
-    }
+    this.state = this.isLinkedDocumentMode()
+      ? normalizeState(this.initialStateValue, null, false)
+      : this.loadState()
 
     this.renderAll()
     this.startTicker()
@@ -196,31 +266,30 @@ export default class extends Controller {
 
   disconnect() {
     this.stopTicker()
-    window.removeEventListener("nexus:work-timer-clear-request", this.boundChromeClearRequest)
+    window.removeEventListener("nexus:time-card-clear-request", this.boundChromeClearRequest)
+    window.removeEventListener(LINKED_APP_BEFORE_SAVE_PICKER, this.boundBeforeSavePicker)
     this.publishChromeClearVisibility(false)
   }
 
-  clockInNow() {
-    const now = Date.now()
-    const d = new Date(now)
-    this.state.clockInMinutes = d.getHours() * 60 + d.getMinutes()
-    this.state.clockInAtMs = now
-    this.state.clockOutAtMs = null
-    this.state.clockOutMinutes = null
-    this.state.running = true
-    this.saveState()
-    this.renderAll()
+  isLinkedDocumentMode() {
+    return this.hasLinkedDocumentIdValue && Number(this.linkedDocumentIdValue) > 0
   }
 
-  clockOutNow() {
-    if (!this.state.running) return
-    const now = Date.now()
-    const d = new Date(now)
-    this.state.clockOutAtMs = now
-    this.state.clockOutMinutes = d.getHours() * 60 + d.getMinutes()
-    this.state.running = false
-    this.saveState()
-    this.renderAll()
+  handleBeforeSavePicker(event) {
+    const frame = this.element.closest("turbo-frame")
+    if (!frame || event.detail?.frameId !== frame.id) return
+
+    this.updateSerializedContent()
+
+    if (this.isLinkedDocumentMode()) {
+      clearLinkedAppPickerDraft(frame.id)
+      return
+    }
+
+    writeLinkedAppPickerDraft(frame.id, {
+      app: "time_card",
+      noteText: this.serializedContentTarget.value
+    })
   }
 
   updateClockInManual(event) {
@@ -286,7 +355,6 @@ export default class extends Controller {
     this.saveState()
     this.updateStatus()
     this.renderBackdrop(text)
-    this.scheduleServerSave(text)
   }
 
   syncBackdropScroll() {
@@ -302,29 +370,16 @@ export default class extends Controller {
     this.syncBackdropScroll()
   }
 
-  scheduleServerSave(text) {
-    if (this.serverSaveTimer) clearTimeout(this.serverSaveTimer)
-    this.serverSaveTimer = setTimeout(() => this.saveNotesToServer(text), 600)
+  updateSerializedContent() {
+    if (!this.hasSerializedContentTarget) return
+    this.serializedContentTarget.value = serializeTimeCardDocument(this.state)
   }
 
-  async saveNotesToServer(text) {
-    if (!this.notesUrlValue) return
-    try {
-      const csrfToken = document.querySelector("meta[name='csrf-token']")?.content
-      await fetch(this.notesUrlValue, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRF-Token": csrfToken || "",
-          "X-Requested-With": "XMLHttpRequest",
-          "Accept": "application/json"
-        },
-        body: JSON.stringify({ notes_text: text }),
-        credentials: "same-origin"
-      })
-    } catch (_e) {
-      // non-blocking
-    }
+  requestDocumentAutosave() {
+    if (!this.isLinkedDocumentMode()) return
+    const form = this.element.querySelector("form")
+    if (!form) return
+    form.dispatchEvent(new CustomEvent("autosave:trigger"))
   }
 
   renderAll() {
@@ -339,6 +394,7 @@ export default class extends Controller {
     if (this.notesInputTarget.value !== this.state.notesText) {
       this.notesInputTarget.value = this.state.notesText
     }
+    this.updateSerializedContent()
     this.renderBackdrop(this.state.notesText)
     const showSessionActions = this.hasCompletedClockOutState()
     this.publishChromeClearVisibility(showSessionActions)
@@ -358,11 +414,11 @@ export default class extends Controller {
 
   currentFrameId() {
     const frame = this.element.closest("turbo-frame")
-    return frame?.id || "work-timer-pane"
+    return frame?.id || "time-card-pane"
   }
 
   publishChromeClearVisibility(show) {
-    window.dispatchEvent(new CustomEvent("nexus:work-timer-clear-state", {
+    window.dispatchEvent(new CustomEvent("nexus:time-card-clear-state", {
       detail: {
         frameId: this.currentFrameId(),
         show: Boolean(show)
@@ -467,64 +523,29 @@ export default class extends Controller {
   }
 
   loadState() {
-    const fallbackClockIn = (() => {
-      const now = new Date()
-      return now.getHours() * 60 + now.getMinutes()
-    })()
-
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY)
-      if (!raw) {
-        return {
-          clockInMinutes: fallbackClockIn,
-          clockInAtMs: Date.now(),
-          clockOutAtMs: null,
-          clockOutMinutes: null,
-          running: true,
-          notesText: ""
-        }
-      }
+      if (!raw) return normalizeState(buildDefaultState(), null, false)
 
-      const parsed = JSON.parse(raw)
-      const clockInMinutes = parsed?.clockInMinutes == null
-        ? null
-        : Number.isInteger(parsed?.clockInMinutes)
-          ? Math.max(0, Math.min(23 * 60 + 59, parsed.clockInMinutes))
-          : fallbackClockIn
-      const clockInAtMs = Number.isFinite(parsed?.clockInAtMs)
-        ? Number(parsed.clockInAtMs)
-        : startTimestampFromClockInMinutes(clockInMinutes)
-      const clockOutAtMs = Number.isFinite(parsed?.clockOutAtMs) ? Number(parsed.clockOutAtMs) : null
-      const clockOutMinutes = Number.isInteger(parsed?.clockOutMinutes) ? parsed.clockOutMinutes : null
-      const running = clockInMinutes == null ? false : parsed?.running === false ? false : true
-      const notesText = String(parsed?.notesText || "")
-
-      return {
-        clockInMinutes,
-        clockInAtMs,
-        clockOutAtMs,
-        clockOutMinutes,
-        running,
-        notesText
-      }
+      return normalizeState(JSON.parse(raw), null, false)
     } catch (_e) {
-      return {
-        clockInMinutes: fallbackClockIn,
-        clockInAtMs: Date.now(),
-        clockOutAtMs: null,
-        clockOutMinutes: null,
-        running: true,
-        notesText: ""
-      }
+      return normalizeState(buildDefaultState(), null, false)
     }
   }
 
   saveState() {
+    if (this.isLinkedDocumentMode()) {
+      this.updateSerializedContent()
+      return
+    }
+
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state))
     } catch (_e) {
       // non-blocking
     }
+
+    this.updateSerializedContent()
   }
 
   clearSessionData() {
@@ -536,6 +557,7 @@ export default class extends Controller {
     this.state.notesText = ""
     this.saveState()
     this.renderAll()
+    this.requestDocumentAutosave()
   }
 
 }

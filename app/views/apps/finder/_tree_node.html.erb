@@ -2,6 +2,7 @@
 <% read_only = local_assigns.fetch(:read_only, false) %>
 <% read_only_can_save = local_assigns.fetch(:read_only_can_save, false) %>
 <% open_in_app_content_types = local_assigns.fetch(:open_in_app_content_types, %w[task_list]) %>
+<% section_key = local_assigns.fetch(:section_key, "documents") %>
 <% is_folder = node[:kind] == :folder %>
 <% children = is_folder ? Array(node[:children]) : [] %>
 <% has_children = children.any? %>
@@ -95,6 +96,7 @@
                 browse_folder_id: browse_folder_id,
                 expanded_folder_ids: expanded_ids,
                 frame_id: frame_id,
+                section_key: section_key,
                 read_only: read_only,
                 read_only_can_save: read_only_can_save,
                 open_in_app_content_types: open_in_app_content_types %>
@@ -105,6 +107,7 @@
     <% file_linked = node.fetch(:has_linked_app, false) %>
     <% show_open_in_app = file_linked && open_in_app_content_types.include?(node[:content_type].to_s) %>
     <% finder_open_doc_title = finder_document_display_title(node[:title].to_s) %>
+    <% effective_section_key = node[:origin_section_key].presence || section_key %>
     <div class="finder-tree__row-line" draggable="<%= (writable && !read_only) ? "true" : "false" %>">
       <% if file_linked && !read_only %>
         <%= link_to "#",
@@ -116,13 +119,14 @@
                 content_type: node[:content_type],
                 file_kind: node[:file_kind],
                 document_title: finder_open_doc_title,
+                section_key: effective_section_key,
                 action: "click->finder-browser#openLinkedFile keydown->finder-browser#openLinkedFileKey"
               },
               role: "treeitem",
               tabindex: "0",
               aria: { label: "Open #{node[:title]}" } do %>
           <span class="finder-tree__icon finder-tree__icon--file" aria-hidden="true">
-            <%= material_symbol_icon(finder_file_icon_for_content_type(node[:content_type], source_extension: node[:source_extension]), size: :sm) %>
+            <%= material_symbol_icon(finder_file_icon_for_content_type(node[:content_type], source_extension: node[:source_extension], section_key: effective_section_key), size: :sm) %>
           </span>
           <span class="finder-tree__label" data-finder-tree-label><%= node[:title] %></span>
         <% end %>
@@ -136,13 +140,14 @@
                 content_type: node[:content_type],
                 file_kind: node[:file_kind],
                 document_title: finder_open_doc_title,
+                section_key: effective_section_key,
                 action: "click->finder-browser#openLinkedFileInApp keydown->finder-browser#openLinkedFileInAppKey"
               },
               role: "treeitem",
               tabindex: "0",
               aria: { label: "Open #{node[:title]}" } do %>
           <span class="finder-tree__icon finder-tree__icon--file" aria-hidden="true">
-            <%= material_symbol_icon(finder_file_icon_for_content_type(node[:content_type], source_extension: node[:source_extension]), size: :sm) %>
+            <%= material_symbol_icon(finder_file_icon_for_content_type(node[:content_type], source_extension: node[:source_extension], section_key: effective_section_key), size: :sm) %>
           </span>
           <span class="finder-tree__label" data-finder-tree-label><%= node[:title] %></span>
         <% end %>
@@ -154,14 +159,24 @@
           aria-label="<%= node[:title] %> (no app for this type yet)"
         >
           <span class="finder-tree__icon finder-tree__icon--file" aria-hidden="true">
-            <%= material_symbol_icon(finder_file_icon_for_content_type(node[:content_type], source_extension: node[:source_extension]), size: :sm) %>
+            <%= material_symbol_icon(finder_file_icon_for_content_type(node[:content_type], source_extension: node[:source_extension], section_key: effective_section_key), size: :sm) %>
           </span>
           <span class="finder-tree__label" data-finder-tree-label><%= node[:title] %></span>
         </span>
       <% end %>
 
       <% if writable && !read_only %>
+        <% is_favorited = node.fetch(:is_favorited, false) %>
         <div class="finder-tree__row-actions">
+          <button
+            type="button"
+            class="item-action-btn item-action-favorite"
+            title="<%= is_favorited ? "Remove from Favorites" : "Add to Favorites" %>"
+            aria-label="<%= is_favorited ? "Remove from Favorites" : "Add to Favorites" %>"
+            data-document-id="<%= node[:id] %>"
+            data-is-favorited="<%= is_favorited %>"
+            data-action="click->finder-browser#toggleFavorite"
+          ><span class="item-action-favorite__filled"><%= material_symbol_icon(:star_rounded, size: :xs) %></span><span class="item-action-favorite__outline"><%= material_symbol_icon(:star_outline_rounded, size: :xs) %></span></button>
           <button
             type="button"
             class="item-action-btn"

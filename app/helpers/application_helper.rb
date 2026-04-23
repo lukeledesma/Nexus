@@ -6,11 +6,11 @@ module ApplicationHelper
   AUDIO_ASSET_EXTENSIONS = %w[.wav .aif .aiff .mp3 .m4a .flac .ogg].freeze
 
   # Wraps turbo-frame in .window-content plus the “not enough space” resize overlay (content-window controller).
-  # +singular_save_picker:+ when true, stacks an iframe layer for Finder so the app turbo-frame is not replaced.
-  def content_window_shell(singular_save_picker: false, &block)
+  # +linked_app_save_picker:+ when true, stacks an iframe layer for Finder so the app turbo-frame is not replaced.
+  def content_window_shell(linked_app_save_picker: false, &block)
     inner = capture(&block)
     render partial: "shared/content_window_window_content",
-      locals: { inner: inner, singular_save_picker: singular_save_picker }
+      locals: { inner: inner, linked_app_save_picker: linked_app_save_picker }
   end
 
   # Single source for launcher grid tiles: order, labels, icons, and click handlers.
@@ -18,11 +18,11 @@ module ApplicationHelper
   def launcher_grid_entries
     [
       { window_key: "finder", pin_key: "finder", label: "Finder", icon: :folder },
-      { window_key: "singular-task-list", pin_key: "singular-task-list", label: "Tasks", icon: :task_checklist },
+      { window_key: "tasks", pin_key: "tasks", label: "Tasks", icon: :task_checklist },
       { window_key: "notes", pin_key: "notes", label: "Notes", icon: :edit_note },
-      { window_key: "work-timer", pin_key: "work-timer", label: "Time Card", icon: :overview },
+      { window_key: "time-card", pin_key: "time-card", label: "Time Card", icon: :overview },
       { window_key: "images", pin_key: "images", label: "Images", icon: :wallpaper },
-      { window_key: "loops", pin_key: "loops", label: "Audio", icon: :graphic_eq }
+      { window_key: "audio", pin_key: "audio", label: "Audio", icon: :graphic_eq }
     ].freeze
   end
 
@@ -42,9 +42,12 @@ module ApplicationHelper
     "other"
   end
 
-  def finder_file_icon_for_content_type(content_type, source_extension: nil)
+  def finder_file_icon_for_content_type(content_type, source_extension: nil, section_key: nil)
+    section = section_key.to_s.strip.downcase
     case content_type.to_s
-    when "note" then :file_document
+    when "note"
+      return :overview if section == "time_card"
+      :edit_note
     when "task_list" then :task_checklist
     when "asset"
       case finder_asset_file_kind_from_extension(source_extension)
