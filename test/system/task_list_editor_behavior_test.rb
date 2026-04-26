@@ -38,26 +38,19 @@ class TaskListEditorBehaviorTest < ApplicationSystemTestCase
     main_rows_before = page.all(".task-item-row--main").size
 
     edit_existing_main_task
-    existing_input = find(".task-item-row--main .task-edit-input", visible: :all)
-    existing_input.set("")
-    existing_input.send_keys(:enter)
+    clear_edit_input_and_submit(".task-item-row--main .task-edit-input", :enter)
 
     assert_text "Existing Task"
 
     click_button "Add task"
-    new_main_input = find(".task-item-row--main .task-edit-input", visible: :all)
-    new_main_input.set("")
-    new_main_input.send_keys(:enter)
+    clear_edit_input_and_submit(".task-item-row--main .task-edit-input", :enter)
 
     assert_equal main_rows_before, page.all(".task-item-row--main").size
 
-    main_row = find(".task-item-row--main", match: :first)
-    main_row.hover
-    within(main_row) { find(".row-plus", visible: :all).click }
+    find(".task-item-row--main", match: :first).hover
+    find(".task-item-row--main .row-plus", visible: :all).click
 
-    new_subtask_input = find(".task-item-row--subtask .task-edit-input", visible: :all)
-    new_subtask_input.set("")
-    new_subtask_input.send_keys(:escape)
+    clear_edit_input_and_submit(".task-item-row--subtask .task-edit-input", :escape)
 
     assert_equal 1, page.all(".task-item-row--subtask", visible: :all).size
     assert_text "Existing Subtask"
@@ -73,10 +66,31 @@ class TaskListEditorBehaviorTest < ApplicationSystemTestCase
   end
 
   def edit_existing_main_task
-    row = find(".task-item-row--main", match: :first)
-    row.hover
-    rename_btn = row.find(".item-action-btn:not(.item-action-delete)", visible: :all)
-    page.execute_script("arguments[0].scrollIntoView({block: 'center', inline: 'nearest'})", rename_btn.native)
-    page.execute_script("arguments[0].click()", rename_btn.native)
+    page.execute_script(<<~JS)
+      (() => {
+        const row = document.querySelector(".task-item-row--main")
+        if (!row) return
+        const btn = row.querySelector(".item-action-btn:not(.item-action-delete)")
+        if (!btn) return
+        btn.scrollIntoView({ block: "center", inline: "nearest" })
+        btn.click()
+      })()
+    JS
+    assert_selector(".task-item-row--main .task-edit-input", visible: :all)
+  end
+
+  def clear_edit_input_and_submit(selector, submit_key)
+    attempts = 0
+
+    begin
+      attempts += 1
+      input = find(selector, visible: :all)
+      input.click
+      input.send_keys([ :command, "a" ], :backspace, submit_key)
+    rescue Capybara::ElementNotFound, Selenium::WebDriver::Error::StaleElementReferenceError
+      raise if attempts >= 3
+
+      retry
+    end
   end
 end
