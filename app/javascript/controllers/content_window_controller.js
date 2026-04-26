@@ -423,14 +423,12 @@ export default class extends Controller {
     const next = Number(window.__nexusDesktopZIndex || 1500) + 1
     window.__nexusDesktopZIndex = next
     windowEl.style.zIndex = String(next)
+    this.applyFocusExpandCue(windowEl)
     windowEl.classList.remove("content-window--focus-pulse", "content-window--focus-pulse-static", "content-window--focus-flash")
-    void windowEl.offsetWidth
-    windowEl.classList.add("content-window--focus-pulse-static")
-    if (windowEl.__nexusFocusPulseTimer) window.clearTimeout(windowEl.__nexusFocusPulseTimer)
-    windowEl.__nexusFocusPulseTimer = window.setTimeout(() => {
-      windowEl.classList.remove("content-window--focus-pulse", "content-window--focus-pulse-static", "content-window--focus-flash")
+    if (windowEl.__nexusFocusPulseTimer) {
+      window.clearTimeout(windowEl.__nexusFocusPulseTimer)
       windowEl.__nexusFocusPulseTimer = null
-    }, 220)
+    }
   }
 
   focusOrOpenWindow(windowEl) {
@@ -1573,13 +1571,24 @@ export default class extends Controller {
   }
 
   flashAttentionRing() {
+    this.applyFocusExpandCue(this.element)
     this.element.classList.remove("content-window--focus-pulse", "content-window--focus-pulse-static")
-    void this.element.offsetWidth
-    this.element.classList.add("content-window--focus-pulse-static")
-    if (this.attentionTimer) clearTimeout(this.attentionTimer)
-    this.attentionTimer = window.setTimeout(() => {
-      this.element.classList.remove("content-window--focus-pulse", "content-window--focus-pulse-static")
-    }, 220)
+    if (this.attentionTimer) {
+      clearTimeout(this.attentionTimer)
+      this.attentionTimer = null
+    }
+  }
+
+  applyFocusExpandCue(windowEl) {
+    if (!windowEl) return
+    windowEl.classList.remove("content-window--focus-expand")
+    void windowEl.offsetWidth
+    windowEl.classList.add("content-window--focus-expand")
+    if (windowEl.__nexusFocusExpandTimer) window.clearTimeout(windowEl.__nexusFocusExpandTimer)
+    windowEl.__nexusFocusExpandTimer = window.setTimeout(() => {
+      windowEl.classList.remove("content-window--focus-expand")
+      windowEl.__nexusFocusExpandTimer = null
+    }, 230)
   }
 
   open(options = {}) {

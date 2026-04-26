@@ -75,7 +75,7 @@ export default class extends Controller {
     const selector = selectorByApp[appKey]
     if (!selector) return []
 
-    const nodes = Array.from(document.querySelectorAll(selector))
+    const nodes = Array.from(document.querySelectorAll(selector)).filter((el) => !el.classList.contains("is-hidden"))
 
     if (!nodes.length) return []
 
@@ -95,18 +95,17 @@ export default class extends Controller {
       window.dispatchEvent(new CustomEvent("app-window:toggle", { detail: { appKey: targetAppKey } }))
     })
 
-    // After opening/bringing forward, pulse all instances so users can see every open window.
     requestAnimationFrame(() => {
       instances.forEach((windowEl) => {
         if (windowEl.classList.contains("is-hidden")) return
-        windowEl.classList.remove("content-window--focus-pulse", "content-window--focus-pulse-static", "content-window--focus-flash")
+        windowEl.classList.remove("content-window--focus-expand")
         void windowEl.offsetWidth
-        windowEl.classList.add("content-window--focus-pulse-static")
-        if (windowEl.__nexusFocusPulseTimer) window.clearTimeout(windowEl.__nexusFocusPulseTimer)
-        windowEl.__nexusFocusPulseTimer = window.setTimeout(() => {
-          windowEl.classList.remove("content-window--focus-pulse", "content-window--focus-pulse-static", "content-window--focus-flash")
-          windowEl.__nexusFocusPulseTimer = null
-        }, 220)
+        windowEl.classList.add("content-window--focus-expand")
+        if (windowEl.__nexusFocusExpandTimer) window.clearTimeout(windowEl.__nexusFocusExpandTimer)
+        windowEl.__nexusFocusExpandTimer = window.setTimeout(() => {
+          windowEl.classList.remove("content-window--focus-expand")
+          windowEl.__nexusFocusExpandTimer = null
+        }, 230)
       })
     })
   }

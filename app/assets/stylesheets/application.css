@@ -4794,6 +4794,22 @@ html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden)
   }
 }
 
+@keyframes content-window-focus-expand {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  48% {
+    transform: translateY(-1.2px) scale(1.011);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+.content-window--focus-expand {
+  animation: content-window-focus-expand 220ms ease-out;
+}
+
 .content-window--focus-pulse::after,
 .content-window--focus-pulse-static::after {
   content: "";
