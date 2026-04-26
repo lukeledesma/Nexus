@@ -75,8 +75,8 @@ class TaskListEditorBehaviorTest < ApplicationSystemTestCase
   def edit_existing_main_task
     row = find(".task-item-row--main", match: :first)
     row.hover
-    within(row) do
-      find(".item-action-btn:not(.item-action-delete)", visible: :all).click
-    end
+    rename_btn = row.find(".item-action-btn:not(.item-action-delete)", visible: :all)
+    page.execute_script("arguments[0].scrollIntoView({block: 'center', inline: 'nearest'})", rename_btn.native)
+    page.execute_script("arguments[0].click()", rename_btn.native)
   end
 end
