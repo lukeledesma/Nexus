@@ -1,26 +1,34 @@
 # Nexus
 
-Nexus is a workspace app for writing notes and managing task lists in a folder-style interface.
+Nexus is a Rails workspace app with desktop-style windows and a folder-based organizer.
 
-It is built with Rails, keeps data in PostgreSQL, and mirrors workspace content to disk for predictable synchronization behavior.
+Current modules include Notes, Tasks, Time Card, Images, and Audio.
+
+It stores data in PostgreSQL and mirrors workspace content to disk for predictable synchronization behavior.
 
 Source: [github.com/lukeledesma/Nexus](https://github.com/lukeledesma/Nexus)
 
-## Why Nexus
-
-Nexus is designed for people who want:
-
-- Notes and tasks in one place.
-- Fast create, rename, and delete flows.
-- A simple folder mental model.
-- Stable, explicit backend behavior.
-
-## What You Get
+## What It Does
 
 - Organizer-style navigation for folders and documents.
-- App windows for notes and task lists.
-- Autosave editing flows.
+- App windows for Notes, Tasks, Time Card, Images, and Audio.
+- Autosave editing for text and task workflows.
 - Filesystem-aware sync under storage/workspace.
+
+## Included Apps
+
+- Notes: rich text note editing with autosave.
+- Tasks: task lists with subtasks and inline notes.
+- Time Card: clock in/out workflow with saved note state.
+- Images: browse uploaded image assets in the workspace.
+- Audio: browse and preview supported audio assets.
+
+## Core Behavior
+
+- Open, rename, move, and delete files/folders from the organizer UI.
+- Save app content into Finder folders as workspace documents.
+- Keep draft flows for linked apps (task, note, time card) under Embedded.
+- Persist and restore window state across refresh.
 
 ## Quick Start
 
