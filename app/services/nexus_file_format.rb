@@ -13,7 +13,7 @@ module NexusFileFormat
   module_function
 
   def unified_header_lines(kind:, title:, document_id: nil, created_at: nil, updated_at: nil, extra: {})
-    lines = [FIRST_LINE, "# kind: #{kind}", "# title: #{title}"]
+    lines = [ FIRST_LINE, "# kind: #{kind}", "# title: #{title}" ]
     lines << "# id: #{document_id}" if document_id.present?
     lines << "# created_at: #{format_ts(created_at)}"
     lines << "# updated_at: #{format_ts(updated_at)}"

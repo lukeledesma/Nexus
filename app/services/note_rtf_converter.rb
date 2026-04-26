@@ -121,7 +121,7 @@ class NoteRtfConverter
       m = style.match(rx)
       return nil unless m
 
-      [m[1].to_i, m[2].to_i, m[3].to_i]
+      [ m[1].to_i, m[2].to_i, m[3].to_i ]
     end
 
     def rtf_escape(str)
@@ -402,7 +402,7 @@ class NoteRtfConverter
       end
 
       def emit_unicode(code)
-        @frag << CGI.escapeHTML([code].pack("U"))
+        @frag << CGI.escapeHTML([ code ].pack("U"))
       rescue StandardError
         @frag << "?"
       end

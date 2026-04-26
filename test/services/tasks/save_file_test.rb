@@ -37,7 +37,7 @@ module Tasks
 
     test "save as new clears draft and keeps draft identity" do
       draft = EmbeddedDraftDocument.fetch_or_create(user: @user, app_key: "tasks")
-      draft.update!(tasks: [{ "text" => "draft", "checked" => false, "subtasks" => [] }])
+      draft.update!(tasks: [ { "text" => "draft", "checked" => false, "subtasks" => [] } ])
 
       result = Tasks::SaveFile.call(
         user: @user,
@@ -46,7 +46,7 @@ module Tasks
         filename: "Saved",
         requested_document_id: draft.id,
         note_text: nil,
-        task_payload: [{ text: "saved", checked: false, subtasks: [] }].to_json
+        task_payload: [ { text: "saved", checked: false, subtasks: [] } ].to_json
       )
 
       assert result.success?

@@ -96,7 +96,7 @@ class DocumentsController < ApplicationController
   def edit
     if @document.folder?
       redirect_to root_path, alert: "Open an item to edit."
-      return
+      nil
     end
   end
 
@@ -410,6 +410,4 @@ class DocumentsController < ApplicationController
     end
     result
   end
-
 end
-

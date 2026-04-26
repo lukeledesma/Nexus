@@ -11,7 +11,7 @@ class NoteRtfConverterTest < Minitest::Test
   end
 
   def test_round_trip_preserves_bold_and_italic
-    html = '<p>Hi <strong>bold</strong> and <em>it</em></p>'
+    html = "<p>Hi <strong>bold</strong> and <em>it</em></p>"
     back = NoteRtfConverter.rtf_to_html(NoteRtfConverter.html_to_rtf(html))
     assert_includes back, "<strong>bold</strong>"
     assert_includes back, "<em>it</em>"

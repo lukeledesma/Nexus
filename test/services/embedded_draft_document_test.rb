@@ -31,7 +31,7 @@ class EmbeddedDraftDocumentTest < ActiveSupport::TestCase
 
   test "clear_draft resets payload without replacing draft identity" do
     draft = EmbeddedDraftDocument.fetch_or_create(user: @user, app_key: "tasks")
-    draft.update!(tasks: [{ "text" => "Keep identity", "checked" => false, "subtasks" => [] }])
+    draft.update!(tasks: [ { "text" => "Keep identity", "checked" => false, "subtasks" => [] } ])
 
     assert EmbeddedDraftDocument.clear_draft!(user: @user, app_key: "tasks")
 

@@ -53,7 +53,7 @@ class DocumentDiskLoader
         .map { |path| relative_disk_path(path) }
         .reject(&:blank?)
         .reject { |path| hidden_path?(path) }
-        .sort_by { |path| [path.count("/"), path] }
+        .sort_by { |path| [ path.count("/"), path ] }
 
       folders = {}
       folder_paths.each do |relative_path|
@@ -140,7 +140,7 @@ class DocumentDiskLoader
       # nested document and runs `sync_destroy_on_disk` on each file — deleting real bytes on disk.
       # A folder path can be "wrong" (rename drift Embedded/Image vs IImage) while child file paths
       # are still valid; one refresh then deleted everything under both DB and disk.
-      Document.where(is_folder: false).where.not(storage_path: [nil, ""]).find_each do |doc|
+      Document.where(is_folder: false).where.not(storage_path: [ nil, "" ]).find_each do |doc|
         # Embedded drafts are virtual saved documents and may not have a synced
         # on-disk file at all times. Never purge them from DB on path-missing checks,
         # otherwise their IDs rotate and window dedupe by document_id breaks.
@@ -156,7 +156,7 @@ class DocumentDiskLoader
       end
 
       # Empty folders only: no children left to cascade-delete.
-      Document.where(is_folder: true).where.not(storage_path: [nil, ""]).find_each do |doc|
+      Document.where(is_folder: true).where.not(storage_path: [ nil, "" ]).find_each do |doc|
         rel = doc.storage_path.to_s
         next if keep.include?(rel)
 
@@ -291,7 +291,7 @@ class DocumentDiskLoader
       end
 
       body = lines[body_start..]&.join("\n").to_s
-      [metadata, body]
+      [ metadata, body ]
     end
 
     def parse_note_from_unified(metadata, body)
@@ -428,7 +428,7 @@ class DocumentDiskLoader
       end
 
       body = lines[body_start..]&.join("\n").to_s
-      [metadata, body]
+      [ metadata, body ]
     end
 
     def parse_reset_days(raw)

@@ -20,25 +20,25 @@ class LinkedAppSaveToDocument
 
   def call
     folder = Document.find_by(id: @folder_id)
-    return [:not_found, nil] unless folder&.folder?
-    return [:forbidden, nil] unless folder_allowed?(folder)
+    return [ :not_found, nil ] unless folder&.folder?
+    return [ :forbidden, nil ] unless folder_allowed?(folder)
 
     config = FRAME_MAP[@frame_id]
     config ||= { content_type: "task_list", app_key: "tasks" } if @frame_id.start_with?("task-spawn-")
     config ||= { content_type: "note", app_key: "notes" } if @frame_id.start_with?("note-spawn-")
     config ||= { content_type: "note", app_key: "time-card" } if @frame_id.start_with?("time-card-spawn-")
-    return [:bad_request, { error: "Unknown frame" }] unless config
+    return [ :bad_request, { error: "Unknown frame" } ] unless config
 
     title = basename_from_filename(@filename)
-    return [:unprocessable_entity, { error: "Invalid filename" }] if title.blank?
+    return [ :unprocessable_entity, { error: "Invalid filename" } ] if title.blank?
 
     doc = find_or_build_document(folder, config[:content_type], title)
     assign_payload(doc, config[:content_type], config[:app_key])
 
     if doc.save
-      [:ok, { document_id: doc.id, title: doc.title, storage_path: doc.storage_path.to_s }]
+      [ :ok, { document_id: doc.id, title: doc.title, storage_path: doc.storage_path.to_s } ]
     else
-      [:unprocessable_entity, { errors: doc.errors.full_messages }]
+      [ :unprocessable_entity, { errors: doc.errors.full_messages } ]
     end
   end
 
@@ -110,5 +110,4 @@ class LinkedAppSaveToDocument
   rescue StandardError
     []
   end
-
 end

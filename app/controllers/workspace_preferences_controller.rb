@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 class WorkspacePreferencesController < ApplicationController
   def show
     result = preferences_manager.payload

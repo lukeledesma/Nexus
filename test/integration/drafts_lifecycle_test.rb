@@ -38,12 +38,12 @@ class DraftsLifecycleTest < ActionDispatch::IntegrationTest
     draft_id = response.parsed_body.fetch("document_id")
 
     draft_doc = Document.find(draft_id)
-    draft_doc.update!(tasks: [{ "text" => "draft task", "checked" => false, "subtasks" => [] }])
+    draft_doc.update!(tasks: [ { "text" => "draft task", "checked" => false, "subtasks" => [] } ])
 
     folder = Apps::FinderController.workspace_section_root(@user, "documents")
     assert folder
 
-    payload = [{ text: "saved task", checked: false, subtasks: [] }].to_json
+    payload = [ { text: "saved task", checked: false, subtasks: [] } ].to_json
     post "/apps/tasks/save_file", params: {
       folder_id: folder.id,
       frame_id: "tasks-pane",

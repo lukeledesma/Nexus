@@ -294,7 +294,7 @@ class DocumentStorageSyncLite
       created_at: @document.created_at,
       updated_at: @document.updated_at
     )
-    (header + [@document.content.to_s]).join("\n")
+    (header + [ @document.content.to_s ]).join("\n")
   end
 
   def note_rtf_file_body
@@ -321,7 +321,7 @@ class DocumentStorageSyncLite
       text = value["text"].to_s.strip
       next if text.empty?
 
-      lines = [task_list_line(text, value["checked"], subtask: false)]
+      lines = [ task_list_line(text, value["checked"], subtask: false) ]
 
       Array(value["subtasks"]).each do |subtask|
         subtask_value = subtask.respond_to?(:to_h) ? subtask.to_h : {}
@@ -335,7 +335,7 @@ class DocumentStorageSyncLite
     end.compact
 
     task_lines = task_groups.flat_map.with_index do |group, index|
-      index < task_groups.length - 1 ? (group + [""]) : group
+      index < task_groups.length - 1 ? (group + [ "" ]) : group
     end
 
     (header + task_lines).join("\n")

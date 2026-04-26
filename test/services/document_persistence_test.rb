@@ -20,7 +20,7 @@ class DocumentPersistenceTest < ActiveSupport::TestCase
     assert doc.storage_path.present?
     assert DocumentStorageSyncLite.storage_root.join(doc.storage_path).file?
   ensure
-    Document.where(id: [doc&.id, folder&.id].compact).delete_all
+    Document.where(id: [ doc&.id, folder&.id ].compact).delete_all
     FileUtils.rm_rf(DocumentStorageSyncLite.storage_root.join(folder&.storage_path.to_s)) if folder&.storage_path.present?
   end
 
@@ -48,7 +48,7 @@ class DocumentPersistenceTest < ActiveSupport::TestCase
     assert_not Document.exists?(title: doc_title)
   ensure
     DocumentStorageSyncLite.define_method(:create, original_create) if original_create
-    Document.where(id: [doc&.id, folder&.id].compact).delete_all
+    Document.where(id: [ doc&.id, folder&.id ].compact).delete_all
     FileUtils.rm_rf(DocumentStorageSyncLite.storage_root.join(folder&.storage_path.to_s)) if folder&.storage_path.present?
   end
 
@@ -70,7 +70,7 @@ class DocumentPersistenceTest < ActiveSupport::TestCase
     assert_not Document.exists?(doc.id)
     assert_not path.exist?
   ensure
-    Document.where(id: [doc&.id, folder&.id].compact).delete_all
+    Document.where(id: [ doc&.id, folder&.id ].compact).delete_all
     FileUtils.rm_rf(DocumentStorageSyncLite.storage_root.join(folder&.storage_path.to_s)) if folder&.storage_path.present?
   end
 
@@ -96,7 +96,7 @@ class DocumentPersistenceTest < ActiveSupport::TestCase
     assert Document.exists?(doc.id)
   ensure
     DocumentStorageSyncLite.define_method(:destroy, original_destroy) if original_destroy
-    Document.where(id: [doc&.id, folder&.id].compact).delete_all
+    Document.where(id: [ doc&.id, folder&.id ].compact).delete_all
     FileUtils.rm_rf(DocumentStorageSyncLite.storage_root.join(folder&.storage_path.to_s)) if folder&.storage_path.present?
   end
 
@@ -123,7 +123,7 @@ class DocumentPersistenceTest < ActiveSupport::TestCase
     assert_not folder_path.exist?
     assert_not file_path.exist?
   ensure
-    Document.where(id: [file&.id, folder&.id, root&.id].compact).delete_all
+    Document.where(id: [ file&.id, folder&.id, root&.id ].compact).delete_all
     FileUtils.rm_rf(DocumentStorageSyncLite.storage_root.join(root&.storage_path.to_s)) if root&.storage_path.present?
   end
 
@@ -151,7 +151,7 @@ class DocumentPersistenceTest < ActiveSupport::TestCase
     assert Document.exists?(file.id)
   ensure
     DocumentStorageSyncLite.define_method(:destroy, original_destroy) if original_destroy
-    Document.where(id: [file&.id, folder&.id, root&.id].compact).delete_all
+    Document.where(id: [ file&.id, folder&.id, root&.id ].compact).delete_all
     FileUtils.rm_rf(DocumentStorageSyncLite.storage_root.join(root&.storage_path.to_s)) if root&.storage_path.present?
   end
 end

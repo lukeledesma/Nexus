@@ -37,7 +37,7 @@ module Documents
           if allowed_wallpaper_upload?(uploaded, ext)
             build_uploaded_asset_document(uploaded, ext)
           else
-            [nil, "#{uploaded.original_filename}: Only JPEG and PNG images are allowed here."]
+            [ nil, "#{uploaded.original_filename}: Only JPEG and PNG images are allowed here." ]
           end
         elsif text_like_finder_upload_extension?(ext)
           build_uploaded_text_document(uploaded)
@@ -87,7 +87,7 @@ module Documents
     def normalize_uploaded_file_list(raw)
       return [] if raw.blank?
 
-      arr = raw.is_a?(Array) ? raw.compact : [raw]
+      arr = raw.is_a?(Array) ? raw.compact : [ raw ]
       arr.select { |f| f.respond_to?(:tempfile) && f.respond_to?(:read) }
     end
 
@@ -123,9 +123,9 @@ module Documents
         pending_disk_extension: ext.presence,
         pending_asset_bytes: bytes
       )
-      [doc, nil]
+      [ doc, nil ]
     rescue StandardError
-      [nil, "Could not read file bytes."]
+      [ nil, "Could not read file bytes." ]
     end
 
     def build_uploaded_text_document(uploaded)
@@ -141,9 +141,9 @@ module Documents
         reset_days: parsed[:reset_days] || [],
         last_reset_at: parsed[:last_reset_at]
       )
-      [doc, nil]
+      [ doc, nil ]
     rescue StandardError
-      [nil, "Could not import text file."]
+      [ nil, "Could not import text file." ]
     end
   end
 end

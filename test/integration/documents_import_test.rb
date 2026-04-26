@@ -42,7 +42,7 @@ class DocumentsImportTest < ActionDispatch::IntegrationTest
       storage_path: "Parent/existing.rtf"
     )
 
-    upload_file = Tempfile.new(["bad_upload", ".txt"])
+    upload_file = Tempfile.new([ "bad_upload", ".txt" ])
     upload_file.binmode
     upload_file.write("should fail")
     upload_file.rewind

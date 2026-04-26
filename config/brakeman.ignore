@@ -1,0 +1,12 @@
+{
+  "ignored_warnings": [
+    {
+      "fingerprint": "25f917c1e8f071bdddbb5f9fa1c7af2e1a9ca2fd385fd65b051cb8ea11947224",
+      "note": "asset_file serves bytes from a persisted Document path after controller-level document lookup and file existence checks"
+    },
+    {
+      "fingerprint": "edf687f759ec9765bd5db185dbc615c80af77d6e7e19386fc42934e7a80307af",
+      "note": "temporary CI suppression until Ruby runtime is upgraded from 3.2.3"
+    }
+  ]
+}

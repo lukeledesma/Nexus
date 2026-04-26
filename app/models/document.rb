@@ -111,10 +111,10 @@ class Document < ApplicationRecord
     else
       self.content_type = content_type.to_s.presence || "note"
       default_title = case content_type.to_s
-                      when "task_list" then DEFAULT_TASK_LIST_TITLE
-                      when "asset" then "Untitled"
-                      else DEFAULT_NOTE_TITLE
-                      end
+      when "task_list" then DEFAULT_TASK_LIST_TITLE
+      when "asset" then "Untitled"
+      else DEFAULT_NOTE_TITLE
+      end
       self.title = (title.presence || default_title).to_s.strip
       self.tasks = normalize_tasks(tasks)
 

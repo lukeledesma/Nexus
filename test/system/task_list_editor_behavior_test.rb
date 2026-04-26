@@ -30,7 +30,7 @@ class TaskListEditorBehaviorTest < ApplicationSystemTestCase
   end
 
   teardown do
-    Document.where(id: [@task_list&.id, @tasks_folder&.id, @workspace_root&.id].compact).delete_all
+    Document.where(id: [ @task_list&.id, @tasks_folder&.id, @workspace_root&.id ].compact).delete_all
     User.where(id: @user&.id).delete_all
   end
 

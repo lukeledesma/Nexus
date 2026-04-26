@@ -197,7 +197,7 @@ module Apps
 
       @open_in_app_content_types =
         if @finder_read_only
-          read_only_content_type.present? ? [read_only_content_type.to_s] : []
+          read_only_content_type.present? ? [ read_only_content_type.to_s ] : []
         else
           %w[note task_list asset]
         end
@@ -278,7 +278,7 @@ module Apps
         ORDER BY LOWER(title) ASC
       SQL
 
-      docs = Document.find_by_sql(Document.sanitize_sql_array([sql, workspace_root.id]))
+      docs = Document.find_by_sql(Document.sanitize_sql_array([ sql, workspace_root.id ]))
       docs.map { |doc| tree_node_for_favorite(doc) }
     end
 
@@ -303,14 +303,14 @@ module Apps
         )
         SELECT * FROM subtree
       SQL
-      Document.find_by_sql(Document.sanitize_sql_array([sql, root_folder.id]))
+      Document.find_by_sql(Document.sanitize_sql_array([ sql, root_folder.id ]))
     end
 
     def build_tree_nodes_from_rows(root_folder, rows)
       children_by_parent = Hash.new { |h, k| h[k] = [] }
       rows.each { |d| children_by_parent[d.parent_id] << d }
       children_by_parent.each_value do |list|
-        list.sort_by! { |d| [d.folder? ? 0 : 1, d.title.to_s.downcase] }
+        list.sort_by! { |d| [ d.folder? ? 0 : 1, d.title.to_s.downcase ] }
       end
       direct = children_by_parent[root_folder.id] || []
       direct.map { |d| tree_node_from_doc(d, children_by_parent) }
@@ -380,4 +380,3 @@ module Apps
     end
   end
 end
-

@@ -36,7 +36,7 @@ class TimeCardDocumentCodec
       }
     )
 
-    (header + [notes]).join("\n")
+    (header + [ notes ]).join("\n")
   end
 
   private
@@ -124,7 +124,7 @@ class TimeCardDocumentCodec
     end
 
     body = lines[body_start..]&.join("\n").to_s
-    [metadata, body]
+    [ metadata, body ]
   end
 
   def normalize_serialized_text(raw)

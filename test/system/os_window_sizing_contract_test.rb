@@ -23,16 +23,16 @@ class OsWindowSizingContractTest < ApplicationSystemTestCase
     User.where(id: @user&.id).delete_all
   end
 
-  test "settings content window opens from app toggle" do
+  test "user content window opens from app toggle" do
     page.execute_script(<<~JS)
-      const el = document.querySelector("[data-content-window-app-key-value='settings']")
+      const el = document.querySelector("[data-content-window-app-key-value='user']")
       if (!el) return
       if (el.classList.contains("is-hidden")) {
-        window.dispatchEvent(new CustomEvent("app-window:toggle", { detail: { appKey: "settings" } }))
+        window.dispatchEvent(new CustomEvent("app-window:toggle", { detail: { appKey: "user" } }))
       }
     JS
-    wait_until { !window_hidden?("[data-content-window-app-key-value='settings']") }
-    assert_selector "[data-content-window-app-key-value='settings'] .content-window-chrome-title", text: "SETTINGS"
+    wait_until { !window_hidden?("[data-content-window-app-key-value='user']") }
+    assert_selector "[data-content-window-app-key-value='user'] .content-window-chrome-title", text: "USER"
   end
 
   private

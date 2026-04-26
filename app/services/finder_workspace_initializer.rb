@@ -81,7 +81,7 @@ class FinderWorkspaceInitializer
 
     section_titles = Apps::FinderController.workspace_section_definitions
       .reject { |definition| definition[:key] == "favorites" }
-      .map { |definition| definition[:title] } + [LEGACY_DOCUMENTS_SECTION_TITLE]
+      .map { |definition| definition[:title] } + [ LEGACY_DOCUMENTS_SECTION_TITLE ]
 
     root.children.folders.each do |folder|
       next if folder.id == finder_root.id
@@ -142,7 +142,7 @@ class FinderWorkspaceInitializer
   end
 
   def mark_files_favorited_in_subtree!(root)
-    stack = [root]
+    stack = [ root ]
     visited = Set.new
 
     until stack.empty?

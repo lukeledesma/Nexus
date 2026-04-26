@@ -10,7 +10,7 @@ module WorkspacePreferences
     DEFAULT_THEME_NAME = "Modern"
     CUSTOM_THEME_ID = "custom"
     CUSTOM_THEME_NAME = "CUSTOM"
-    ALLOWED_THEME_IDS = [DEFAULT_THEME_ID].freeze
+    ALLOWED_THEME_IDS = [ DEFAULT_THEME_ID ].freeze
 
     DEFAULT_APPEARANCE = {
       "hue" => 200,
@@ -214,7 +214,7 @@ module WorkspacePreferences
             (doc.parent_id == EmbeddedIimageFolder.document_for(user)&.id || ::DocumentPolicy.new(user: user, document: doc).in_finder_section?)
         clear_wallpaper_picks!(state) unless valid
       end
-      [wallpaper_state_slice(state) != before_wp, false]
+      [ wallpaper_state_slice(state) != before_wp, false ]
     end
 
     private
@@ -266,7 +266,7 @@ module WorkspacePreferences
     end
 
     def ensure_default_theme(_themes)
-      [default_theme_snapshot]
+      [ default_theme_snapshot ]
     end
 
     def ensure_storage_files

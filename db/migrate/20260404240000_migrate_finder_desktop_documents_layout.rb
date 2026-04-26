@@ -4,7 +4,7 @@
 # and ensures username/Finder/Desktop exists. Embedded stays at username/Embedded.
 class MigrateFinderDesktopDocumentsLayout < ActiveRecord::Migration[7.1]
   def up
-    User.where.not(username: [nil, ""]).find_each do |user|
+    User.where.not(username: [ nil, "" ]).find_each do |user|
       username = user.username.to_s.strip
       next if username.blank?
 

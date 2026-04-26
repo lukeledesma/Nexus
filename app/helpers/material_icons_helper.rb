@@ -22,7 +22,7 @@ module MaterialIconsHelper
     svg = File.read(path)
     size_key = size.to_sym
     size_class = SIZE_CLASSES[size_key] || SIZE_CLASSES[:md]
-    classes = ["material-icon", size_class, html_class].compact.join(" ")
+    classes = [ "material-icon", size_class, html_class ].compact.join(" ")
     svg.sub(/\A<svg\s/, "<svg class=\"#{ERB::Util.html_escape(classes)}\" ").html_safe
   end
 end

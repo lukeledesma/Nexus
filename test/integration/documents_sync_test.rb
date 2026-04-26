@@ -62,7 +62,7 @@ class DocumentsSyncTest < ActionDispatch::IntegrationTest
     assert_equal "after", file.reload.content
   ensure
     FileUtils.rm_rf(DocumentStorageSyncLite.storage_root.join("sync-folder"))
-    Document.where(id: [file&.id, folder&.id].compact).delete_all
+    Document.where(id: [ file&.id, folder&.id ].compact).delete_all
   end
 
   test "organizer load ingests supported text file from disk into db" do

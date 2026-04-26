@@ -48,7 +48,7 @@ class EmbeddedIimageFolder
       candidates.max_by do |f|
         files = f.children.files.to_a
         eligible = files.count { |c| eligible_asset?(c) }
-        [eligible, files.size, -f.id]
+        [ eligible, files.size, -f.id ]
       end
     end
 

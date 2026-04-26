@@ -142,6 +142,5 @@ module Apps
         end
       end
     end
-
   end
 end

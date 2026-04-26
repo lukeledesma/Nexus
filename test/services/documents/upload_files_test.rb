@@ -29,13 +29,13 @@ module Documents
     end
 
     test "imports text file upload" do
-      tempfile = Tempfile.new(["upload", ".txt"])
+      tempfile = Tempfile.new([ "upload", ".txt" ])
       tempfile.binmode
       tempfile.write("Simple note")
       tempfile.rewind
       uploaded = Rack::Test::UploadedFile.new(tempfile.path, "text/plain", original_filename: "Simple.txt")
 
-      result = Documents::UploadFiles.call(user: @user, folder: @folder, files: [uploaded])
+      result = Documents::UploadFiles.call(user: @user, folder: @folder, files: [ uploaded ])
 
       assert result.success?
       assert_equal 1, result.payload[:ids].length
