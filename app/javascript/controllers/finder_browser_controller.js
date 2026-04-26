@@ -60,12 +60,22 @@ export default class extends Controller {
         else this.startCreateFolder(Number(pid))
       }
       window.addEventListener("nexus:finder-create-folder", this.boundChromeCreate)
+
+      this.boundLinkedAppDocumentSaved = this.handleLinkedAppDocumentSaved.bind(this)
+      window.addEventListener("nexus:linked-app-document-saved", this.boundLinkedAppDocumentSaved)
     }
   }
 
   disconnect() {
     if (this.boundChromeCreate) {
       window.removeEventListener("nexus:finder-create-folder", this.boundChromeCreate)
+    }
+    if (this.boundLinkedAppDocumentSaved) {
+      window.removeEventListener("nexus:linked-app-document-saved", this.boundLinkedAppDocumentSaved)
+    }
+    if (this.liveRefreshTimer) {
+      clearTimeout(this.liveRefreshTimer)
+      this.liveRefreshTimer = null
     }
   }
 
@@ -231,6 +241,7 @@ export default class extends Controller {
 
         dispatchLinkedAppHostEvent("nexus:linked-app-document-saved", {
           frameId: this.frameIdValue,
+          documentId: data.document_id,
           title: data.display_title || data.title || trimmed
         })
         
@@ -702,6 +713,21 @@ export default class extends Controller {
     } catch (_error) {
       window.alert("Could not update favorite status.")
     }
+  }
+
+  handleLinkedAppDocumentSaved(event) {
+    const { frameId, documentId } = event.detail || {}
+    if (!documentId) return
+    if (frameId && frameId === this.frameIdValue) return
+    this.scheduleLiveRefresh()
+  }
+
+  scheduleLiveRefresh(delay = 90) {
+    if (this.liveRefreshTimer) clearTimeout(this.liveRefreshTimer)
+    this.liveRefreshTimer = setTimeout(() => {
+      this.liveRefreshTimer = null
+      this.reloadFramePreservingBrowse()
+    }, delay)
   }
 
   csrfToken() {

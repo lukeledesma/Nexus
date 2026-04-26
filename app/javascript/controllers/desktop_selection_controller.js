@@ -21,11 +21,19 @@ export default class extends Controller {
       this.element.appendChild(this.selectionBox)
     }
 
+    this.desktopShell = document.getElementById("desktop-shell")
+    this.desktopCanvas = document.getElementById("desktop-shell-canvas")
+
+    // Desktop background clicks now land on the scroll shell/canvas layer.
     this.element.addEventListener("mousedown", this.handleMouseDown)
+    this.desktopShell?.addEventListener("mousedown", this.handleMouseDown)
+    this.desktopCanvas?.addEventListener("mousedown", this.handleMouseDown)
   }
 
   disconnect() {
     this.element.removeEventListener("mousedown", this.handleMouseDown)
+    this.desktopShell?.removeEventListener("mousedown", this.handleMouseDown)
+    this.desktopCanvas?.removeEventListener("mousedown", this.handleMouseDown)
     document.removeEventListener("mousemove", this.boundMouseMove)
     document.removeEventListener("mouseup", this.boundMouseUp)
     document.body.classList.remove("is-desktop-selecting")
@@ -38,7 +46,7 @@ export default class extends Controller {
     // Allow selection on desktop element or on shell canvas (empty space)
     const shell = document.getElementById("desktop-shell")
     const canvas = document.getElementById("desktop-shell-canvas")
-    const isCanvas = event.target === canvas || (canvas && event.target === canvas)
+    const isCanvas = event.target === canvas
     const isShell = event.target === shell || (shell && event.target === shell)
     const isDesktop = event.target === this.element
     
