@@ -74,14 +74,28 @@ build_and_restart() {
 set -e
 export PATH="$REMOTE_RUBY:\$PATH"
 cd $REMOTE_APP
+
+load_puma_env() {
+  while IFS= read -r entry; do
+    case "\$entry" in
+      RAILS_ENV=*|RAILS_MASTER_KEY=*|SECRET_KEY_BASE=*|NEXUS_DATABASE_PASSWORD=*|NEXUS_DB_NAME=*|NEXUS_DB_USER=*|NEXUS_CACHE_DB_NAME=*|NEXUS_QUEUE_DB_NAME=*|NEXUS_CABLE_DB_NAME=*)
+        export "\$entry"
+        ;;
+    esac
+  done < <(sed -n 's/^Environment="\([A-Z0-9_]*=.*\)"$/\1/p' < <(systemctl cat puma 2>/dev/null))
+}
+
+load_puma_env
+export RAILS_ENV=production
+
 bundle config set --local without 'development test'
 bundle install --quiet
 if [ -f package.json ]; then
   if command -v yarn &>/dev/null; then yarn install --silent; else npm install --silent; fi
 fi
-PENDING_MIGRATIONS=\$(bundle exec rails db:migrate:status 2>/dev/null | grep 'down' | wc -l || echo 0)
+PENDING_MIGRATIONS=\$(bundle exec rails db:migrate:status 2>/dev/null | awk '/^[[:space:]]*down/ { count++ } END { print count + 0 }')
 if [ "\$PENDING_MIGRATIONS" -gt 0 ]; then
-  bundle exec rails db:migrate RAILS_ENV=production
+  bundle exec rails db:migrate
 fi
 SECRET_KEY_BASE_DUMMY=1 RAILS_ENV=production bundle exec rails assets:clobber --quiet
 SECRET_KEY_BASE_DUMMY=1 RAILS_ENV=production bundle exec rails assets:precompile --quiet

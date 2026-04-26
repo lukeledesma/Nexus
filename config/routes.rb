@@ -4,8 +4,6 @@ Rails.application.routes.draw do
   delete "/logout", to: "sessions#destroy"
 
   namespace :apps do
-    resources :folders, only: %i[show create update destroy]
-    resources :task_lists, only: %i[show create update destroy]
     get "finder", to: "finder#show"
     get "notes", to: "notes#show"
     get "time_card", to: "time_card#show"
@@ -18,10 +16,7 @@ Rails.application.routes.draw do
     get "tasks", to: "tasks#show"
     post "tasks/save_file", to: "tasks#save_file"
     get "tasks/draft_file", to: "tasks#draft_file"
-    post "workspace/flush_disk", to: "workspace_sync#flush_disk"
   end
-
-  resources :folders, only: %i[create update destroy], controller: "apps/folders"
 
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 

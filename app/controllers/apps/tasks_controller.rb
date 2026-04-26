@@ -2,29 +2,17 @@
 
 module Apps
   class TasksController < BaseController
-    before_action :redirect_top_level_frame_requests, only: %i[show]
+    skip_before_action :sync_from_disk, only: %i[draft_file save_file]
 
-    before_action :ensure_task_items
+    before_action :redirect_top_level_frame_requests, only: %i[show]
+    before_action :ensure_task_document, only: %i[show]
 
     # GET /apps/tasks
     def show
-      @task_list = @app_folder.items.find_by(item_type: "task_list")
-      @linked_document_id = resolved_task_list_document_id
-      @task_list_updated_at = @task_list&.updated_at
-
-      if @linked_document_id.present?
-        doc = WorkspaceDocumentAccess.openable_document_for(
-          current_user,
-          @linked_document_id,
-          content_type: "task_list"
-        )
-        @tasks_for_view = normalize_tasks(doc&.tasks || [])
-        @linked_document_display_title = helpers.finder_document_display_title(doc&.title.to_s)
-        @task_list_updated_at = doc&.updated_at || @task_list_updated_at
-      else
-        apply_linked_document_or_blank(@task_list, "task_list")
-        @tasks_for_view = normalize_tasks(@task_list&.tasks || [])
-      end
+      @linked_document_id = @task_document.id
+      @task_list_updated_at = @task_document.updated_at
+      @tasks_for_view = normalize_tasks(@task_document.tasks || [])
+      @linked_document_display_title = helpers.finder_document_display_title(@task_document.title.to_s)
     end
 
 
@@ -34,7 +22,11 @@ module Apps
       folder_id = params[:folder_id].presence
       frame_id = params[:frame_id].to_s
       filename = params[:filename].to_s
-      document_id = params[:document_id].presence
+      requested_document_id = params[:document_id].presence
+
+      # If the client passes the embedded draft id, treat this as "save draft as new file"
+      # instead of "update existing document".
+      document_id = normalize_save_document_id(frame_id, requested_document_id)
 
       if folder_id.blank? || frame_id.blank? || filename.blank?
         render json: { error: "folder_id, frame_id, and filename are required" }, status: :bad_request
@@ -47,13 +39,29 @@ module Apps
         frame_id: frame_id,
         filename: filename,
         document_id: document_id,
-        note_text: params[:note_text]
+        note_text: params[:note_text],
+        task_payload: params[:task_payload]
       ).call
 
       case result
       when :ok
+        # Determine if this is a draft save (no document_id after normalization means
+        # creating a new file from embedded draft, not updating an existing linked file).
+        is_embedded_draft_save = document_id.blank?
+        
+        # Clear the draft BEFORE returning response so frontend doesn't see stale content
+        if is_embedded_draft_save
+          app_key = infer_app_key_from_frame_id(frame_id)
+          EmbeddedDraftDocument.clear_draft!(user: current_user, app_key: app_key) if app_key.present?
+        end
+
         disp = helpers.finder_document_display_title(payload[:title])
-        render json: payload.merge(ok: true, display_title: disp)
+        # Signal that this save cleared an embedded draft, so don't restore it as a linked document.
+        render json: payload.merge(
+          ok: true,
+          display_title: disp,
+          cleared_embedded_draft: is_embedded_draft_save
+        )
       when :not_found
         head :not_found
       when :forbidden
@@ -86,24 +94,16 @@ module Apps
 
     private
 
-    # Tasks treat the embedded draft as a canonical saved document.
-    # If the requested linked document is stale/missing, fall back to the draft
-    # so refresh never drops the UI into transient Item mode.
-    def resolved_task_list_document_id
-      linked = openable_linked_document_id("task_list")
-      return linked if linked.present?
+    def resolved_task_document
+      did = params[:document_id].presence
+      if did.present?
+        doc = WorkspaceDocumentAccess.openable_document_for(current_user, did, content_type: "task_list")
+        return doc if doc
+      end
 
-      EmbeddedDraftDocument.fetch_or_create(user: current_user, app_key: "tasks")&.id
+      EmbeddedDraftDocument.fetch_or_create(user: current_user, app_key: "tasks")
     rescue StandardError
       nil
-    end
-
-    def openable_linked_document_id(expected_content_type)
-      did = params[:document_id].presence
-      return nil if did.blank?
-
-      doc = WorkspaceDocumentAccess.openable_document_for(current_user, did, content_type: expected_content_type)
-      doc&.id
     end
 
     def redirect_top_level_frame_requests
@@ -113,33 +113,11 @@ module Apps
       redirect_to root_path
     end
 
-    def ensure_task_items
-      @app_folder = Folder.find_or_create_by!(name: "App") do |folder|
-        folder.name = "App"
-      end
+    def ensure_task_document
+      @task_document = resolved_task_document
+      return if @task_document
 
-      # Ensure TaskList item exists
-      Item.find_or_create_by!(folder_id: @app_folder.id, item_type: "task_list") do |item|
-        item.folder_id = @app_folder.id
-        item.name = "Tasks"
-        item.item_type = "task_list"
-        item.body = nil
-        item.tasks = []
-      end
-
-
-
-      # Sync legacy workspace shells/config files without regenerating linked-app draft files.
-      # Rare cache-clear reload spikes can trigger transient file races; retry once.
-      begin
-        ItemStorageSyncLite.sync_all!(username: current_user&.username)
-      rescue Errno::ENOENT
-        sleep 0.03
-        ItemStorageSyncLite.sync_all!(username: current_user&.username)
-      end
-    rescue StandardError => e
-      Rails.logger.error("[TasksController] ensure_task_items failed: #{e.class}: #{e.message}")
-      raise
+      render plain: "Task document unavailable", status: :unprocessable_entity
     end
 
     def normalize_tasks(value)
@@ -183,38 +161,34 @@ module Apps
       end
     end
 
-    def apply_linked_document_or_blank(item, expected_type)
-      return unless item
-
-      if params[:document_id].present?
-        hydrate_item_from_finder_document(item, expected_type)
-      elsif params[:blank].to_s == "1"
-        reset_linked_item_to_blank(item, expected_type)
-      end
-    end
-
-    def hydrate_item_from_finder_document(item, expected_type)
-      did = params[:document_id].presence
-      return if did.blank? || !item
-
-      doc = WorkspaceDocumentAccess.openable_document_for(current_user, did, content_type: expected_type)
-      return unless doc
-
-      case expected_type
-      when "task_list"
-        # Linked task-list views now render directly from Document and no longer
-        # overwrite the shared linked-app Item cache.
-        return
+    def infer_app_key_from_frame_id(frame_id)
+      case frame_id
+      when "tasks-pane", /^task-spawn-/
+        "tasks"
+      when "notes-pane", /^note-spawn-/
+        "notes"
+      when "time-card-pane", /^time-card-spawn-/
+        "time-card"
       else
-        item.update!(tasks: doc.tasks || [])
+        nil
       end
     end
 
-    def reset_linked_item_to_blank(item, expected_type)
-      case expected_type
-      when "task_list"
-        item.update!(tasks: [])
-      end
+    def normalize_save_document_id(frame_id, requested_document_id)
+      return nil if requested_document_id.blank?
+
+      doc_id = requested_document_id.to_i
+      return nil if doc_id <= 0
+
+      app_key = infer_app_key_from_frame_id(frame_id)
+      return doc_id if app_key.blank?
+
+      draft = EmbeddedDraftDocument.fetch_or_create(user: current_user, app_key: app_key)
+      return nil if draft && draft.id == doc_id
+
+      doc_id
+    rescue StandardError
+      doc_id
     end
   end
 end

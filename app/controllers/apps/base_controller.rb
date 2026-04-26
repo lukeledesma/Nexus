@@ -9,7 +9,7 @@ module Apps
     def sync_from_disk
       return if @disk_synced
 
-      DocumentDiskLoader.sync!
+      DocumentDiskLoader.sync!(purge_missing: false)
       @disk_synced = true
     rescue StandardError => e
       Rails.logger.error("[Apps::BaseController] sync failed: #{e.class}: #{e.message}")

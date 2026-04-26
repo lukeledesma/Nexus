@@ -5,7 +5,11 @@ require "fileutils"
 class DocumentStorageSyncLite
   class << self
     def storage_root
-      Rails.root.join("storage", "workspace")
+      env_override = ENV["NEXUS_STORAGE_ROOT"].to_s.strip
+      return Pathname.new(env_override) unless env_override.empty?
+
+      root_name = Rails.env.test? ? "workspace_test" : "workspace"
+      Rails.root.join("storage", root_name)
     end
 
     def next_available_filename(base_path, title, extension: ".txt", exclude_path: nil)

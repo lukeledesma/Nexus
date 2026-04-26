@@ -7,12 +7,12 @@ require "time"
 
 class DocumentDiskLoader
   class << self
-    def sync!
+    def sync!(purge_missing: true)
       return if syncing?
 
       begin_sync!
       ensure_roots!
-      sync_from_disk!
+      sync_from_disk!(purge_missing: purge_missing)
     ensure
       end_sync!
     end
@@ -39,12 +39,12 @@ class DocumentDiskLoader
       FileUtils.mkdir_p(storage_root)
     end
 
-    def sync_from_disk!
+    def sync_from_disk!(purge_missing:)
       seen_paths = []
 
       folder_docs = upsert_folders_from_disk!(seen_paths)
       upsert_files_from_disk!(folder_docs, seen_paths)
-      purge_missing_from_database!(seen_paths)
+      purge_missing_from_database!(seen_paths) if purge_missing
     end
 
     def upsert_folders_from_disk!(seen_paths)

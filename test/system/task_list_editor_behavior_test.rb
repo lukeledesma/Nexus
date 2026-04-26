@@ -3,11 +3,13 @@ require "application_system_test_case"
 class TaskListEditorBehaviorTest < ApplicationSystemTestCase
   setup do
     @user = User.create!(email: "task_editor@example.com", password: "password123", password_confirmation: "password123")
-    @folder = Folder.create!(name: "App")
-    @task_list = Item.create!(
-      folder: @folder,
-      item_type: "task_list",
-      name: "System Test Tasks",
+    @workspace_root = FinderListedFolders.workspace_root_for(@user)
+    @tasks_folder = Document.create!(is_folder: true, parent: @workspace_root, title: "Tasks")
+    @task_list = Document.create!(
+      is_folder: false,
+      parent: @tasks_folder,
+      title: "System Test Tasks",
+      content_type: "task_list",
       tasks: [
         {
           "text" => "Existing Task",
@@ -20,7 +22,7 @@ class TaskListEditorBehaviorTest < ApplicationSystemTestCase
     )
 
     sign_in(@user.email, "password123")
-    visit apps_task_list_path(@task_list)
+    visit apps_tasks_path(document_id: @task_list.id)
 
     unless page.has_css?(".task-item-row--main", wait: 2)
       skip("Task list UI unavailable in system test auth flow for this environment")
@@ -28,8 +30,7 @@ class TaskListEditorBehaviorTest < ApplicationSystemTestCase
   end
 
   teardown do
-    Item.where(id: @task_list&.id).delete_all
-    Folder.where(id: @folder&.id).delete_all
+    Document.where(id: [@task_list&.id, @tasks_folder&.id, @workspace_root&.id].compact).delete_all
     User.where(id: @user&.id).delete_all
   end
 

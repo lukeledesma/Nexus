@@ -400,6 +400,8 @@ module Apps
     end
 
     def build_favorites_tree_nodes(workspace_root)
+      return [] unless favorites_column_available?
+
       sql = <<~SQL.squish
         WITH RECURSIVE subtree AS (
           SELECT documents.*
@@ -464,7 +466,7 @@ module Apps
           title: doc.title.to_s,
           writable: !doc.protected_workspace_structure?,
           children: sf.map { |c| tree_node_from_doc(c, children_by_parent) } + fi.map { |f| tree_node_for_file(f) },
-          is_favorited: doc.is_favorited?
+          is_favorited: favorited_flag_for(doc)
         }
       else
         tree_node_for_file(doc)
@@ -501,8 +503,20 @@ module Apps
         source_extension: ext,
         writable: !doc.protected_workspace_structure?,
         has_linked_app: has_linked_app,
-        is_favorited: doc.is_favorited?
+        is_favorited: favorited_flag_for(doc)
       }
+    end
+
+    def favorited_flag_for(doc)
+      return doc.is_favorited? if doc.respond_to?(:is_favorited?)
+
+      false
+    end
+
+    def favorites_column_available?
+      Document.column_names.include?("is_favorited")
+    rescue StandardError
+      false
     end
   end
 end

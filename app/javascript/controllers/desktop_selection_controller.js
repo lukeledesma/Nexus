@@ -15,12 +15,9 @@ export default class extends Controller {
     
     // Append to canvas so it scrolls with content
     const canvas = document.getElementById("desktop-shell-canvas")
-    console.log("[SelectionController] Canvas found:", !!canvas)
     if (canvas) {
       canvas.appendChild(this.selectionBox)
-      console.log("[SelectionController] Selection box appended to canvas")
     } else {
-      console.warn("[SelectionController] Canvas not found, appending to desktop element")
       this.element.appendChild(this.selectionBox)
     }
 
@@ -45,24 +42,17 @@ export default class extends Controller {
     const isShell = event.target === shell || (shell && event.target === shell)
     const isDesktop = event.target === this.element
     
-    console.log("[SelectionController] Mousedown - isDesktop:", isDesktop, "isShell:", isShell, "isCanvas:", isCanvas, "target:", event.target)
-    
     if (!isDesktop && !isCanvas && !isShell) {
-      console.log("[SelectionController] Mousedown rejected - not on valid surface")
       return
     }
     if (event.target instanceof Element && event.target.closest("section.content-window")) {
-      console.log("[SelectionController] Mousedown rejected - on content window")
       return
     }
     
     event.preventDefault()
 
     // Calculate position relative to shell (accounting for scroll)
-    if (!shell) {
-      console.warn("[SelectionController] Shell not found")
-      return
-    }
+    if (!shell) return
     
     const shellRect = shell.getBoundingClientRect()
     const scrollLeft = shell.scrollLeft
@@ -71,8 +61,6 @@ export default class extends Controller {
     // Origin coordinates in scrollable canvas space
     this.originX = event.clientX - shellRect.left + scrollLeft
     this.originY = event.clientY - shellRect.top + scrollTop
-    
-    console.log("[SelectionController] Drag started - origin:", this.originX, this.originY)
     
     this.isDragging = true
     document.body.classList.add("is-desktop-selecting")
@@ -83,10 +71,6 @@ export default class extends Controller {
     this.selectionBox.style.height = "0px"
     this.selectionBox.classList.add("is-visible")
     
-    console.log("[SelectionController] Selection box styled and visible class added")
-    console.log("[SelectionController] Selection box element:", this.selectionBox)
-    console.log("[SelectionController] Selection box parent:", this.selectionBox.parentNode)
-
     document.addEventListener("mousemove", this.boundMouseMove)
     document.addEventListener("mouseup", this.boundMouseUp)
   }
@@ -122,13 +106,6 @@ export default class extends Controller {
     this.selectionBox.style.top = `${top}px`
     this.selectionBox.style.width = `${width}px`
     this.selectionBox.style.height = `${height}px`
-    
-    // Log every 10th move to avoid spam
-    if (!this._moveCount) this._moveCount = 0
-    this._moveCount++
-    if (this._moveCount % 10 === 0) {
-      console.log("[SelectionController] Dragging - box:", { left, top, width, height })
-    }
   }
 
   handleMouseUp() {

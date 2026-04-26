@@ -1,6 +1,8 @@
 # Nexus — UI Guide
 
-How the Nexus interface works. Reference for understanding and using the app.
+This guide explains how the Nexus interface behaves and how key UI flows are expected to work.
+
+For a product-level overview, start with the root README.
 
 ---
 
@@ -151,6 +153,6 @@ This behavior should be preserved for all new scrollable panes whenever practica
 Implementation references:
 
 - CSS standard: `app/assets/stylesheets/application.css` (section comment: `Subtle theme-matched scrollbars`)
-- Scroll activity toggle: `app/javascript/controllers/finder_controller.js` (`handleScrollActivity` + `.is-scrolling` class)
+- Scroll activity toggle: `app/javascript/controllers/finder_browser_controller.js` (`handleScrollActivity` + `.is-scrolling` class)
 
 Note: on macOS, native overlay scrollbars may appear especially refined. That look is acceptable and should not be replaced with heavier custom chrome.

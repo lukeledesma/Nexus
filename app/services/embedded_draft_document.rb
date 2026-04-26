@@ -32,6 +32,52 @@ class EmbeddedDraftDocument
       nil
     end
 
+    def clear_draft!(user:, app_key:)
+      config = APP_CONFIG[app_key.to_s]
+      return false unless config
+
+      root = FinderListedFolders.workspace_root_for(user)
+      return false unless root
+
+      embedded = root.children.folders.find { |d| d.title.to_s.strip.casecmp?("embedded") }
+      return false unless embedded
+
+      draft = embedded.children.files.where("LOWER(title) = ?", config[:title].downcase).first
+      return false unless draft
+
+      # Reset draft to empty state without destroying it so it's available for next session.
+      case app_key.to_s
+      when "tasks"
+        draft.tasks = []
+        draft.content = nil
+      when "time-card"
+        draft.tasks = []
+        draft.content = TimeCardDocumentCodec.dump(
+          {
+            clockInMinutes: nil,
+            clockInAtMs: nil,
+            clockOutAtMs: nil,
+            clockOutMinutes: nil,
+            running: false,
+            notesText: ""
+          }
+        )
+      else
+        draft.tasks = []
+        draft.content = ""
+      end
+
+      if draft.save
+        ensure_synced_to_disk!(draft)
+        true
+      else
+        false
+      end
+    rescue StandardError => e
+      Rails.logger.error("[EmbeddedDraftDocument] clear_draft! failed: #{e.class}: #{e.message}")
+      false
+    end
+
     private
 
     def create_draft!(embedded, app_key, config)

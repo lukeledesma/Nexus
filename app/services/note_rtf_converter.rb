@@ -3,7 +3,7 @@
 require "nokogiri"
 require "cgi"
 
-# Converts between Quill-style HTML (Document#content / Item#body) and RTF files
+# Converts between Quill-style HTML (Document#content) and RTF files
 # so macOS TextEdit opens saved notes as rich text.
 class NoteRtfConverter
   class << self

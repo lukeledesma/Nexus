@@ -346,6 +346,11 @@ class DocumentsController < ApplicationController
   end
 
   def toggle_favorite
+    unless favorites_column_available?
+      render json: { error: "Favorites are temporarily unavailable." }, status: :service_unavailable
+      return
+    end
+
     if @document.user_workspace_root?
       render json: { error: "This item cannot be favorited." }, status: :forbidden
       return
@@ -357,7 +362,7 @@ class DocumentsController < ApplicationController
     end
 
     @document.toggle!(:is_favorited)
-    render json: { is_favorited: @document.is_favorited? }, status: :ok
+    render json: { is_favorited: favorited_flag_for(@document) }, status: :ok
   end
 
   def destroy
@@ -393,7 +398,6 @@ class DocumentsController < ApplicationController
   private
 
   def set_document
-    sync_from_disk
     @document = Document.find(params[:id])
   rescue ActiveRecord::RecordNotFound
     redirect_to root_path, alert: "Item was not found on disk."
@@ -402,7 +406,9 @@ class DocumentsController < ApplicationController
   def sync_from_disk
     return if @disk_synced
 
-    DocumentDiskLoader.sync!
+    # Request-time sync keeps DB and disk aligned without treating transient
+    # filesystem gaps as confirmed deletes.
+    DocumentDiskLoader.sync!(purge_missing: false)
     @disk_synced = true
   rescue StandardError => e
     Rails.logger.error("[DocumentDiskLoader] sync failed: #{e.class}: #{e.message}")
@@ -437,8 +443,6 @@ class DocumentsController < ApplicationController
 
     @root_files = Document.files.where(parent_id: nil).order(Arel.sql("LOWER(title) ASC"))
     @has_organizer_content = @browser_folders.any? || @root_files.any?
-    @sidebar_task_lists = Item.task_lists.ordered
-    @folders = Folder.where.not(name: "App").includes(:items).ordered
   end
 
   def next_folder_name
@@ -631,9 +635,17 @@ class DocumentsController < ApplicationController
     []
   end
 
-end
-  def toggle_favorite
-    @document.toggle!(:is_favorited)
-    render json: { is_favorited: @document.is_favorited? }, status: :ok
+  def favorites_column_available?
+    Document.column_names.include?("is_favorited")
+  rescue StandardError
+    false
   end
+
+  def favorited_flag_for(document)
+    return document.is_favorited? if document.respond_to?(:is_favorited?)
+
+    false
+  end
+
+end
 

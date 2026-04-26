@@ -170,7 +170,23 @@ export default class extends Controller {
       const isNotesFrame =
         this.frameIdValue === "notes-pane" || String(this.frameIdValue || "").startsWith("note-spawn-")
       const isTimeCardFrame = this.frameIdValue === "time-card-pane"
-      if (isNotesFrame || isTimeCardFrame) {
+      const isTaskFrame =
+        this.frameIdValue === "tasks-pane" || String(this.frameIdValue || "").startsWith("task-spawn-")
+      
+      if (isTaskFrame) {
+        let taskPayload = ""
+        try {
+          const host = linkedAppHostWindow()
+          const frame = host?.document?.getElementById(this.frameIdValue)
+          if (frame) {
+            const payloadEl = frame.querySelector('[data-task-list-editor-target="payload"]')
+            taskPayload = (payloadEl?.value || "").toString()
+          }
+        } catch (_e) {
+          // non-blocking
+        }
+        if (taskPayload) body.set("task_payload", taskPayload)
+      } else if (isNotesFrame || isTimeCardFrame) {
         let noteText = ""
         try {
           const draft = readLinkedAppPickerDraft(this.frameIdValue)
@@ -217,6 +233,9 @@ export default class extends Controller {
           frameId: this.frameIdValue,
           title: data.display_title || data.title || trimmed
         })
+        
+        // Only persist as linked document if this wasn't an embedded draft save.
+        // Embedded draft saves should not become the "linked document" for the next session.
         if (data.document_id != null) {
           try {
             window.sessionStorage.setItem(`nexus.linkedAppDocument.${this.frameIdValue}`, String(data.document_id))
@@ -233,7 +252,8 @@ export default class extends Controller {
         dispatchLinkedAppHostEvent("nexus:linked-app-save-picker-close", {
           frameId: this.frameIdValue,
           saved: true,
-          documentId: data.document_id
+          documentId: data.document_id,
+          clearedEmbeddedDraft: data.cleared_embedded_draft
         })
       } catch (_e) {
         submitting = false

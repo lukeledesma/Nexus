@@ -1,7 +1,10 @@
 # Nexus App Command Guide
 
-This is the canonical command guide for the app repo.  
-Run commands from the repository root (e.g. `cd` into your clone of this project).
+This guide is for maintainers and operators who need day-to-day commands for development, deploys, and production checks.
+
+If you are new to the project, start with the root README first, then return here when you are ready to run commands.
+
+Run commands from the repository root (your local clone of this project).
 
 ## Source repository
 
@@ -56,7 +59,7 @@ Then run migrations **on the server** (no `#` comment on the same line as `bin/r
 
 ```bash
 export RAILS_ENV=production
-export NEXUS_DATABASE_PASSWORD='your_postgres_password_for_user_alchemy'
+export NEXUS_DATABASE_PASSWORD='your_postgres_password_for_user_nexus'
 bin/rails db:migrate
 ```
 

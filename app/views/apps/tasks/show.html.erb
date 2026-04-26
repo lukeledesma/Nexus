@@ -1,17 +1,9 @@
 <% frame_id = params[:frame_id].presence || "tasks-pane" %>
 <turbo-frame id="<%= frame_id %>" data-linked-app-draft-root data-linked-app-has-linked-document="<%= @linked_document_id.present? %>">
   <section class="app-surface app-surface--tool" data-controller="title-editor task-list-editor tool-window-status" data-tool-window-status-item-type-value="task_list" data-tool-window-status-updated-at-value="<%= @task_list_updated_at&.utc&.iso8601 %>" data-task-list-linked-mode="<%= @linked_document_id.present? %>" data-task-list-linked-document-id="<%= @linked_document_id.to_s %>" data-task-list-linked-document-title="<%= (@linked_document_display_title || "").to_s %>">
-    <% linked_mode = @linked_document_id.present? %>
-    <% autosave_form_data = { turbo_frame: frame_id, controller: "autosave", autosave_debounce_value: 120 } %>
-    <% unless linked_mode %>
-      <% autosave_form_data[:autosave_item_id_value] = @task_list.id if @task_list %>
-      <% autosave_form_data[:autosave_item_type_value] = "task_list" %>
-    <% end %>
-
-    <% form_url = linked_mode ? document_path(@linked_document_id) : apps_task_list_path(@task_list, frame_id: frame_id) %>
-    <%= form_with url: form_url, method: :patch,
-          data: autosave_form_data, class: "task-list-form os-window-body-start" do %>
-      <input type="hidden" name="<%= linked_mode ? "document[tasks_payload]" : "item[tasks_payload]" %>" value="" data-task-list-editor-target="payload">
+    <%= form_with url: document_path(@linked_document_id), method: :patch,
+          data: { turbo_frame: frame_id, controller: "autosave", autosave_debounce_value: 120 }, class: "task-list-form os-window-body-start" do %>
+      <input type="hidden" name="document[tasks_payload]" value="" data-task-list-editor-target="payload">
 
       <div class="task-list-content-shell" data-task-list-editor-target="contentShell" data-action="dragover->task-list-editor#handleDragOver drop->task-list-editor#handleDrop dragleave->task-list-editor#handleDragLeave">
         <ul class="task-list-rows" data-task-list-editor-target="list" data-action="click->task-list-editor#handleListClick keydown->task-list-editor#handleListKeydown dragstart->task-list-editor#handleDragStart dragend->task-list-editor#handleDragEnd">

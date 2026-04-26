@@ -15,7 +15,7 @@ class DocumentsSyncTest < ActionDispatch::IntegrationTest
     User.where(id: @user&.id).delete_all
   end
 
-  test "organizer load removes db file missing on disk" do
+  test "organizer load preserves db file missing on disk" do
     folder = Document.create!(is_folder: true, title: "sync-folder", storage_path: "sync-folder")
     file = Document.create!(
       is_folder: false,
@@ -30,10 +30,39 @@ class DocumentsSyncTest < ActionDispatch::IntegrationTest
 
     get root_path
 
-    assert_nil Document.find_by(id: file.id)
+    assert_not_nil Document.find_by(id: file.id)
   ensure
     FileUtils.rm_rf(DocumentStorageSyncLite.storage_root.join("sync-folder"))
     Document.folders.where(storage_path: "sync-folder").delete_all
+  end
+
+  test "document update does not require disk sync" do
+    folder = Document.create!(is_folder: true, title: "sync-folder", storage_path: "sync-folder")
+    file = Document.create!(
+      is_folder: false,
+      parent: folder,
+      title: "draft",
+      content_type: "note",
+      content: "before",
+      storage_path: "sync-folder/draft.rtf"
+    )
+
+    original_sync = DocumentDiskLoader.method(:sync!)
+    DocumentDiskLoader.singleton_class.define_method(:sync!) do |*args, **kwargs|
+      raise "sync should not run"
+    end
+
+    begin
+      patch document_path(file), params: { document: { content: "after" } }
+    ensure
+      DocumentDiskLoader.singleton_class.define_method(:sync!, original_sync)
+    end
+
+    assert_response :no_content
+    assert_equal "after", file.reload.content
+  ensure
+    FileUtils.rm_rf(DocumentStorageSyncLite.storage_root.join("sync-folder"))
+    Document.where(id: [file&.id, folder&.id].compact).delete_all
   end
 
   test "organizer load ingests supported text file from disk into db" do

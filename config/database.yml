@@ -14,18 +14,18 @@ test:
 production:
   primary: &primary_production
     <<: *default
-    database: <%= ENV.fetch("NEXUS_DB_NAME", "alchemy_production") %>
-    username: <%= ENV.fetch("NEXUS_DB_USER", "alchemy") %>
+    database: <%= ENV.fetch("NEXUS_DB_NAME", "nexus_production") %>
+    username: <%= ENV.fetch("NEXUS_DB_USER", "nexus") %>
     password: <%= ENV["NEXUS_DATABASE_PASSWORD"] %>
   cache:
     <<: *primary_production
-    database: <%= ENV.fetch("NEXUS_CACHE_DB_NAME", "alchemy_production_cache") %>
+    database: <%= ENV.fetch("NEXUS_CACHE_DB_NAME", "nexus_production_cache") %>
     migrations_paths: db/cache_migrate
   queue:
     <<: *primary_production
-    database: <%= ENV.fetch("NEXUS_QUEUE_DB_NAME", "alchemy_production_queue") %>
+    database: <%= ENV.fetch("NEXUS_QUEUE_DB_NAME", "nexus_production_queue") %>
     migrations_paths: db/queue_migrate
   cable:
     <<: *primary_production
-    database: <%= ENV.fetch("NEXUS_CABLE_DB_NAME", "alchemy_production_cable") %>
+    database: <%= ENV.fetch("NEXUS_CABLE_DB_NAME", "nexus_production_cable") %>
     migrations_paths: db/cable_migrate

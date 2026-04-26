@@ -1,8 +1,12 @@
 # frozen_string_literal: true
 
 class RemoveKanbanAndThoughtWall < ActiveRecord::Migration[8.1]
+  class MigrationItem < ActiveRecord::Base
+    self.table_name = "items"
+  end
+
   def up
-    Item.where(item_type: %w[kanban thought_wall]).delete_all
+    MigrationItem.where(item_type: %w[kanban thought_wall]).delete_all if table_exists?(:items)
 
     say_with_time "convert kanban/thought_wall documents to notes" do
       Document.where(content_type: %w[kanban thought_wall]).find_each do |doc|

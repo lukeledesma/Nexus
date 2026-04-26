@@ -1,9 +1,10 @@
 # Nexus — Developer Guide
 
-Technical reference for the Nexus Rails application. Covers file structure, architecture,
-frontend controllers, data flow, and deployment.
+Technical reference for contributors working on the Nexus Rails codebase.
 
-This is the primary AI context document for future development sessions.
+This document covers architecture, file structure, frontend controllers, data flow, and deployment behavior.
+
+If you are just trying to understand what Nexus is, read the root README first.
 
 ---
 
@@ -30,11 +31,14 @@ Nexus_Dev/
 │   │   ├── documents_controller.rb
 │   │   └── apps/
 │   │       ├── base_controller.rb
-│   │       ├── folders_controller.rb
 │   │       ├── notes_controller.rb
-│   │       ├── task_lists_controller.rb
 │   │       ├── tasks_controller.rb
-│   │       └── settings_controller.rb
+│   │       ├── finder_controller.rb
+│   │       ├── time_card_controller.rb
+│   │       ├── images_controller.rb
+│   │       ├── audio_controller.rb
+│   │       ├── wallpaper_iimage_controller.rb
+│   │       └── user_controller.rb
 │   ├── javascript/
 │   │   ├── application.js
 │   │   └── controllers/
@@ -58,10 +62,14 @@ Nexus_Dev/
 │   │       └── item_creator_controller.js
 │   ├── models/
 │   │   ├── user.rb
-│   │   ├── folder.rb     # after_commit disk sync hooks
-│   │   └── item.rb       # after_commit disk sync hooks
+│   │   └── document.rb
 │   ├── services/
-│   │   └── item_storage_sync_lite.rb  # Rebuilds storage/workspace from DB
+│   │   ├── document_storage_sync_lite.rb
+│   │   ├── document_disk_loader.rb
+│   │   ├── embedded_draft_document.rb
+│   │   ├── linked_app_save_to_document.rb
+│   │   ├── note_rtf_converter.rb
+│   │   └── time_card_document_codec.rb
 │   └── views/
 │       ├── layouts/application.html.erb
 │       ├── shared/_desktop_side_panel.html.erb
@@ -92,19 +100,15 @@ Nexus_Dev/
 - `email`, `password_digest` (bcrypt)
 - Session-based auth via `sessions_controller.rb`
 
-### Folder
-- `name` (string)
-- `belongs_to :user`
-- `has_many :items`
-- `after_commit` → `ItemStorageSyncLite.sync`
+### Document
+- `is_folder` + `parent_id` define the workspace tree.
+- `content_type` is one of `note`, `task_list`, or `asset`.
+- `content` stores note payload, `tasks` stores task-list payload.
+- Disk sync is handled by `DocumentStorageSyncLite` + `DocumentDiskLoader`.
 
-### Item
-- `name` (string)
-- `item_type` (legacy; modern workspace files use `Document`)
-- `body` (legacy text payload)
-- `tasks` (jsonb; used for task lists)
-- `belongs_to :folder`
-- `after_commit` → `ItemStorageSyncLite.sync`
+### Legacy Tables (Historical)
+- Older migrations may reference `folders` / `items` through migration-local classes.
+- Runtime app behavior is document-backed.
 
 ### Content format (Note)
 ```json
@@ -127,11 +131,9 @@ Nexus_Dev/
 ## 4. Stimulus Controllers — Key Behaviors
 
 ### `organizer_controller.js`
-- Manages the folder tree: expand/collapse, live item count, in-place item delete/insert.
-- Handles creation modal submission → inserts new item row inline under its folder.
-- Sort: item rows are alphabetically re-sorted after create and rename.
-- Delete: removes item row in place, decrements count, keeps folder open.
-- Folder collapse: closes selected item in main pane if it belongs to the collapsing folder.
+- Manages app/window launch interactions from the side panel.
+- Opens linked app drafts and new app instances from `+` actions.
+- Resolves the top-most visible app window for focus/toggle behavior.
 
 ### `finder_browser_controller.js`
 - Handles Finder file-list interactions and selection/open behavior.
@@ -148,7 +150,7 @@ Nexus_Dev/
 ### `autosave_controller.js`
 - Listens to `input`, `change`, `focusout` on form fields.
 - Serializes requests (no overlapping saves).
-- On save success: updates matching organizer item labels by data attribute.
+- On save success: dispatches save-state events and syncs linked document payloads.
 - Forced save via `autosave:trigger` custom event (dispatched by title_editor and task_list_editor).
 
 ### `title_editor_controller.js`
@@ -202,7 +204,7 @@ When adding a new scrollable container:
 
 ## 6. Server-Rendered State
 
-`app/views/apps/task_lists/show.html.erb` renders `has-saved-note` and `has-note` classes
+`app/views/apps/tasks/show.html.erb` renders `has-saved-note` and `has-note` classes
 directly from stored note content at page load so the note indicator is correct on first render
 (before any Stimulus runs).
 
@@ -214,18 +216,12 @@ Pattern:
 
 ---
 
-## 7. Disk Mirror — `ItemStorageSyncLite`
+## 7. Disk Mirror — `DocumentStorageSyncLite` + `DocumentDiskLoader`
 
-- Location: `app/services/item_storage_sync_lite.rb`
-- Root: `storage/workspace/`
-  - `Tasks.md`: Singular task list document
-  - User folders as subdirectories (no items inside)
-- Triggered: `after_commit` on `Folder` and `Item` models.
-- Behavior: rebuilds folder directories and `.nexus` files from current DB state.
-- File names sanitized, duplicates suffixed with numbers.
-- Writes note content and task list content with metadata headers.
-
-This is **app → disk** (one-directional). Disk does not write back to DB automatically.
+- `DocumentStorageSyncLite` writes document and folder changes from DB to disk.
+- `DocumentDiskLoader` ingests supported files/folders from disk into DB.
+- Root defaults to `storage/workspace` (or `storage/workspace_test` in test env).
+- Runtime sync avoids destructive purge during request-time reads (`purge_missing: false`).
 
 ---
 
@@ -233,13 +229,9 @@ This is **app → disk** (one-directional). Disk does not write back to DB autom
 
 ```
 GET  /                          → documents#index (organizer shell)
-GET  /apps/task_lists/:id       → apps/task_lists#show
-PATCH /apps/task_lists/:id      → apps/task_lists#update
-DELETE /apps/task_lists/:id     → apps/task_lists#destroy
-GET  /apps/folders/:id          → apps/folders#show
-POST /items                     → items#create
-PATCH /items/:id                → items#update
-DELETE /items/:id               → items#destroy
+GET  /apps/tasks                → apps/tasks#show
+POST /apps/tasks/save_file      → apps/tasks#save_file
+GET  /apps/tasks/draft_file     → apps/tasks#draft_file
 GET  /login                     → sessions#new
 POST /login                     → sessions#create
 DELETE /logout                  → sessions#destroy
@@ -276,8 +268,8 @@ Does:
 - Ruby: typically rbenv under the deploy user (see `NEXUS_DEPLOY_RUBY`)
 - App path: configurable via `NEXUS_DEPLOY_APP`
 - Puma: systemd service `puma.service` with `RAILS_ENV=production`, `RAILS_MASTER_KEY`, `NEXUS_DATABASE_PASSWORD`
-- DB: PostgreSQL, user `alchemy`, database `alchemy_production` (legacy names, still in use)
-- Nginx: `/etc/nginx/sites-enabled/alchemy` → proxies to `127.0.0.1:3000`
+- DB: PostgreSQL, user `nexus`, database `nexus_production`
+- Nginx: `/etc/nginx/sites-enabled/nexus` → proxies to `127.0.0.1:3000`
 
 ### Credentials
 - `config/credentials.yml.enc` encrypted with `config/master.key`
@@ -313,7 +305,7 @@ Tests live in `test/`. Integration tests cover document import flows.
 - Stimulus: `kebab-case` controller file names → `PascalCase` class names.
 - CSS classes: `kebab-case`, BEM-like for component scoping.
 - Timestamps: UTC.
-- Item content: stored as JSON string in `items.content` column.
+- Task-list payload: stored in `documents.tasks` as JSONB.
 
 ---
 
@@ -327,12 +319,12 @@ Tests live in `test/`. Integration tests cover document import flows.
 6. Folder count updates immediately on item create/delete.
 7. Only one inline task note open at a time.
 8. `has-saved-note` renders server-side at page load so it survives refresh.
-9. `ALCHEMY_DATABASE_PASSWORD` fallback removed — use `NEXUS_DATABASE_PASSWORD` exclusively.
+9. Use `NEXUS_DATABASE_PASSWORD` for database auth.
 
 ---
 
 ## 14. Known Technical Debt
 
-- DB user and database names are still `alchemy` / `alchemy_production` on the production server (PostgreSQL). Renaming these requires a migration on the live server — deferred.
-- Nginx site config still named `alchemy` — functional but can be renamed to `nexus` when convenient.
+- DB user and database names should be managed via `NEXUS_DB_USER` / `NEXUS_DB_NAME`.
+- Nginx site config naming should follow `nexus` conventions.
 - `test/integration/documents_import_test.rb` references old test patterns — review before expanding test suite.

@@ -77,6 +77,7 @@ export default class extends Controller {
     if (!selector) return null
 
     const nodes = Array.from(document.querySelectorAll(selector)).filter((el) => !el.classList.contains("is-hidden"))
+
     if (!nodes.length) return null
 
     // Prefer top-most visible window for this app group.
@@ -88,7 +89,6 @@ export default class extends Controller {
 
     return nodes[0] || null
   }
-
   noopAppAction(event) {
     event.preventDefault()
     event.stopPropagation()

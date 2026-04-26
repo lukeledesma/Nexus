@@ -1468,7 +1468,7 @@ export default class extends Controller {
   }
 
   handleLinkedAppSavePickerClose(event) {
-    const { frameId, saved, documentId } = event.detail || {}
+    const { frameId, saved, documentId, clearedEmbeddedDraft } = event.detail || {}
     if (frameId !== this.frameIdValue) return
 
     if (saved) this.clearLinkedAppPickerDraftSnapshot()
@@ -1477,19 +1477,29 @@ export default class extends Controller {
       const u = new URL(this.buildAppUrl({ blank: false }), window.location.origin)
       u.searchParams.set("document_id", String(documentId))
       this.currentUrl = `${u.pathname}${u.search}`
+
+      // Ensure the current window immediately becomes the saved file view.
+      if (this.hasFrameTarget) {
+        this.frameTarget.removeAttribute("src")
+        void this.frameTarget.offsetWidth
+        this.frameTarget.src = this.currentUrl
+      }
     }
 
     this.closeLinkedAppSavePicker()
 
-      if (saved && documentId != null) {
-        const docIdStr = String(documentId)
-        // Persist linked doc to both storages so it survives logout/login
-        try {
-          window.sessionStorage.setItem(`nexus.linkedAppDocument.${this.frameIdValue}`, docIdStr)
-          window.localStorage.setItem(`nexus.linkedAppDocument.${this.frameIdValue}`, docIdStr)
-        } catch (_) {}
-        this.syncSpawnedLinkedDocumentRegistration(docIdStr)
-      }
+    // Only persist the linked document if this wasn't an embedded draft save.
+    // Embedded draft saves should not become the "linked document" for the next session.
+    if (saved && documentId != null) {
+      const docIdStr = String(documentId)
+      // Persist linked doc to both storages so it survives logout/login
+      try {
+        window.sessionStorage.setItem(`nexus.linkedAppDocument.${this.frameIdValue}`, docIdStr)
+        window.localStorage.setItem(`nexus.linkedAppDocument.${this.frameIdValue}`, docIdStr)
+      } catch (_) {}
+      this.syncSpawnedLinkedDocumentRegistration(docIdStr)
+    }
+
   }
 
   readStoredLayers() {

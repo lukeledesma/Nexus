@@ -1,156 +1,97 @@
-# NEXUS
+# Nexus
 
-Nexus is a Rails application for folder-based notes and task lists with filesystem-aware storage synchronization.
+Nexus is a workspace app for writing notes and managing task lists in a folder-style interface.
 
-**Source:** [github.com/lukeledesma/Nexus](https://github.com/lukeledesma/Nexus)
+It is built with Rails, keeps data in PostgreSQL, and mirrors workspace content to disk for predictable synchronization behavior.
 
-Documentation:
+Source: [github.com/lukeledesma/Nexus](https://github.com/lukeledesma/Nexus)
 
-- Command shortcuts: `docs/COMMANDS.md`
-- Deploy scripts: `deploy/`
-- Technical docs: `docs/UI_GUIDE.md` and `docs/DEV_GUIDE.md`
+## Why Nexus
 
-## What Nexus Optimizes For
+Nexus is designed for people who want:
 
-- Simple content model: folders + notes + task lists.
-- Fast organizer UX for create, rename, and delete workflows.
-- Predictable backend behavior with clear operational diagnostics.
-- Safe production operation with explicit environment-driven configuration.
+- Notes and tasks in one place.
+- Fast create, rename, and delete flows.
+- A simple folder mental model.
+- Stable, explicit backend behavior.
 
-## Architecture Snapshot
+## What You Get
 
-- Rails app served by Puma.
-- Nginx reverse proxy for public traffic.
-- PostgreSQL for persistent data.
-- Filesystem storage root under `storage/workspace` for organizer synchronization.
+- Organizer-style navigation for folders and documents.
+- App windows for notes and task lists.
+- Autosave editing flows.
+- Filesystem-aware sync under storage/workspace.
 
-Request flow:
-1. Browser -> Nginx
-2. Nginx -> Puma (`127.0.0.1:3000`)
-3. Puma -> Rails controller/action
-4. Rails -> PostgreSQL + disk sync services
+## Quick Start
 
-## Requirements
+### Requirements
 
 - Ruby 3.2.3
 - PostgreSQL
 - Bundler
 
-## Setup (Local)
+### Run Locally
 
 ```bash
 bundle install
 bin/rails db:create
 bin/rails db:migrate
-```
-
-Run server from the repo root:
-
-```bash
 bin/rails server
 ```
 
-Open:
+Open http://localhost:3000
 
-`http://localhost:3000`
-
-## Test
-
-Run all tests:
+### Run Tests
 
 ```bash
 bin/rails test
 ```
 
-## Environment Variables
+## Repo Map
 
-Production DB config uses:
+- docs/COMMANDS.md: command and deploy reference.
+- docs/UI_GUIDE.md: UI behavior and interaction rules.
+- docs/DEV_GUIDE.md: technical architecture and implementation details.
+- deploy/: deployment scripts and local deploy env template.
 
-- `NEXUS_DATABASE_PASSWORD`
-- `NEXUS_DB_NAME` (default: `alchemy_production` — legacy DB name on server)
-- `NEXUS_DB_USER` (default: `alchemy` — legacy DB user on server)
+## Deployment
 
-Deploy scripts (see `docs/COMMANDS.md`):
-
-- `NEXUS_DEPLOY_HOST` (required), or set once in gitignored `deploy/deploy.local.env` (see `deploy/deploy.local.env.example`)
-- `NEXUS_DEPLOY_USER`, `NEXUS_DEPLOY_APP`, `NEXUS_DEPLOY_RUBY`, `NEXUS_DEPLOY_SSH_KEY` (optional)
-
-Rails credentials:
-
-- `RAILS_MASTER_KEY` must match `config/master.key`
-
-## Operations (Production)
-
-Deploy:
+Nexus includes two scripts for a GitHub-first deploy flow:
 
 ```bash
 ./deploy/deploy_github.sh
 ./deploy/deploy_server.sh
 ```
 
-(Configure the server host once via `deploy/deploy.local.env` from `deploy/deploy.local.env.example`, or `export NEXUS_DEPLOY_HOST=…` before deploy.)
+Set deploy environment values in deploy/deploy.local.env using deploy/deploy.local.env.example.
 
-Health:
+For full operations details, see docs/COMMANDS.md.
 
-```bash
-sudo systemctl status puma
-sudo systemctl status nginx
-curl -I http://127.0.0.1
-curl -I https://nxs.tools/
-```
+## Environment Variables
 
-Logs (paths depend on your server layout):
+Production database settings:
 
-```bash
-sudo journalctl -u puma -n 120 --no-pager
-sudo tail -n 120 /var/log/nginx/error.log
-tail -n 120 /path/to/app/log/puma.log
-```
+- NEXUS_DATABASE_PASSWORD
+- NEXUS_DB_NAME (default: nexus_production)
+- NEXUS_DB_USER (default: nexus)
 
-Assets check:
+Deploy settings:
 
-```bash
-ASSET=$(curl -s http://127.0.0.1 | grep -o '/assets/application-[^"]*\.css' | head -1)
-echo "$ASSET"
-curl -I "http://127.0.0.1$ASSET"
-```
+- NEXUS_DEPLOY_HOST (required)
+- NEXUS_DEPLOY_USER (optional)
+- NEXUS_DEPLOY_APP (optional)
+- NEXUS_DEPLOY_RUBY (optional)
+- NEXUS_DEPLOY_SSH_KEY (optional)
 
-If assets are missing (adjust paths and Ruby to your server):
+Rails credentials:
 
-```bash
-cd /path/to/app
-export PATH="/path/to/ruby/bin:$PATH"
-SECRET_KEY_BASE_DUMMY=1 RAILS_ENV=production bundle exec rails assets:clobber
-SECRET_KEY_BASE_DUMMY=1 RAILS_ENV=production bundle exec rails assets:precompile
-sudo systemctl restart puma
-```
+- RAILS_MASTER_KEY must match config/master.key
 
-## Diagnosability Principles
-
-- No disk sync at app boot (prevents unrelated task failures from boot side effects).
-- Disk sync errors include request ID and condensed backtrace in logs.
-- Routes and service wiring favor explicit behavior over hidden coupling.
-
-## Key Backend Files
-
-- `app/controllers/documents_controller.rb`
-- `app/models/folder.rb`
-- `app/models/item.rb`
-- `app/services/item_storage_sync_lite.rb`
-- `app/controllers/apps/task_lists_controller.rb`
-
-## Key Frontend Files
-
-- `app/views/shared/_desktop_side_panel.html.erb`
-- `app/views/apps/singular/task_list.html.erb`
-- `app/javascript/controllers/`
-- `app/assets/stylesheets/application.css`
-
-## Development Standard
+## Contributing Notes
 
 When changing behavior:
 
 1. Keep backend and frontend changes cohesive.
-2. Preserve clear failure modes with useful logs.
-3. Update docs under `docs/` when commands or deployment assumptions change.
-4. Validate create/edit/delete and asset delivery in production-like mode.
+2. Preserve useful failure logs.
+3. Update docs when commands or deploy assumptions change.
+4. Validate create, edit, delete, and asset delivery in a production-like run.

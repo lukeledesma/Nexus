@@ -16,14 +16,14 @@ class DocumentsRenameTest < ActionDispatch::IntegrationTest
   end
 
   test "allows case-only rename for file in same folder" do
-    folder = Document.create!(is_folder: true, title: "Warren", storage_path: "Warren")
+    folder = Document.create!(is_folder: true, title: "Sample Client", storage_path: "Sample Client")
     file = Document.create!(
       is_folder: false,
       parent: folder,
       title: "sample export",
       content_type: "note",
       content: "<p>sample</p>",
-      storage_path: "Warren/sample_export.rtf"
+      storage_path: "Sample Client/sample_export.rtf"
     )
 
     patch rename_document_path(file), params: { name: "Sample Export" }
@@ -34,14 +34,14 @@ class DocumentsRenameTest < ActionDispatch::IntegrationTest
   end
 
   test "rejects rename when name starts with period" do
-    folder = Document.create!(is_folder: true, title: "Warren", storage_path: "Warren")
+    folder = Document.create!(is_folder: true, title: "Sample Client", storage_path: "Sample Client")
     file = Document.create!(
       is_folder: false,
       parent: folder,
       title: "sample export",
       content_type: "note",
       content: "<p>sample</p>",
-      storage_path: "Warren/sample_export.rtf"
+      storage_path: "Sample Client/sample_export.rtf"
     )
     original_title = file.title
 
