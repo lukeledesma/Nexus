@@ -105,6 +105,8 @@ export default class extends Controller {
     window.addEventListener("app-window:close", this.boundCloseRequest)
     this.boundLinkedAppSaved = this.onLinkedAppDocumentSaved.bind(this)
     window.addEventListener("nexus:linked-app-document-saved", this.boundLinkedAppSaved)
+    this.boundFinderItemRenamed = this.onFinderItemRenamed.bind(this)
+    window.addEventListener("nexus:finder-item-renamed", this.boundFinderItemRenamed)
     this.boundTimeCardClearState = this.handleTimeCardClearState.bind(this)
     window.addEventListener("nexus:time-card-clear-state", this.boundTimeCardClearState)
     this.boundViewportResize = () => {
@@ -173,6 +175,7 @@ export default class extends Controller {
     window.removeEventListener("nexus:notes-spawn-blank-window", this.boundSpawnBlankNoteWindow)
     window.removeEventListener("nexus:time-card-spawn-blank-window", this.boundSpawnBlankTimeCardWindow)
     window.removeEventListener("nexus:linked-app-document-saved", this.boundLinkedAppSaved)
+    window.removeEventListener("nexus:finder-item-renamed", this.boundFinderItemRenamed)
     window.removeEventListener("nexus:time-card-clear-state", this.boundTimeCardClearState)
     window.removeEventListener("resize", this.boundViewportResize)
     if (this.boundLinkedAppPickerClose) {
@@ -1310,6 +1313,20 @@ export default class extends Controller {
     if (!t) return
     this.persistLinkedAppOpenTitle(t)
     this.syncOpenFileBadge(t)
+  }
+
+  onFinderItemRenamed(event) {
+    const { itemId, newName, isFolder } = event.detail || {}
+    if (isFolder || !itemId || !newName) return
+    
+    const linkedDocId = this.readLinkedDocumentIdForCurrentFrame()
+    if (!linkedDocId || String(linkedDocId) !== String(itemId)) return
+    
+    const newTitle = (newName || "").trim()
+    if (!newTitle) return
+    
+    this.persistLinkedAppOpenTitle(newTitle)
+    this.syncOpenFileBadge(newTitle)
   }
 
   handleFrameLoad(event) {

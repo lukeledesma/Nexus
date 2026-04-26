@@ -63,6 +63,9 @@ export default class extends Controller {
 
       this.boundLinkedAppDocumentSaved = this.handleLinkedAppDocumentSaved.bind(this)
       window.addEventListener("nexus:linked-app-document-saved", this.boundLinkedAppDocumentSaved)
+
+      this.boundFinderStructureChanged = this.handleFinderStructureChanged.bind(this)
+      window.addEventListener("nexus:finder-structure-changed", this.boundFinderStructureChanged)
     }
   }
 
@@ -72,6 +75,9 @@ export default class extends Controller {
     }
     if (this.boundLinkedAppDocumentSaved) {
       window.removeEventListener("nexus:linked-app-document-saved", this.boundLinkedAppDocumentSaved)
+    }
+    if (this.boundFinderStructureChanged) {
+      window.removeEventListener("nexus:finder-structure-changed", this.boundFinderStructureChanged)
     }
     if (this.liveRefreshTimer) {
       clearTimeout(this.liveRefreshTimer)
@@ -137,6 +143,9 @@ export default class extends Controller {
     input.maxLength = 255
     input.setAttribute("aria-label", "File name")
     input.autocomplete = "off"
+    input.spellcheck = false
+    input.setAttribute("autocorrect", "off")
+    input.setAttribute("autocapitalize", "off")
     input.placeholder = "Name…"
 
     row.appendChild(icon)
@@ -445,6 +454,9 @@ export default class extends Controller {
     input.maxLength = 255
     input.setAttribute("aria-label", "New folder name")
     input.autocomplete = "off"
+    input.spellcheck = false
+    input.setAttribute("autocorrect", "off")
+    input.setAttribute("autocapitalize", "off")
 
     row.appendChild(icon)
     row.appendChild(input)
@@ -485,7 +497,13 @@ export default class extends Controller {
         }
         finished = true
         li.remove()
+        const folderId = data.id
         this.reloadFramePreservingBrowse()
+        if (folderId) {
+          window.dispatchEvent(new CustomEvent("nexus:finder-structure-changed", {
+            detail: { type: "folder_created", folderId, sectionKey: this.sectionKeyValue }
+          }))
+        }
       } catch (_e) {
         submitting = false
         window.alert("Could not create folder.")
@@ -535,6 +553,8 @@ export default class extends Controller {
     if (!renameUrl) return
     const label = li.querySelector("[data-finder-tree-label]")
     if (!label || li.querySelector(".finder-tree__pending-name-input")) return
+    const originalRow = label.closest(".finder-tree__row")
+    if (!originalRow) return
 
     const storageName = li.dataset.storageName || ""
     const displayTitle = li.dataset.displayTitle || label.textContent || ""
@@ -543,14 +563,37 @@ export default class extends Controller {
     input.className = "finder-folder-name-input finder-tree__pending-name-input"
     input.value = isFolder ? displayTitle : finderDisplayTitleFromStorageName(storageName)
     input.maxLength = 255
+    input.autocomplete = "off"
+    input.spellcheck = false
+    input.setAttribute("autocorrect", "off")
+    input.setAttribute("autocapitalize", "off")
 
-    label.replaceWith(input)
+    // Disable draggable on the row-line while editing — Chrome/Safari swallow
+    // spacebar keypresses inside any input that is a descendant of draggable="true".
+    const rowLine = li.querySelector(":scope > .finder-tree__row-line")
+    const prevDraggable = rowLine?.getAttribute("draggable")
+    if (rowLine) rowLine.setAttribute("draggable", "false")
+
+    const editingRow = document.createElement("div")
+    editingRow.className = `${originalRow.className} finder-tree__row--editing`
+    editingRow.setAttribute("role", "presentation")
+    const rowIcon = originalRow.querySelector(".finder-tree__icon")
+    if (rowIcon) editingRow.appendChild(rowIcon.cloneNode(true))
+    editingRow.appendChild(input)
+
+    const restoreDraggable = () => {
+      if (!rowLine) return
+      if (prevDraggable != null) rowLine.setAttribute("draggable", prevDraggable)
+      else rowLine.removeAttribute("draggable")
+    }
+
+    originalRow.replaceWith(editingRow)
     input.focus()
     input.select()
 
     const cancel = () => {
-      input.replaceWith(label)
-      label.textContent = displayTitle
+      restoreDraggable()
+      if (editingRow.isConnected) editingRow.replaceWith(originalRow)
     }
 
     const save = async () => {
@@ -571,8 +614,21 @@ export default class extends Controller {
         cancel()
         return
       }
-      await response.json().catch(() => ({}))
+      restoreDraggable()
+      const data = await response.json().catch(() => ({}))
+      const itemId = li?.dataset?.finderTreeNodeId
+      const newName = trimmed
       this.reloadFramePreservingBrowse()
+      if (itemId) {
+        window.dispatchEvent(new CustomEvent("nexus:finder-item-renamed", {
+          detail: { 
+            itemId, 
+            newName,
+            isFolder,
+            sectionKey: this.sectionKeyValue 
+          }
+        }))
+      }
     }
 
     input.addEventListener("keydown", (e) => {
@@ -630,6 +686,11 @@ export default class extends Controller {
     const currentBrowse = this.selectedBrowseId() || String(this.rootFolderIdValue || "")
     const nextBrowse = currentBrowse === deletedId ? this.rootFolderIdValue : currentBrowse
     this.reloadFrameWithBrowseId(nextBrowse, { pruneSubtreeLi: li })
+    if (kind === "folder" && deletedId) {
+      window.dispatchEvent(new CustomEvent("nexus:finder-structure-changed", {
+        detail: { type: "folder_deleted", folderId: deletedId, sectionKey: this.sectionKeyValue }
+      }))
+    }
   }
 
   selectedBrowseId() {
@@ -719,6 +780,12 @@ export default class extends Controller {
     const { frameId, documentId } = event.detail || {}
     if (!documentId) return
     if (frameId && frameId === this.frameIdValue) return
+    this.scheduleLiveRefresh()
+  }
+
+  handleFinderStructureChanged(event) {
+    const { sectionKey } = event.detail || {}
+    if (sectionKey && sectionKey !== this.sectionKeyValue) return
     this.scheduleLiveRefresh()
   }
 

@@ -7189,6 +7189,8 @@ a.finder-tree__row--file:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
   align-self: center;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .finder-folder-link .finder-folder-name-input,
