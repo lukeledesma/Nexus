@@ -1508,6 +1508,10 @@ a:hover { text-decoration: underline; }
   position: relative;
 }
 
+.task-list-content-shell--drag-active {
+  min-height: 56px;
+}
+
 .task-list-rows {
   position: relative;
 }
