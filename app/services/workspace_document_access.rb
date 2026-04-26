@@ -2,16 +2,17 @@
 
 # Documents the user may open from the workspace into linked apps (files under Finder 2).
 class WorkspaceDocumentAccess
-  def self.openable_document_for(user, document_id, content_type:)
-    doc = Document.find_by(id: document_id.to_i)
-    return nil unless doc&.file?
+  def self.openable_document_for(user, document_id, content_type:, section_key: nil, allow_embedded: true)
+    result = Apps::OpenLinkedDocument.call(
+      user: user,
+      document_id: document_id,
+      content_type: content_type,
+      section_key: section_key,
+      allow_embedded: allow_embedded
+    )
+    return nil unless result.success?
 
-    in_finder_sections = Apps::FinderController.document_in_any_finder_section?(user, doc)
-    in_embedded = document_in_embedded_subtree?(user, doc)
-    return nil unless in_finder_sections || in_embedded
-    return nil if content_type.present? && doc.content_type.to_s != content_type.to_s
-
-    doc
+    result.payload.fetch(:document)
   end
 
   def self.document_in_embedded_subtree?(user, doc)

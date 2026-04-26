@@ -55,7 +55,10 @@ class Document < ApplicationRecord
     value = title.to_s.strip.downcase
     return false if value.blank?
 
-    User.where("LOWER(username) = ?", value).exists?
+    identities = User.pluck(:username, :email).flatten.compact.map { |v| v.to_s.strip.downcase }.reject(&:blank?).uniq
+    identities.any? do |identity|
+      value == identity || value.match?(/\A#{Regexp.escape(identity)} \d+\z/)
+    end
   end
 
   # Embedded and fixed Finder section roots under the user workspace cannot be renamed/deleted from the UI.
@@ -63,14 +66,18 @@ class Document < ApplicationRecord
     return false unless folder?
     return false if user_workspace_root?
 
-    p = parent
-    return false unless p&.user_workspace_root?
+    protected_titles = %w[Embedded Documents Tasks Images Audio]
+    return false unless protected_titles.any? { |name| title.to_s.casecmp?(name) }
 
-    %w[Embedded Documents Tasks Images Audio].any? { |name| title.to_s.casecmp?(name) }
+    p = parent
+    return true if p&.user_workspace_root?
+
+    p&.folder? && p.title.to_s.casecmp?("Finder") && p.parent&.user_workspace_root?
   end
 
   def sync_create_to_disk
     return unless persisted?
+    return if Current.suppress_document_disk_sync
     return if defined?(DocumentDiskLoader) && DocumentDiskLoader.syncing?
 
     DocumentStorageSyncLite.new(self).create
@@ -78,12 +85,14 @@ class Document < ApplicationRecord
 
   def sync_update_to_disk
     return unless persisted?
+    return if Current.suppress_document_disk_sync
     return if defined?(DocumentDiskLoader) && DocumentDiskLoader.syncing?
 
     DocumentStorageSyncLite.new(self).update
   end
 
   def sync_destroy_on_disk
+    return if Current.suppress_document_disk_sync
     return if defined?(DocumentDiskLoader) && DocumentDiskLoader.syncing?
 
     DocumentStorageSyncLite.new(self).destroy

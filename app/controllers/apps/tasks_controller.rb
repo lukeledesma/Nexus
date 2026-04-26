@@ -19,57 +19,33 @@ module Apps
 
     # POST /apps/tasks/save_file
     def save_file
-      folder_id = params[:folder_id].presence
-      frame_id = params[:frame_id].to_s
-      filename = params[:filename].to_s
-      requested_document_id = params[:document_id].presence
-
-      # If the client passes the embedded draft id, treat this as "save draft as new file"
-      # instead of "update existing document".
-      document_id = normalize_save_document_id(frame_id, requested_document_id)
-
-      if folder_id.blank? || frame_id.blank? || filename.blank?
-        render json: { error: "folder_id, frame_id, and filename are required" }, status: :bad_request
-        return
-      end
-
-      result, payload = LinkedAppSaveToDocument.new(
+      result = Tasks::SaveFile.call(
         user: current_user,
-        folder_id: folder_id,
-        frame_id: frame_id,
-        filename: filename,
-        document_id: document_id,
+        folder_id: params[:folder_id].presence,
+        frame_id: params[:frame_id],
+        filename: params[:filename],
+        requested_document_id: params[:document_id].presence,
         note_text: params[:note_text],
         task_payload: params[:task_payload]
-      ).call
+      )
 
-      case result
+      case result.status
       when :ok
-        # Determine if this is a draft save (no document_id after normalization means
-        # creating a new file from embedded draft, not updating an existing linked file).
-        is_embedded_draft_save = document_id.blank?
-        
-        # Clear the draft BEFORE returning response so frontend doesn't see stale content
-        if is_embedded_draft_save
-          app_key = infer_app_key_from_frame_id(frame_id)
-          EmbeddedDraftDocument.clear_draft!(user: current_user, app_key: app_key) if app_key.present?
-        end
-
-        disp = helpers.finder_document_display_title(payload[:title])
-        # Signal that this save cleared an embedded draft, so don't restore it as a linked document.
+        payload = result.payload || {}
+        display_title = helpers.finder_document_display_title(payload[:title])
         render json: payload.merge(
           ok: true,
-          display_title: disp,
-          cleared_embedded_draft: is_embedded_draft_save
+          display_title: display_title,
+          cleared_embedded_draft: payload[:cleared_embedded_draft]
         )
       when :not_found
         head :not_found
       when :forbidden
         head :forbidden
       when :unprocessable_entity
-        render json: payload || { error: "Could not save file." }, status: :unprocessable_entity
+        render json: result.payload || { error: "Could not save file." }, status: :unprocessable_entity
       when :bad_request
-        render json: payload, status: :bad_request
+        render json: result.payload, status: :bad_request
       else
         head :internal_server_error
       end
@@ -97,8 +73,14 @@ module Apps
     def resolved_task_document
       did = params[:document_id].presence
       if did.present?
-        doc = WorkspaceDocumentAccess.openable_document_for(current_user, did, content_type: "task_list")
-        return doc if doc
+        result = Apps::OpenLinkedDocument.call(
+          user: current_user,
+          document_id: did,
+          content_type: "task_list",
+          section_key: "documents",
+          allow_embedded: true
+        )
+        return result.payload.fetch(:document) if result.success?
       end
 
       EmbeddedDraftDocument.fetch_or_create(user: current_user, app_key: "tasks")
@@ -161,34 +143,5 @@ module Apps
       end
     end
 
-    def infer_app_key_from_frame_id(frame_id)
-      case frame_id
-      when "tasks-pane", /^task-spawn-/
-        "tasks"
-      when "notes-pane", /^note-spawn-/
-        "notes"
-      when "time-card-pane", /^time-card-spawn-/
-        "time-card"
-      else
-        nil
-      end
-    end
-
-    def normalize_save_document_id(frame_id, requested_document_id)
-      return nil if requested_document_id.blank?
-
-      doc_id = requested_document_id.to_i
-      return nil if doc_id <= 0
-
-      app_key = infer_app_key_from_frame_id(frame_id)
-      return doc_id if app_key.blank?
-
-      draft = EmbeddedDraftDocument.fetch_or_create(user: current_user, app_key: app_key)
-      return nil if draft && draft.id == doc_id
-
-      doc_id
-    rescue StandardError
-      doc_id
-    end
   end
 end

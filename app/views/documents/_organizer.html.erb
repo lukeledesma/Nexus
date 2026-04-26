@@ -65,7 +65,7 @@
         </li>
         <% @root_files.each do |doc| %>
           <% display_name = doc.title.presence || "Untitled" %>
-          <li class="doc-row doc-row--file-inline" tabindex="0" data-recent-docs-target="doc" data-doc-kind="file" data-delete-url="<%= document_path(doc) %>">
+          <li class="doc-row doc-row--file-inline" tabindex="0" data-recent-docs-target="doc" data-doc-kind="file" data-delete-url="<%= document_path(doc) %>" data-open-url="<%= document_path(doc) %>" data-action="click->recent-docs#openDocRow keydown->recent-docs#openDocRowKey">
             <div class="doc-link doc-link--static organizer-row file-row">
               <span class="row-left">
                 <%= link_to(display_name.presence || "Untitled", document_path(doc), class: "file-link", data: { rename_target: "label" }) %>

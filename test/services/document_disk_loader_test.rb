@@ -1,4 +1,5 @@
 require "test_helper"
+require "securerandom"
 
 class DocumentDiskLoaderTest < ActiveSupport::TestCase
   test "task list parser understands explicit main and subtask markers" do
@@ -74,5 +75,28 @@ class DocumentDiskLoaderTest < ActiveSupport::TestCase
 
     assert_not Document.exists?(stale_folder.id), "expected missing folders to be purged"
     assert_not Document.exists?(stale_file.id), "expected missing files to still be purged"
+  end
+
+  test "purge keeps embedded drafts even when draft file is missing" do
+    suffix = SecureRandom.hex(4)
+    user = User.create!(
+      email: "disk_loader_draft_#{suffix}@example.com",
+      username: "disk_loader_user_#{suffix}",
+      password: "password123",
+      password_confirmation: "password123"
+    )
+    FinderWorkspaceInitializer.ensure_for_user!(user)
+    draft = EmbeddedDraftDocument.fetch_or_create(user: user, app_key: "tasks")
+    assert draft
+
+    draft_path = DocumentStorageSyncLite.storage_root.join(draft.storage_path.to_s)
+    FileUtils.rm_f(draft_path)
+
+    DocumentDiskLoader.send(:purge_missing_from_database!, [])
+
+    assert Document.exists?(draft.id), "expected embedded draft row to remain after purge"
+  ensure
+    Document.delete_all
+    User.where(id: user&.id).delete_all
   end
 end

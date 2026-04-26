@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "marcel"
-
 class DocumentsController < ApplicationController
   before_action :sync_from_disk, only: %i[index organizer_fragment]
   before_action :set_document, only: %i[show edit update destroy create_file create_subfolder move_folder move_file upload_images rename toggle_favorite file_list asset_file]
@@ -24,7 +22,8 @@ class DocumentsController < ApplicationController
     folder_name = next_folder_name
     folder = Document.new(is_folder: true, title: folder_name)
 
-    unless folder.save
+    result = persist_document(folder, operation: :create)
+    unless result.success?
       render plain: "Could not create folder.", status: :unprocessable_entity
       return
     end
@@ -76,7 +75,8 @@ class DocumentsController < ApplicationController
   def create
     if params[:new_folder].present?
       folder = Document.new(is_folder: true, title: next_folder_name)
-      if folder.save
+      result = persist_document(folder, operation: :create)
+      if result.success?
         flash[:created_folder_id] = folder.id
         flash[:created_folder_name] = folder.title
         redirect_to root_path
@@ -114,7 +114,8 @@ class DocumentsController < ApplicationController
       @document.content = params.dig(:document, :content).to_s
     end
 
-    if @document.save
+    result = persist_document(@document, operation: :update)
+    if result.success?
       head :no_content
     else
       render json: { error: @document.errors.full_messages.to_sentence }, status: :unprocessable_entity
@@ -122,205 +123,83 @@ class DocumentsController < ApplicationController
   end
 
   def create_subfolder
-    unless @document.folder?
-      render json: { error: "Parent must be a folder" }, status: :unprocessable_entity
-      return
-    end
-
-    title = params[:title].to_s.strip
-    if title.blank?
-      render json: { error: "Folder name is required." }, status: :unprocessable_entity
-      return
-    end
-
-    if title.start_with?(".")
-      render json: { error: "Name cannot start with a period" }, status: :unprocessable_entity
-      return
-    end
-
-    child = Document.new(is_folder: true, parent: @document, title: title)
-
-    if child.save
-      render json: { ok: true, id: child.id, title: child.title }
+    result = Documents::CreateSubfolder.call(parent: @document, title: params[:title])
+    if result.success?
+      render json: { ok: true, id: result.payload[:id], title: result.payload[:title] }
     else
-      render json: { error: child.errors.full_messages.to_sentence }, status: :unprocessable_entity
+      render json: { error: result.error }, status: result.status
     end
   end
 
   def create_file
-    unless @document.folder?
-      redirect_to root_path, alert: "Items can only be created inside folders."
-      return
-    end
-
-    content_type = normalize_content_type(params[:content_type])
-    initial_content = nil
-
-    item = Document.new(
-      is_folder: false,
-      parent: @document,
-      title: next_item_title(@document, content_type),
-      content_type: content_type,
-      content: initial_content,
-      tasks: [],
-      reset_mode: "none",
-      reset_days: []
-    )
-
-    if item.save
+    result = Documents::CreateFile.call(parent: @document, content_type: params[:content_type])
+    if result.success?
       if request.xhr? || request.format.json?
-        render json: { ok: true, folder_id: @document.id, file_id: item.id }
+        render json: { ok: true, folder_id: result.payload[:folder_id], file_id: result.payload[:file_id] }
         return
       end
 
-      flash[:created_file_id] = item.id
+      flash[:created_file_id] = result.payload[:file_id]
       redirect_to root_path
     else
       if request.xhr? || request.format.json?
-        render json: { error: "Could not create item." }, status: :unprocessable_entity
+        render json: { error: result.error }, status: result.status
         return
       end
 
-      redirect_to root_path, alert: "Could not create item."
+      redirect_to root_path, alert: result.error
     end
   end
 
   def move_folder
-    unless @document.folder?
-      render json: { error: "Only folders can be moved." }, status: :unprocessable_entity
-      return
-    end
+    result = Documents::MoveDocument.call(
+      user: current_user,
+      document: @document,
+      parent_id: params[:parent_id],
+      kind: :folder
+    )
 
-    if @document.user_workspace_root? || @document.protected_workspace_structure?
-      render json: { error: "This folder cannot be moved." }, status: :forbidden
-      return
+    if result.success?
+      render json: { ok: true, id: result.payload[:id], parent_id: result.payload[:parent_id] }
+    else
+      render json: { error: result.error }, status: result.status
     end
-
-    finder_root = Apps::FinderController.finder_section_root_for_document(current_user, @document)
-    unless finder_root && Apps::FinderController.document_in_finder_subtree?(finder_root, @document)
-      render json: { error: "Folder is not in Finder." }, status: :forbidden
-      return
-    end
-
-    new_parent, err = finder_reparent_target_or_error(finder_root)
-    if err
-      render json: { error: err.fetch(:message) }, status: err.fetch(:status)
-      return
-    end
-
-    if new_parent.id == @document.id || node_within_folder_tree?(@document, new_parent)
-      render json: { error: "Cannot move a folder into itself or its subfolder." }, status: :unprocessable_entity
-      return
-    end
-
-    finder_apply_reparent_json!(new_parent)
   end
 
   def move_file
-    unless @document.file?
-      render json: { error: "Only files can be moved with this action." }, status: :unprocessable_entity
-      return
-    end
+    result = Documents::MoveDocument.call(
+      user: current_user,
+      document: @document,
+      parent_id: params[:parent_id],
+      kind: :file
+    )
 
-    finder_root = Apps::FinderController.finder_section_root_for_document(current_user, @document)
-    unless finder_root && Apps::FinderController.document_in_finder_subtree?(finder_root, @document)
-      render json: { error: "File is not in Finder." }, status: :forbidden
-      return
+    if result.success?
+      render json: { ok: true, id: result.payload[:id], parent_id: result.payload[:parent_id] }
+    else
+      render json: { error: result.error }, status: result.status
     end
-
-    new_parent, err = finder_reparent_target_or_error(finder_root)
-    if err
-      render json: { error: err.fetch(:message) }, status: err.fetch(:status)
-      return
-    end
-
-    finder_apply_reparent_json!(new_parent)
   end
 
   # Multipart POST: `files` or `files[]` — drops into Finder sections or Wallpaper.
   def upload_images
-    unless @document.folder?
-      render json: { error: "Upload into a folder only." }, status: :unprocessable_entity
-      return
-    end
+    result = Documents::UploadFiles.call(user: current_user, folder: @document, files: params[:files])
 
-    finder_root = Apps::FinderController.finder_section_root_for_document(current_user, @document)
-    in_finder = finder_root && Apps::FinderController.document_in_finder_subtree?(finder_root, @document)
-    iimage_folder = EmbeddedIimageFolder.document_for(current_user)
-    in_iimage = iimage_folder && @document.id == iimage_folder.id
-
-    unless in_finder || in_iimage
-      render json: { error: "Can only upload into allowed folders." }, status: :forbidden
-      return
-    end
-
-    if @document.protected_workspace_structure?
-      render json: { error: "Cannot upload into that folder." }, status: :forbidden
-      return
-    end
-
-    list = normalize_uploaded_file_list(params[:files])
-    if list.empty?
-      render json: { error: "No files received." }, status: :unprocessable_entity
-      return
-    end
-
-    created_ids = []
-    errors = []
-
-    list.each do |uploaded|
-      ext = File.extname(uploaded.original_filename.to_s).downcase
-      if in_iimage
-        unless allowed_wallpaper_upload?(uploaded, ext)
-          errors << "#{uploaded.original_filename}: Only JPEG and PNG images are allowed here."
-          next
-        end
-
-        doc, error_message = build_uploaded_asset_document(uploaded, ext)
-      elsif text_like_finder_upload_extension?(ext)
-        doc, error_message = build_uploaded_text_document(uploaded)
-      else
-        doc, error_message = build_uploaded_asset_document(uploaded, ext)
-      end
-
-      if doc&.save
-        created_ids << doc.id
-      else
-        errors << "#{uploaded.original_filename}: #{error_message || doc&.errors&.full_messages&.to_sentence || "Could not upload."}"
-      end
-    end
-
-    if created_ids.any?
-      files_payload =
-        Document.where(id: created_ids).order(:id).map do |d|
-          ext = File.extname(d.storage_path.to_s).downcase
-          {
-            id: d.id,
-            name: d.title.to_s,
-            ext: ext,
-            kind_label: case ext
-                        when ".png" then "PNG"
-                        when ".mp3" then "MP3"
-                        when ".wav" then "WAV"
-                        else "JPEG"
-                        end
-          }
-        end
-      render json: { ok: true, ids: created_ids, files: files_payload, errors: errors }
-    elsif errors.any?
-      render json: { error: errors.join(" ") }, status: :unprocessable_entity
+    if result.success?
+      render json: { ok: true, ids: result.payload[:ids], files: result.payload[:files], errors: result.payload[:errors] }
     else
-      render json: { error: "Could not upload files." }, status: :unprocessable_entity
+      render json: { error: result.error }, status: result.status
     end
   end
 
   def rename
-    if @document.user_workspace_root?
+    policy = ::DocumentPolicy.new(user: current_user, document: @document)
+    if policy.user_workspace_root?
       render json: { error: "User root folders cannot be renamed." }, status: :forbidden
       return
     end
 
-    if @document.protected_workspace_structure?
+    unless policy.can_rename?
       render json: { error: "This folder cannot be renamed." }, status: :forbidden
       return
     end
@@ -338,7 +217,8 @@ class DocumentsController < ApplicationController
 
     @document.title = name
 
-    if @document.save
+    result = persist_document(@document, operation: :update)
+    if result.success?
       render json: { ok: true, name: @document.title }
     else
       render json: { error: @document.errors.full_messages.to_sentence }, status: :unprocessable_entity
@@ -346,17 +226,19 @@ class DocumentsController < ApplicationController
   end
 
   def toggle_favorite
+    policy = ::DocumentPolicy.new(user: current_user, document: @document)
+
     unless favorites_column_available?
       render json: { error: "Favorites are temporarily unavailable." }, status: :service_unavailable
       return
     end
 
-    if @document.user_workspace_root?
+    if policy.user_workspace_root?
       render json: { error: "This item cannot be favorited." }, status: :forbidden
       return
     end
 
-    unless @document.file?
+    unless policy.can_toggle_favorite?(favorites_available: true)
       render json: { error: "Only files can be favorited." }, status: :unprocessable_entity
       return
     end
@@ -366,7 +248,8 @@ class DocumentsController < ApplicationController
   end
 
   def destroy
-    if @document.user_workspace_root?
+    policy = ::DocumentPolicy.new(user: current_user, document: @document)
+    if policy.user_workspace_root?
       message = "User root folders are protected."
       if request.xhr? || request.format.json?
         render json: { error: message }, status: :forbidden
@@ -376,7 +259,7 @@ class DocumentsController < ApplicationController
       return
     end
 
-    if @document.protected_workspace_structure?
+    unless policy.can_delete?
       message = "This folder is part of the workspace layout and cannot be deleted."
       if request.xhr? || request.format.json?
         render json: { error: message }, status: :forbidden
@@ -386,7 +269,16 @@ class DocumentsController < ApplicationController
       return
     end
 
-    @document.destroy
+    result = DocumentPersistence.destroy(@document)
+    unless result.success?
+      message = result.error.presence || "Could not delete item."
+      if request.xhr? || request.format.json?
+        render json: { error: message }, status: :unprocessable_entity
+      else
+        redirect_to root_path, alert: message
+      end
+      return
+    end
 
     if request.xhr? || request.format.json?
       head :no_content
@@ -467,144 +359,6 @@ class DocumentsController < ApplicationController
     "#{base} #{expected}"
   end
 
-  def next_item_title(folder, content_type)
-    base = case content_type.to_s
-           when "task_list" then "Untitled Task List"
-           else "Untitled Note"
-           end
-    names = folder.children.files.where(content_type: content_type).pluck(:title).map(&:to_s)
-    return base unless names.include?(base)
-
-    suffixes = names
-      .map { |name| name[/^#{Regexp.escape(base)} (\d+)$/, 1]&.to_i }
-      .compact
-      .select { |num| num >= 2 }
-      .uniq
-      .sort
-
-    expected = 2
-    suffixes.each do |num|
-      return "#{base} #{expected}" if num != expected
-
-      expected += 1
-    end
-
-    "#{base} #{expected}"
-  end
-
-  def normalize_content_type(raw)
-    value = raw.to_s
-    return value if Document::CONTENT_TYPES.include?(value)
-
-    "task_list"
-  end
-
-  # --- Finder tree reparent (move_folder / move_file) ---
-
-  # Returns [new_parent, nil] or [nil, { message:, status: }] for JSON error responses.
-  def finder_reparent_target_or_error(finder_root)
-    parent_id = params[:parent_id].presence&.to_i
-    if parent_id.blank? || parent_id <= 0
-      return [nil, { message: "Choose a folder to move into.", status: :unprocessable_entity }]
-    end
-
-    new_parent = Document.find_by(id: parent_id)
-    unless new_parent&.folder?
-      return [nil, { message: "Invalid folder.", status: :unprocessable_entity }]
-    end
-
-    unless Apps::FinderController.document_in_finder_subtree?(finder_root, new_parent)
-      return [nil, { message: "Can only move into folders in Finder.", status: :forbidden }]
-    end
-
-    if new_parent.protected_workspace_structure?
-      return [nil, { message: "Cannot move into that folder.", status: :forbidden }]
-    end
-
-    [new_parent, nil]
-  end
-
-  def finder_apply_reparent_json!(new_parent)
-    @document.parent = new_parent
-    if @document.save
-      render json: { ok: true, id: @document.id, parent_id: new_parent.id }
-    else
-      render json: { error: @document.errors.full_messages.to_sentence }, status: :unprocessable_entity
-    end
-  end
-
-  # True if +node+ is +folder+ or any descendant of +folder+ (walk parents from +node+).
-  def node_within_folder_tree?(folder, node)
-    p = node
-    while p
-      return true if p.id == folder.id
-      p = p.parent
-    end
-    false
-  end
-
-  def normalize_uploaded_file_list(raw)
-    return [] if raw.blank?
-
-    arr = raw.is_a?(Array) ? raw.compact : [raw]
-    arr.select { |f| f.respond_to?(:tempfile) && f.respond_to?(:read) }
-  end
-
-  def allowed_wallpaper_upload?(uploaded, ext)
-    return false unless %w[.jpg .jpeg .png].include?(ext)
-
-    mime = Marcel::MimeType.for(Pathname.new(uploaded.tempfile.path))
-    %w[image/jpeg image/png].include?(mime)
-  rescue StandardError
-    false
-  end
-
-  def text_like_finder_upload_extension?(ext)
-    %w[.txt .nexus .rtf].include?(ext)
-  end
-
-  def upload_filename_stem(uploaded, fallback: "Untitled")
-    ext = File.extname(uploaded.original_filename.to_s)
-    stem = File.basename(uploaded.original_filename.to_s, ext)
-    stem = stem.gsub(/[^\p{L}\p{N}\s._-]/u, "_").strip
-    stem.presence || fallback
-  end
-
-  def build_uploaded_asset_document(uploaded, ext)
-    bytes = uploaded.read
-    uploaded.rewind if uploaded.respond_to?(:rewind)
-
-    doc = Document.new(
-      is_folder: false,
-      parent: @document,
-      title: upload_filename_stem(uploaded, fallback: "Asset"),
-      content_type: "asset",
-      pending_disk_extension: ext.presence,
-      pending_asset_bytes: bytes
-    )
-    [doc, nil]
-  rescue StandardError
-    [nil, "Could not read file bytes."]
-  end
-
-  def build_uploaded_text_document(uploaded)
-    parsed = DocumentDiskLoader.send(:parse_nexus_file, uploaded.tempfile.path)
-    doc = Document.new(
-      is_folder: false,
-      parent: @document,
-      title: upload_filename_stem(uploaded),
-      content_type: parsed[:content_type].presence || "note",
-      content: parsed[:content],
-      tasks: parsed[:tasks] || [],
-      reset_mode: parsed[:reset_mode].presence || "none",
-      reset_days: parsed[:reset_days] || [],
-      last_reset_at: parsed[:last_reset_at]
-    )
-    [doc, nil]
-  rescue StandardError
-    [nil, "Could not import text file."]
-  end
-
   def parse_tasks_payload
     raw = params.dig(:document, :tasks_payload).to_s
     parsed = JSON.parse(raw)
@@ -645,6 +399,16 @@ class DocumentsController < ApplicationController
     return document.is_favorited? if document.respond_to?(:is_favorited?)
 
     false
+  end
+
+  def persist_document(document, operation:)
+    result = DocumentPersistence.persist(document, operation: operation)
+    return result if result.success?
+
+    if result.error.present? && document.errors.empty?
+      document.errors.add(:base, result.error)
+    end
+    result
   end
 
 end

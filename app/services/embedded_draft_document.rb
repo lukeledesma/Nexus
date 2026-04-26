@@ -13,19 +13,18 @@ class EmbeddedDraftDocument
       config = APP_CONFIG[app_key.to_s]
       return nil unless config
 
-      root = FinderListedFolders.workspace_root_for(user)
-      return nil unless root
-
-      embedded = root.children.folders.find { |d| d.title.to_s.strip.casecmp?("embedded") }
+      embedded = embedded_folder_for(user)
       return nil unless embedded
 
-      existing = embedded.children.files.where("LOWER(title) = ?", config[:title].downcase).first
+      existing = canonical_draft_for_embedded(embedded, config)
       if existing
         ensure_synced_to_disk!(existing)
         return existing
       end
 
-      created = create_draft!(embedded, app_key.to_s, config)
+      created = embedded.with_lock do
+        canonical_draft_for_embedded(embedded, config) || create_draft!(embedded, app_key.to_s, config)
+      end
       ensure_synced_to_disk!(created)
       created
     rescue StandardError
@@ -36,13 +35,10 @@ class EmbeddedDraftDocument
       config = APP_CONFIG[app_key.to_s]
       return false unless config
 
-      root = FinderListedFolders.workspace_root_for(user)
-      return false unless root
-
-      embedded = root.children.folders.find { |d| d.title.to_s.strip.casecmp?("embedded") }
+      embedded = embedded_folder_for(user)
       return false unless embedded
 
-      draft = embedded.children.files.where("LOWER(title) = ?", config[:title].downcase).first
+      draft = canonical_draft_for_embedded(embedded, config)
       return false unless draft
 
       # Reset draft to empty state without destroying it so it's available for next session.
@@ -78,7 +74,33 @@ class EmbeddedDraftDocument
       false
     end
 
+    def draft_document?(doc)
+      return false unless doc&.file?
+
+      config = APP_CONFIG.values.find do |item|
+        doc.title.to_s.casecmp?(item[:title]) && doc.content_type.to_s == item[:content_type]
+      end
+      return false unless config
+
+      doc.parent&.folder? && doc.parent.title.to_s.casecmp?("Embedded")
+    end
+
     private
+
+    def embedded_folder_for(user)
+      root = FinderListedFolders.workspace_root_for(user)
+      return nil unless root
+
+      root.children.folders.find { |d| d.title.to_s.strip.casecmp?("embedded") }
+    end
+
+    def canonical_draft_for_embedded(embedded, config)
+      embedded.children.files
+        .where("LOWER(title) = ?", config[:title].downcase)
+        .where(content_type: config[:content_type])
+        .order(:id)
+        .first
+    end
 
     def create_draft!(embedded, app_key, config)
       attrs = {

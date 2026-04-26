@@ -3,22 +3,22 @@
 module Apps
   class NotesController < BaseController
     def show
-      notes_root = Apps::FinderController.workspace_section_root(current_user, "notes")
-
       @linked_document_id = nil
       @linked_document_display_title = nil
       @note_text = ""
 
-      raw = params[:document_id].to_s.strip
-      if raw.match?(/^\d+$/)
-        doc = WorkspaceDocumentAccess.openable_document_for(current_user, raw, content_type: "note")
-        in_notes_section = doc && notes_root && Apps::FinderController.document_in_finder_subtree?(notes_root, doc)
-        in_embedded = doc && WorkspaceDocumentAccess.document_in_embedded_subtree?(current_user, doc)
-        if in_notes_section || in_embedded
-          @linked_document_id = doc.id
-          @linked_document_display_title = helpers.finder_document_display_title(doc.title.to_s)
-          @note_text = plain_text_from_note_html(doc.content.to_s)
-        end
+      result = Apps::OpenLinkedDocument.call(
+        user: current_user,
+        document_id: params[:document_id],
+        content_type: "note",
+        section_key: "notes",
+        allow_embedded: true
+      )
+      if result.success?
+        doc = result.payload.fetch(:document)
+        @linked_document_id = doc.id
+        @linked_document_display_title = helpers.finder_document_display_title(doc.title.to_s)
+        @note_text = plain_text_from_note_html(doc.content.to_s)
       end
 
       render layout: false if turbo_frame_request?

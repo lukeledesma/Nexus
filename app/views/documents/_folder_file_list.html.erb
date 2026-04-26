@@ -5,7 +5,7 @@
       <% if file_doc %>
         <% file_row_classes = ["organizer-row", "file-row", "plc-file-row"] %>
         <% file_row_classes << "file-row--created" if flash[:created_file_id].to_i == file_doc.id %>
-        <div class="<%= file_row_classes.join(' ') %>" tabindex="0" data-recent-docs-target="doc" data-doc-kind="file" data-file-name="<%= file_entry[:name] %>" data-delete-url="<%= document_path(file_doc) %>">
+        <div class="<%= file_row_classes.join(' ') %>" tabindex="0" data-recent-docs-target="doc" data-doc-kind="file" data-file-name="<%= file_entry[:name] %>" data-delete-url="<%= document_path(file_doc) %>" data-open-url="<%= document_path(file_doc) %>" data-action="click->recent-docs#openDocRow keydown->recent-docs#openDocRowKey">
           <div class="row-left">
             <%= link_to(file_entry[:name].presence || "Untitled", document_path(file_doc), class: "file-link", data: { rename_target: "label" }) %>
           </div>

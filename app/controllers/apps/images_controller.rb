@@ -7,10 +7,14 @@ module Apps
     def show
       @linked_document_id = nil
       @linked_document_display_title = nil
-      raw = params[:document_id].to_s.strip
-      if raw.match?(/^\d+$/)
-        doc = WorkspaceDocumentAccess.openable_document_for(current_user, raw, content_type: "asset")
-        if doc && image_asset_document?(doc)
+      result = Apps::OpenLinkedDocument.call(
+        user: current_user,
+        document_id: params[:document_id],
+        content_type: "asset"
+      )
+      if result.success?
+        doc = result.payload.fetch(:document)
+        if image_asset_document?(doc)
           @linked_document_id = doc.id
           @linked_document_display_title = helpers.finder_document_display_title(doc.title.to_s)
         end

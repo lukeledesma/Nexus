@@ -46,10 +46,9 @@ export default class extends Controller {
       return
     }
 
-    const visibleInstance = this.findVisibleInstanceForAppRow(appKey)
-    if (visibleInstance) {
-      const targetAppKey = visibleInstance.dataset.contentWindowAppKeyValue || appKey
-      window.dispatchEvent(new CustomEvent("app-window:toggle", { detail: { appKey: targetAppKey } }))
+    const instances = this.findInstancesForAppRow(appKey)
+    if (instances.length > 0) {
+      this.expandAndHighlightInstances(instances, appKey)
       return
     }
 
@@ -64,7 +63,7 @@ export default class extends Controller {
     }))
   }
 
-  findVisibleInstanceForAppRow(appKey) {
+  findInstancesForAppRow(appKey) {
     const selectorByApp = {
       "tasks": 'section.content-window[data-content-window-app-key-value="tasks"], section.content-window[data-content-window-app-key-value^="task-spawn-"]',
       "notes": 'section.content-window[data-content-window-app-key-value="notes"], section.content-window[data-content-window-app-key-value^="note-spawn-"]',
@@ -74,21 +73,44 @@ export default class extends Controller {
     }
 
     const selector = selectorByApp[appKey]
-    if (!selector) return null
+    if (!selector) return []
 
-    const nodes = Array.from(document.querySelectorAll(selector)).filter((el) => !el.classList.contains("is-hidden"))
+    const nodes = Array.from(document.querySelectorAll(selector))
 
-    if (!nodes.length) return null
+    if (!nodes.length) return []
 
-    // Prefer top-most visible window for this app group.
-    nodes.sort((a, b) => {
+    // Bring back windows from back to front so the final stack order is predictable.
+    return nodes.sort((a, b) => {
       const za = Number.parseInt(a.style.zIndex || window.getComputedStyle(a).zIndex || "0", 10)
       const zb = Number.parseInt(b.style.zIndex || window.getComputedStyle(b).zIndex || "0", 10)
-      return (Number.isFinite(zb) ? zb : 0) - (Number.isFinite(za) ? za : 0)
+      return (Number.isFinite(za) ? za : 0) - (Number.isFinite(zb) ? zb : 0)
+    })
+  }
+
+  expandAndHighlightInstances(instances, fallbackAppKey) {
+    if (!Array.isArray(instances) || instances.length === 0) return
+
+    instances.forEach((windowEl) => {
+      const targetAppKey = windowEl.dataset.contentWindowAppKeyValue || fallbackAppKey
+      window.dispatchEvent(new CustomEvent("app-window:toggle", { detail: { appKey: targetAppKey } }))
     })
 
-    return nodes[0] || null
+    // After opening/bringing forward, pulse all instances so users can see every open window.
+    requestAnimationFrame(() => {
+      instances.forEach((windowEl) => {
+        if (windowEl.classList.contains("is-hidden")) return
+        windowEl.classList.remove("content-window--focus-pulse", "content-window--focus-pulse-static", "content-window--focus-flash")
+        void windowEl.offsetWidth
+        windowEl.classList.add("content-window--focus-pulse-static")
+        if (windowEl.__nexusFocusPulseTimer) window.clearTimeout(windowEl.__nexusFocusPulseTimer)
+        windowEl.__nexusFocusPulseTimer = window.setTimeout(() => {
+          windowEl.classList.remove("content-window--focus-pulse", "content-window--focus-pulse-static", "content-window--focus-flash")
+          windowEl.__nexusFocusPulseTimer = null
+        }, 220)
+      })
+    })
   }
+
   noopAppAction(event) {
     event.preventDefault()
     event.stopPropagation()

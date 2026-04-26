@@ -5,7 +5,6 @@ require "set"
 module Apps
   class FinderController < BaseController
     DEFAULT_SECTION_KEY = "documents"
-    LEGACY_DOCUMENTS_SECTION_TITLE = "Documents"
     TASKS_SECTION_TITLE = "Tasks"
     TIME_CARD_SECTION_TITLE = "Time Card"
     NOTES_SECTION_TITLE = "Notes"
@@ -33,7 +32,6 @@ module Apps
       "audio-pane" => { section_key: "audio", content_type: "asset", allow_save: false },
       "images-pane" => { section_key: "images", content_type: "asset", allow_save: false }
     }.freeze
-    LEGACY_FINDER_WORKSPACE_FOLDER_TITLE = "Finder"
     # Matches file kinds with an opener app (see finder_browser_controller.js).
     LINKED_FILE_CONTENT_TYPES = %w[note task_list asset].freeze
 
@@ -72,51 +70,10 @@ module Apps
       end
 
       def workspace_section_roots(user)
-        root = workspace_root_folder(user)
-        return {} unless root
+        roots = FinderWorkspaceInitializer.section_roots_for(user)
+        return roots if roots.present?
 
-        finder_root = workspace_finder_container!(root)
-        return {} unless finder_root
-
-        migrate_documents_section_to_tasks!(finder_root)
-
-        workspace_section_definitions.each_with_object({}) do |definition, out|
-          if definition[:key] == "favorites"
-            out[definition[:key]] = nil
-            next
-          end
-
-          title = definition[:title]
-          existing = finder_root.children.folders.find { |d| d.title.to_s.strip.casecmp?(title) }
-          out[definition[:key]] = existing || finder_root.children.create!(is_folder: true, title: title)
-        end
-      rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid
-        root = workspace_root_folder(user)
-        finder_root = workspace_finder_container!(root)
-        return {} unless root
-        return {} unless finder_root
-
-        workspace_section_definitions.each_with_object({}) do |definition, out|
-          if definition[:key] == "favorites"
-            out[definition[:key]] = nil
-            next
-          end
-
-          folder = finder_root.children.folders.find { |d| d.title.to_s.strip.casecmp?(definition[:title]) }
-          out[definition[:key]] = folder if folder
-        end
-      ensure
-        finder_root ||= workspace_finder_container!(root)
-        roots = workspace_section_definitions.each_with_object({}) do |definition, out|
-          if definition[:key] == "favorites"
-            out[definition[:key]] = nil
-            next
-          end
-
-          out[definition[:key]] ||= finder_root&.children&.folders&.find { |d| d.title.to_s.strip.casecmp?(definition[:title]) }
-        end
-        migrate_legacy_notes_folder_from_tasks!(roots["documents"], roots["notes"])
-        migrate_legacy_favorites_folder!(finder_root, roots["documents"])
+        FinderWorkspaceInitializer.ensure_for_user!(user)
       end
 
       # Legacy alias retained for older callers; Finder now defaults to Documents.
@@ -170,108 +127,11 @@ module Apps
         end
         false
       end
-
-      private
-
-      def workspace_finder_container!(root)
-        return nil unless root
-
-        finder_root = root.children.folders.find { |d| d.title.to_s.strip.casecmp?(LEGACY_FINDER_WORKSPACE_FOLDER_TITLE) }
-        finder_root ||= root.children.create!(is_folder: true, title: LEGACY_FINDER_WORKSPACE_FOLDER_TITLE)
-
-        section_titles = workspace_section_definitions.reject { |definition| definition[:key] == "favorites" }.map { |definition| definition[:title] } + [LEGACY_DOCUMENTS_SECTION_TITLE]
-        root.children.folders.each do |folder|
-          next if folder.id == finder_root.id
-          title = folder.title.to_s.strip
-          next if title.casecmp?("Embedded")
-          next unless section_titles.any? { |candidate| title.casecmp?(candidate) }
-
-          folder.update!(parent: finder_root)
-        end
-
-        finder_root
-      rescue StandardError
-        nil
-      end
-
-      # One-time migration: the legacy "Documents" section root is now named "Tasks".
-      # Update the existing folder record so storage sync renames disk paths under storage/workspace/<user>/.
-      def migrate_documents_section_to_tasks!(root)
-        documents_folder = root.children.folders.find { |d| d.title.to_s.strip.casecmp?(LEGACY_DOCUMENTS_SECTION_TITLE) }
-        return unless documents_folder
-
-        tasks_folder = root.children.folders.find { |d| d.title.to_s.strip.casecmp?(TASKS_SECTION_TITLE) }
-        return if tasks_folder && tasks_folder.id == documents_folder.id
-
-        if tasks_folder
-          Document.transaction do
-            documents_folder.children.find_each { |child| child.update!(parent: tasks_folder) }
-            documents_folder.destroy!
-          end
-          return
-        end
-
-        documents_folder.update!(title: TASKS_SECTION_TITLE)
-      rescue StandardError
-        nil
-      end
-
-      # One-time migration: old Notes folder nested under Tasks becomes top-level Notes section.
-      def migrate_legacy_notes_folder_from_tasks!(tasks_root, notes_root)
-        return unless tasks_root&.folder? && notes_root&.folder?
-
-        legacy_notes = tasks_root.children.folders.find { |d| d.title.to_s.strip.casecmp?(NOTES_SECTION_TITLE) }
-        return unless legacy_notes
-
-        Document.transaction do
-          legacy_notes.children.find_each { |child| child.update!(parent: notes_root) }
-          legacy_notes.destroy!
-        end
-      rescue StandardError
-        nil
-      end
-
-      # One-time migration: legacy physical "Favorites" folder is deprecated.
-      # Keep content accessible by moving children into Tasks and rely on `is_favorited` for the virtual Favorites section.
-      def migrate_legacy_favorites_folder!(finder_root, tasks_root)
-        return unless finder_root&.folder?
-
-        legacy_favorites = finder_root.children.folders.find { |d| d.title.to_s.strip.casecmp?(FAVORITES_SECTION_TITLE) }
-        return unless legacy_favorites
-
-        Document.transaction do
-          mark_files_favorited_in_subtree!(legacy_favorites)
-
-          target_parent = tasks_root&.folder? ? tasks_root : finder_root
-          legacy_favorites.children.find_each { |child| child.update!(parent: target_parent) }
-          legacy_favorites.destroy!
-        end
-      rescue StandardError
-        nil
-      end
-
-      def mark_files_favorited_in_subtree!(root)
-        stack = [root]
-        visited = Set.new
-
-        until stack.empty?
-          node = stack.pop
-          next unless node
-          next if visited.include?(node.id)
-
-          visited.add(node.id)
-          node.children.find_each do |child|
-            if child.folder?
-              stack << child
-            else
-              child.update!(is_favorited: true)
-            end
-          end
-        end
-      end
     end
 
     def show
+      FinderWorkspaceInitializer.ensure_for_user!(current_user)
+
       @finder_read_only = params[:mode].to_s == "save_as"
       @finder_single_section_mode = false
       frame_id = params[:frame_id].to_s

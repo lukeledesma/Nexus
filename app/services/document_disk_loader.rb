@@ -169,16 +169,7 @@ class DocumentDiskLoader
     end
 
     def protected_embedded_draft?(doc)
-      return false unless doc&.file?
-
-      draft_titles = ["Task Draft", "Note Draft", "Time Card Draft"]
-      return false unless draft_titles.include?(doc.title.to_s)
-
-      parent_title = doc.parent&.title.to_s
-      return true if parent_title.casecmp?("Embedded")
-
-      rel = doc.storage_path.to_s
-      rel.start_with?("Admin/Embedded/") || rel.start_with?("Embedded/")
+      EmbeddedDraftDocument.draft_document?(doc)
     end
 
     def find_or_initialize_by_storage_path(storage_path, is_folder:)

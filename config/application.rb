@@ -15,6 +15,11 @@ module Nexus
     config.autoload_paths << services_path
     config.eager_load_paths << services_path
 
+    # Policies are used by service objects in production (eager_load=true).
+    policies_path = Rails.root.join("app/policies")
+    config.autoload_paths << policies_path
+    config.eager_load_paths << policies_path
+
     # Disk sync is performed per-request in the controller, not at boot.
   end
 end

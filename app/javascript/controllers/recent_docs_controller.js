@@ -83,6 +83,36 @@ export default class extends Controller {
     this.requestDelete(row, url, kind)
   }
 
+  openDocRow(event) {
+    const row = event.currentTarget
+    if (!(row instanceof Element)) return
+    if ((row.dataset.docKind || "") !== "file") return
+
+    const interactive = event.target instanceof Element
+      ? event.target.closest("button, a, input, textarea, select, label, [data-no-toggle='true']")
+      : null
+    if (interactive) return
+
+    const url = row.dataset.openUrl
+    if (!url) return
+
+    event.preventDefault()
+    window.location.assign(url)
+  }
+
+  openDocRowKey(event) {
+    if (event.key !== "Enter" && event.key !== " ") return
+    const row = event.currentTarget
+    if (!(row instanceof Element)) return
+    if ((row.dataset.docKind || "") !== "file") return
+
+    const url = row.dataset.openUrl
+    if (!url) return
+
+    event.preventDefault()
+    window.location.assign(url)
+  }
+
   openItemCreator(e) {
     e.preventDefault()
     e.stopPropagation()

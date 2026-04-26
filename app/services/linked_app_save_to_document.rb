@@ -45,9 +45,7 @@ class LinkedAppSaveToDocument
   private
 
   def folder_allowed?(folder)
-    return false unless folder.folder?
-
-    Apps::FinderController.document_in_any_finder_section?(@user, folder)
+    ::DocumentPolicy.new(user: @user, document: folder).can_save_into_folder?
   end
 
   def find_or_build_document(folder, content_type, title)
