@@ -1,7 +1,9 @@
 # frozen_string_literal: true
 
 class DocumentsController < ApplicationController
-  before_action :sync_from_disk, only: %i[index organizer_fragment]
+  PANEL_SEARCH_MAX_RESULTS = 40
+
+  before_action :sync_from_disk, only: %i[index organizer_fragment panel_search]
   before_action :set_document, only: %i[show edit update destroy create_file create_subfolder move_folder move_file upload_images rename toggle_favorite file_list asset_file]
 
   def index
@@ -16,6 +18,23 @@ class DocumentsController < ApplicationController
   def organizer_fragment
     load_organizer_data
     render partial: "organizer"
+  end
+
+  def panel_search
+    query = params[:q].to_s.strip
+    if query.blank?
+      render json: { ok: true, query: "", name_matches: [], content_matches: [] }
+      return
+    end
+
+    results = build_panel_search_results(query)
+
+    render json: {
+      ok: true,
+      query: query,
+      name_matches: results[:name_matches],
+      content_matches: results[:content_matches]
+    }
   end
 
   def create_root_folder
@@ -309,6 +328,111 @@ class DocumentsController < ApplicationController
   def set_no_cache_headers
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
+  end
+
+  def build_panel_search_results(query)
+    files = panel_search_files_for_workspace
+    downcased_query = query.to_s.downcase
+    name_matches = []
+    content_matches = []
+
+    files.each do |doc|
+      display_title = panel_search_display_title(doc.title)
+      payload = panel_search_result_payload(doc, display_title)
+      next unless payload
+
+      if display_title.downcase.include?(downcased_query)
+        name_matches << payload
+        next
+      end
+
+      searchable = panel_search_searchable_content(doc)
+      content_matches << payload if searchable.downcase.include?(downcased_query)
+    end
+
+    name_matches.sort_by! { |item| item[:document_title].downcase }
+    content_matches.sort_by! { |item| item[:document_title].downcase }
+
+    {
+      name_matches: name_matches.first(PANEL_SEARCH_MAX_RESULTS),
+      content_matches: content_matches.first(PANEL_SEARCH_MAX_RESULTS)
+    }
+  end
+
+  def panel_search_files_for_workspace
+    section_roots = Apps::FinderController.workspace_section_roots(current_user).values.compact
+    root_ids = section_roots.map(&:id).uniq
+    return [] if root_ids.empty?
+
+    placeholders = ([ "?" ] * root_ids.length).join(",")
+    sql = <<~SQL.squish
+      WITH RECURSIVE subtree AS (
+        SELECT *
+        FROM documents
+        WHERE id IN (#{placeholders})
+        UNION ALL
+        SELECT d.*
+        FROM documents d
+        INNER JOIN subtree t ON d.parent_id = t.id
+      )
+      SELECT *
+      FROM subtree
+      WHERE is_folder = FALSE
+    SQL
+
+    Document.find_by_sql(Document.sanitize_sql_array([ sql, *root_ids ]))
+  rescue StandardError
+    []
+  end
+
+  def panel_search_display_title(title)
+    # Search uses the same title users see in Finder; hidden storage suffixes stay hidden.
+    helpers.finder_document_display_title(title).sub(/\.dotfield\z/i, "").strip.presence || "Untitled"
+  end
+
+  def panel_search_searchable_content(document)
+    [ document.content.to_s, document.tasks.to_json ].join("\n")
+  end
+
+  def panel_search_result_payload(document, display_title)
+    app_key = panel_search_app_key_for(document)
+    return nil if app_key.blank?
+
+    {
+      document_id: document.id.to_s,
+      document_title: display_title,
+      app_key: app_key,
+      icon: panel_search_icon_for(app_key)
+    }
+  end
+
+  def panel_search_app_key_for(document)
+    content_type = document.content_type.to_s
+    section_key = Apps::FinderController.origin_section_key_from_storage_path(document.storage_path)
+
+    case content_type
+    when "note"
+      section_key == "time_card" ? "time-card" : "notes"
+    when "task_list"
+      "tasks"
+    when "asset"
+      extension = File.extname(document.storage_path.to_s)
+      extension = File.extname(document.title.to_s) if extension.blank?
+      case helpers.finder_asset_file_kind_from_extension(extension)
+      when "image" then "images"
+      when "audio" then "audio"
+      end
+    end
+  end
+
+  def panel_search_icon_for(app_key)
+    {
+      "notes" => "edit_note",
+      "tasks" => "task_checklist",
+      "time-card" => "overview",
+      "images" => "wallpaper",
+      "audio" => "graphic_eq"
+    }[app_key.to_s] || "file_document"
   end
 
   def load_organizer_data

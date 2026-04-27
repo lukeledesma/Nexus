@@ -32,6 +32,7 @@ export default class extends Controller {
     if (!t) return
     if (!["INPUT", "SELECT", "TEXTAREA"].includes(t.tagName)) return
     if (t.type === "hidden") return
+    this.#publishDirtyState()
     this.submit()
   }
 
@@ -72,6 +73,7 @@ export default class extends Controller {
     if (token) headers["X-CSRF-Token"] = token
 
     this.inFlight = true
+    this.#publishSavingState(form)
     try {
       const response = await fetch(form.action, {
         method: method === "GET" ? "GET" : "POST",
@@ -90,7 +92,7 @@ export default class extends Controller {
         await this.#syncLinkedWorkspaceDocument(form, linkedId, token)
       }
 
-      this.#publishSaveState(json)
+      this.#publishSaveState(form, json)
     } catch (_error) {
       // Keep autosave silent; user can still use Finder save flow when unlinked.
     } finally {
@@ -137,14 +139,42 @@ export default class extends Controller {
     })
   }
 
-  #publishSaveState(json) {
+  #eventDetail(form, json = null) {
+    const frame = form?.closest("turbo-frame")
+    const frameId = (frame?.id || "").toString().trim()
+    const itemType = (json?.item_type || this.itemTypeValue || "").toString().trim()
+    const linkedDocumentId = this.hasLinkedDocumentIdValue ? this.linkedDocumentIdValue : 0
+
+    return {
+      frameId,
+      itemType,
+      linkedDocumentId
+    }
+  }
+
+  #publishDirtyState() {
+    const form = this.element
+    if (!form || form.tagName !== "FORM") return
+
+    window.dispatchEvent(new CustomEvent("nexus:item-dirty", {
+      detail: this.#eventDetail(form)
+    }))
+  }
+
+  #publishSavingState(form) {
+    window.dispatchEvent(new CustomEvent("nexus:item-saving", {
+      detail: this.#eventDetail(form)
+    }))
+  }
+
+  #publishSaveState(form, json) {
     const itemType = (json.item_type || this.itemTypeValue || "").toString().trim()
-    if (!itemType) return
 
     const timestamp = (json.updated_at || "").toString().trim() || new Date().toISOString()
 
     window.dispatchEvent(new CustomEvent("nexus:item-saved", {
       detail: {
+        ...this.#eventDetail(form, json),
         itemType,
         timestamp
       }

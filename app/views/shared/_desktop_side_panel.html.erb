@@ -18,15 +18,30 @@
     id="desktop-side-panel-drawer"
     class="desktop-side-panel-drawer"
     data-side-panel-target="drawer"
+    data-controller="side-panel-search"
+    data-side-panel-search-search-url-value="<%= panel_search_documents_path %>"
     role="dialog"
     aria-modal="true"
     aria-label="Nexus apps"
     aria-hidden="true"
   >
-    <header class="desktop-side-panel-header"></header>
+    <header class="desktop-side-panel-header">
+      <label class="desktop-side-panel-search" aria-label="Search Finder files">
+        <span class="desktop-side-panel-search-icon" aria-hidden="true"><%= material_symbol_icon(:tune, size: :xs) %></span>
+        <input
+          type="search"
+          class="desktop-side-panel-search-input"
+          placeholder="Search Finder files"
+          autocomplete="off"
+          spellcheck="false"
+          data-side-panel-search-target="input"
+          data-action="input->side-panel-search#handleInput keydown->side-panel-search#handleInputKeydown"
+        >
+      </label>
+    </header>
 
     <div class="desktop-side-panel-body" data-controller="organizer">
-      <nav class="desktop-side-panel-apps" aria-label="Apps">
+      <nav class="desktop-side-panel-apps" aria-label="Apps" data-side-panel-search-target="apps">
         <% launcher_grid_entries.each do |entry| %>
           <button
             type="button"
@@ -49,7 +64,10 @@
         <% end %>
       </nav>
 
-      <div class="desktop-side-panel-user-section">
+      <nav class="desktop-side-panel-apps" aria-label="Search results" data-side-panel-search-target="results" hidden></nav>
+      <p class="desktop-side-panel-search-empty" data-side-panel-search-target="emptyState" hidden>No Finder files matched.</p>
+
+      <div class="desktop-side-panel-user-section" data-side-panel-search-target="userSection">
         <div class="desktop-side-panel-theme-row" data-controller="user-settings">
           <span class="desktop-side-panel-row-icon" aria-hidden="true">
             <%= material_symbol_icon(:palette, size: :sm) %>

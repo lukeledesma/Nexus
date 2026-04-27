@@ -3805,8 +3805,7 @@ body.nexus-finder-embed *::-webkit-scrollbar-thumb:hover {
   margin: 0;
   /* Match .content-window-chrome (title bar shell). */
   min-height: 2.7rem;
-  padding: 0.4rem 0.75rem 0.35rem;
-  padding-right: calc(0.75rem + var(--nexus-icon-btn-size) + var(--nexus-small-action-gap));
+  padding: 0.4rem 0.75rem 0.35rem calc(0.75rem + var(--nexus-icon-btn-size) + 0.5rem);
   border-bottom: 1px solid var(--border-hairline);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
   user-select: none;
@@ -3816,7 +3815,7 @@ body.nexus-finder-embed *::-webkit-scrollbar-thumb:hover {
 /* Same as .content-window-chrome-title */
 .desktop-side-panel-brand {
   margin: 0;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-width: 0;
   font-size: 0.78rem;
   font-weight: 700;
@@ -3825,6 +3824,48 @@ body.nexus-finder-embed *::-webkit-scrollbar-thumb:hover {
   color: var(--text);
   line-height: 1;
   text-align: left;
+}
+
+.desktop-side-panel-search {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  flex: 1 1 auto;
+  padding: 0.28rem 0.48rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-hairline);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.desktop-side-panel-search:focus-within {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.desktop-side-panel-search-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  flex: 0 0 auto;
+}
+
+.desktop-side-panel-search-input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.desktop-side-panel-search-input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.9;
 }
 
 .desktop-side-panel-body {
@@ -3849,6 +3890,26 @@ body.nexus-finder-embed *::-webkit-scrollbar-thumb:hover {
   gap: 4px;
   margin: 0;
   padding: 0;
+}
+
+.desktop-side-panel-search-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0.5rem 0.55rem;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  letter-spacing: 0.01em;
+}
+
+/* Ensure [hidden] attribute properly hides elements in flex layouts */
+.desktop-side-panel-apps[hidden],
+.desktop-side-panel-search-empty[hidden] {
+  display: none !important;
 }
 
 .desktop-side-panel-app-row {
@@ -5077,6 +5138,18 @@ html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden)
   text-overflow: ellipsis;
   min-width: 0;
   max-width: min(14rem, 28vw);
+}
+
+.content-window-open-file-name--dirty {
+  color: #facc15;
+}
+
+.content-window-open-file-name--saved {
+  color: #4ade80;
+}
+
+.content-window-open-file-name--draft {
+  color: #f87171;
 }
 
 .content-window-chrome-actions .content-window-save-btn,

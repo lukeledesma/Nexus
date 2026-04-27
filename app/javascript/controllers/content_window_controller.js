@@ -109,6 +109,12 @@ export default class extends Controller {
     window.addEventListener("nexus:finder-item-renamed", this.boundFinderItemRenamed)
     this.boundTimeCardClearState = this.handleTimeCardClearState.bind(this)
     window.addEventListener("nexus:time-card-clear-state", this.boundTimeCardClearState)
+    this.boundItemDirtyState = this.handleItemDirtyState.bind(this)
+    window.addEventListener("nexus:item-dirty", this.boundItemDirtyState)
+    this.boundItemSavingState = this.handleItemSavingState.bind(this)
+    window.addEventListener("nexus:item-saving", this.boundItemSavingState)
+    this.boundItemSavedState = this.handleItemSavedState.bind(this)
+    window.addEventListener("nexus:item-saved", this.boundItemSavedState)
     this.boundViewportResize = () => {
       this.syncViewportShellMargins()
       this.syncDesktopCanvasDimensions()
@@ -177,6 +183,9 @@ export default class extends Controller {
     window.removeEventListener("nexus:linked-app-document-saved", this.boundLinkedAppSaved)
     window.removeEventListener("nexus:finder-item-renamed", this.boundFinderItemRenamed)
     window.removeEventListener("nexus:time-card-clear-state", this.boundTimeCardClearState)
+    window.removeEventListener("nexus:item-dirty", this.boundItemDirtyState)
+    window.removeEventListener("nexus:item-saving", this.boundItemSavingState)
+    window.removeEventListener("nexus:item-saved", this.boundItemSavedState)
     window.removeEventListener("resize", this.boundViewportResize)
     if (this.boundLinkedAppPickerClose) {
       window.removeEventListener("nexus:linked-app-save-picker-close", this.boundLinkedAppPickerClose)
@@ -215,6 +224,24 @@ export default class extends Controller {
     const { frameId, show } = event.detail || {}
     if (frameId !== this.frameIdValue) return
     this.chromeTimeCardClearTarget.hidden = !Boolean(show)
+  }
+
+  handleItemDirtyState(event) {
+    const frameId = String(event?.detail?.frameId || "")
+    if (!frameId || frameId !== this.frameIdValue) return
+    this.syncOpenFileNameState("dirty")
+  }
+
+  handleItemSavingState(event) {
+    const frameId = String(event?.detail?.frameId || "")
+    if (!frameId || frameId !== this.frameIdValue) return
+    this.syncOpenFileNameState("dirty")
+  }
+
+  handleItemSavedState(event) {
+    const frameId = String(event?.detail?.frameId || "")
+    if (!frameId || frameId !== this.frameIdValue) return
+    this.syncOpenFileNameState("saved")
   }
 
   /** Open linked doc from Finder save-picker tree (same window, exit picker chrome). */
@@ -1040,12 +1067,53 @@ export default class extends Controller {
       nameEl.hidden = true
       nameEl.textContent = ""
       nameEl.removeAttribute("title")
+      this.syncOpenFileNameStateFor(windowEl, "neutral")
       return
     }
     sep.hidden = false
     nameEl.hidden = false
     nameEl.textContent = t
     nameEl.setAttribute("title", t)
+    this.syncOpenFileNameStateFor(windowEl, "saved")
+  }
+
+  isDraftOpenFileTitle(title) {
+    return /\bdraft\b/i.test(String(title || "").trim())
+  }
+
+  syncOpenFileNameState(state) {
+    this.syncOpenFileNameStateFor(this.element, state)
+  }
+
+  syncOpenFileNameStateFor(windowEl, state) {
+    if (!windowEl) return
+    const nameEl = windowEl.querySelector("[data-nexus-open-file-name]")
+    if (!nameEl) return
+
+    nameEl.classList.remove(
+      "content-window-open-file-name--dirty",
+      "content-window-open-file-name--saved",
+      "content-window-open-file-name--draft"
+    )
+
+    if (nameEl.hidden) return
+
+    const title = String(nameEl.textContent || "").trim()
+    if (!title) return
+
+    if (this.isDraftOpenFileTitle(title)) {
+      nameEl.classList.add("content-window-open-file-name--draft")
+      return
+    }
+
+    if (state === "dirty") {
+      nameEl.classList.add("content-window-open-file-name--dirty")
+      return
+    }
+
+    if (state === "saved") {
+      nameEl.classList.add("content-window-open-file-name--saved")
+    }
   }
 
   readOpenTitleForFrame(frameId) {

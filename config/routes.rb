@@ -34,6 +34,7 @@ Rails.application.routes.draw do
   resources :documents do
     collection do
       get :organizer_fragment
+      get :panel_search
     end
 
     member do
