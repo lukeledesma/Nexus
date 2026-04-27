@@ -69,8 +69,21 @@ export default class extends Controller {
 
     this.pointerClientX = event.clientX
     this.pointerClientY = event.clientY
-    this.originX = event.clientX - shellRect.left + scrollLeft
-    this.originY = event.clientY - shellRect.top + scrollTop
+
+    // Origin coordinates in scrollable canvas space
+    let originX = event.clientX - shellRect.left + scrollLeft
+    let originY = event.clientY - shellRect.top + scrollTop
+
+    // Constrain origin to valid bounds
+    const margin = getNexusDesktopShellInsetPx()
+    const panelBlockEnd = getDesktopSidePanelBlockEndPx()
+    const minX = Math.max(margin, panelBlockEnd)
+    const maxX = scrollLeft + shell.clientWidth - margin
+    const minY = margin
+    const maxY = scrollTop + shell.clientHeight - margin
+
+    this.originX = Math.max(Math.min(originX, maxX), minX)
+    this.originY = Math.max(Math.min(originY, maxY), minY)
 
     this.isDragging = true
     document.body.classList.add("is-desktop-selecting")
@@ -122,8 +135,14 @@ export default class extends Controller {
     let currentY = this.pointerClientY - shellRect.top + scrollTop
 
     const minX = Math.max(margin, panelBlockEnd)
+    const maxX = scrollLeft + shell.clientWidth - margin
+    const minY = margin
+    const maxY = scrollTop + shell.clientHeight - margin
+
     currentX = Math.max(currentX, minX)
-    currentY = Math.max(currentY, margin)
+    currentX = Math.min(currentX, maxX)
+    currentY = Math.max(currentY, minY)
+    currentY = Math.min(currentY, maxY)
 
     const left = Math.min(this.originX, currentX)
     const top = Math.min(this.originY, currentY)
