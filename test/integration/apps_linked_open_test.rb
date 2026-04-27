@@ -36,6 +36,25 @@ class AppsLinkedOpenTest < ActionDispatch::IntegrationTest
     assert_includes response.body, document_path(doc.id)
   end
 
+  test "notes rehydrates without trailing blank line after disk round-trip" do
+    notes_root = Apps::FinderController.workspace_section_root(@user, "notes")
+    doc = notes_root.children.create!(
+      title: "Single Line",
+      is_folder: false,
+      content_type: "note",
+      content: "hello"
+    )
+
+    DocumentDiskLoader.sync!
+    doc.reload
+
+    get apps_notes_path, params: { document_id: doc.id }
+
+    assert_response :success
+    textarea = Nokogiri::HTML(response.body).at_css('textarea[name="document[content]"]')
+    assert_equal "hello", textarea&.text
+  end
+
   test "notes falls back to draft editor for invalid id" do
     get apps_notes_path, params: { document_id: "nope" }
 

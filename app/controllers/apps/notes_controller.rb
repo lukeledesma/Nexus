@@ -29,7 +29,7 @@ module Apps
     def plain_text_from_note_html(value)
       html = value.to_s
       with_breaks = html.gsub(/<br\s*\/?>/i, "\n").gsub(%r{</p>}i, "\n\n")
-      ActionController::Base.helpers.strip_tags(with_breaks).to_s
+      ActionController::Base.helpers.strip_tags(with_breaks).to_s.sub(/\n+\z/, "")
     end
   end
 end

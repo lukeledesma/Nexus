@@ -9,13 +9,7 @@
                       autosave_debounce_value: 180
                     },
                     html: { class: "notes-app__form" } do |f| %>
-        <%= f.text_area :content,
-                        name: "document[content]",
-                        value: @note_text,
-                        class: "notes-app__textarea",
-                        placeholder: "Write your note...",
-                        autocomplete: "off",
-                        spellcheck: "true" %>
+        <textarea name="document[content]" id="content" class="notes-app__textarea" placeholder="Write your note..." autocomplete="off" spellcheck="true"><%= @note_text %></textarea>
       <% end %>
     <% else %>
       <div class="notes-app__form">

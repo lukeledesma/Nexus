@@ -56,6 +56,8 @@ export default class extends Controller {
     if (event.target instanceof Element && event.target.closest("section.content-window")) {
       return
     }
+
+    this.blurActiveEditableElement()
     
     event.preventDefault()
 
@@ -81,6 +83,19 @@ export default class extends Controller {
     
     document.addEventListener("mousemove", this.boundMouseMove)
     document.addEventListener("mouseup", this.boundMouseUp)
+  }
+
+  blurActiveEditableElement() {
+    const active = document.activeElement
+    if (!(active instanceof HTMLElement)) return
+    if (active === document.body) return
+
+    const isEditable =
+      active.matches("input, textarea, select") ||
+      active.isContentEditable ||
+      active.getAttribute("role") === "textbox"
+
+    if (isEditable) active.blur()
   }
 
   handleMouseMove(event) {
