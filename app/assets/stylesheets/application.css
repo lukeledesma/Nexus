@@ -4850,12 +4850,6 @@ html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden)
   opacity: 0;
 }
 
-.content-window[data-content-window-app-key-value="notes"]:focus-within,
-.content-window[data-content-window-app-key-value^="note-spawn-"]:focus-within {
-  transform: translateY(-0.95px) scale(1.0082);
-  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.54), 0 0 0 1px rgba(130, 214, 255, 0.14);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .content-window {
     transition: none;
