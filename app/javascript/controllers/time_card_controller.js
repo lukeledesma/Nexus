@@ -91,18 +91,37 @@ function formatElapsed(ms) {
 }
 
 function validSentenceCountFromNotes(text, requiredCount = Infinity) {
-  const countingHeaderPrefix = /^\s*h(\d+)\s*:/i
   const lines = String(text || "").replaceAll("\r", "").split("\n")
+  const dashPrefix = /^(\s*)-\s*(.*)$/
+  const timeRangePrefix = /^(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})/
   let count = 0
+  let inTimeBlock = false
 
   for (const raw of lines) {
     const trimmed = raw.replace(/\s+$/g, "").trim()
     if (!trimmed) continue
 
+    // Check if this is a time range header
+    if (timeRangePrefix.test(trimmed)) {
+      inTimeBlock = true
+      continue
+    }
+
+    // Count dash-prefixed entries
+    if (inTimeBlock) {
+      const dashMatch = dashPrefix.exec(trimmed)
+      if (dashMatch) {
+        const body = String(dashMatch[2] || "").trim()
+        if (/\S/.test(body)) count += 1
+        continue
+      }
+    }
+
+    // Legacy H-prefix format
+    const countingHeaderPrefix = /^\s*h(\d+)\s*:/i
     const m = countingHeaderPrefix.exec(trimmed)
     if (m) {
       const hNum = parseInt(m[1], 10)
-      // Only count if this H-prefix is currently required (hNum <= requiredCount)
       if (hNum <= requiredCount) {
         const body = trimmed.replace(/^\s*h\d+\s*:\s*/i, "")
         if (/\S/.test(body)) count += 1
@@ -120,21 +139,340 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
 }
 
-function buildNotesHtml(text, requiredCount) {
+// Parses "HH:MM-HH:MM" or "HH:MM - HH:MM" at the start of a line.
+// Returns { startMin, endMin, durationMin, raw } or null.
+function parseTimeRangePrefix(line) {
+  const m = /^(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})/.exec(line.trim())
+  if (!m) return null
+  const startMin = parseTimeStringToMinutes(m[1])
+  const endMin = parseTimeStringToMinutes(m[2])
+  if (startMin === null || endMin === null) return null
+  let durationMin = endMin - startMin
+  if (durationMin < 0) durationMin += 24 * 60
+  return { startMin, endMin, durationMin, raw: m[0] }
+}
+
+// Scans all lines for time-range entries and returns structured data.
+// Entries are dash-prefixed lines following a time range.
+// Handles both closed (HH:MM-HH:MM) and open (HH:MM-) ranges.
+function parseEntriesFromNotes(text) {
+  const entries = []
+  const lines = String(text || "").replaceAll("\r", "").split("\n")
+  let currentRange = null
+  let currentEntryCount = 0
+  let rangeIdCounter = 0
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+
+    // Check if this is a closed time range: HH:MM-HH:MM
+    const closedMatch = /^(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})(.*)$/.exec(trimmed)
+    if (closedMatch) {
+      // Save previous range if exists
+      if (currentRange) {
+        currentRange.completedCount = currentEntryCount
+        entries.push(currentRange)
+      }
+      // Start new closed range
+      const startMin = parseTimeStringToMinutes(closedMatch[1])
+      const endMin = parseTimeStringToMinutes(closedMatch[2])
+      if (startMin !== null && endMin !== null) {
+        let durationMin = endMin - startMin
+        if (durationMin < 0) durationMin += 24 * 60
+        const description = closedMatch[3].replace(/^\s*[-–:]\s*/, "").trim()
+        const requiredCount = Math.ceil(durationMin / 60)
+        currentRange = {
+          id: String(rangeIdCounter++),
+          startMin,
+          endMin,
+          durationMin,
+          description,
+          customerLabel: description,
+          requiredCount,
+          completedCount: 0,
+          isOpen: false
+        }
+        currentEntryCount = 0
+      }
+      continue
+    }
+
+    // Check if this is an open time range: HH:MM-
+    const openMatch = /^(\d{1,2}:\d{2})\s*[-–]\s*(?!\d)(.*)$/.exec(trimmed)
+    if (openMatch) {
+      // Save previous range if exists
+      if (currentRange) {
+        currentRange.completedCount = currentEntryCount
+        entries.push(currentRange)
+      }
+      // Start new open range
+      const startMin = parseTimeStringToMinutes(openMatch[1])
+      if (startMin !== null) {
+        const description = openMatch[2].replace(/^\s*[-–:]\s*/, "").trim()
+        currentRange = {
+          id: String(rangeIdCounter++),
+          startMin,
+          endMin: null,
+          durationMin: null,
+          description,
+          customerLabel: description,
+          requiredCount: null,
+          completedCount: 0,
+          isOpen: true
+        }
+        currentEntryCount = 0
+      }
+      continue
+    }
+
+    // Check if this is a dash-prefixed entry
+    if (trimmed.startsWith("-")) {
+      if (currentRange) {
+        const body = trimmed.replace(/^\s*-\s*/, "")
+        if (/\S/.test(body)) currentEntryCount++
+      }
+      continue
+    }
+
+    // First non-dash child line under a range is treated as the customer label.
+    if (currentRange && !currentRange.customerLabel) {
+      currentRange.customerLabel = trimmed
+    }
+  }
+
+  // Save last range
+  if (currentRange) {
+    currentRange.completedCount = currentEntryCount
+    entries.push(currentRange)
+  }
+
+  return entries
+}
+
+function formatDuration(minutes) {
+  if (minutes <= 0) return "0m"
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  if (h === 0) return `${m}m`
+  if (m === 0) return `${h}h`
+  return `${h}h ${m}m`
+}
+
+function elapsedMsSinceMinuteOfDay(startMin) {
+  if (!Number.isInteger(startMin)) return 0
+
+  const now = new Date()
+  const start = new Date(now)
+  start.setHours(Math.floor(startMin / 60), startMin % 60, 0, 0)
+  if (start.getTime() > now.getTime()) {
+    start.setDate(start.getDate() - 1)
+  }
+
+  return Math.max(0, now.getTime() - start.getTime())
+}
+
+function formatChromeWorkedDuration(ms, includeSeconds = false) {
+  const totalSeconds = Math.max(0, Math.floor(Number(ms || 0) / 1000))
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  if (includeSeconds) return `${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`
+  return `${pad2(hours)}:${pad2(minutes)}`
+}
+
+function summarizeWorkedHoursFromNotes(text) {
+  const entries = parseEntriesFromNotes(text)
+  if (!entries.length) {
+    return { hasValue: false, label: "", isOpen: false }
+  }
+
+  let totalMs = 0
+  for (const entry of entries) {
+    if (entry.isOpen) {
+      totalMs += elapsedMsSinceMinuteOfDay(entry.startMin)
+      continue
+    }
+    if (Number.isFinite(entry.durationMin)) {
+      totalMs += Number(entry.durationMin) * 60000
+    }
+  }
+
+  const lastEntry = entries[entries.length - 1]
+  const isOpen = Boolean(lastEntry?.isOpen)
+  return {
+    hasValue: true,
+    label: formatChromeWorkedDuration(totalMs, isOpen),
+    isOpen
+  }
+}
+
+// Extracts start time (first time range start) and end time (last time range end) from notes.
+// Returns { startMin, endMin, isOngoing } where isOngoing is true if last range is open (HH:MM- format).
+// Returns { startMin: null, endMin: null, isOngoing: false } if no ranges found.
+function extractTimeSpanFromNotes(text) {
+  const lines = String(text || "").replaceAll("\r", "").split("\n")
+  let firstStartMin = null
+  let lastEndMin = null
+  let isOngoing = false
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim()
+    
+    // Check for closed range: HH:MM-HH:MM
+    const closedMatch = /^(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})/.exec(trimmed)
+    if (closedMatch) {
+      const startMin = parseTimeStringToMinutes(closedMatch[1])
+      const endMin = parseTimeStringToMinutes(closedMatch[2])
+      if (startMin !== null && endMin !== null) {
+        if (firstStartMin === null) firstStartMin = startMin
+        lastEndMin = endMin
+        isOngoing = false
+      }
+      continue
+    }
+
+    // Check for open range: HH:MM- (no end time)
+    const openMatch = /^(\d{1,2}:\d{2})\s*[-–]\s*(?!\d)/.exec(trimmed)
+    if (openMatch) {
+      const startMin = parseTimeStringToMinutes(openMatch[1])
+      if (startMin !== null) {
+        if (firstStartMin === null) firstStartMin = startMin
+        lastEndMin = null // Open range has no end
+        isOngoing = true
+      }
+    }
+  }
+
+  return {
+    startMin: firstStartMin,
+    endMin: lastEndMin,
+    isOngoing
+  }
+}
+
+function buildNotesHtml(text) {
   if (!text) return ''
   const lines = text.split('\n')
-  return lines.map(line => {
-    const m = /^(\s*)(h(\d+)\s*:)(.*)$/i.exec(line)
-    if (!m) return escapeHtml(line)
-    const hNum = parseInt(m[3], 10)
-    const hasBody = /\S/.test(m[4] || "")
-    const cls = hNum > requiredCount
-      ? 'time-card-app__notes-prefix time-card-app__notes-prefix--pending'
-      : hasBody
-        ? 'time-card-app__notes-prefix time-card-app__notes-prefix--done'
-        : 'time-card-app__notes-prefix time-card-app__notes-prefix--missing'
-    return escapeHtml(m[1]) + `<span class="${cls}">${escapeHtml(m[2])}</span>` + escapeHtml(m[4])
-  }).join('\n')
+  const result = []
+  const dashPrefix = /^(\s*)(-)\s*(.*?)$/
+  const closedTimeRangePrefix = /^(\d{1,2}:\d{2}\s*[-–]\s*\d{1,2}:\d{2})(.*)$/
+  const openTimeRangePrefix = /^(\d{1,2}:\d{2}\s*[-–])(.*)$/
+
+  // Build maps of time-range lines to completion count, projected label text, and whether they're open.
+  const timeRangeCompletionMap = new Map()
+  const timeRangeLabelMap = new Map()
+  const timeRangeIdMap = new Map()
+  const timeRangeIsOpenMap = new Map()
+  let timeRangeIdCounter = 0
+  let lastTimeRangeIndex = -1
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim()
+    const closedMatch = closedTimeRangePrefix.test(trimmed)
+    const openMatch = /^(\d{1,2}:\d{2})\s*[-–]\s*(?!\d)/.test(trimmed)
+    
+    if (closedMatch) {
+      lastTimeRangeIndex = i
+      timeRangeCompletionMap.set(i, 0)
+      timeRangeLabelMap.set(i, "")
+      timeRangeIdMap.set(i, String(timeRangeIdCounter++))
+      timeRangeIsOpenMap.set(i, false)
+    } else if (openMatch) {
+      lastTimeRangeIndex = i
+      timeRangeCompletionMap.set(i, 0)
+      timeRangeLabelMap.set(i, "")
+      timeRangeIdMap.set(i, String(timeRangeIdCounter++))
+      timeRangeIsOpenMap.set(i, true)
+    } else if (lastTimeRangeIndex >= 0 && dashPrefix.test(trimmed)) {
+      const dashMatch = dashPrefix.exec(trimmed)
+      const body = String(dashMatch[3] || "").trim()
+      if (/\S/.test(body)) {
+        timeRangeCompletionMap.set(lastTimeRangeIndex, (timeRangeCompletionMap.get(lastTimeRangeIndex) || 0) + 1)
+      }
+    } else if (lastTimeRangeIndex >= 0 && trimmed) {
+      const existing = timeRangeLabelMap.get(lastTimeRangeIndex) || ""
+      if (!existing) {
+        timeRangeLabelMap.set(lastTimeRangeIndex, trimmed)
+      }
+    }
+  }
+
+  // Render each line
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const trimmed = line.trim()
+
+    // Empty indented line directly after a time range => ghost customer hint.
+    if (/^\s+$/.test(line)) {
+      let prevIndex = i - 1
+      while (prevIndex >= 0 && lines[prevIndex].trim() === "") prevIndex -= 1
+      const prevTrimmed = prevIndex >= 0 ? lines[prevIndex].trim() : ""
+      if (closedTimeRangePrefix.test(prevTrimmed) || /^(\d{1,2}:\d{2})\s*[-–]\s*(?!\d)/.test(prevTrimmed)) {
+        result.push(`${escapeHtml(line)}<span class="time-card-app__ghost-text">Customer</span>`)
+        continue
+      }
+    }
+
+    // Closed time-range line: color-code based on completion
+    const closedMatch = closedTimeRangePrefix.exec(trimmed)
+    if (closedMatch) {
+      const range = parseTimeRangePrefix(trimmed)
+      if (range) {
+        const completedCount = timeRangeCompletionMap.get(i) || 0
+        const rangeRequiredCount = Math.ceil(range.durationMin / 60)
+        let cls = 'time-card-app__notes-prefix time-card-app__notes-prefix--time-range '
+        if (completedCount >= rangeRequiredCount) {
+          cls += 'time-card-app__notes-prefix--done'
+        } else if (completedCount > 0) {
+          cls += 'time-card-app__notes-prefix--pending'
+        } else {
+          cls += 'time-card-app__notes-prefix--missing'
+        }
+        const sameLineSuffix = closedMatch[2]
+        const projectedLabel = (timeRangeLabelMap.get(i) || "").trim()
+        const projected = !/\S/.test(sameLineSuffix) && projectedLabel
+          ? `<span class="time-card-app__time-range-label">${escapeHtml(projectedLabel)}</span>`
+          : ""
+        const rangeId = timeRangeIdMap.get(i)
+        const rangeIdAttr = rangeId ? ` data-range-id="${escapeHtml(rangeId)}"` : ""
+        result.push(`<span class="${cls}"${rangeIdAttr}>${escapeHtml(closedMatch[1])}</span>${projected}${escapeHtml(sameLineSuffix)}`)
+        continue
+      }
+    }
+
+    // Open time-range line: always purple
+    const openMatch = openTimeRangePrefix.exec(trimmed)
+    if (openMatch) {
+      let cls = 'time-card-app__notes-prefix time-card-app__notes-prefix--time-range time-card-app__notes-prefix--ongoing'
+      const rangeId = timeRangeIdMap.get(i)
+      const rangeIdAttr = rangeId ? ` data-range-id="${escapeHtml(rangeId)}"` : ""
+      const sameLineSuffix = openMatch[2]
+      const projectedLabel = (timeRangeLabelMap.get(i) || "").trim()
+      const projected = !/\S/.test(sameLineSuffix) && projectedLabel
+        ? `<span class="time-card-app__time-range-label">${escapeHtml(projectedLabel)}</span>`
+        : ""
+      result.push(`<span class="${cls}"${rangeIdAttr}>${escapeHtml(openMatch[1])}</span>${projected}${escapeHtml(sameLineSuffix)}`)
+      continue
+    }
+
+    // Dash-prefixed entry: style the dash
+    const dashMatch = dashPrefix.exec(trimmed)
+    if (dashMatch) {
+      const before = line.slice(0, line.indexOf('-'))
+      const after = line.slice(line.indexOf('-') + 1)
+      if (/^\s*$/.test(after)) {
+        result.push(`${escapeHtml(before)}<span class="time-card-app__entry-dash">-</span> <span class="time-card-app__ghost-text">Entry</span>`)
+      } else {
+        result.push(`${escapeHtml(before)}<span class="time-card-app__entry-dash">-</span>${escapeHtml(after)}`)
+      }
+      continue
+    }
+
+    // Regular line
+    result.push(escapeHtml(line))
+  }
+
+  return result.join('\n')
 }
 
 function serializeTimeCardDocument(state) {
@@ -242,7 +580,8 @@ export default class extends Controller {
     "ratioText",
     "notesInput",
     "notesBackdrop",
-    "serializedContent"
+    "serializedContent",
+    "timelineBar"
   ]
 
   static values = {
@@ -253,22 +592,78 @@ export default class extends Controller {
   connect() {
     this.boundChromeClearRequest = this.handleChromeClearRequest.bind(this)
     this.boundBeforeSavePicker = this.handleBeforeSavePicker.bind(this)
+    this.boundResize = () => {
+      if (!this.hasNotesInputTarget) return
+      this.renderBackdrop(this.notesInputTarget.value)
+      this.renderTimeline()
+    }
+    this.boundNotesScroll = () => this.syncBackdropScroll()
+    this.boundBackdropScroll = () => {
+      if (this.notesBackdropTarget.scrollTop !== 0) this.notesBackdropTarget.scrollTop = 0
+      if (this.notesBackdropTarget.scrollLeft !== 0) this.notesBackdropTarget.scrollLeft = 0
+    }
     window.addEventListener("nexus:time-card-clear-request", this.boundChromeClearRequest)
     window.addEventListener(LINKED_APP_BEFORE_SAVE_PICKER, this.boundBeforeSavePicker)
-    this.hasPlayedOverdueAlert = false
+    window.addEventListener("resize", this.boundResize)
+    this.backdropSyncFrame = null
+    this.chromeHoursTicker = null
+    this.currentHighlightedRangeId = null
     this.state = this.isLinkedDocumentMode()
       ? normalizeState(this.initialStateValue, null, false)
       : this.loadState()
 
+    this.setupRangeHoverDelegation()
     this.renderAll()
-    this.startTicker()
+    if (this.hasNotesInputTarget) {
+      this.notesInputTarget.addEventListener("scroll", this.boundNotesScroll)
+    }
+    if (this.hasNotesBackdropTarget) {
+      this.notesBackdropTarget.addEventListener("scroll", this.boundBackdropScroll)
+    }
   }
 
   disconnect() {
-    this.stopTicker()
+    this.stopChromeHoursTicker()
     window.removeEventListener("nexus:time-card-clear-request", this.boundChromeClearRequest)
     window.removeEventListener(LINKED_APP_BEFORE_SAVE_PICKER, this.boundBeforeSavePicker)
-    this.publishChromeClearVisibility(false)
+    window.removeEventListener("resize", this.boundResize)
+    this.element?.removeEventListener("mouseenter", this.boundRangeMouseEnter, true)
+    this.element?.removeEventListener("mouseleave", this.boundRangeMouseLeave, true)
+    if (this.backdropSyncFrame) {
+      window.cancelAnimationFrame(this.backdropSyncFrame)
+      this.backdropSyncFrame = null
+    }
+    if (this.hasNotesInputTarget) {
+      this.notesInputTarget.removeEventListener("scroll", this.boundNotesScroll)
+    }
+    if (this.hasNotesBackdropTarget) {
+      this.notesBackdropTarget.removeEventListener("scroll", this.boundBackdropScroll)
+    }
+  }
+
+  setupRangeHoverDelegation() {
+    if (!this.boundRangeMouseEnter) {
+      this.boundRangeMouseEnter = (e) => this.handleRangeMouseEnter(e)
+      this.boundRangeMouseLeave = (e) => this.handleRangeMouseLeave(e)
+    }
+    this.element.addEventListener("mouseenter", this.boundRangeMouseEnter, true)
+    this.element.addEventListener("mouseleave", this.boundRangeMouseLeave, true)
+  }
+
+  handleRangeMouseEnter(event) {
+    const segment = event.target.closest(".time-card-timeline__segment[data-range-id]")
+    if (segment) {
+      const rangeId = segment.getAttribute("data-range-id")
+      if (rangeId) this.highlightRange(rangeId, true)
+    }
+  }
+
+  handleRangeMouseLeave(event) {
+    const segment = event.target.closest(".time-card-timeline__segment[data-range-id]")
+    if (segment) {
+      const rangeId = segment.getAttribute("data-range-id")
+      if (rangeId) this.highlightRange(rangeId, false)
+    }
   }
 
   isLinkedDocumentMode() {
@@ -292,82 +687,195 @@ export default class extends Controller {
     })
   }
 
-  updateClockInManual(event) {
-    const v = String(event.target.value || "").trim()
-    if (v === "" || v === "--:--") {
-      this.state.clockInMinutes = null
-      this.state.clockInAtMs = null
-      this.state.clockOutAtMs = null
-      this.state.clockOutMinutes = null
-      this.state.running = false
-      this.saveState()
-      this.renderAll()
-      return
-    }
-
-    const mins = parseTimeStringToMinutes(v)
-    if (mins === null) return
-    this.state.clockInMinutes = mins
-    this.state.clockInAtMs = null
-    this.state.clockOutAtMs = null
-    this.state.clockOutMinutes = null
-    this.state.running = true
-    this.saveState()
-    this.renderAll()
-  }
-
-  applyClockInOnEnter(event) {
-    if (event.key !== "Enter") return
-    event.preventDefault()
-    this.updateClockInManual(event)
-    event.target.blur()
-  }
-
-  updateClockOutManual(event) {
-    const v = String(event.target.value || "").trim()
-    if (v === "" || v === "--:--") {
-      this.state.clockOutMinutes = null
-      this.state.clockOutAtMs = null
-      this.state.running = this.state.clockInMinutes != null
-      this.saveState()
-      this.renderAll()
-      return
-    }
-    const mins = parseTimeStringToMinutes(v)
-    if (mins === null) return
-    this.state.clockOutMinutes = mins
-    this.state.clockOutAtMs = null
-    this.state.running = false
-    this.saveState()
-    this.renderAll()
-  }
-
-  applyClockOutOnEnter(event) {
-    if (event.key !== "Enter") return
-    event.preventDefault()
-    this.updateClockOutManual(event)
-    event.target.blur()
-  }
-
   updateNotes() {
     const text = this.notesInputTarget.value
     this.state.notesText = text
     this.saveState()
-    this.updateStatus()
     this.renderBackdrop(text)
+    this.renderTimeline()
+    this.updateChromeHoursBadge()
+  }
+
+  handleNotesKeydown(event) {
+    if (event.key !== "Enter") return
+    if (event.defaultPrevented) return
+    if (!this.hasNotesInputTarget) return
+
+    const textarea = this.notesInputTarget
+    const start = Number(textarea.selectionStart)
+    const end = Number(textarea.selectionEnd)
+    if (!Number.isInteger(start) || !Number.isInteger(end)) return
+
+    const text = textarea.value
+    const lineStart = text.lastIndexOf("\n", Math.max(0, start - 1)) + 1
+    const lineEndIndex = text.indexOf("\n", end)
+    const lineEnd = lineEndIndex === -1 ? text.length : lineEndIndex
+    const currentLine = text.slice(lineStart, lineEnd)
+
+    // Enter on an empty dash entry should exit the block:
+    // remove the placeholder entry line and place cursor on a clean line.
+    if (/^\s*-\s*$/.test(currentLine)) {
+      event.preventDefault()
+      textarea.setRangeText("", lineStart, lineEnd, "start")
+      textarea.dispatchEvent(new Event("input", { bubbles: true }))
+      return
+    }
+
+    // Option A flow:
+    // 1) Time range line (closed or open) => next line starts as customer label (2-space indent)
+    // 2) Customer label line => next line starts as dash entry
+    // 3) Dash entry line => continue dash entry list
+    let nextPrefix = ""
+    const closedTimeRangeAtEnd = /^\s*\d{1,2}:\d{2}\s*[-–]\s*\d{1,2}:\d{2}\s*$/.test(currentLine)
+    const openTimeRangeAtEnd = /^\s*\d{1,2}:\d{2}\s*[-–]\s*$/.test(currentLine)
+    if (closedTimeRangeAtEnd || openTimeRangeAtEnd) {
+      nextPrefix = "  "
+    } else if (/^\s{2,}(?!-)\S.*$/.test(currentLine)) {
+      nextPrefix = "  - "
+    } else {
+      const entry = /^(\s*)-\s.*$/.exec(currentLine)
+      if (entry) {
+        nextPrefix = `${entry[1]}- `
+      }
+    }
+
+    if (!nextPrefix) return
+
+    event.preventDefault()
+    const oldScrollTop = textarea.scrollTop
+    const oldMaxScroll = textarea.scrollHeight - textarea.clientHeight
+
+    textarea.setRangeText(`\n${nextPrefix}`, start, end, "end")
+
+    // Reading scrollHeight forces a synchronous layout flush so the value is current.
+    const newMaxScroll = textarea.scrollHeight - textarea.clientHeight
+    const lineHeight = parseFloat(getComputedStyle(textarea).lineHeight) || 18
+    if (oldScrollTop >= oldMaxScroll - lineHeight * 2) {
+      textarea.scrollTop = newMaxScroll
+    }
+
+    textarea.dispatchEvent(new Event("input", { bubbles: true }))
   }
 
   syncBackdropScroll() {
     if (!this.hasNotesBackdropTarget) return
-    this.notesBackdropTarget.scrollTop = this.notesInputTarget.scrollTop
-    this.notesBackdropTarget.scrollLeft = this.notesInputTarget.scrollLeft
+    const textarea = this.notesInputTarget
+    const backdrop = this.notesBackdropTarget
+    const inner = backdrop.firstElementChild
+    if (!inner) return
+    // Keep backdrop itself pinned at zero — the inner wrapper moves via transform
+    // so backdrop.scrollHeight is never read and stale-height bugs can't occur.
+    backdrop.scrollTop = 0
+    backdrop.scrollLeft = 0
+    inner.style.transform =
+      `translateY(${-textarea.scrollTop}px) translateX(${-textarea.scrollLeft}px)`
+  }
+
+  scheduleBackdropScrollSync() {
+    if (this.backdropSyncFrame) {
+      window.cancelAnimationFrame(this.backdropSyncFrame)
+    }
+
+    this.backdropSyncFrame = window.requestAnimationFrame(() => {
+      this.backdropSyncFrame = null
+      this.syncBackdropScroll()
+    })
+  }
+
+  renderTimeline() {
+    if (!this.hasTimelineBarTarget) return
+    const TOTAL_MIN = 24 * 60
+    const entries = parseEntriesFromNotes(this.state.notesText)
+    const trackParts = []
+    const labelParts = []
+
+    // Background band for overall session
+    if (this.state.clockInMinutes != null) {
+      const sessionEnd = this.state.running
+        ? (new Date().getHours() * 60 + new Date().getMinutes())
+        : this.state.clockOutMinutes
+      if (sessionEnd != null) {
+        const left = (this.state.clockInMinutes / TOTAL_MIN) * 100
+        let dur = sessionEnd - this.state.clockInMinutes
+        if (dur < 0) dur += TOTAL_MIN
+        const width = (dur / TOTAL_MIN) * 100
+        trackParts.push(`<span class="time-card-timeline__band" style="left:${left.toFixed(3)}%;width:${width.toFixed(3)}%"></span>`)
+      }
+    }
+
+    // Entry segments with color classes matching time-range state
+    for (const entry of entries) {
+      const left = (entry.startMin / TOTAL_MIN) * 100
+      const rangeIdAttr = entry.id ? ` data-range-id="${escapeHtml(entry.id)}"` : ""
+
+      if (entry.isOpen) {
+        // Open range: calculate width from start to current time, always purple
+        const now = new Date()
+        const currentMin = now.getHours() * 60 + now.getMinutes()
+        const width = Math.max(1, ((currentMin - entry.startMin) / TOTAL_MIN) * 100)
+        const customer = String(entry.customerLabel || "").trim()
+        const label = `${minutesToTimeString(entry.startMin)}–(ongoing)${customer ? ' • ' + customer : ''}`
+        trackParts.push(`<span class="time-card-timeline__segment time-card-timeline__segment--ongoing"${rangeIdAttr} style="left:${left.toFixed(3)}%;width:${width.toFixed(3)}%" title="${escapeHtml(label)}"></span>`)
+      } else {
+        // Closed range: render with completion-based colors
+        const width = (Math.max(1, entry.durationMin) / TOTAL_MIN) * 100
+        const customer = String(entry.customerLabel || "").trim()
+        const label = `${minutesToTimeString(entry.startMin)}–${minutesToTimeString(entry.endMin)}${customer ? ' • ' + customer : ''}`
+        const rangeRequiredCount = Math.ceil(entry.durationMin / 60)
+        let colorClass = "time-card-timeline__segment"
+        if (entry.completedCount >= rangeRequiredCount) {
+          colorClass += " time-card-timeline__segment--done"
+        } else if (entry.completedCount > 0) {
+          colorClass += " time-card-timeline__segment--pending"
+        } else {
+          colorClass += " time-card-timeline__segment--missing"
+        }
+        trackParts.push(`<span class="${colorClass}"${rangeIdAttr} style="left:${left.toFixed(3)}%;width:${width.toFixed(3)}%" title="${escapeHtml(label)}"></span>`)
+      }
+    }
+
+    // Tick marks and labels at 6h intervals
+    const TICK_HOURS = [6, 12, 18]
+    for (const h of TICK_HOURS) {
+      const pct = (h / 24) * 100
+      trackParts.push(`<span class="time-card-timeline__tick" style="left:${pct}%"></span>`)
+      labelParts.push(`<span class="time-card-timeline__label" style="left:${pct}%">${pad2(h)}:00</span>`)
+    }
+
+    this.timelineBarTarget.innerHTML =
+      `<div class="time-card-timeline__track">${trackParts.join('')}</div>` +
+      `<div class="time-card-timeline__labels">${labelParts.join('')}</div>`
+  }
+
+  highlightRange(rangeId, active) {
+    const value = String(rangeId)
+    if (active) {
+      this.currentHighlightedRangeId = value
+    } else {
+      this.currentHighlightedRangeId = null
+    }
+    const segments = this.element.querySelectorAll(`.time-card-timeline__segment[data-range-id="${value}"]`)
+    const ranges = this.element.querySelectorAll(`.time-card-app__notes-prefix--time-range[data-range-id="${value}"]`)
+    for (const el of segments) {
+      el.classList.toggle("is-highlighted", active)
+    }
+    for (const el of ranges) {
+      el.classList.toggle("is-highlighted", active)
+    }
   }
 
   renderBackdrop(text) {
     if (!this.hasNotesBackdropTarget) return
-    const required = this.requiredSentenceCount()
-    this.notesBackdropTarget.innerHTML = buildNotesHtml(text ?? this.notesInputTarget.value, required)
+    this.notesBackdropTarget.innerHTML =
+      `<div>${buildNotesHtml(text ?? this.notesInputTarget.value)}</div>`
+    if (this.currentHighlightedRangeId) {
+      const ranges = this.element.querySelectorAll(`.time-card-app__notes-prefix--time-range[data-range-id="${this.currentHighlightedRangeId}"]`)
+      for (const el of ranges) {
+        el.classList.add("is-highlighted")
+      }
+    }
     this.syncBackdropScroll()
+    this.scheduleBackdropScrollSync()
   }
 
   updateSerializedContent() {
@@ -383,12 +891,6 @@ export default class extends Controller {
   }
 
   renderAll() {
-    this.clockInInputTarget.value = this.state.clockInMinutes != null
-      ? minutesToTimeString(this.state.clockInMinutes)
-      : "--:--"
-    this.clockOutInputTarget.value = this.state.clockOutMinutes != null
-      ? minutesToTimeString(this.state.clockOutMinutes)
-      : "--:--"
     // Only set textarea value on initial render — do not overwrite user edits in progress.
     // The server-loaded value is rendered by ERB; localStorage state takes priority thereafter.
     if (this.notesInputTarget.value !== this.state.notesText) {
@@ -396,10 +898,39 @@ export default class extends Controller {
     }
     this.updateSerializedContent()
     this.renderBackdrop(this.state.notesText)
-    const showSessionActions = this.hasCompletedClockOutState()
-    this.publishChromeClearVisibility(showSessionActions)
-    this.renderElapsed()
-    this.updateStatus()
+    this.renderTimeline()
+    this.updateChromeHoursBadge()
+  }
+
+  updateChromeHoursBadge() {
+    const summary = summarizeWorkedHoursFromNotes(this.state.notesText)
+    window.dispatchEvent(new CustomEvent("nexus:time-card-chrome-hours", {
+      detail: {
+        frameId: this.currentFrameId(),
+        label: summary.hasValue ? summary.label : "",
+        isOpen: summary.isOpen
+      }
+    }))
+    this.syncChromeHoursTicker(summary.isOpen)
+  }
+
+  syncChromeHoursTicker(shouldRun) {
+    if (!shouldRun) {
+      this.stopChromeHoursTicker()
+      return
+    }
+    if (this.chromeHoursTicker) return
+
+    this.chromeHoursTicker = window.setInterval(() => {
+      this.renderTimeline()
+      this.updateChromeHoursBadge()
+    }, 1000)
+  }
+
+  stopChromeHoursTicker() {
+    if (!this.chromeHoursTicker) return
+    window.clearInterval(this.chromeHoursTicker)
+    this.chromeHoursTicker = null
   }
 
   hasCompletedClockOutState() {
@@ -417,110 +948,6 @@ export default class extends Controller {
     return frame?.id || "time-card-pane"
   }
 
-  publishChromeClearVisibility(show) {
-    window.dispatchEvent(new CustomEvent("nexus:time-card-clear-state", {
-      detail: {
-        frameId: this.currentFrameId(),
-        show: Boolean(show)
-      }
-    }))
-  }
-
-  elapsedMs() {
-    if (this.state.clockInMinutes == null) return 0
-
-    const start = Number(this.state.clockInAtMs)
-    if (Number.isFinite(start) && start > 0) {
-      if (this.state.running) {
-        return Math.max(0, Date.now() - start)
-      }
-      const end = Number(this.state.clockOutAtMs)
-      if (Number.isFinite(end) && end > start) return Math.max(0, end - start)
-      // clockOutAtMs was cleared by manual edit — fall through to minute-based
-    }
-
-    // Minute-based: manual clock-out entered
-    if (this.state.clockOutMinutes != null && !this.state.running) {
-      let diff = (this.state.clockOutMinutes - this.state.clockInMinutes) * 60000
-      if (diff < 0) diff += 24 * 60 * 60000
-      return Math.max(0, diff)
-    }
-
-    return elapsedFromClockInMinutes(this.state.clockInMinutes)
-  }
-
-  renderElapsed() {
-    const elapsedMs = this.elapsedMs()
-    this.elapsedTextTarget.textContent = formatElapsed(elapsedMs)
-  }
-
-  validSentenceCount(requiredCount) {
-    return validSentenceCountFromNotes(this.state.notesText, requiredCount)
-  }
-
-  requiredSentenceCount() {
-    const elapsedMs = this.elapsedMs()
-    return Math.floor(elapsedMs / HOUR_MS)
-  }
-
-  nextDueMs(written, elapsedMs) {
-    const required = Math.floor(elapsedMs / HOUR_MS)
-    if (written < required) return 0
-
-    const nextHourThreshold = (Math.max(required, written) + 1) * HOUR_MS
-    return Math.max(0, nextHourThreshold - elapsedMs)
-  }
-
-  updateStatus() {
-    const elapsedMs = this.elapsedMs()
-    const required = Math.floor(elapsedMs / HOUR_MS)
-    const written = this.validSentenceCount(required)
-    const missing = Math.max(0, required - written)
-    const nextDue = this.nextDueMs(written, elapsedMs)
-
-    this.ratioTextTarget.textContent = `${written}/${required}`
-    this.nextDueTextTarget.textContent =
-      missing > 0 ? "Next required entry: overdue now" : `Next required entry in ${formatElapsed(nextDue)}`
-
-    const creditedHours = Math.max(written, required)
-    const cycleStart = creditedHours * HOUR_MS
-    const cycleProgress = missing > 0 ? 1 : Math.max(0, Math.min(1, (elapsedMs - cycleStart) / HOUR_MS))
-    this.progressFillTarget.style.width = `${Math.round(cycleProgress * 100)}%`
-    this.progressFillTarget.classList.toggle("is-danger", missing > 0)
-    this.ratioTextTarget.classList.toggle("is-danger", missing > 0)
-
-    if (missing > 0) {
-      this.alertTextTarget.textContent = `Missing ${missing} entr${missing === 1 ? "y" : "ies"} for current hours.`
-      this.alertTextTarget.classList.add("is-visible")
-      this.alertTextTarget.classList.remove("is-good")
-      if (!this.hasPlayedOverdueAlert) {
-        this.hasPlayedOverdueAlert = true
-        playOverdueAlertTone(this)
-      }
-    } else {
-      this.alertTextTarget.textContent = "All caught up!"
-      this.alertTextTarget.classList.remove("is-visible")
-      this.alertTextTarget.classList.add("is-good")
-      this.hasPlayedOverdueAlert = false
-    }
-
-    // Re-render backdrop so prefix colors update as hours tick over.
-    this.renderBackdrop(this.state.notesText)
-  }
-
-  startTicker() {
-    this.stopTicker()
-    this.ticker = window.setInterval(() => {
-      this.renderElapsed()
-      this.updateStatus()
-    }, 1000)
-  }
-
-  stopTicker() {
-    if (!this.ticker) return
-    window.clearInterval(this.ticker)
-    this.ticker = null
-  }
 
   loadState() {
     try {
@@ -549,11 +976,6 @@ export default class extends Controller {
   }
 
   clearSessionData() {
-    this.state.clockInMinutes = null
-    this.state.clockInAtMs = null
-    this.state.clockOutAtMs = null
-    this.state.clockOutMinutes = null
-    this.state.running = false
     this.state.notesText = ""
     this.saveState()
     this.renderAll()

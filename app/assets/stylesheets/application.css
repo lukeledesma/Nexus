@@ -5140,6 +5140,17 @@ html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden)
   max-width: min(14rem, 28vw);
 }
 
+.content-window-time-card-hours {
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  white-space: nowrap;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
 .content-window-open-file-name--dirty {
   color: #facc15;
 }
@@ -5936,6 +5947,15 @@ input.app-save-dialog__btn {
   opacity: 1;
 }
 
+.time-card-app__time-display {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
+  color: var(--text);
+}
+
 .time-card-app__elapsed {
   margin: 0;
   font-size: 0.82rem;
@@ -6041,7 +6061,7 @@ input.app-save-dialog__btn {
   flex: 1 1 auto;
   min-height: 0;
   border-radius: 6px;
-  overflow: hidden;
+  overflow: clip;
 }
 
 /* Shared layout for both layers — must be pixel-identical */
@@ -6049,7 +6069,7 @@ input.app-save-dialog__btn {
 .time-card-notes-textarea {
   grid-area: 1 / 1;
   margin: 0;
-  padding: 0.5rem;
+  padding: 0.5rem 0.5rem 1.2rem;
   border: 1px solid var(--border-hairline);
   border-radius: 6px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -6075,6 +6095,8 @@ input.app-save-dialog__btn {
   pointer-events: none;
   user-select: none;
   z-index: 0;
+  overflow: clip;
+  overscroll-behavior: none;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
@@ -6101,6 +6123,7 @@ input.app-save-dialog__btn {
   z-index: 1;
   outline: none;
   scrollbar-width: thin;
+  overscroll-behavior: none;
 }
 
 .time-card-notes-textarea::placeholder {
@@ -6116,6 +6139,49 @@ input.app-save-dialog__btn {
 /* Green H-prefix spans rendered in the backdrop */
 .time-card-app__notes-prefix {
   font-weight: inherit;
+  position: relative;
+}
+
+.time-card-app__notes-prefix--time-range {
+  display: inline;
+}
+
+.time-card-app__notes-prefix--time-range.is-highlighted {
+  color: #60a5fa;
+}
+
+.time-card-app__time-range-label {
+  position: absolute;
+  left: calc(100% + 0.45rem);
+  top: 0;
+  color: var(--text);
+  opacity: 0.82;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: color 0.1s, opacity 0.1s;
+}
+
+.time-card-app__notes-prefix--time-range.is-highlighted .time-card-app__time-range-label {
+  color: #60a5fa;
+  opacity: 1;
+}
+
+/* Dash prefix for entry lines */
+.time-card-app__entry-dash {
+  color: var(--text-muted);
+  opacity: 0.65;
+}
+
+.time-card-app__ghost-text {
+  color: var(--text-muted);
+  opacity: 0.52;
+  font-style: italic;
+  pointer-events: none;
+}
+
+.time-card-app__notes-prefix--done .time-card-app__entry-dash {
+  color: #34d399;
 }
 
 .time-card-app__notes-prefix--done {
@@ -6136,6 +6202,127 @@ input.app-save-dialog__btn {
 
 .time-card-app__notes-prefix--missing {
   color: #f87171;
+}
+
+.time-card-app__notes-prefix--ongoing {
+  color: #a78bfa;
+}
+
+:root[data-nexus-shell-mode="light"] .time-card-app__notes-prefix--missing {
+  color: #dc2626;
+}
+
+:root[data-nexus-shell-mode="light"] .time-card-app__notes-prefix--ongoing {
+  color: #7c3aed;
+}
+
+/* 24-hour timeline bar */
+.time-card-timeline-shell {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 1px;
+}
+
+.time-card-timeline__track {
+  position: relative;
+  height: 9px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-hairline);
+  overflow: hidden;
+}
+
+.time-card-timeline__labels {
+  position: relative;
+  height: 10px;
+}
+
+.time-card-timeline__band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(130, 214, 255, 0.12);
+  pointer-events: none;
+}
+
+.time-card-timeline__segment {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  border-radius: 2px;
+  background: #34d399;
+  opacity: 0.82;
+  cursor: default;
+  min-width: 3px;
+  transition: opacity 0.1s, background 0.1s;
+}
+
+.time-card-timeline__segment--done {
+  background: #34d399;
+}
+
+.time-card-timeline__segment--pending {
+  background: #fbbf24;
+}
+
+.time-card-timeline__segment--missing {
+  background: #f87171;
+}
+
+.time-card-timeline__segment--ongoing {
+  background: #a78bfa;
+}
+
+:root[data-nexus-shell-mode="light"] .time-card-timeline__segment--done {
+  background: #15803d;
+}
+
+:root[data-nexus-shell-mode="light"] .time-card-timeline__segment--pending {
+  background: #9a8700;
+}
+
+:root[data-nexus-shell-mode="light"] .time-card-timeline__segment--missing {
+  background: #dc2626;
+}
+
+:root[data-nexus-shell-mode="light"] .time-card-timeline__segment--ongoing {
+  background: #7c3aed;
+}
+
+.time-card-timeline__segment:hover,
+.time-card-timeline__segment.is-highlighted {
+  background: #60a5fa;
+  opacity: 1;
+}
+
+.time-card-timeline__tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.18);
+  pointer-events: none;
+}
+
+.time-card-timeline__label {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 0.52rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  line-height: 1;
+  top: 0;
+  letter-spacing: 0.04em;
+}
+
+:root[data-nexus-shell-mode="light"] .time-card-timeline__segment {
+  background: #15803d;
+}
+
+:root[data-nexus-shell-mode="light"] .time-card-timeline__tick {
+  background: rgba(0, 0, 0, 0.15);
 }
 
 

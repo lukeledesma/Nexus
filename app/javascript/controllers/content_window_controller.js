@@ -109,6 +109,8 @@ export default class extends Controller {
     window.addEventListener("nexus:finder-item-renamed", this.boundFinderItemRenamed)
     this.boundTimeCardClearState = this.handleTimeCardClearState.bind(this)
     window.addEventListener("nexus:time-card-clear-state", this.boundTimeCardClearState)
+    this.boundTimeCardChromeHours = this.handleTimeCardChromeHours.bind(this)
+    window.addEventListener("nexus:time-card-chrome-hours", this.boundTimeCardChromeHours)
     this.boundItemDirtyState = this.handleItemDirtyState.bind(this)
     window.addEventListener("nexus:item-dirty", this.boundItemDirtyState)
     this.boundItemSavingState = this.handleItemSavingState.bind(this)
@@ -183,6 +185,7 @@ export default class extends Controller {
     window.removeEventListener("nexus:linked-app-document-saved", this.boundLinkedAppSaved)
     window.removeEventListener("nexus:finder-item-renamed", this.boundFinderItemRenamed)
     window.removeEventListener("nexus:time-card-clear-state", this.boundTimeCardClearState)
+    window.removeEventListener("nexus:time-card-chrome-hours", this.boundTimeCardChromeHours)
     window.removeEventListener("nexus:item-dirty", this.boundItemDirtyState)
     window.removeEventListener("nexus:item-saving", this.boundItemSavingState)
     window.removeEventListener("nexus:item-saved", this.boundItemSavedState)
@@ -224,6 +227,17 @@ export default class extends Controller {
     const { frameId, show } = event.detail || {}
     if (frameId !== this.frameIdValue) return
     this.chromeTimeCardClearTarget.hidden = !Boolean(show)
+  }
+
+  handleTimeCardChromeHours(event) {
+    const isTimeCardWindow =
+      this.appKeyValue === "time-card" || this.appKeyValue.startsWith("time-card-spawn-")
+    if (!isTimeCardWindow) return
+
+    const { frameId, label, isOpen } = event.detail || {}
+    if (String(frameId || "") !== String(this.frameIdValue || "")) return
+
+    this.syncTimeCardHoursBadge(label, { isOpen: Boolean(isOpen) })
   }
 
   handleItemDirtyState(event) {
@@ -428,6 +442,10 @@ export default class extends Controller {
       }
       this.currentUrl = this.buildAppUrl({ blank: this.isLinkedApp() })
       this.clearOpenFileBadge()
+    }
+
+    if (this.appKeyValue === "time-card" || this.appKeyValue.startsWith("time-card-spawn-")) {
+      this.clearTimeCardHoursBadge()
     }
 
     if (this.hasFrameTarget) {
@@ -776,6 +794,7 @@ export default class extends Controller {
     clone.style.width = `${Math.round(rect.width)}px`
     clone.style.height = `${Math.round(rect.height)}px`
     this.syncOpenFileBadgeFor(clone, title)
+    this.syncTimeCardHoursBadgeFor(clone, "", { isOpen: false })
 
     this.persistSpawnedTimeCardWindow({
       appKey: uid,
@@ -1011,6 +1030,7 @@ export default class extends Controller {
       const frame = clone.querySelector("turbo-frame[data-content-window-target='frame']")
       if (frame) frame.id = String(entry.frameId || entry.appKey)
       this.syncOpenFileBadgeFor(clone, restoredTitle)
+      this.syncTimeCardHoursBadgeFor(clone, "", { isOpen: false })
 
       window.__nexusSpawnedTimeCardsByDocumentId[String(entry.documentId)] = String(entry.appKey)
       this.element.parentElement.appendChild(clone)
@@ -1075,6 +1095,36 @@ export default class extends Controller {
     nameEl.textContent = t
     nameEl.setAttribute("title", t)
     this.syncOpenFileNameStateFor(windowEl, "saved")
+  }
+
+  syncTimeCardHoursBadge(label, { isOpen = false } = {}) {
+    this.syncTimeCardHoursBadgeFor(this.element, label, { isOpen })
+  }
+
+  syncTimeCardHoursBadgeFor(windowEl, label, { isOpen = false } = {}) {
+    if (!windowEl) return
+    const sep = windowEl.querySelector("[data-nexus-time-card-hours-separator]")
+    const hoursEl = windowEl.querySelector("[data-nexus-time-card-hours]")
+    if (!sep || !hoursEl) return
+
+    const text = String(label || "").trim()
+
+    if (!text) {
+      sep.hidden = true
+      hoursEl.hidden = true
+      hoursEl.textContent = ""
+      hoursEl.removeAttribute("title")
+      return
+    }
+
+    sep.hidden = false
+    hoursEl.hidden = false
+    hoursEl.textContent = text
+    hoursEl.setAttribute("title", `Worked ${text}`)
+  }
+
+  clearTimeCardHoursBadge() {
+    this.syncTimeCardHoursBadge("", { isOpen: false })
   }
 
   isDraftOpenFileTitle(title) {
@@ -1273,6 +1323,7 @@ export default class extends Controller {
 
   clearOpenFileBadge() {
     this.syncOpenFileBadge("")
+    this.clearTimeCardHoursBadge()
     if (this.isLinkedDocumentApp() && this.hasFrameIdValue) this.clearLinkedAppOpenTitleStorage()
   }
 
@@ -2396,6 +2447,7 @@ export default class extends Controller {
       nameEl.textContent = ""
       nameEl.removeAttribute("title")
     }
+    this.syncTimeCardHoursBadgeFor(clone, "", { isOpen: false })
     const rect = this.element.getBoundingClientRect()
     clone.style.left = `${Math.round(rect.left) + 24}px`
     clone.style.top  = `${Math.round(rect.top)  + 24}px`

@@ -9,100 +9,36 @@
         data: { turbo: false, controller: "autosave", autosave_debounce_value: 180 },
         html: { class: "time-card-app__form" } do %>
         <input type="hidden" name="document[content]" value="<%= @serialized_document_content %>" data-time-card-target="serializedContent">
-        <header class="time-card-app__header">
-          <div class="time-card-app__clockin-group">
-            <p class="time-card-app__label">Start Time</p>
-            <input id="time-card-clockin-input" type="text" inputmode="numeric" maxlength="5" class="time-card-app__time-input"
-              placeholder="--:--" aria-label="Start time"
-              data-time-card-target="clockInInput"
-              data-action="change->time-card#updateClockInManual keydown->time-card#applyClockInOnEnter" />
-          </div>
-
-          <div class="time-card-app__clockout-group">
-            <p class="time-card-app__label">End Time</p>
-            <input id="time-card-clockout-input" type="text" inputmode="numeric" maxlength="5" class="time-card-app__time-input"
-              placeholder="--:--" aria-label="End time"
-              data-time-card-target="clockOutInput"
-              data-action="change->time-card#updateClockOutManual keydown->time-card#applyClockOutOnEnter" />
-          </div>
-
-          <div class="time-card-app__elapsed-group">
-            <p class="time-card-app__label">Total</p>
-            <p class="time-card-app__elapsed" data-time-card-target="elapsedText">00:00:00</p>
-          </div>
-        </header>
-
-        <section class="time-card-app__status">
-          <p class="time-card-app__status-line" data-time-card-target="nextDueText"></p>
-          <div class="time-card-app__progress" role="progressbar" aria-label="Progress to next required entry">
-            <div class="time-card-app__progress-fill" data-time-card-target="progressFill"></div>
-          </div>
-          <div class="time-card-app__status-foot">
-            <p class="time-card-app__status-line time-card-app__status-line--alert" data-time-card-target="alertText"></p>
-            <p class="time-card-app__status-line time-card-app__status-line--ratio" data-time-card-target="ratioText">0/0</p>
-          </div>
-        </section>
 
         <section class="time-card-app__entries">
           <div class="time-card-notes-shell">
             <div class="time-card-notes-backdrop" aria-hidden="true" data-time-card-target="notesBackdrop"></div>
             <textarea class="time-card-notes-textarea"
               data-time-card-target="notesInput"
-              data-action="input->time-card#updateNotes scroll->time-card#syncBackdropScroll"
-              placeholder="Write your entry..."
+              data-action="input->time-card#updateNotes scroll->time-card#syncBackdropScroll keydown->time-card#handleNotesKeydown"
+              placeholder="10:00-12:00 Customer&#10;- Entry 1&#10;- Entry 2"
               autocomplete="off"
               spellcheck="true"></textarea>
           </div>
         </section>
+        <div class="time-card-timeline-shell" data-time-card-target="timelineBar"></div>
       <% end %>
     <% else %>
       <div class="time-card-app__form">
         <input type="hidden" value="" data-time-card-target="serializedContent">
-        <header class="time-card-app__header">
-          <div class="time-card-app__clockin-group">
-            <p class="time-card-app__label">Start Time</p>
-            <input id="time-card-clockin-input" type="text" inputmode="numeric" maxlength="5" class="time-card-app__time-input"
-              placeholder="--:--" aria-label="Start time"
-              data-time-card-target="clockInInput"
-              data-action="change->time-card#updateClockInManual keydown->time-card#applyClockInOnEnter" />
-          </div>
-
-          <div class="time-card-app__clockout-group">
-            <p class="time-card-app__label">End Time</p>
-            <input id="time-card-clockout-input" type="text" inputmode="numeric" maxlength="5" class="time-card-app__time-input"
-              placeholder="--:--" aria-label="End time"
-              data-time-card-target="clockOutInput"
-              data-action="change->time-card#updateClockOutManual keydown->time-card#applyClockOutOnEnter" />
-          </div>
-
-          <div class="time-card-app__elapsed-group">
-            <p class="time-card-app__label">Total</p>
-            <p class="time-card-app__elapsed" data-time-card-target="elapsedText">00:00:00</p>
-          </div>
-        </header>
-
-        <section class="time-card-app__status">
-          <p class="time-card-app__status-line" data-time-card-target="nextDueText"></p>
-          <div class="time-card-app__progress" role="progressbar" aria-label="Progress to next required entry">
-            <div class="time-card-app__progress-fill" data-time-card-target="progressFill"></div>
-          </div>
-          <div class="time-card-app__status-foot">
-            <p class="time-card-app__status-line time-card-app__status-line--alert" data-time-card-target="alertText"></p>
-            <p class="time-card-app__status-line time-card-app__status-line--ratio" data-time-card-target="ratioText">0/0</p>
-          </div>
-        </section>
 
         <section class="time-card-app__entries">
           <div class="time-card-notes-shell">
             <div class="time-card-notes-backdrop" aria-hidden="true" data-time-card-target="notesBackdrop"></div>
             <textarea class="time-card-notes-textarea"
               data-time-card-target="notesInput"
-              data-action="input->time-card#updateNotes scroll->time-card#syncBackdropScroll"
-              placeholder="Write your entry..."
+              data-action="input->time-card#updateNotes scroll->time-card#syncBackdropScroll keydown->time-card#handleNotesKeydown"
+              placeholder="10:00-12:00 Customer&#10;- Entry 1&#10;- Entry 2"
               autocomplete="off"
               spellcheck="true"></textarea>
           </div>
         </section>
+        <div class="time-card-timeline-shell" data-time-card-target="timelineBar"></div>
       </div>
     <% end %>
   </section>
