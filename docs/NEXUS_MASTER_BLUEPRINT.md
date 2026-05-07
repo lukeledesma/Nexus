@@ -12,6 +12,7 @@ Primary apps:
 - Tasks
 - Notes
 - Time Card
+- Calendar
 - Images
 - Audio
 - Finder (file system browser and save/open host)
@@ -202,7 +203,7 @@ File:
 
 Main route groups:
 - Auth: /login /logout
-- App windows: /apps/finder, /apps/tasks, /apps/notes, /apps/time_card, /apps/images, /apps/audio, /apps/user
+- App windows: /apps/finder, /apps/tasks, /apps/notes, /apps/time_card, /apps/calendar, /apps/images, /apps/audio, /apps/user
 - Draft and save bridge: /apps/tasks/draft_file and /apps/tasks/save_file
 - Workspace preferences: /workspace_preferences GET/PATCH
 - Document CRUD and file operations under /documents
@@ -286,7 +287,16 @@ Files:
 - app/controllers/apps/images_controller.rb
 - app/controllers/apps/audio_controller.rb
 
-### 9.7 Apps::UserController
+### 9.7 Apps::CalendarController
+Capabilities:
+- render standalone calendar app window (not Finder-linked)
+- serve calendar client shell for month/week/day views
+
+Files:
+- app/controllers/apps/calendar_controller.rb
+- app/javascript/controllers/calendar_app_controller.js
+
+### 9.8 Apps::UserController
 Capabilities:
 - render user settings app
 - update username with password verification
@@ -295,7 +305,7 @@ Capabilities:
 File:
 - app/controllers/apps/user_controller.rb
 
-### 9.8 WorkspacePreferencesController
+### 9.9 WorkspacePreferencesController
 Capabilities:
 - read and update shell/theme/wallpaper state
 - currently only Modern shell is active path
@@ -360,6 +370,7 @@ Window frames include:
 - tasks-pane
 - notes-pane
 - time-card-pane
+- calendar-pane
 - images-pane
 - audio-pane
 - user-pane
@@ -407,6 +418,17 @@ User actions:
 Persistence:
 - documents.content_type note in Time Card section
 - content serialized by TimeCardDocumentCodec
+
+### Calendar
+User actions:
+- open standalone calendar app from launcher
+- switch month/week/day views
+- create, edit, delete events
+- drag and move events across times and dates (15-minute increments in week/day)
+
+Persistence:
+- browser localStorage (calendar list state, events, active view, active date)
+- no Finder document linkage for this app
 
 ### Images
 User actions:

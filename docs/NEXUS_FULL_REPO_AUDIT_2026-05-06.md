@@ -5,6 +5,7 @@ Scope requested: entire Nexus_Dev folder contents
 
 ## Latest Update Log
 
+- 2026-05-07: Calendar app shipped as a standalone launcher app (no Finder row/document binding), including month/week/day views, chrome `+` event creation, drag-and-drop event moves (cross-day and 15-minute snapping in week/day), and persisted view/date restoration across refresh; documentation updated in `docs/NEXUS_MASTER_BLUEPRINT.md`.
 - 2026-05-07: CI runs `nexus:diagnostics` after unit tests (writes via `NEXUS_DIAGNOSTICS_OUTPUT` under `tmp/`); added `test/integration/json_api_contracts_test.rb` for core JSON endpoint contracts; `CI=true` set on test jobs for test-environment eager loading parity with GitHub Actions.
 - 2026-05-06: Extended `bin/rake nexus:diagnostics` snapshots with primary DB connection metadata, resolved document sync root, and both `storage/workspace` and `storage/workspace_test` directory summaries; updated `docs/DB_DIAGNOSTICS.md` accordingly (backend visibility before user-facing feature work).
 - 2026-05-06: Owner responses captured and converted into execution defaults.
