@@ -14,6 +14,7 @@ export default class extends Controller {
     this.boundKeydown = this.handleKeydown.bind(this)
     this.boundRowClick = this.toggleRow.bind(this)
     this.tasks = this.readTasksFromDom()
+    this.stripTrailingBlankMainTasks()
     this.setupRowClickListener()
     this.renderTasks()
     window.addEventListener("keydown", this.boundKeydown)
@@ -234,6 +235,16 @@ export default class extends Controller {
     this.setStatus("Saving...")
     if (this.timer) clearTimeout(this.timer)
     this.timer = setTimeout(() => this.saveNow(), this.debounceValue)
+  }
+
+  stripTrailingBlankMainTasks() {
+    while (this.tasks.length > 0) {
+      const last = this.tasks[this.tasks.length - 1]
+      const textEmpty = !(String(last.text || "").trim())
+      const noSubs = !last.subtasks || last.subtasks.length === 0
+      if (!(textEmpty && noSubs)) break
+      this.tasks.pop()
+    }
   }
 
   readTasksFromDom() {

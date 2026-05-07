@@ -1,0 +1,7 @@
+./app/services/finder_workspace_initializer.rb:6:  LEGACY_DOCUMENTS_SECTION_TITLE = "Documents"
+./app/services/finder_workspace_initializer.rb:7:  LEGACY_FINDER_WORKSPACE_FOLDER_TITLE = "Finder"
+./app/services/finder_workspace_initializer.rb:42:    finder_root = root.children.folders.find { |d| d.title.to_s.strip.casecmp?(LEGACY_FINDER_WORKSPACE_FOLDER_TITLE) }
+./app/services/finder_workspace_initializer.rb:79:    finder_root = root.children.folders.find { |d| d.title.to_s.strip.casecmp?(LEGACY_FINDER_WORKSPACE_FOLDER_TITLE) }
+./app/services/finder_workspace_initializer.rb:80:    finder_root ||= root.children.create!(is_folder: true, title: LEGACY_FINDER_WORKSPACE_FOLDER_TITLE)
+./app/services/finder_workspace_initializer.rb:84:      .map { |definition| definition[:title] } + [ LEGACY_DOCUMENTS_SECTION_TITLE ]
+./app/services/finder_workspace_initializer.rb:100:    documents_folder = finder_root.children.folders.find { |d| d.title.to_s.strip.casecmp?(LEGACY_DOCUMENTS_SECTION_TITLE) }

@@ -57,6 +57,7 @@ export default class extends Controller {
     const minByAppKey = {
       tasks: taskListMin,
       finder: finderLikeMin,
+      calendar: finderLikeMin,
       audio: audioMin,
       images: imagesMin,
       notes: notesMin,
@@ -68,7 +69,7 @@ export default class extends Controller {
     this.minWindowHeight = appMinimum.height
 
     const rect = this.element.getBoundingClientRect()
-    if (this.appKeyValue === "finder") {
+    if (this.appKeyValue === "finder" || this.appKeyValue === "calendar") {
       /* Default / first paint: use minimum allowed size (not generic 550×480 .content-window CSS). */
       this.windowWidth = this.minWindowWidth
       this.windowHeight = this.minWindowHeight
@@ -2533,6 +2534,16 @@ export default class extends Controller {
     window.dispatchEvent(
       new CustomEvent("nexus:task-list-add-task", {
         detail: { frameId: this.hasFrameIdValue ? this.frameIdValue : "tasks-pane" }
+      })
+    )
+  }
+
+  emitCalendarNewEvent(event) {
+    if (event) event.preventDefault()
+    if (this.appKeyValue !== "calendar") return
+    window.dispatchEvent(
+      new CustomEvent("nexus:calendar-new-event", {
+        detail: { frameId: this.hasFrameIdValue ? this.frameIdValue : "calendar-pane" }
       })
     )
   }

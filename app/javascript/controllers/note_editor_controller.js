@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { stripTrailingEmptyBlocks } from "lib/note_editor_dom"
 
 export default class extends Controller {
   static targets = ["title", "editor", "content", "status"]
@@ -17,6 +18,7 @@ export default class extends Controller {
   hydrateEditor() {
     if (!this.hasEditorTarget || !this.hasContentTarget) return
     this.editorTarget.innerHTML = this.contentTarget.value || ""
+    stripTrailingEmptyBlocks(this.editorTarget)
   }
 
   onTitleInput() {
@@ -52,6 +54,7 @@ export default class extends Controller {
 
   syncEditorToHiddenField() {
     if (!this.hasEditorTarget || !this.hasContentTarget) return
+    stripTrailingEmptyBlocks(this.editorTarget)
     this.contentTarget.value = this.editorTarget.innerHTML
   }
 

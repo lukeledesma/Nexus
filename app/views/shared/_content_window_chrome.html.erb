@@ -4,6 +4,7 @@
 <% open_file_badge = local_assigns.fetch(:open_file_badge, false) %>
 <% show_finder_new_folder = local_assigns.fetch(:show_finder_new_folder, false) %>
 <% show_task_list_add = local_assigns.fetch(:show_task_list_add, false) %>
+<% show_calendar_new_event = local_assigns.fetch(:show_calendar_new_event, false) %>
 <% show_set_wallpaper = local_assigns.fetch(:show_set_wallpaper, false) %>
 <% show_time_card_clear = local_assigns.fetch(:show_time_card_clear, false) %>
 <% chrome_toolbar = show_finder_new_folder || show_task_list_add || linked_app_save_flow %>
@@ -85,6 +86,15 @@
           data-action="click->content-window#emitTaskListAddTask"
           title="Add task"
           aria-label="Add task"
+        ><%= material_symbol_icon(:add, size: :xs) %></button>
+      <% end %>
+      <% if show_calendar_new_event %>
+        <button
+          type="button"
+          class="content-window-new-folder-btn settings-themes-item-action-btn theme-builder-save-btn"
+          data-action="click->content-window#emitCalendarNewEvent"
+          title="New event"
+          aria-label="New event"
         ><%= material_symbol_icon(:add, size: :xs) %></button>
       <% end %>
       <% if show_save %>

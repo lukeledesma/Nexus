@@ -139,6 +139,19 @@ What it does:
 - Fails if legacy organizer-specific visual card classes reappear in ERB views
 - Prints `UI contract check passed` on success
 
+Database diagnostics snapshot:
+
+```bash
+bin/rake nexus:diagnostics
+```
+
+What it does:
+
+- Writes a timestamped markdown report to docs/audit/
+- Lists every table in the active database
+- Includes row counts, columns, and max updated_at when present
+- Provides a repeatable before/after baseline for cleanup work
+
 List routes:
 
 ```bash

@@ -1,0 +1,66 @@
+                                  Prefix Verb   URI Pattern                                                                                       Controller#Action
+                                   login GET    /login(.:format)                                                                                  sessions#new
+                                         POST   /login(.:format)                                                                                  sessions#create
+                                  logout DELETE /logout(.:format)                                                                                 sessions#destroy
+                             apps_finder GET    /apps/finder(.:format)                                                                            apps/finder#show
+                              apps_notes GET    /apps/notes(.:format)                                                                             apps/notes#show
+                          apps_time_card GET    /apps/time_card(.:format)                                                                         apps/time_card#show
+                             apps_images GET    /apps/images(.:format)                                                                            apps/images#show
+                              apps_audio GET    /apps/audio(.:format)                                                                             apps/audio#show
+             apps_wallpaper_iimage_files GET    /apps/wallpaper_iimage/files(.:format)                                                            apps/wallpaper_iimage#files
+                               apps_user GET    /apps/user(.:format)                                                                              apps/user#show
+                      apps_user_username PATCH  /apps/user/username(.:format)                                                                     apps/user#update_username
+                      apps_user_password PATCH  /apps/user/password(.:format)                                                                     apps/user#update_password
+                              apps_tasks GET    /apps/tasks(.:format)                                                                             apps/tasks#show
+                    apps_tasks_save_file POST   /apps/tasks/save_file(.:format)                                                                   apps/tasks#save_file
+                   apps_tasks_draft_file GET    /apps/tasks/draft_file(.:format)                                                                  apps/tasks#draft_file
+                      rails_health_check GET    /up(.:format)                                                                                     rails/health#show
+                   workspace_preferences GET    /workspace_preferences(.:format)                                                                  workspace_preferences#show
+                                         PATCH  /workspace_preferences(.:format)                                                                  workspace_preferences#update
+                                    root GET    /                                                                                                 documents#index
+            documents_create_root_folder POST   /documents/create_root_folder(.:format)                                                           documents#create_root_folder
+            organizer_fragment_documents GET    /documents/organizer_fragment(.:format)                                                           documents#organizer_fragment
+                  panel_search_documents GET    /documents/panel_search(.:format)                                                                 documents#panel_search
+                    create_file_document POST   /documents/:id/create_file(.:format)                                                              documents#create_file
+               create_subfolder_document POST   /documents/:id/create_subfolder(.:format)                                                         documents#create_subfolder
+                    move_folder_document POST   /documents/:id/move_folder(.:format)                                                              documents#move_folder
+                      move_file_document POST   /documents/:id/move_file(.:format)                                                                documents#move_file
+                  upload_images_document POST   /documents/:id/upload_images(.:format)                                                            documents#upload_images
+                         rename_document PATCH  /documents/:id/rename(.:format)                                                                   documents#rename
+                toggle_favorite_document PATCH  /documents/:id/toggle_favorite(.:format)                                                          documents#toggle_favorite
+                      file_list_document GET    /documents/:id/file_list(.:format)                                                                documents#file_list
+                     asset_file_document GET    /documents/:id/asset_file(.:format)                                                               documents#asset_file
+                               documents GET    /documents(.:format)                                                                              documents#index
+                                         POST   /documents(.:format)                                                                              documents#create
+                            new_document GET    /documents/new(.:format)                                                                          documents#new
+                           edit_document GET    /documents/:id/edit(.:format)                                                                     documents#edit
+                                document GET    /documents/:id(.:format)                                                                          documents#show
+                                         PATCH  /documents/:id(.:format)                                                                          documents#update
+                                         PUT    /documents/:id(.:format)                                                                          documents#update
+                                         DELETE /documents/:id(.:format)                                                                          documents#destroy
+        turbo_recede_historical_location GET    /recede_historical_location(.:format)                                                             turbo/native/navigation#recede
+        turbo_resume_historical_location GET    /resume_historical_location(.:format)                                                             turbo/native/navigation#resume
+       turbo_refresh_historical_location GET    /refresh_historical_location(.:format)                                                            turbo/native/navigation#refresh
+           rails_postmark_inbound_emails POST   /rails/action_mailbox/postmark/inbound_emails(.:format)                                           action_mailbox/ingresses/postmark/inbound_emails#create
+              rails_relay_inbound_emails POST   /rails/action_mailbox/relay/inbound_emails(.:format)                                              action_mailbox/ingresses/relay/inbound_emails#create
+           rails_sendgrid_inbound_emails POST   /rails/action_mailbox/sendgrid/inbound_emails(.:format)                                           action_mailbox/ingresses/sendgrid/inbound_emails#create
+     rails_mandrill_inbound_health_check GET    /rails/action_mailbox/mandrill/inbound_emails(.:format)                                           action_mailbox/ingresses/mandrill/inbound_emails#health_check
+           rails_mandrill_inbound_emails POST   /rails/action_mailbox/mandrill/inbound_emails(.:format)                                           action_mailbox/ingresses/mandrill/inbound_emails#create
+            rails_mailgun_inbound_emails POST   /rails/action_mailbox/mailgun/inbound_emails/mime(.:format)                                       action_mailbox/ingresses/mailgun/inbound_emails#create
+          rails_conductor_inbound_emails GET    /rails/conductor/action_mailbox/inbound_emails(.:format)                                          rails/conductor/action_mailbox/inbound_emails#index
+                                         POST   /rails/conductor/action_mailbox/inbound_emails(.:format)                                          rails/conductor/action_mailbox/inbound_emails#create
+       new_rails_conductor_inbound_email GET    /rails/conductor/action_mailbox/inbound_emails/new(.:format)                                      rails/conductor/action_mailbox/inbound_emails#new
+           rails_conductor_inbound_email GET    /rails/conductor/action_mailbox/inbound_emails/:id(.:format)                                      rails/conductor/action_mailbox/inbound_emails#show
+new_rails_conductor_inbound_email_source GET    /rails/conductor/action_mailbox/inbound_emails/sources/new(.:format)                              rails/conductor/action_mailbox/inbound_emails/sources#new
+   rails_conductor_inbound_email_sources POST   /rails/conductor/action_mailbox/inbound_emails/sources(.:format)                                  rails/conductor/action_mailbox/inbound_emails/sources#create
+   rails_conductor_inbound_email_reroute POST   /rails/conductor/action_mailbox/:inbound_email_id/reroute(.:format)                               rails/conductor/action_mailbox/reroutes#create
+rails_conductor_inbound_email_incinerate POST   /rails/conductor/action_mailbox/:inbound_email_id/incinerate(.:format)                            rails/conductor/action_mailbox/incinerates#create
+                      rails_service_blob GET    /rails/active_storage/blobs/redirect/:signed_id/*filename(.:format)                               active_storage/blobs/redirect#show
+                rails_service_blob_proxy GET    /rails/active_storage/blobs/proxy/:signed_id/*filename(.:format)                                  active_storage/blobs/proxy#show
+                                         GET    /rails/active_storage/blobs/:signed_id/*filename(.:format)                                        active_storage/blobs/redirect#show
+               rails_blob_representation GET    /rails/active_storage/representations/redirect/:signed_blob_id/:variation_key/*filename(.:format) active_storage/representations/redirect#show
+         rails_blob_representation_proxy GET    /rails/active_storage/representations/proxy/:signed_blob_id/:variation_key/*filename(.:format)    active_storage/representations/proxy#show
+                                         GET    /rails/active_storage/representations/:signed_blob_id/:variation_key/*filename(.:format)          active_storage/representations/redirect#show
+                      rails_disk_service GET    /rails/active_storage/disk/:encoded_key/*filename(.:format)                                       active_storage/disk#show
+               update_rails_disk_service PUT    /rails/active_storage/disk/:encoded_token(.:format)                                               active_storage/disk#update
+                    rails_direct_uploads POST   /rails/active_storage/direct_uploads(.:format)                                                    active_storage/direct_uploads#create

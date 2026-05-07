@@ -18,7 +18,7 @@ class TimeCardDocumentCodec
 
     parse_unified(normalized) ||
       parse_legacy_frontmatter(normalized) ||
-      blank_state.merge("notesText" => normalized)
+      blank_state.merge("notesText" => normalize_notes_body(normalized))
   end
 
   def dump(state)
@@ -40,6 +40,12 @@ class TimeCardDocumentCodec
   end
 
   private
+
+  # Collapse phantom blank lines persisted at EOF (often from save/serialize round-trips).
+  # Single trailing newline is kept for normal typing flow.
+  def normalize_notes_body(notes)
+    notes.to_s.gsub(/\r\n?/, "\n").sub(/\n{2,}\z/, "")
+  end
 
   def blank_state
     {
@@ -92,7 +98,7 @@ class TimeCardDocumentCodec
       "clockOutAtMs" => parse_integer(meta["clock_out_at_ms"]),
       "clockOutMinutes" => parse_time(meta["end_time"]),
       "running" => parse_boolean(meta["running"]),
-      "notesText" => notes.to_s
+      "notesText" => normalize_notes_body(notes)
     }
   end
 

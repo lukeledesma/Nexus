@@ -488,7 +488,7 @@ class DocumentsController < ApplicationController
     parsed = JSON.parse(raw)
     return [] unless parsed.is_a?(Array)
 
-    parsed.filter_map do |task|
+    tasks = parsed.filter_map do |task|
       next unless task.is_a?(Hash)
 
       subtasks = Array(task["subtasks"]).filter_map do |subtask|
@@ -509,8 +509,21 @@ class DocumentsController < ApplicationController
         "subtasks" => subtasks
       }
     end
+
+    strip_trailing_blank_main_tasks(tasks)
   rescue JSON::ParserError
     []
+  end
+
+  def strip_trailing_blank_main_tasks(tasks)
+    while tasks.any? && blank_main_task_row?(tasks.last)
+      tasks.pop
+    end
+    tasks
+  end
+
+  def blank_main_task_row?(task)
+    task["text"].to_s.strip.blank? && task["subtasks"].to_a.empty?
   end
 
   def favorites_column_available?

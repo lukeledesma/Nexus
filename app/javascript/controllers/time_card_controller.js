@@ -82,6 +82,11 @@ function startTimestampFromClockInMinutes(clockInMinutes) {
   return start.getTime()
 }
 
+/** Collapses 2+ trailing newlines from time card notes (phantom blank lines after refresh). */
+function normalizeTrailingTimeCardNotesNewlines(text) {
+  return String(text || "").replace(/\r/g, "").replace(/\n{2,}$/, "")
+}
+
 function formatElapsed(ms) {
   const totalSeconds = Math.floor(ms / 1000)
   const hours = Math.floor(totalSeconds / 3600)
@@ -528,7 +533,7 @@ function normalizeState(raw, fallbackClockIn = null, defaultRunning = false) {
   const clockOutAtMs = Number.isFinite(parsed?.clockOutAtMs) ? Number(parsed.clockOutAtMs) : null
   const clockOutMinutes = Number.isInteger(parsed?.clockOutMinutes) ? parsed.clockOutMinutes : null
   const running = clockInMinutes == null ? false : parsed?.running === false ? false : Boolean(parsed?.running ?? base.running)
-  const notesText = String(parsed?.notesText || "")
+  const notesText = normalizeTrailingTimeCardNotesNewlines(parsed?.notesText ?? base.notesText)
 
   return {
     clockInMinutes,

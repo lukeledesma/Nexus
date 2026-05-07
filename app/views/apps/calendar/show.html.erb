@@ -1,0 +1,103 @@
+<% frame_id = params[:frame_id].presence || turbo_frame_request_id.presence || "calendar-pane" %>
+<turbo-frame id="<%= frame_id %>">
+  <section class="app-surface app-surface--tool app-surface--settings calendar-app os-window-body-start" data-controller="calendar-app">
+    <div class="calendar-shell">
+      <aside class="calendar-app__sidebar finder-shell-pane finder-shell-pane--folders">
+        <section class="calendar-app__mini-wrap">
+          <header class="calendar-app__mini-header">
+            <strong data-calendar-app-target="miniTitle"></strong>
+            <div class="calendar-app__mini-nav">
+              <button type="button" class="calendar-app__icon-btn" data-action="calendar-app#miniPrev" aria-label="Previous month">
+                <%= material_symbol_icon(:remove, size: :xs) %>
+              </button>
+              <button type="button" class="calendar-app__icon-btn" data-action="calendar-app#miniNext" aria-label="Next month">
+                <%= material_symbol_icon(:add, size: :xs) %>
+              </button>
+            </div>
+          </header>
+          <div class="calendar-app__mini-grid" data-calendar-app-target="miniGrid"></div>
+        </section>
+
+        <section class="calendar-app__calendars">
+          <h4 class="calendar-app__calendars-title">My calendars</h4>
+          <div data-calendar-app-target="calendarList"></div>
+        </section>
+      </aside>
+
+      <section class="calendar-app__main finder-shell-pane finder-shell-pane--contents">
+        <header class="calendar-app__toolbar">
+          <div class="calendar-app__toolbar-left">
+            <button type="button" class="calendar-app__btn" data-action="calendar-app#goToday">Today</button>
+            <button type="button" class="calendar-app__icon-btn" data-action="calendar-app#goPrev" aria-label="Previous period">
+              <%= material_symbol_icon(:remove, size: :xs) %>
+            </button>
+            <button type="button" class="calendar-app__icon-btn" data-action="calendar-app#goNext" aria-label="Next period">
+              <%= material_symbol_icon(:add, size: :xs) %>
+            </button>
+            <h3 class="calendar-app__title" data-calendar-app-target="mainTitle"></h3>
+          </div>
+
+          <div class="calendar-app__toolbar-right">
+            <div class="calendar-app__view-toggle">
+              <button type="button" class="calendar-app__view-btn" data-view="month" data-action="calendar-app#setMonthView">Month</button>
+              <button type="button" class="calendar-app__view-btn" data-view="week" data-action="calendar-app#setWeekView">Week</button>
+              <button type="button" class="calendar-app__view-btn" data-view="day" data-action="calendar-app#setDayView">Day</button>
+            </div>
+          </div>
+        </header>
+
+        <div class="calendar-app__body" data-calendar-app-target="body"></div>
+      </section>
+    </div>
+
+    <div class="calendar-app__modal hidden" data-calendar-app-target="modal" data-action="click->calendar-app#clickModalBackdrop">
+      <div
+        class="calendar-app__modal-card"
+        tabindex="-1"
+        data-action="mousedown->calendar-app#handleModalCardPointerDown click->calendar-app#clickModalCard"
+      >
+        <h4 class="calendar-app__modal-title" data-calendar-app-target="modalTitle">New event</h4>
+        <div class="calendar-app__field">
+          <span>Title</span>
+          <input type="text" data-calendar-app-target="eventTitleInput" maxlength="80" autocomplete="off" aria-label="Event title">
+        </div>
+        <div class="calendar-app__field-row">
+          <div class="calendar-app__field">
+            <span>Date</span>
+            <input type="date" data-calendar-app-target="eventDateInput" aria-label="Event date">
+          </div>
+          <div class="calendar-app__field">
+            <span>All day</span>
+            <select data-calendar-app-target="allDaySelect" data-action="change->calendar-app#toggleTimeFields" aria-label="All day">
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+        </div>
+        <div class="calendar-app__field-row hidden" data-calendar-app-target="timeFields">
+          <div class="calendar-app__field">
+            <span>Start</span>
+            <input type="time" data-calendar-app-target="startTimeInput" value="09:00" aria-label="Start time">
+          </div>
+          <div class="calendar-app__field">
+            <span>End</span>
+            <input type="time" data-calendar-app-target="endTimeInput" value="10:00" aria-label="End time">
+          </div>
+        </div>
+        <div class="calendar-app__field">
+          <span>Calendar</span>
+          <select data-calendar-app-target="eventCalendarSelect" aria-label="Calendar"></select>
+        </div>
+        <div class="calendar-app__field">
+          <span>Color</span>
+          <div class="calendar-app__color-row" data-calendar-app-target="colorPicker"></div>
+        </div>
+        <div class="calendar-app__modal-actions">
+          <button type="button" class="calendar-app__btn" data-calendar-app-target="deleteButton" data-action="calendar-app#deleteEditingEvent">Delete</button>
+          <button type="button" class="calendar-app__btn" data-action="calendar-app#closeModal">Cancel</button>
+          <button type="button" class="calendar-app__btn calendar-app__btn--primary" data-action="calendar-app#saveEvent">Save</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</turbo-frame>

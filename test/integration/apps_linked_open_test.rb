@@ -98,6 +98,14 @@ class AppsLinkedOpenTest < ActionDispatch::IntegrationTest
     assert_includes response.body, %(data-time-card-linked-document-id-value="0")
   end
 
+  test "calendar app renders standalone shell" do
+    get apps_calendar_path
+
+    assert_response :success
+    assert_includes response.body, %(data-controller="calendar-app")
+    assert_includes response.body, %(id="calendar-pane")
+  end
+
   test "images renders linked image when extension matches" do
     images_root = Apps::FinderController.workspace_section_root(@user, "images")
     doc = images_root.children.create!(title: "photo.jpg", is_folder: false, content_type: "asset", content: "")

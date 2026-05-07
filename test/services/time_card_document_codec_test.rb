@@ -55,4 +55,24 @@ class TimeCardDocumentCodecTest < ActiveSupport::TestCase
     assert_equal false, parsed["running"]
     assert_equal "h1: test", parsed["notesText"]
   end
+
+  test "strips two or more trailing newlines from notes body" do
+    raw = [
+      "# NEXUS_FILE v1",
+      "# kind: time_card",
+      "# title: Time Card",
+      "# created_at: null",
+      "# updated_at: null",
+      "# start_time:",
+      "# end_time:",
+      "# running: false",
+      "# clock_in_at_ms:",
+      "# clock_out_at_ms:",
+      "",
+      "hello\n\r\n\r"
+    ].join("\n")
+
+    parsed = TimeCardDocumentCodec.load(raw)
+    assert_equal "hello", parsed["notesText"]
+  end
 end

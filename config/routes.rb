@@ -7,6 +7,7 @@ Rails.application.routes.draw do
     get "finder", to: "finder#show"
     get "notes", to: "notes#show"
     get "time_card", to: "time_card#show"
+    get "calendar", to: "calendar#show"
     get "images", to: "images#show"
     get "audio", to: "audio#show"
     get "wallpaper_iimage/files", to: "wallpaper_iimage#files"
