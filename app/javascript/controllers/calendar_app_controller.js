@@ -34,7 +34,12 @@ export default class extends Controller {
     this.searchQuery = ""
     this.editingEventId = null
     this.calendars = this.readCalendars()
-    this.events = this.readEvents().length > 0 ? this.readEvents() : this.sampleEvents()
+    if (window.localStorage.getItem(STORAGE_KEY) === null) {
+      this.events = this.sampleEvents()
+      this.persistEvents()
+    } else {
+      this.events = this.readEvents()
+    }
     this.pickedColor = EVENT_COLORS[0]
     this.boundGlobalKeydown = (event) => this.handleGlobalKeydown(event)
     this.boundChromeNewEvent = (event) => this.handleChromeNewEvent(event)
