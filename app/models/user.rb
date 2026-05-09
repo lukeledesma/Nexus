@@ -1,6 +1,8 @@
 class User < ApplicationRecord
   has_secure_password
 
+  has_many :user_app_states, dependent: :delete_all
+
   before_validation :normalize_login_fields
   after_create_commit :provision_workspace_root_folder
   after_update_commit :sync_workspace_after_username_change

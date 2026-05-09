@@ -4,12 +4,38 @@ import { createOsWindowSizer } from "lib/os_window_sizing"
 import { syncOrganizerAboveVisibleContentWindows } from "lib/nexus_desktop_layers"
 import { clearLinkedAppPickerDraft, LINKED_APP_BEFORE_SAVE_PICKER } from "lib/linked_app_picker_draft"
 import { syncNexusDesktopWallpaper } from "lib/nexus_workspace_chrome"
+import { NexusUserState } from "lib/nexus_user_state"
 
 /** Kept in sync with inline boot script in `shared/_content_windows_boot.html.erb`. */
 const DESKTOP_WINDOW_LAYERS_KEY = "nexus.desktop.windowLayers"
-const TASK_WINDOW_REGISTRY_KEY = "nexus.taskWindowRegistry"
-const NOTE_WINDOW_REGISTRY_KEY = "nexus.noteWindowRegistry"
-const TIMECARD_WINDOW_REGISTRY_KEY = "nexus.timeCardWindowRegistry"
+/** Server-synced registries of spawned per-document windows (open across devices). */
+const TASK_WINDOW_REGISTRY_KEY = "windows.tasks"
+const NOTE_WINDOW_REGISTRY_KEY = "windows.notes"
+const TIMECARD_WINDOW_REGISTRY_KEY = "windows.timeCard"
+/** Legacy device-local localStorage keys; consulted once at first read for migration. */
+const LEGACY_TASK_REGISTRY_KEY = "nexus.taskWindowRegistry"
+const LEGACY_NOTE_REGISTRY_KEY = "nexus.noteWindowRegistry"
+const LEGACY_TIMECARD_REGISTRY_KEY = "nexus.timeCardWindowRegistry"
+
+function readRegistry(key, legacyKey) {
+  const synced = NexusUserState.get(key)
+  if (Array.isArray(synced)) return synced
+  if (NexusUserState.has(key)) return []
+  try {
+    const raw = window.localStorage.getItem(legacyKey)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (Array.isArray(parsed)) {
+      NexusUserState.set(key, parsed)
+      return parsed
+    }
+  } catch (_e) { /* ignore */ }
+  return []
+}
+
+function writeRegistry(key, entries) {
+  NexusUserState.set(key, entries)
+}
 /** Treat as “at least operational min” within this many px (subpixel + border rounding). */
 const MIN_SIZE_SLACK_PX = 2
 /** Desktop canvas minimum app area (px): when viewport is smaller, shell scrolls instead of shrinking windows further. */
@@ -118,6 +144,8 @@ export default class extends Controller {
     window.addEventListener("nexus:item-saving", this.boundItemSavingState)
     this.boundItemSavedState = this.handleItemSavedState.bind(this)
     window.addEventListener("nexus:item-saved", this.boundItemSavedState)
+    this.boundUserStateLoaded = this.handleUserStateLoaded.bind(this)
+    window.addEventListener("nexus:user-state-loaded", this.boundUserStateLoaded)
     this.boundViewportResize = () => {
       this.syncViewportShellMargins()
       this.syncDesktopCanvasDimensions()
@@ -190,6 +218,7 @@ export default class extends Controller {
     window.removeEventListener("nexus:item-dirty", this.boundItemDirtyState)
     window.removeEventListener("nexus:item-saving", this.boundItemSavingState)
     window.removeEventListener("nexus:item-saved", this.boundItemSavedState)
+    window.removeEventListener("nexus:user-state-loaded", this.boundUserStateLoaded)
     window.removeEventListener("resize", this.boundViewportResize)
     if (this.boundLinkedAppPickerClose) {
       window.removeEventListener("nexus:linked-app-save-picker-close", this.boundLinkedAppPickerClose)
@@ -808,6 +837,22 @@ export default class extends Controller {
     this.element.parentElement.appendChild(clone)
   }
 
+  handleUserStateLoaded(event) {
+    const changed = new Set(event.detail?.changedKeys || [])
+    if (this.appKeyValue === "tasks" && changed.has(TASK_WINDOW_REGISTRY_KEY)) {
+      window.__nexusTaskWindowsRestored = false
+      this.restorePersistedSpawnedTaskWindows()
+    }
+    if (this.appKeyValue === "notes" && changed.has(NOTE_WINDOW_REGISTRY_KEY)) {
+      window.__nexusNoteWindowsRestored = false
+      this.restorePersistedSpawnedNoteWindows()
+    }
+    if (this.appKeyValue === "time-card" && changed.has(TIMECARD_WINDOW_REGISTRY_KEY)) {
+      window.__nexusTimeCardWindowsRestored = false
+      this.restorePersistedSpawnedTimeCardWindows()
+    }
+  }
+
   restorePersistedSpawnedTaskWindows() {
     if (this.appKeyValue !== "tasks") return
     if (window.__nexusTaskWindowsRestored) return
@@ -864,22 +909,11 @@ export default class extends Controller {
   }
 
   readPersistedSpawnedTaskWindows() {
-    try {
-      const raw = window.localStorage.getItem(TASK_WINDOW_REGISTRY_KEY)
-      if (!raw) return []
-      const parsed = JSON.parse(raw)
-      return Array.isArray(parsed) ? parsed : []
-    } catch (_error) {
-      return []
-    }
+    return readRegistry(TASK_WINDOW_REGISTRY_KEY, LEGACY_TASK_REGISTRY_KEY)
   }
 
   writePersistedSpawnedTaskWindows(entries) {
-    try {
-      window.localStorage.setItem(TASK_WINDOW_REGISTRY_KEY, JSON.stringify(entries))
-    } catch (_error) {
-      // non-blocking
-    }
+    writeRegistry(TASK_WINDOW_REGISTRY_KEY, entries)
   }
 
   persistSpawnedTaskWindow(entry) {
@@ -949,22 +983,11 @@ export default class extends Controller {
   }
 
   readPersistedSpawnedNoteWindows() {
-    try {
-      const raw = window.localStorage.getItem(NOTE_WINDOW_REGISTRY_KEY)
-      if (!raw) return []
-      const parsed = JSON.parse(raw)
-      return Array.isArray(parsed) ? parsed : []
-    } catch (_error) {
-      return []
-    }
+    return readRegistry(NOTE_WINDOW_REGISTRY_KEY, LEGACY_NOTE_REGISTRY_KEY)
   }
 
   writePersistedSpawnedNoteWindows(entries) {
-    try {
-      window.localStorage.setItem(NOTE_WINDOW_REGISTRY_KEY, JSON.stringify(entries))
-    } catch (_error) {
-      // non-blocking
-    }
+    writeRegistry(NOTE_WINDOW_REGISTRY_KEY, entries)
   }
 
   persistSpawnedNoteWindow(entry) {
@@ -1039,22 +1062,11 @@ export default class extends Controller {
   }
 
   readPersistedSpawnedTimeCardWindows() {
-    try {
-      const raw = window.localStorage.getItem(TIMECARD_WINDOW_REGISTRY_KEY)
-      if (!raw) return []
-      const parsed = JSON.parse(raw)
-      return Array.isArray(parsed) ? parsed : []
-    } catch (_error) {
-      return []
-    }
+    return readRegistry(TIMECARD_WINDOW_REGISTRY_KEY, LEGACY_TIMECARD_REGISTRY_KEY)
   }
 
   writePersistedSpawnedTimeCardWindows(entries) {
-    try {
-      window.localStorage.setItem(TIMECARD_WINDOW_REGISTRY_KEY, JSON.stringify(entries))
-    } catch (_error) {
-      // non-blocking
-    }
+    writeRegistry(TIMECARD_WINDOW_REGISTRY_KEY, entries)
   }
 
   persistSpawnedTimeCardWindow(entry) {

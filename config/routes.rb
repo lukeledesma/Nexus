@@ -26,6 +26,10 @@ Rails.application.routes.draw do
   get "up" => "rails/health#show", as: :rails_health_check
   get    "workspace_preferences", to: "workspace_preferences#show"
   patch  "workspace_preferences", to: "workspace_preferences#update"
+
+  get    "user_app_states",       to: "user_app_states#index"
+  patch  "user_app_states/:key",  to: "user_app_states#update", constraints: { key: %r{[^/]+} }
+  delete "user_app_states/:key",  to: "user_app_states#destroy", constraints: { key: %r{[^/]+} }
   # Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.erb)
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker

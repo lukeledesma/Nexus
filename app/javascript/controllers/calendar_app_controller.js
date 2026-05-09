@@ -1,9 +1,42 @@
 import { Controller } from "@hotwired/stimulus"
+import { NexusUserState } from "lib/nexus_user_state"
 
-const STORAGE_KEY = "nexus.calendar.events.v1"
-const STORAGE_CALS_KEY = "nexus.calendar.cals.v1"
-const STORAGE_VIEW_KEY = "nexus.calendar.view.v1"
-const STORAGE_VIEW_DATE_KEY = "nexus.calendar.viewDate.v1"
+const STORAGE_KEY = "calendar.events"
+const STORAGE_CALS_KEY = "calendar.cals"
+const STORAGE_VIEW_KEY = "calendar.view"
+const STORAGE_VIEW_DATE_KEY = "calendar.viewDate"
+const SYNCED_KEYS = new Set([STORAGE_KEY, STORAGE_CALS_KEY, STORAGE_VIEW_KEY, STORAGE_VIEW_DATE_KEY])
+const LEGACY_KEY_BY_NEW = {
+  [STORAGE_KEY]: "nexus.calendar.events.v1",
+  [STORAGE_CALS_KEY]: "nexus.calendar.cals.v1",
+  [STORAGE_VIEW_KEY]: "nexus.calendar.view.v1",
+  [STORAGE_VIEW_DATE_KEY]: "nexus.calendar.viewDate.v1"
+}
+
+function readSyncedOrMigrate(key) {
+  if (NexusUserState.has(key)) return NexusUserState.get(key)
+  const legacyKey = LEGACY_KEY_BY_NEW[key]
+  if (!legacyKey) return undefined
+  try {
+    const raw = window.localStorage.getItem(legacyKey)
+    if (raw == null) return undefined
+    const parsed = JSON.parse(raw)
+    NexusUserState.set(key, parsed)
+    return parsed
+  } catch (_e) {
+    return undefined
+  }
+}
+
+function readSyncedStringOrMigrate(key) {
+  if (NexusUserState.has(key)) return NexusUserState.get(key)
+  const legacyKey = LEGACY_KEY_BY_NEW[key]
+  if (!legacyKey) return undefined
+  const raw = window.localStorage.getItem(legacyKey)
+  if (raw == null) return undefined
+  NexusUserState.set(key, raw)
+  return raw
+}
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 const EVENT_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"]
@@ -34,77 +67,91 @@ export default class extends Controller {
     this.searchQuery = ""
     this.editingEventId = null
     this.calendars = this.readCalendars()
-    if (window.localStorage.getItem(STORAGE_KEY) === null) {
+    const restoredEvents = readSyncedOrMigrate(STORAGE_KEY)
+    if (Array.isArray(restoredEvents)) {
+      this.events = this.readEvents()
+    } else {
       this.events = this.sampleEvents()
       this.persistEvents()
-    } else {
-      this.events = this.readEvents()
     }
     this.pickedColor = EVENT_COLORS[0]
     this.boundGlobalKeydown = (event) => this.handleGlobalKeydown(event)
     this.boundChromeNewEvent = (event) => this.handleChromeNewEvent(event)
     this.boundDragMove = (event) => this.handleEventDragMove(event)
     this.boundDragEnd = (event) => this.handleEventDragEnd(event)
+    this.boundUserStateLoaded = (event) => this.handleUserStateLoaded(event)
     this.activeDrag = null
     this.suppressEditUntil = 0
     window.addEventListener("keydown", this.boundGlobalKeydown)
     window.addEventListener("nexus:calendar-new-event", this.boundChromeNewEvent)
+    window.addEventListener("nexus:user-state-loaded", this.boundUserStateLoaded)
     this.renderAll()
   }
 
   disconnect() {
     window.removeEventListener("keydown", this.boundGlobalKeydown)
     window.removeEventListener("nexus:calendar-new-event", this.boundChromeNewEvent)
+    window.removeEventListener("nexus:user-state-loaded", this.boundUserStateLoaded)
     window.removeEventListener("pointermove", this.boundDragMove)
     window.removeEventListener("pointerup", this.boundDragEnd)
     window.removeEventListener("pointercancel", this.boundDragEnd)
   }
 
-  readCalendars() {
-    try {
-      const parsed = JSON.parse(window.localStorage.getItem(STORAGE_CALS_KEY) || "null")
-      if (!Array.isArray(parsed) || parsed.length === 0) return DEFAULT_CALS.map((c) => ({ ...c }))
-      return parsed.map((c) => ({ ...c, checked: c.checked !== false }))
-    } catch (_e) {
-      return DEFAULT_CALS.map((c) => ({ ...c }))
+  handleUserStateLoaded(event) {
+    const changed = new Set(event.detail?.changedKeys || [])
+    if (![...SYNCED_KEYS].some((k) => changed.has(k))) return
+
+    if (changed.has(STORAGE_KEY)) this.events = this.readEvents()
+    if (changed.has(STORAGE_CALS_KEY)) this.calendars = this.readCalendars()
+    if (changed.has(STORAGE_VIEW_KEY)) this.currentView = this.readView()
+    if (changed.has(STORAGE_VIEW_DATE_KEY)) {
+      const restored = this.readViewDate()
+      if (restored) {
+        this.viewDate = restored
+        this.selectedDate = new Date(restored)
+        this.miniDate = new Date(restored.getFullYear(), restored.getMonth(), 1)
+      }
     }
+    this.renderAll()
+  }
+
+  readCalendars() {
+    const parsed = readSyncedOrMigrate(STORAGE_CALS_KEY)
+    if (!Array.isArray(parsed) || parsed.length === 0) return DEFAULT_CALS.map((c) => ({ ...c }))
+    return parsed.map((c) => ({ ...c, checked: c.checked !== false }))
   }
 
   persistCalendars() {
-    window.localStorage.setItem(STORAGE_CALS_KEY, JSON.stringify(this.calendars))
+    NexusUserState.set(STORAGE_CALS_KEY, this.calendars)
   }
 
   readEvents() {
-    try {
-      const parsed = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "[]")
-      if (!Array.isArray(parsed)) return []
-      return parsed.filter((e) => e && typeof e.title === "string" && typeof e.date === "string")
-    } catch (_e) {
-      return []
-    }
+    const parsed = readSyncedOrMigrate(STORAGE_KEY)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((e) => e && typeof e.title === "string" && typeof e.date === "string")
   }
 
   persistEvents() {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(this.events))
+    NexusUserState.set(STORAGE_KEY, this.events)
   }
 
   readView() {
-    const saved = String(window.localStorage.getItem(STORAGE_VIEW_KEY) || "month")
+    const saved = String(readSyncedStringOrMigrate(STORAGE_VIEW_KEY) || "month")
     return ["month", "week", "day"].includes(saved) ? saved : "month"
   }
 
   persistView() {
-    window.localStorage.setItem(STORAGE_VIEW_KEY, this.currentView)
+    NexusUserState.set(STORAGE_VIEW_KEY, this.currentView)
   }
 
   readViewDate() {
-    const saved = window.localStorage.getItem(STORAGE_VIEW_DATE_KEY)
+    const saved = readSyncedStringOrMigrate(STORAGE_VIEW_DATE_KEY)
     const parsed = this.parseYmd(saved)
     return parsed || null
   }
 
   persistViewDate() {
-    window.localStorage.setItem(STORAGE_VIEW_DATE_KEY, this.fmt(this.viewDate))
+    NexusUserState.set(STORAGE_VIEW_DATE_KEY, this.fmt(this.viewDate))
   }
 
   renderAll() {
