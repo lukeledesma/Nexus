@@ -1,5 +1,10 @@
 # Nexus App Command Guide
 
+Navigation note:
+
+- Start at docs/README.md for current docs structure.
+- Read docs/AI_HANDOFF.md for current state before running production operations.
+
 This guide is for maintainers and operators who need day-to-day commands for development, deploys, and production checks.
 
 If you are new to the project, start with the root README first, then return here when you are ready to run commands.

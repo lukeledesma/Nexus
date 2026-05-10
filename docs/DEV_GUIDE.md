@@ -1,5 +1,11 @@
 # Nexus — Developer Guide
 
+Navigation note:
+
+- Start at docs/README.md for the current docs map.
+- For latest status and handoff context, read docs/AI_HANDOFF.md first.
+- Use this file for deeper implementation details after reading those two files.
+
 Technical reference for contributors working on the Nexus Rails codebase.
 
 This document covers architecture, file structure, frontend controllers, data flow, and deployment behavior.
