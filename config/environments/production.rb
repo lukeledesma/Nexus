@@ -60,6 +60,16 @@ Rails.application.configure do
   # Set host to be used by links generated in mailer templates.
   config.action_mailer.default_url_options = { host: "nxs.tools" }
 
+  # Real-time sync channel (Notes/Tasks/Finder/Calendar).
+  config.action_cable.mount_path = "/cable"
+  config.action_cable.url = ENV.fetch("ACTION_CABLE_URL", "wss://nxs.tools/cable")
+  config.action_cable.allowed_request_origins = [
+    %r{\Ahttps?://nxs\.tools\z},
+    %r{\Ahttps?://www\.nxs\.tools\z},
+    %r{\Ahttps?://192\.168\.\d+\.\d+(?::\d+)?\z},
+    %r{\Ahttps?://10\.\d+\.\d+\.\d+(?::\d+)?\z}
+  ]
+
   # Specify outgoing SMTP server. Remember to add smtp/* credentials via bin/rails credentials:edit.
   # config.action_mailer.smtp_settings = {
   #   user_name: Rails.application.credentials.dig(:smtp, :user_name),
