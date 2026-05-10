@@ -5458,6 +5458,33 @@ html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden)
   will-change: transform;
 }
 
+.content-window.os-window.content-window--opening,
+.content-window.os-window.content-window--closing {
+  transition: transform 300ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity 300ms cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 300ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.content-window.os-window.content-window--opening {
+  opacity: 0;
+  transform: scale(0.97);
+}
+
+.content-window.os-window.content-window--opening.content-window--opening-active {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.content-window.os-window.content-window--closing {
+  opacity: 0;
+  transform: scale(0.97);
+  pointer-events: none;
+}
+
+.content-window.os-window.content-window--drag-lift {
+  transform-origin: center center;
+  transform: scale(1.011);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.56);
+}
+
 /* Finder: match JS minimum (760×460) so first paint lines up with Settings. */
 .content-window[data-content-window-app-key-value="finder"] {
   width: min(760px, calc(100vw - 2rem));
@@ -5547,6 +5574,17 @@ html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden)
 @media (prefers-reduced-motion: reduce) {
   .content-window {
     transition: none;
+  }
+
+  .content-window.os-window.content-window--opening,
+  .content-window.os-window.content-window--closing {
+    transition: none;
+    transform: none;
+    opacity: 1;
+  }
+
+  .content-window.os-window.content-window--drag-lift {
+    transform: none;
   }
 
   .content-window--focus-pulse,
@@ -5761,16 +5799,25 @@ html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden)
 }
 
 .content-window-open-file-name {
-  color: var(--text-muted);
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  color: var(--text);
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
   line-height: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
   max-width: min(14rem, 28vw);
+}
+
+.content-window-open-file-edited {
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  font-weight: 500;
+  margin-left: 0.3rem;
+  opacity: 0.6;
+  flex-shrink: 0;
 }
 
 .content-window-time-card-hours {
@@ -5782,18 +5829,6 @@ html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden)
   flex-shrink: 0;
   color: var(--text-muted);
   opacity: 0.8;
-}
-
-.content-window-open-file-name--dirty {
-  color: #facc15;
-}
-
-.content-window-open-file-name--saved {
-  color: #4ade80;
-}
-
-.content-window-open-file-name--draft {
-  color: #f87171;
 }
 
 .content-window-chrome-actions .content-window-save-btn,

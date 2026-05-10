@@ -41,6 +41,8 @@ const MIN_SIZE_SLACK_PX = 2
 /** Desktop canvas minimum app area (px): when viewport is smaller, shell scrolls instead of shrinking windows further. */
 const SHELL_CANVAS_MIN_W = 760
 const SHELL_CANVAS_MIN_H = 460
+const CONTENT_WINDOW_OPEN_ANIMATION_MS = 300
+const CONTENT_WINDOW_CLOSE_ANIMATION_MS = 300
 
 export default class extends Controller {
   static targets = [
@@ -107,6 +109,9 @@ export default class extends Controller {
     this.preferredWindowHeight = this.minWindowHeight
     this.activeDrag = null
     this.activeResize = null
+    this.openAnimationFrame = null
+    this.openAnimationTimer = null
+    this.closeAnimationTimer = null
     this._boundsPinX = "none"
     this._boundsPinY = "none"
 
@@ -203,6 +208,7 @@ export default class extends Controller {
     this.stopDrag()
     this.stopResize()
     if (this.attentionTimer) clearTimeout(this.attentionTimer)
+    this.cancelVisibilityAnimation()
     if (this.windowSizer) this.windowSizer.disconnect()
     window.removeEventListener("app-window:toggle", this.boundToggleRequest)
     window.removeEventListener("app-window:open", this.boundOpenRequest)
@@ -369,9 +375,7 @@ export default class extends Controller {
     }
 
     if (this.hasFrameTarget) {
-      this.frameTarget.removeAttribute("src")
-      void this.frameTarget.offsetWidth
-      this.frameTarget.src = this.currentUrl
+      this.hardReloadFrame(this.currentUrl)
     }
   }
 
@@ -483,8 +487,7 @@ export default class extends Controller {
         Boolean(documentId) ||
         (this.isLinkedApp() && this.currentUrl.includes("blank=1"))
       if (mustHardReload) {
-        this.frameTarget.removeAttribute("src")
-        void this.frameTarget.offsetWidth
+        this.clearFrameForNavigation()
       }
       this.frameTarget.src = this.currentUrl
     }
@@ -677,9 +680,7 @@ export default class extends Controller {
     // Store documentId for cleanup
     clone.dataset.spawnedFromDocumentId = String(documentId)
 
-    // Give the turbo-frame a unique id so Turbo doesn't confuse it with the original.
-    const frame = clone.querySelector("turbo-frame[data-content-window-target='frame']")
-    if (frame) frame.id = uid
+    this.prepareClonedWindowShell(clone, { frameId: uid, title, openOnConnect: true })
 
     // Offset position so the new window doesn't land exactly on top of the original.
     const rect = this.element.getBoundingClientRect()
@@ -687,7 +688,6 @@ export default class extends Controller {
     clone.style.top = `${Math.round(rect.top) + 24}px`
     clone.style.width = `${Math.round(rect.width)}px`
     clone.style.height = `${Math.round(rect.height)}px`
-    this.syncOpenFileBadgeFor(clone, title)
 
     this.persistSpawnedTaskWindow({
       appKey: uid,
@@ -723,15 +723,13 @@ export default class extends Controller {
     clone.dataset.isSpawnedImageWindow = "true"
     clone.dataset.spawnedFromDocumentId = String(documentId)
 
-    const frame = clone.querySelector("turbo-frame[data-content-window-target='frame']")
-    if (frame) frame.id = uid
+    this.prepareClonedWindowShell(clone, { frameId: uid, title, openOnConnect: true })
 
     const rect = this.element.getBoundingClientRect()
     clone.style.left = `${Math.round(rect.left) + 24}px`
     clone.style.top = `${Math.round(rect.top) + 24}px`
     clone.style.width = `${Math.round(rect.width)}px`
     clone.style.height = `${Math.round(rect.height)}px`
-    this.syncOpenFileBadgeFor(clone, title)
 
     this.element.parentElement.appendChild(clone)
   }
@@ -766,15 +764,13 @@ export default class extends Controller {
     clone.dataset.isSpawnedNoteWindow = "true"
     clone.dataset.spawnedFromDocumentId = String(documentId)
 
-    const frame = clone.querySelector("turbo-frame[data-content-window-target='frame']")
-    if (frame) frame.id = uid
+    this.prepareClonedWindowShell(clone, { frameId: uid, title, openOnConnect: true })
 
     const rect = this.element.getBoundingClientRect()
     clone.style.left = `${Math.round(rect.left) + 24}px`
     clone.style.top = `${Math.round(rect.top) + 24}px`
     clone.style.width = `${Math.round(rect.width)}px`
     clone.style.height = `${Math.round(rect.height)}px`
-    this.syncOpenFileBadgeFor(clone, title)
 
     this.persistSpawnedNoteWindow({
       appKey: uid,
@@ -815,16 +811,13 @@ export default class extends Controller {
     clone.dataset.isSpawnedTimeCardWindow = "true"
     clone.dataset.spawnedFromDocumentId = String(documentId)
 
-    const frame = clone.querySelector("turbo-frame[data-content-window-target='frame']")
-    if (frame) frame.id = uid
+    this.prepareClonedWindowShell(clone, { frameId: uid, title, openOnConnect: true, clearTimeCardHours: true })
 
     const rect = this.element.getBoundingClientRect()
     clone.style.left = `${Math.round(rect.left) + 24}px`
     clone.style.top = `${Math.round(rect.top) + 24}px`
     clone.style.width = `${Math.round(rect.width)}px`
     clone.style.height = `${Math.round(rect.height)}px`
-    this.syncOpenFileBadgeFor(clone, title)
-    this.syncTimeCardHoursBadgeFor(clone, "", { isOpen: false })
 
     this.persistSpawnedTimeCardWindow({
       appKey: uid,
@@ -899,9 +892,11 @@ export default class extends Controller {
       clone.dataset.isSpawnedTaskWindow = "true"
       clone.dataset.spawnedFromDocumentId = String(entry.documentId)
 
-      const frame = clone.querySelector("turbo-frame[data-content-window-target='frame']")
-      if (frame) frame.id = String(entry.frameId || entry.appKey)
-      this.syncOpenFileBadgeFor(clone, restoredTitle)
+      this.prepareClonedWindowShell(clone, {
+        frameId: String(entry.frameId || entry.appKey),
+        title: restoredTitle,
+        openOnConnect: false
+      })
 
       window.__nexusSpawnedTasksByDocumentId[String(entry.documentId)] = String(entry.appKey)
       this.element.parentElement.appendChild(clone)
@@ -974,9 +969,11 @@ export default class extends Controller {
       clone.dataset.isSpawnedNoteWindow = "true"
       clone.dataset.spawnedFromDocumentId = String(entry.documentId)
 
-      const frame = clone.querySelector("turbo-frame[data-content-window-target='frame']")
-      if (frame) frame.id = String(entry.frameId || entry.appKey)
-      this.syncOpenFileBadgeFor(clone, restoredTitle)
+      this.prepareClonedWindowShell(clone, {
+        frameId: String(entry.frameId || entry.appKey),
+        title: restoredTitle,
+        openOnConnect: false
+      })
 
       this.element.parentElement.appendChild(clone)
     })
@@ -1051,10 +1048,12 @@ export default class extends Controller {
       clone.dataset.isSpawnedTimeCardWindow = "true"
       clone.dataset.spawnedFromDocumentId = String(entry.documentId)
 
-      const frame = clone.querySelector("turbo-frame[data-content-window-target='frame']")
-      if (frame) frame.id = String(entry.frameId || entry.appKey)
-      this.syncOpenFileBadgeFor(clone, restoredTitle)
-      this.syncTimeCardHoursBadgeFor(clone, "", { isOpen: false })
+      this.prepareClonedWindowShell(clone, {
+        frameId: String(entry.frameId || entry.appKey),
+        title: restoredTitle,
+        clearTimeCardHours: true,
+        openOnConnect: false
+      })
 
       window.__nexusSpawnedTimeCardsByDocumentId[String(entry.documentId)] = String(entry.appKey)
       this.element.parentElement.appendChild(clone)
@@ -1091,19 +1090,16 @@ export default class extends Controller {
 
   syncOpenFileBadgeFor(windowEl, title) {
     if (!windowEl) return
-    const sep = windowEl.querySelector("[data-nexus-open-file-separator]")
     const nameEl = windowEl.querySelector("[data-nexus-open-file-name]")
-    if (!sep || !nameEl) return
+    if (!nameEl) return
     const t = (title || "").trim()
     if (!t) {
-      sep.hidden = true
       nameEl.hidden = true
       nameEl.textContent = ""
       nameEl.removeAttribute("title")
       this.syncOpenFileNameStateFor(windowEl, "neutral")
       return
     }
-    sep.hidden = false
     nameEl.hidden = false
     nameEl.textContent = t
     nameEl.setAttribute("title", t)
@@ -1151,32 +1147,17 @@ export default class extends Controller {
   syncOpenFileNameStateFor(windowEl, state) {
     if (!windowEl) return
     const nameEl = windowEl.querySelector("[data-nexus-open-file-name]")
-    if (!nameEl) return
+    const editedEl = windowEl.querySelector("[data-nexus-open-file-edited]")
+    if (!nameEl || !editedEl) return
 
-    nameEl.classList.remove(
-      "content-window-open-file-name--dirty",
-      "content-window-open-file-name--saved",
-      "content-window-open-file-name--draft"
-    )
-
-    if (nameEl.hidden) return
-
+    // Only show "- Edited" if we have a title and the state is dirty
     const title = String(nameEl.textContent || "").trim()
-    if (!title) return
-
-    if (this.isDraftOpenFileTitle(title)) {
-      nameEl.classList.add("content-window-open-file-name--draft")
+    if (title && state === "dirty") {
+      editedEl.hidden = false
       return
     }
 
-    if (state === "dirty") {
-      nameEl.classList.add("content-window-open-file-name--dirty")
-      return
-    }
-
-    if (state === "saved") {
-      nameEl.classList.add("content-window-open-file-name--saved")
-    }
+    editedEl.hidden = true
   }
 
   readOpenTitleForFrame(frameId) {
@@ -1533,9 +1514,7 @@ export default class extends Controller {
       this.currentUrl = `${url.pathname}${url.search}`
 
       if (this.hasFrameTarget && this.frameTarget.getAttribute("src") !== this.currentUrl) {
-        this.frameTarget.removeAttribute("src")
-        void this.frameTarget.offsetWidth
-        this.frameTarget.src = this.currentUrl
+        this.hardReloadFrame(this.currentUrl)
       }
     } finally {
       this._taskDraftRepairInFlight = false
@@ -1627,9 +1606,7 @@ export default class extends Controller {
 
       // Ensure the current window immediately becomes the saved file view.
       if (this.hasFrameTarget) {
-        this.frameTarget.removeAttribute("src")
-        void this.frameTarget.offsetWidth
-        this.frameTarget.src = this.currentUrl
+        this.hardReloadFrame(this.currentUrl)
       }
     }
 
@@ -1687,7 +1664,7 @@ export default class extends Controller {
   }
 
   toggle() {
-    if (this.element.classList.contains("is-hidden")) {
+    if (this.element.classList.contains("is-hidden") || this.element.classList.contains("content-window--closing")) {
       // Reopening a hidden window should preserve linked document context.
       // Explicit blank resets are handled via app-window:open + forceBlank.
       this.open()
@@ -1742,8 +1719,10 @@ export default class extends Controller {
 
   open(options = {}) {
     const fromRestore = Boolean(options.fromRestore)
+    this.cancelVisibilityAnimation()
     this.ensureFrameLoaded()
-    this.element.classList.remove("is-hidden")
+    this.element.classList.remove("is-hidden", "content-window--closing")
+    this.playOpenAnimation()
     if (this.isAutoSizedWindow) this.element.style.height = ""
     if (this.windowSizer) this.windowSizer.syncOnOpen()
     if (!fromRestore) {
@@ -1757,6 +1736,8 @@ export default class extends Controller {
   }
 
   close() {
+    if (this.element.classList.contains("is-hidden") || this.element.classList.contains("content-window--closing")) return
+
     if (this.hasLinkedAppSavePickerValue && this.element.classList.contains("content-window--linked-app-save-picker")) {
       this.element.classList.remove("content-window--linked-app-save-picker")
       if (this.hasChromeAppToolsTarget) this.chromeAppToolsTarget.hidden = false
@@ -1766,52 +1747,113 @@ export default class extends Controller {
     if (this.shouldResetLinkedDocumentOnClose()) {
       this.resetLinkedDocumentSessionState()
     }
-    this.saveOpenState(false)
-    this.element.classList.add("is-hidden")
 
-    // Spawned linked-doc windows are transient — remove them from DOM when closed.
-    if (
-      this.appKeyValue.startsWith("task-spawn-") ||
+    this.saveOpenState(false)
+    this.playCloseAnimation(() => {
+      this.element.classList.add("is-hidden")
+      this.element.classList.remove("content-window--closing")
+      if (!this.isSpawnedWindow() && this.isLinkedDocumentApp() && !this.shouldResetLinkedDocumentOnClose()) {
+        this.clearFrameForNavigation()
+      }
+      if (this.isSpawnedWindow()) {
+        this.finalizeSpawnedWindowClose()
+      } else {
+        this.emitWindowState(false)
+      }
+    })
+  }
+
+  isSpawnedWindow() {
+    return this.appKeyValue.startsWith("task-spawn-") ||
       this.appKeyValue.startsWith("image-spawn-") ||
       this.appKeyValue.startsWith("note-spawn-") ||
       this.appKeyValue.startsWith("time-card-spawn-")
-    ) {
-      // Clean up the global registry
-      const docId = this.element.dataset.spawnedFromDocumentId
-      if (docId) {
-        if (this.appKeyValue.startsWith("task-spawn-")) delete window.__nexusSpawnedTasksByDocumentId[docId]
-        if (this.appKeyValue.startsWith("image-spawn-")) delete window.__nexusSpawnedImagesByDocumentId[docId]
-        if (this.appKeyValue.startsWith("note-spawn-")) delete window.__nexusSpawnedNotesByDocumentId[docId]
-        if (this.appKeyValue.startsWith("time-card-spawn-")) delete window.__nexusSpawnedTimeCardsByDocumentId[docId]
-      }
-      if (this.appKeyValue.startsWith("task-spawn-")) this.removePersistedSpawnedTaskWindow(this.appKeyValue)
-      if (this.appKeyValue.startsWith("note-spawn-")) this.removePersistedSpawnedNoteWindow(this.appKeyValue)
-      if (this.appKeyValue.startsWith("time-card-spawn-")) this.removePersistedSpawnedTimeCardWindow(this.appKeyValue)
-      try {
-        window.localStorage.removeItem(`nexus.linkedAppDocument.${this.frameIdValue}`)
-        window.sessionStorage.removeItem(`nexus.linkedAppDocument.${this.frameIdValue}`)
-      } catch (_) {}
-      this.element.remove()
-      const hasOtherSpawned = this.appKeyValue.startsWith("task-spawn-")
-        ? document.querySelectorAll('[data-content-window-app-key-value^="task-spawn-"]:not(.is-hidden)').length > 0
-        : this.appKeyValue.startsWith("image-spawn-")
-          ? document.querySelectorAll('[data-content-window-app-key-value^="image-spawn-"]:not(.is-hidden)').length > 0
-          : this.appKeyValue.startsWith("note-spawn-")
-            ? document.querySelectorAll('[data-content-window-app-key-value^="note-spawn-"]:not(.is-hidden)').length > 0
-            : document.querySelectorAll('[data-content-window-app-key-value^="time-card-spawn-"]:not(.is-hidden)').length > 0
-      const hasPrimaryOpen = this.appKeyValue.startsWith("task-spawn-")
-        ? Boolean(document.querySelector('[data-content-window-app-key-value="tasks"]:not(.is-hidden)'))
-        : this.appKeyValue.startsWith("image-spawn-")
-          ? Boolean(document.querySelector('[data-content-window-app-key-value="images"]:not(.is-hidden)'))
-          : this.appKeyValue.startsWith("note-spawn-")
-            ? Boolean(document.querySelector('[data-content-window-app-key-value="notes"]:not(.is-hidden)'))
-            : Boolean(document.querySelector('[data-content-window-app-key-value="time-card"]:not(.is-hidden)'))
-      if (!hasOtherSpawned && !hasPrimaryOpen) {
-        this.emitWindowState(false)
-      }
-    } else {
+  }
+
+  finalizeSpawnedWindowClose() {
+    // Clean up the global registry
+    const docId = this.element.dataset.spawnedFromDocumentId
+    if (docId) {
+      if (this.appKeyValue.startsWith("task-spawn-")) delete window.__nexusSpawnedTasksByDocumentId[docId]
+      if (this.appKeyValue.startsWith("image-spawn-")) delete window.__nexusSpawnedImagesByDocumentId[docId]
+      if (this.appKeyValue.startsWith("note-spawn-")) delete window.__nexusSpawnedNotesByDocumentId[docId]
+      if (this.appKeyValue.startsWith("time-card-spawn-")) delete window.__nexusSpawnedTimeCardsByDocumentId[docId]
+    }
+    if (this.appKeyValue.startsWith("task-spawn-")) this.removePersistedSpawnedTaskWindow(this.appKeyValue)
+    if (this.appKeyValue.startsWith("note-spawn-")) this.removePersistedSpawnedNoteWindow(this.appKeyValue)
+    if (this.appKeyValue.startsWith("time-card-spawn-")) this.removePersistedSpawnedTimeCardWindow(this.appKeyValue)
+    try {
+      window.localStorage.removeItem(`nexus.linkedAppDocument.${this.frameIdValue}`)
+      window.sessionStorage.removeItem(`nexus.linkedAppDocument.${this.frameIdValue}`)
+    } catch (_) {}
+    this.element.remove()
+
+    const hasOtherSpawned = this.appKeyValue.startsWith("task-spawn-")
+      ? document.querySelectorAll('[data-content-window-app-key-value^="task-spawn-"]:not(.is-hidden)').length > 0
+      : this.appKeyValue.startsWith("image-spawn-")
+        ? document.querySelectorAll('[data-content-window-app-key-value^="image-spawn-"]:not(.is-hidden)').length > 0
+        : this.appKeyValue.startsWith("note-spawn-")
+          ? document.querySelectorAll('[data-content-window-app-key-value^="note-spawn-"]:not(.is-hidden)').length > 0
+          : document.querySelectorAll('[data-content-window-app-key-value^="time-card-spawn-"]:not(.is-hidden)').length > 0
+    const hasPrimaryOpen = this.appKeyValue.startsWith("task-spawn-")
+      ? Boolean(document.querySelector('[data-content-window-app-key-value="tasks"]:not(.is-hidden)'))
+      : this.appKeyValue.startsWith("image-spawn-")
+        ? Boolean(document.querySelector('[data-content-window-app-key-value="images"]:not(.is-hidden)'))
+        : this.appKeyValue.startsWith("note-spawn-")
+          ? Boolean(document.querySelector('[data-content-window-app-key-value="notes"]:not(.is-hidden)'))
+          : Boolean(document.querySelector('[data-content-window-app-key-value="time-card"]:not(.is-hidden)'))
+    if (!hasOtherSpawned && !hasPrimaryOpen) {
       this.emitWindowState(false)
     }
+  }
+
+  playOpenAnimation() {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      this.element.classList.remove("content-window--opening", "content-window--opening-active")
+      return
+    }
+
+    this.element.classList.remove("content-window--opening", "content-window--opening-active")
+    this.element.classList.add("content-window--opening")
+    this.openAnimationFrame = window.requestAnimationFrame(() => {
+      this.openAnimationFrame = null
+      this.element.classList.add("content-window--opening-active")
+    })
+
+    this.openAnimationTimer = window.setTimeout(() => {
+      this.openAnimationTimer = null
+      this.element.classList.remove("content-window--opening", "content-window--opening-active")
+    }, CONTENT_WINDOW_OPEN_ANIMATION_MS)
+  }
+
+  playCloseAnimation(onClosed) {
+    this.cancelVisibilityAnimation()
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      onClosed()
+      return
+    }
+
+    this.element.classList.add("content-window--closing")
+    this.closeAnimationTimer = window.setTimeout(() => {
+      this.closeAnimationTimer = null
+      onClosed()
+    }, CONTENT_WINDOW_CLOSE_ANIMATION_MS)
+  }
+
+  cancelVisibilityAnimation() {
+    if (this.openAnimationFrame) {
+      window.cancelAnimationFrame(this.openAnimationFrame)
+      this.openAnimationFrame = null
+    }
+    if (this.openAnimationTimer) {
+      window.clearTimeout(this.openAnimationTimer)
+      this.openAnimationTimer = null
+    }
+    if (this.closeAnimationTimer) {
+      window.clearTimeout(this.closeAnimationTimer)
+      this.closeAnimationTimer = null
+    }
+    this.element.classList.remove("content-window--opening", "content-window--opening-active", "content-window--closing")
   }
 
   ensureFrameLoaded() {
@@ -1820,11 +1862,26 @@ export default class extends Controller {
     this.frameTarget.src = this.currentUrl
   }
 
+  clearFrameForNavigation() {
+    if (!this.hasFrameTarget) return
+    this.stopFrameMediaPlayback()
+    this.frameTarget.replaceChildren()
+    this.frameTarget.removeAttribute("src")
+    void this.frameTarget.offsetWidth
+  }
+
+  hardReloadFrame(url) {
+    if (!this.hasFrameTarget) return
+    this.clearFrameForNavigation()
+    this.frameTarget.src = url
+  }
+
   shouldResetLinkedDocumentOnClose() {
     return this.appKeyValue === "audio" || this.appKeyValue === "images"
   }
 
   resetLinkedDocumentSessionState() {
+    this.stopFrameMediaPlayback()
     if (this.hasFrameIdValue) {
       try {
         window.sessionStorage.removeItem(`nexus.linkedAppDocument.${this.frameIdValue}`)
@@ -1834,9 +1891,22 @@ export default class extends Controller {
     this.currentUrl = this.buildAppUrl({ blank: false })
     this.clearOpenFileBadge()
     if (this.hasFrameTarget) {
-      this.frameTarget.removeAttribute("src")
-      void this.frameTarget.offsetWidth
+      this.clearFrameForNavigation()
     }
+  }
+
+  stopFrameMediaPlayback() {
+    if (!this.hasFrameTarget) return
+    const mediaEls = this.frameTarget.querySelectorAll("audio, video")
+    mediaEls.forEach((mediaEl) => {
+      try {
+        mediaEl.pause()
+      } catch (_) {}
+      try {
+        mediaEl.removeAttribute("src")
+        mediaEl.load()
+      } catch (_) {}
+    })
   }
 
   isLinkedApp() {
@@ -1972,7 +2042,14 @@ export default class extends Controller {
     const rectLeft = rect.left - shellRect.left + scrollLeft
     const rectTop = rect.top - shellRect.top + scrollTop
 
-    this.activeDrag = { offsetX: coords.x - rectLeft, offsetY: coords.y - rectTop }
+    this.activeDrag = {
+      offsetX: coords.x - rectLeft,
+      offsetY: coords.y - rectTop,
+      startX: coords.x,
+      startY: coords.y,
+      didMove: false
+    }
+    this.element.classList.add("content-window--drag-lift")
     this.element.classList.add("content-window--suppress-position-transition")
 
     document.addEventListener("mousemove", this.boundDragMove)
@@ -1986,6 +2063,12 @@ export default class extends Controller {
     if (event.touches) event.preventDefault()
 
     const coords = this.getCoords(event)
+    if (!this.activeDrag.didMove) {
+      const dx = Math.abs(coords.x - this.activeDrag.startX)
+      const dy = Math.abs(coords.y - this.activeDrag.startY)
+      if (dx < 2 && dy < 2) return
+      this.activeDrag.didMove = true
+    }
     const margin = this.viewportMargin
     const w = this.element.offsetWidth
     const h = this.element.offsetHeight
@@ -1999,15 +2082,18 @@ export default class extends Controller {
   }
 
   stopDrag() {
-    const hadDrag = Boolean(this.activeDrag)
+    const dragState = this.activeDrag
+    const hadDrag = Boolean(dragState)
+    const didMove = Boolean(dragState?.didMove)
     this.activeDrag = null
+    this.element.classList.remove("content-window--drag-lift")
     this.element.classList.remove("content-window--suppress-position-transition")
     document.removeEventListener("mousemove", this.boundDragMove)
     document.removeEventListener("mouseup", this.boundDragEnd)
     document.removeEventListener("touchmove", this.boundDragMove)
     document.removeEventListener("touchend", this.boundDragEnd)
     /* reconcile bails out while activeDrag is set — clear first so snap + saveWindowBounds run. */
-    if (hadDrag) {
+    if (hadDrag && didMove) {
       this.reconcileWindowOnViewportResize()
       this.emitWindowState(!this.element.classList.contains("is-hidden"))
     }
@@ -2423,6 +2509,39 @@ export default class extends Controller {
     this.spawnBlankTaskWindow()
   }
 
+  prepareClonedWindowFrame(clone, frameId) {
+    const frame = clone.querySelector("turbo-frame[data-content-window-target='frame']")
+    if (!frame) return
+    frame.id = frameId
+    frame.removeAttribute("busy")
+    frame.removeAttribute("complete")
+    frame.removeAttribute("src")
+    frame.replaceChildren()
+  }
+
+  prepareClonedWindowShell(clone, {
+    frameId,
+    title = "",
+    clearTimeCardHours = false,
+    openOnConnect = false
+  } = {}) {
+    clone.classList.add("is-hidden")
+    clone.classList.remove("content-window--closing")
+    if (openOnConnect) clone.dataset.openOnConnect = "true"
+    this.prepareClonedWindowFrame(clone, frameId)
+    this.syncOpenFileBadgeFor(clone, title)
+    const editedEl = clone.querySelector("[data-nexus-open-file-edited]")
+    if (editedEl) editedEl.hidden = true
+    if (clearTimeCardHours) this.syncTimeCardHoursBadgeFor(clone, "", { isOpen: false })
+    const pickerLayer = clone.querySelector("[data-content-window-target='savePickerLayer']")
+    if (pickerLayer) {
+      pickerLayer.hidden = true
+      pickerLayer.setAttribute("aria-hidden", "true")
+    }
+    const pickerIframe = clone.querySelector("[data-content-window-target='savePickerIframe']")
+    if (pickerIframe) pickerIframe.removeAttribute("src")
+  }
+
   /** Spawns a new blank notes window instance (unsaved). */
   handleSpawnBlankNoteWindow() {
     if (this.appKeyValue !== "notes") return
@@ -2443,24 +2562,9 @@ export default class extends Controller {
     clone.dataset.contentWindowFrameIdValue = uid
     clone.dataset.contentWindowStorageKeyValue = uid
     clone.dataset.contentWindowHasLinkedAppSavePickerValue = "true"
-    clone.dataset.openOnConnect = "true"
     clone.dataset.isSpawnedTaskWindow = "true"
     // No spawnedFromDocumentId — blank window hasn't been saved yet
-    const frame = clone.querySelector("turbo-frame[data-content-window-target='frame']")
-    if (frame) {
-      frame.id = uid
-      frame.removeAttribute("src")
-    }
-
-    const sep = clone.querySelector("[data-nexus-open-file-separator]")
-    const nameEl = clone.querySelector("[data-nexus-open-file-name]")
-    if (sep) sep.hidden = true
-    if (nameEl) {
-      nameEl.hidden = true
-      nameEl.textContent = ""
-      nameEl.removeAttribute("title")
-    }
-    this.syncTimeCardHoursBadgeFor(clone, "", { isOpen: false })
+    this.prepareClonedWindowShell(clone, { frameId: uid, title: "", openOnConnect: true })
     const rect = this.element.getBoundingClientRect()
     clone.style.left = `${Math.round(rect.left) + 24}px`
     clone.style.top  = `${Math.round(rect.top)  + 24}px`
@@ -2478,23 +2582,9 @@ export default class extends Controller {
     clone.dataset.contentWindowFrameIdValue = uid
     clone.dataset.contentWindowStorageKeyValue = uid
     clone.dataset.contentWindowHasLinkedAppSavePickerValue = "true"
-    clone.dataset.openOnConnect = "true"
     clone.dataset.isSpawnedNoteWindow = "true"
     // No spawnedFromDocumentId — blank window hasn't been saved yet
-    const frame = clone.querySelector("turbo-frame[data-content-window-target='frame']")
-    if (frame) {
-      frame.id = uid
-      frame.removeAttribute("src")
-    }
-
-    const sep = clone.querySelector("[data-nexus-open-file-separator]")
-    const nameEl = clone.querySelector("[data-nexus-open-file-name]")
-    if (sep) sep.hidden = true
-    if (nameEl) {
-      nameEl.hidden = true
-      nameEl.textContent = ""
-      nameEl.removeAttribute("title")
-    }
+    this.prepareClonedWindowShell(clone, { frameId: uid, title: "", openOnConnect: true })
     const rect = this.element.getBoundingClientRect()
     clone.style.left = `${Math.round(rect.left) + 24}px`
     clone.style.top  = `${Math.round(rect.top)  + 24}px`
@@ -2512,23 +2602,9 @@ export default class extends Controller {
     clone.dataset.contentWindowFrameIdValue = uid
     clone.dataset.contentWindowStorageKeyValue = uid
     clone.dataset.contentWindowHasLinkedAppSavePickerValue = "true"
-    clone.dataset.openOnConnect = "true"
     clone.dataset.isSpawnedTimeCardWindow = "true"
     // No spawnedFromDocumentId — blank window hasn't been saved yet
-    const frame = clone.querySelector("turbo-frame[data-content-window-target='frame']")
-    if (frame) {
-      frame.id = uid
-      frame.removeAttribute("src")
-    }
-
-    const sep = clone.querySelector("[data-nexus-open-file-separator]")
-    const nameEl = clone.querySelector("[data-nexus-open-file-name]")
-    if (sep) sep.hidden = true
-    if (nameEl) {
-      nameEl.hidden = true
-      nameEl.textContent = ""
-      nameEl.removeAttribute("title")
-    }
+    this.prepareClonedWindowShell(clone, { frameId: uid, title: "", openOnConnect: true, clearTimeCardHours: true })
     const rect = this.element.getBoundingClientRect()
     clone.style.left = `${Math.round(rect.left) + 24}px`
     clone.style.top  = `${Math.round(rect.top)  + 24}px`

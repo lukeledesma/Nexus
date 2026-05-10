@@ -29,6 +29,7 @@
     <div
       class="finder-tree__row-line<%= ' is-selected' if folder_selected %>"
       draggable="<%= (writable && !read_only) ? "true" : "false" %>"
+      data-action="click->finder-browser#activateRowLine"
     >
       <%= link_to folder_href,
             class: "finder-tree__row finder-tree__row--folder",
@@ -108,7 +109,7 @@
     <% show_open_in_app = file_linked && open_in_app_content_types.include?(node[:content_type].to_s) %>
     <% finder_open_doc_title = finder_document_display_title(node[:title].to_s) %>
     <% effective_section_key = node[:origin_section_key].presence || section_key %>
-    <div class="finder-tree__row-line" draggable="<%= (writable && !read_only) ? "true" : "false" %>">
+    <div class="finder-tree__row-line" draggable="<%= (writable && !read_only) ? "true" : "false" %>" data-action="click->finder-browser#activateRowLine">
       <% if file_linked && !read_only %>
         <%= link_to "#",
               class: "finder-tree__row finder-tree__row--file",

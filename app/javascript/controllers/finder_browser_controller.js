@@ -310,6 +310,21 @@ export default class extends Controller {
     this.startCreateFolder(parentId)
   }
 
+  activateRowLine(event) {
+    const line = event.currentTarget
+    if (!(line instanceof Element)) return
+
+    const target = event.target instanceof Element ? event.target : null
+    if (!target) return
+    if (target.closest(".finder-tree__row-actions")) return
+    if (target.closest("button, input, textarea, select")) return
+    if (target.closest("a.finder-tree__row")) return
+
+    const row = line.querySelector("a.finder-tree__row")
+    if (!row) return
+    row.click()
+  }
+
   openLinkedFileKey(event) {
     if (event.key !== "Enter" && event.key !== " ") return
     event.preventDefault()

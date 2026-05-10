@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_25_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_07_115500) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -33,6 +33,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_25_130000) do
     t.index ["parent_id"], name: "index_documents_on_parent_id"
   end
 
+  create_table "user_app_states", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.jsonb "data", default: {}, null: false
+    t.string "key", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["key"], name: "index_user_app_states_on_key"
+    t.index ["user_id", "key"], name: "index_user_app_states_on_user_id_and_key", unique: true
+  end
+
   create_table "users", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "email", null: false
@@ -42,4 +52,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_25_130000) do
     t.index "lower((username)::text)", name: "index_users_on_lower_username", unique: true, where: "(username IS NOT NULL)"
     t.index ["email"], name: "index_users_on_email", unique: true
   end
+
+  add_foreign_key "user_app_states", "users"
 end
