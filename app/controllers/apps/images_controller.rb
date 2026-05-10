@@ -2,7 +2,9 @@
 
 module Apps
   class ImagesController < BaseController
-    IMAGE_EXTENSIONS = %w[.jpg .jpeg .png .gif .webp .bmp .tif .tiff .svg].freeze
+    skip_before_action :sync_from_disk
+
+    IMAGE_EXTENSIONS = %w[.jpg .jpeg .png .gif .webp .bmp .tif .tiff .svg .heic .heif .avif].freeze
 
     def show
       @linked_document_id = nil

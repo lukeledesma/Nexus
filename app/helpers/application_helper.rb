@@ -2,7 +2,7 @@ module ApplicationHelper
   include NexusUiHelper
   include MaterialIconsHelper
 
-  IMAGE_ASSET_EXTENSIONS = %w[.jpg .jpeg .png .gif .webp .bmp .tif .tiff .svg].freeze
+  IMAGE_ASSET_EXTENSIONS = %w[.jpg .jpeg .png .gif .webp .bmp .tif .tiff .svg .heic .heif .avif].freeze
   AUDIO_ASSET_EXTENSIONS = %w[.wav .aif .aiff .mp3 .m4a .flac .ogg].freeze
 
   # Wraps turbo-frame in .window-content plus the “not enough space” resize overlay (content-window controller).

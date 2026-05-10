@@ -2,9 +2,9 @@
 
 module Apps
   class WallpaperIimageController < BaseController
-    def files
-      DocumentDiskLoader.sync!
+    skip_before_action :sync_from_disk
 
+    def files
       doc = EmbeddedIimageFolder.document_for(current_user)
       unless doc
         render json: { folder_id: nil, empty: true, files: [], unavailable: true }
