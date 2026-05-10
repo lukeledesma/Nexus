@@ -105,7 +105,13 @@ echo "PUMA_STATUS=\$PUMA_STATUS"
 if sudo nginx -t 2>/dev/null; then
   sudo systemctl reload nginx 2>/dev/null || true
 fi
-NGINX_STATUS=\$(sudo systemctl is-active nginx 2>/dev/null || echo unknown)
+if systemctl is-active nginx >/dev/null 2>&1; then
+  NGINX_STATUS=$(systemctl is-active nginx)
+elif sudo -n systemctl is-active nginx >/dev/null 2>&1; then
+  NGINX_STATUS=$(sudo -n systemctl is-active nginx)
+else
+  NGINX_STATUS=unknown
+fi
 echo "NGINX_STATUS=\$NGINX_STATUS"
 DEPLOY_COMMIT=\$(git rev-parse --short HEAD 2>/dev/null || echo rsync)
 echo "DEPLOY_COMMIT=\$DEPLOY_COMMIT"
