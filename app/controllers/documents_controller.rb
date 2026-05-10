@@ -85,10 +85,23 @@ class DocumentsController < ApplicationController
       when ".wav" then "audio/wav"
       else Rack::Mime.mime_type(ext, "application/octet-stream")
       end
-    send_file path.to_s,
-              type: ctype,
-              disposition: "inline",
-              filename: File.basename(path.to_s)
+
+    if Rails.env.production?
+      # Production: Use X-Accel-Redirect for nginx to serve file directly (fast, non-blocking)
+      # nginx serves the file without tying up a Puma thread - critical for performance
+      internal_path = x_accel_path_for(path)
+      response.headers["X-Accel-Redirect"] = internal_path
+      response.headers["Content-Type"] = ctype
+      response.headers["Content-Disposition"] = "inline; filename=#{File.basename(path.to_s)}"
+      response.headers["X-Accel-Buffering"] = "yes"
+      head :ok
+    else
+      # Development: Use send_file (no nginx to do X-Accel-Redirect)
+      send_file path.to_s,
+                type: ctype,
+                disposition: "inline",
+                filename: File.basename(path.to_s)
+    end
   end
 
   def create
@@ -623,3 +636,22 @@ class DocumentsController < ApplicationController
     (changed & %w[title parent_id content_type is_folder]).any?
   end
 end
+
+  def x_accel_path_for(file_path)
+    # Rails needs to map the disk path to an internal nginx path
+    # storage/workspace/{user}/path/to/file -> /assets-internal/workspace/{user}/path/to/file
+    # nginx is configured to serve /assets-internal paths from the storage directory
+    
+    file_str = file_path.to_s
+    
+    # Handle both absolute and relative paths
+    # Extract the part after storage/workspace/
+    if file_str.include?("/storage/workspace/")
+      # /Users/.../storage/workspace/user123/Embedded/image.png -> workspace/user123/Embedded/image.png
+      relative = file_str.split("/storage/workspace/").last
+      "/assets-internal/workspace/#{relative}"
+    else
+      # Fallback - shouldn't happen in normal operation
+      raise "Unable to map asset path: #{file_str}"
+    end
+  end
