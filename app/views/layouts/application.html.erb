@@ -195,6 +195,27 @@
 
       <section class="content-window os-window is-hidden"
         data-controller="content-window"
+        data-content-window-app-key-value="clock"
+        data-content-window-app-url-value="/apps/clock"
+        data-content-window-storage-key-value="nexus.contentWindow.clock.bounds"
+        data-content-window-frame-id-value="clock-pane"
+        aria-live="polite">
+        <%= render "shared/content_window_chrome", title: "Clock" %>
+        <div class="pane-resize-handle pane-resize-handle--top" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
+        <%= content_window_shell do %>
+          <turbo-frame id="clock-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
+        <% end %>
+      </section>
+
+      <section class="content-window os-window is-hidden"
+        data-controller="content-window"
         data-content-window-app-key-value="user"
         data-content-window-app-url-value="/apps/user"
         data-content-window-storage-key-value="nexus.contentWindow.user.bounds"

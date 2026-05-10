@@ -8381,3 +8381,199 @@ a.finder-tree__row--file:focus-visible {
   color: var(--text);
 }
 
+.clock-app {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.55rem;
+  min-height: 0;
+  height: 100%;
+}
+
+.clock-app__tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.32rem;
+}
+
+.clock-app__tab {
+  appearance: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 0.27rem 0.58rem;
+  cursor: pointer;
+}
+
+.clock-app__tab.is-active {
+  color: var(--text);
+  border-color: color-mix(in oklab, var(--text) 20%, var(--border) 80%);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.clock-app__sound-toggle {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.36rem;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  user-select: none;
+}
+
+.clock-app__sound-toggle input {
+  accent-color: var(--accent);
+}
+
+.clock-app__notice {
+  border-radius: 8px;
+  border: 1px solid var(--border-hairline);
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--text);
+  padding: 0.3rem 0.5rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+}
+
+.clock-app__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.clock-app__panel[hidden] {
+  display: none !important;
+}
+
+.clock-app__panel--centered {
+  justify-content: center;
+}
+
+.clock-app__display {
+  margin: 0;
+  text-align: center;
+  color: var(--text);
+  font-family: "SF Mono", "Roboto Mono", Menlo, Consolas, monospace;
+  font-size: clamp(1.6rem, 4.1vw, 2.2rem);
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  line-height: 1.15;
+}
+
+.clock-app__input {
+  appearance: none;
+  width: 100%;
+  min-width: 0;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.022);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.72rem;
+  padding: 0.36rem 0.48rem;
+  box-sizing: border-box;
+}
+
+.clock-app__input:focus-visible {
+  outline: none;
+  border-color: color-mix(in oklab, var(--accent) 54%, var(--border) 46%);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 28%, transparent);
+}
+
+.clock-app__btn,
+.clock-app__icon-btn {
+  appearance: none;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.018);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.71rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.33rem 0.52rem;
+  cursor: pointer;
+}
+
+.clock-app__btn--primary {
+  border-color: color-mix(in oklab, var(--accent) 38%, var(--border) 62%);
+  background: color-mix(in oklab, var(--accent) 12%, transparent);
+}
+
+.clock-app__btn--danger {
+  border-color: color-mix(in oklab, #ef4444 48%, var(--border) 52%);
+  color: color-mix(in oklab, #ef4444 72%, var(--text) 28%);
+}
+
+.clock-app__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: center;
+}
+
+.clock-app__timer-input-row {
+  width: min(100%, 260px);
+  margin: 0 auto;
+}
+
+.clock-app__auto-repeat {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.clock-app__laps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  overflow: auto;
+  min-height: 0;
+  padding-right: 2px;
+}
+
+.clock-app__lap-row {
+  border: 1px solid var(--border-hairline);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 0.34rem 0.48rem;
+}
+
+.clock-app__lap-row {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr;
+  gap: 0.4rem;
+  align-items: center;
+  font-size: 0.7rem;
+}
+
+.clock-app__lap-row span:nth-child(2),
+.clock-app__lap-row span:nth-child(3) {
+  text-align: right;
+  font-family: "SF Mono", "Roboto Mono", Menlo, Consolas, monospace;
+}
+
+.clock-app__empty {
+  margin: 0;
+  color: var(--text-muted);
+  text-align: center;
+  font-size: 0.7rem;
+  padding: 0.45rem;
+}
+
+@media (max-width: 720px) {
+  .clock-app__panel--centered {
+    justify-content: flex-start;
+  }
+}
+

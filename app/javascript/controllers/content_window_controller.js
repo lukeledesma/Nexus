@@ -82,6 +82,7 @@ export default class extends Controller {
       const imagesMin = { width: 320, height: 320 }
       const notesMin = { width: 320, height: 320 }
       const timeCardMin = { width: 320, height: 320 }
+      const clockMin = taskListMin
     const minByAppKey = {
       tasks: taskListMin,
       finder: finderLikeMin,
@@ -90,6 +91,7 @@ export default class extends Controller {
       images: imagesMin,
       notes: notesMin,
       "time-card": timeCardMin,
+      clock: clockMin,
       user: { width: 320, height: 220 },
     }
     const appMinimum = minByAppKey[this.appKeyValue] || taskListMin
