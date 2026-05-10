@@ -25,9 +25,11 @@ export default class extends Controller {
     this.boundRequestSave = this.handleRequestSave.bind(this)
     this.boundTaskListAddFromChrome = this.handleTaskListAddFromChrome.bind(this)
     this.boundBeforeSavePicker = this.handleBeforeSavePicker.bind(this)
+    this.boundRemoteTaskListChanged = this.handleRemoteTaskListChanged.bind(this)
     this.boundSyncPayloadInput = () => this.#syncPayload()
     window.addEventListener("app-window:state", this.boundWindowState)
     window.addEventListener("nexus:task-list-add-task", this.boundTaskListAddFromChrome)
+    window.addEventListener("nexus:task-list-remote-changed", this.boundRemoteTaskListChanged)
     window.addEventListener(LINKED_APP_BEFORE_SAVE_PICKER, this.boundBeforeSavePicker)
     document.addEventListener("nexus:request-save", this.boundRequestSave)
     if (this.hasListTarget) {
@@ -53,6 +55,7 @@ export default class extends Controller {
   disconnect() {
     document.removeEventListener("nexus:request-save", this.boundRequestSave)
     window.removeEventListener("nexus:task-list-add-task", this.boundTaskListAddFromChrome)
+    window.removeEventListener("nexus:task-list-remote-changed", this.boundRemoteTaskListChanged)
     window.removeEventListener(LINKED_APP_BEFORE_SAVE_PICKER, this.boundBeforeSavePicker)
     if (this.hasListTarget && this.boundSyncPayloadInput) {
       this.listTarget.removeEventListener("input", this.boundSyncPayloadInput, true)
@@ -161,6 +164,22 @@ export default class extends Controller {
     if (id && frame && frame.id !== id) return
     if (!this.hasListTarget) return
     this.addTask({ preventDefault() {} })
+  }
+
+  handleRemoteTaskListChanged(event) {
+    const detail = event?.detail || {}
+    const incomingDocumentId = Number(detail.document_id)
+    const linkedDocumentId = Number(this.element.dataset.taskListLinkedDocumentId || 0)
+    if (!Number.isInteger(incomingDocumentId) || incomingDocumentId <= 0) return
+    if (!Number.isInteger(linkedDocumentId) || linkedDocumentId <= 0) return
+    if (incomingDocumentId !== linkedDocumentId) return
+    if (!Array.isArray(detail.tasks)) return
+
+    // Avoid clobbering local in-progress edits; next remote save will deliver again.
+    if (this.#activeEditInput()) return
+    if (this.autosaveTimer) return
+
+    this.#applyRemoteTasks(detail.tasks)
   }
 
   handleRequestSave(event) {
@@ -1180,6 +1199,26 @@ export default class extends Controller {
     })
 
     this.payloadTarget.value = JSON.stringify(tasks)
+  }
+
+  #applyRemoteTasks(tasks) {
+    if (!this.hasListTarget) return
+
+    while (this.listTarget.firstChild) this.listTarget.removeChild(this.listTarget.firstChild)
+
+    tasks.forEach((task) => {
+      const text = String(task?.text || "")
+      const checked = Boolean(task?.checked)
+      const subtasks = (Array.isArray(task?.subtasks) ? task.subtasks : []).map((subtask) => ({
+        text: String(subtask?.text || ""),
+        checked: Boolean(subtask?.checked)
+      }))
+
+      const row = this.#buildMainTaskRow(text, checked, subtasks)
+      this.listTarget.appendChild(row)
+    })
+
+    this.#refreshAll()
   }
 
   #triggerAutosave(delay = 80) {

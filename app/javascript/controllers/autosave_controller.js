@@ -3,6 +3,7 @@ import { Controller } from "@hotwired/stimulus"
 export default class extends Controller {
   static values = {
     debounce: { type: Number, default: 250 },
+    submitOnInput: { type: Boolean, default: true },
     itemId: Number,
     itemType: String,
     linkedDocumentId: { type: Number, default: 0 }
@@ -32,6 +33,7 @@ export default class extends Controller {
     if (!t) return
     if (!["INPUT", "SELECT", "TEXTAREA"].includes(t.tagName)) return
     if (t.type === "hidden") return
+    if (e.type === "input" && !this.submitOnInputValue) return
     this.#publishDirtyState()
     this.submit()
   }

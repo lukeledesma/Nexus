@@ -4,7 +4,7 @@ class Document < ApplicationRecord
   DEFAULT_FOLDER_TITLE = "New Folder"
   DEFAULT_NOTE_TITLE = "Untitled Note"
   DEFAULT_TASK_LIST_TITLE = "Untitled Task List"
-  CONTENT_TYPES = %w[note task_list asset].freeze
+  CONTENT_TYPES = %w[note task_list asset calendar_events].freeze
 
   # Binary/media files on disk (bytes are not stored in `content`; sync reads/writes the file at storage_path).
   ASSET_FILE_EXTENSIONS = %w[.wav .aif .aiff .mp3 .m4a .flac .ogg .jpg .jpeg .png].freeze
@@ -136,6 +136,12 @@ class Document < ApplicationRecord
         self.reset_mode = "none"
         self.reset_days = []
         self.last_reset_at = nil
+      elsif content_type == "calendar_events"
+        self.content = content.to_s
+        self.tasks = []
+        self.reset_mode = "none"
+        self.reset_days = []
+        self.last_reset_at = nil
       end
     end
   end
@@ -199,6 +205,6 @@ class Document < ApplicationRecord
     return if folder?
     return if CONTENT_TYPES.include?(content_type.to_s)
 
-    errors.add(:content_type, "must be note, task_list, or asset")
+    errors.add(:content_type, "must be note, task_list, asset, or calendar_events")
   end
 end

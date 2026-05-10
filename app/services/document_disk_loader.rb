@@ -5,30 +5,73 @@ require "fileutils"
 require "find"
 require "time"
 
+# Thread-safe state management for synchronization
+class ThreadSafeState
+  @mutex = Mutex.new
+  @syncing = false
+
+  def self.syncing?
+    @mutex.synchronize { @syncing }
+  end
+
+  def self.begin_sync!
+    @mutex.synchronize { @syncing = true }
+  end
+
+  def self.end_sync!
+    @mutex.synchronize { @syncing = false }
+  end
+
+  def syncing?
+    self.class.syncing?
+  end
+
+  def begin_sync!
+    self.class.begin_sync!
+  end
+
+  def end_sync!
+    self.class.end_sync!
+  end
+end
+
 class DocumentDiskLoader
+  # Class: DocumentDiskLoader
+  # Description: Handles synchronization of documents and folders between the database and the file system.
+  # Methods:
+  # - sync!: Orchestrates the synchronization process, ensuring roots and syncing from disk.
+  # - syncing?: Checks if a sync operation is currently in progress.
+  # - begin_sync!: Marks the start of a sync operation.
+  # - end_sync!: Marks the end of a sync operation.
+  # - storage_root: Returns the root directory for document storage.
+  # - ensure_roots!: Ensures the existence of storage root directories.
+  # - sync_from_disk!: Synchronizes folders and files from the disk to the database.
   class << self
     def sync!(purge_missing: true)
       return if syncing?
+
+      log_sync_start
 
       begin_sync!
       ensure_roots!
       sync_from_disk!(purge_missing: purge_missing)
     ensure
       end_sync!
+      log_sync_end
     end
 
     def syncing?
-      Thread.current[:document_disk_loader_syncing] == true
+      ThreadSafeState.new.syncing?
     end
 
     private
 
     def begin_sync!
-      Thread.current[:document_disk_loader_syncing] = true
+      ThreadSafeState.new.begin_sync!
     end
 
     def end_sync!
-      Thread.current[:document_disk_loader_syncing] = false
+      ThreadSafeState.new.end_sync!
     end
 
     def storage_root
@@ -43,7 +86,7 @@ class DocumentDiskLoader
       seen_paths = []
 
       folder_docs = upsert_folders_from_disk!(seen_paths)
-      upsert_files_from_disk!(folder_docs, seen_paths)
+      upsert_files_from_disk!(seen_paths, folder_docs)
       purge_missing_from_database!(seen_paths) if purge_missing
     end
 
@@ -83,7 +126,7 @@ class DocumentDiskLoader
       folders
     end
 
-    def upsert_files_from_disk!(folder_docs, seen_paths)
+    def upsert_files_from_disk!(seen_paths, folder_docs)
       Find.find(storage_root.to_s) do |path|
         next unless File.file?(path)
         next unless supported_file_extension?(path)
@@ -449,6 +492,14 @@ class DocumentDiskLoader
       Time.zone.parse(value)
     rescue ArgumentError, TypeError
       nil
+    end
+
+    def log_sync_start
+      Rails.logger.info("Starting document disk sync...")
+    end
+
+    def log_sync_end
+      Rails.logger.info("Document disk sync completed.")
     end
   end
 end

@@ -8,6 +8,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
+    <%= action_cable_meta_tag %>
     <% if logged_in? %>
       <meta name="nexus-user-id" content="<%= current_user.id %>">
     <% end %>
@@ -179,7 +180,7 @@
         data-content-window-storage-key-value="nexus.contentWindow.calendar.bounds"
         data-content-window-frame-id-value="calendar-pane"
         aria-live="polite">
-        <%= render "shared/content_window_chrome", title: "Calendar", show_calendar_new_event: true %>
+        <%= render "shared/content_window_chrome", title: "Calendar", open_file_badge: true, show_calendar_new_event: true %>
         <div class="pane-resize-handle pane-resize-handle--top" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>

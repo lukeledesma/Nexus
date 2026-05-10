@@ -67,13 +67,18 @@ export default class extends Controller {
     this.searchQuery = ""
     this.editingEventId = null
     this.calendars = this.readCalendars()
+    this.hasPendingChanges = false
+    this.saveTimer = null
+    this.saveInFlight = false
+    this.savePending = false
+    this.latestSaveToken = 0
+    this.lastPersistedToken = 0
+    this.remoteTimestamp = null
+    
+    // Start from synced state (if any), then load from file as source of truth.
     const restoredEvents = readSyncedOrMigrate(STORAGE_KEY)
-    if (Array.isArray(restoredEvents)) {
-      this.events = this.readEvents()
-    } else {
-      this.events = this.sampleEvents()
-      this.persistEvents()
-    }
+    this.events = Array.isArray(restoredEvents) ? this.readEvents() : []
+    
     this.pickedColor = EVENT_COLORS[0]
     this.boundGlobalKeydown = (event) => this.handleGlobalKeydown(event)
     this.boundChromeNewEvent = (event) => this.handleChromeNewEvent(event)
@@ -86,6 +91,26 @@ export default class extends Controller {
     window.addEventListener("nexus:calendar-new-event", this.boundChromeNewEvent)
     window.addEventListener("nexus:user-state-loaded", this.boundUserStateLoaded)
     this.renderAll()
+    
+    // Load from file as the authoritative source. Only seed samples when no file exists.
+    this.loadEventsFromFile().then((loaded) => {
+      if (loaded) {
+        this.renderAll()
+        return
+      }
+
+      if (this.events.length === 0) {
+        this.events = this.sampleEvents()
+        this.persistEvents()
+        this.renderAll()
+      }
+    }).catch((error) => {
+      console.error("Failed to load events from file:", error)
+    })
+
+    // Listen for push notifications from the Action Cable sync channel.
+    this.boundCalendarRemoteChanged = (event) => this.handleCalendarRemoteChanged(event)
+    window.addEventListener("nexus:calendar-remote-changed", this.boundCalendarRemoteChanged)
   }
 
   disconnect() {
@@ -95,6 +120,7 @@ export default class extends Controller {
     window.removeEventListener("pointermove", this.boundDragMove)
     window.removeEventListener("pointerup", this.boundDragEnd)
     window.removeEventListener("pointercancel", this.boundDragEnd)
+    window.removeEventListener("nexus:calendar-remote-changed", this.boundCalendarRemoteChanged)
   }
 
   handleUserStateLoaded(event) {
@@ -115,6 +141,16 @@ export default class extends Controller {
     this.renderAll()
   }
 
+  async handleCalendarRemoteChanged({ detail }) {
+    // Skip if our own write just echoed back (timestamps match).
+    if (detail?.updated_at && detail.updated_at === this.remoteTimestamp) return
+    // Skip if we have a local write in progress — our version will win.
+    if (this.saveInFlight || this.savePending || this.latestSaveToken !== this.lastPersistedToken) return
+    this.remoteTimestamp = detail?.updated_at || null
+    const loaded = await this.loadEventsFromFile()
+    if (loaded) this.renderAll()
+  }
+
   readCalendars() {
     const parsed = readSyncedOrMigrate(STORAGE_CALS_KEY)
     if (!Array.isArray(parsed) || parsed.length === 0) return DEFAULT_CALS.map((c) => ({ ...c }))
@@ -132,7 +168,192 @@ export default class extends Controller {
   }
 
   persistEvents() {
+    // Save to session storage immediately
     NexusUserState.set(STORAGE_KEY, this.events)
+
+    // Track unsaved changes; latest token must reach disk before we emit "saved".
+    this.latestSaveToken += 1
+    
+    // Publish dirty state immediately
+    window.dispatchEvent(new CustomEvent("nexus:item-dirty", {
+      detail: { frameId: this.currentFrameId(), itemType: "calendar_events" }
+    }))
+    
+    // Clear any pending save timer
+    if (this.saveTimer) clearTimeout(this.saveTimer)
+    
+    // Debounce the file save to avoid too many requests
+    this.saveTimer = setTimeout(() => {
+      this.persistEventsToFile()
+    }, 250)
+  }
+
+  async persistEventsToFile() {
+    if (this.saveInFlight) {
+      this.savePending = true
+      return
+    }
+
+    this.saveInFlight = true
+    const tokenAtStart = this.latestSaveToken
+    let savedTimestamp = null
+
+    try {
+      // Publish saving state before the fetch
+      window.dispatchEvent(new CustomEvent("nexus:item-saving", {
+        detail: { frameId: this.currentFrameId(), itemType: "calendar_events" }
+      }))
+
+      // Convert events array to a date-keyed object format
+      const eventsByDate = {}
+      this.events.forEach(event => {
+        if (!eventsByDate[event.date]) {
+          eventsByDate[event.date] = []
+        }
+        eventsByDate[event.date].push({
+          title: event.title,
+          time: event.start || "",
+          end: event.end || "",
+          color: event.color || "",
+          calendar: event.cal || "personal",
+          all_day: event.allDay || false
+        })
+      })
+
+      const response = await fetch("/apps/calendar/save_events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": this.getCsrfToken() },
+        body: JSON.stringify({ events_json: JSON.stringify(eventsByDate) })
+      })
+
+      if (response.ok) {
+        const json = await response.json()
+        this.lastPersistedToken = Math.max(this.lastPersistedToken, tokenAtStart)
+        savedTimestamp = json.updated_at || new Date().toISOString()
+        // Keep remoteTimestamp in sync so the poller won't re-fetch our own write.
+        if (json.updated_at) this.remoteTimestamp = json.updated_at
+      } else {
+        console.error("Failed to save calendar events")
+      }
+    } catch (error) {
+      console.error("Error saving calendar events:", error)
+    } finally {
+      this.saveInFlight = false
+
+      // If changes arrived while this request was in flight, flush again immediately.
+      if (this.savePending || this.lastPersistedToken < this.latestSaveToken) {
+        this.savePending = false
+        this.persistEventsToFile()
+        return
+      }
+
+      // Only mark as saved when the newest known change is persisted.
+      if (this.lastPersistedToken >= this.latestSaveToken) {
+        window.dispatchEvent(new CustomEvent("nexus:item-saved", {
+          detail: {
+            frameId: this.currentFrameId(),
+            itemType: "calendar_events",
+            timestamp: savedTimestamp || new Date().toISOString()
+          }
+        }))
+      }
+    }
+  }
+
+  async loadEventsFromFile() {
+    try {
+      const response = await fetch("/apps/calendar/draft_file")
+      if (!response.ok) return false
+
+      const data = await response.json()
+      if (!data.ok || !data.events) return false
+
+      // Convert from date-keyed object to events array
+      const eventsByDate = data.events
+      const events = []
+      let eventId = 1
+
+      Object.entries(eventsByDate).forEach(([date, dateEvents]) => {
+        Array.isArray(dateEvents) && dateEvents.forEach(event => {
+          const calendarId = (event.calendar || "personal").toString().trim() || "personal"
+          events.push({
+            id: `event_${eventId++}`,
+            title: event.title || "",
+            date: date,
+            allDay: this.parseAllDayFlag(event.all_day),
+            start: event.time || "",
+            end: this.parseEndTime(event),
+            cal: calendarId,
+            color: event.color || "#3b82f6"
+          })
+        })
+      })
+
+      // Keep UI in sync with file even when file has zero events.
+      this.events = events
+      NexusUserState.set(STORAGE_KEY, this.events)
+
+      // Stamp the remote timestamp we loaded from so the poller has a baseline.
+      if (data.updated_at) this.remoteTimestamp = data.updated_at
+
+      const calendarsChanged = this.ensureCalendarsForEvents(events)
+      if (calendarsChanged) {
+        this.persistCalendars()
+      }
+
+      return true
+    } catch (error) {
+      console.error("Error loading calendar events from file:", error)
+      return false
+    }
+  }
+
+  parseAllDayFlag(value) {
+    if (value === true) return true
+    if (typeof value === "string") return value.trim().toLowerCase() === "true"
+    return false
+  }
+
+  parseEndTime(event) {
+    const explicitEnd = (event.end || event.end_time || "").toString().trim()
+    if (explicitEnd) return explicitEnd
+
+    // Backward compatibility: old files only stored start time.
+    const start = (event.time || "").toString().trim()
+    if (!start) return ""
+
+    const startMinutes = this.timeToMinutes(start)
+    return this.minutesToTime(Math.min(MINUTES_PER_DAY - 1, startMinutes + 30))
+  }
+
+  ensureCalendarsForEvents(events) {
+    const known = new Set(this.calendars.map((c) => c.id))
+    let changed = false
+
+    events.forEach((event) => {
+      const id = (event.cal || "").toString().trim()
+      if (!id || known.has(id)) return
+
+      this.calendars.push({
+        id,
+        name: id.charAt(0).toUpperCase() + id.slice(1),
+        color: event.color || EVENT_COLORS[0],
+        checked: true
+      })
+      known.add(id)
+      changed = true
+    })
+
+    return changed
+  }
+
+  currentFrameId() {
+    return this.element.closest("turbo-frame")?.id || "calendar-pane"
+  }
+
+  getCsrfToken() {
+    const token = document.querySelector('meta[name="csrf-token"]')
+    return token ? token.getAttribute("content") : ""
   }
 
   readView() {

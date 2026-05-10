@@ -36,6 +36,50 @@ class LinkedAppSaveToDocument
     assign_payload(doc, config[:content_type], config[:app_key])
 
     if doc.save
+      if doc.content_type == "task_list"
+        normalized_tasks = Array(doc.tasks).filter_map do |task|
+          next unless task.respond_to?(:to_h)
+
+          hash = task.to_h
+          text = hash["text"].to_s.strip
+          subtasks = Array(hash["subtasks"]).filter_map do |subtask|
+            next unless subtask.respond_to?(:to_h)
+            sub_hash = subtask.to_h
+            sub_text = sub_hash["text"].to_s.strip
+            next if sub_text.empty?
+
+            { "text" => sub_text, "checked" => ActiveModel::Type::Boolean.new.cast(sub_hash["checked"]) }
+          end
+          next if text.empty? && subtasks.empty?
+
+          checked = subtasks.present? ? subtasks.all? { |sub| sub["checked"] } : ActiveModel::Type::Boolean.new.cast(hash["checked"])
+          { "text" => text, "checked" => checked, "subtasks" => subtasks }
+        end
+
+        UserSyncChannel.broadcast_task_list_change(
+          user: @user,
+          document_id: doc.id,
+          tasks: normalized_tasks,
+          updated_at: doc.updated_at.utc.iso8601
+        )
+        UserSyncChannel.broadcast_document_change(
+          user: @user,
+          document_id: doc.id,
+          content_type: doc.content_type,
+          tasks: normalized_tasks,
+          updated_at: doc.updated_at.utc.iso8601
+        )
+      elsif doc.content_type == "note"
+        UserSyncChannel.broadcast_document_change(
+          user: @user,
+          document_id: doc.id,
+          content_type: doc.content_type,
+          content: doc.content.to_s,
+          updated_at: doc.updated_at.utc.iso8601
+        )
+      end
+
+      UserSyncChannel.broadcast_finder_change(user: @user)
       [ :ok, { document_id: doc.id, title: doc.title, storage_path: doc.storage_path.to_s } ]
     else
       [ :unprocessable_entity, { errors: doc.errors.full_messages } ]

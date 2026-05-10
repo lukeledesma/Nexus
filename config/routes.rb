@@ -18,6 +18,9 @@ Rails.application.routes.draw do
     get "tasks", to: "tasks#show"
     post "tasks/save_file", to: "tasks#save_file"
     get "tasks/draft_file", to: "tasks#draft_file"
+    post "calendar/save_events", to: "calendar#save_events"
+    get "calendar/draft_file", to: "calendar#draft_file"
+    get "calendar/last_saved", to: "calendar#last_saved"
   end
 
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html

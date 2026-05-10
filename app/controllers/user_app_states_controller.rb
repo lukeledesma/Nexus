@@ -20,6 +20,7 @@ class UserAppStatesController < ApplicationController
     raw_value = raw_value.map { |v| v.respond_to?(:to_unsafe_h) ? v.to_unsafe_h : v } if raw_value.is_a?(Array)
 
     record = UserAppState.put(user: current_user, key: params[:key], value: raw_value)
+    UserSyncChannel.broadcast_state_change(user: current_user, key: params[:key], value: record&.data)
     render json: { key: params[:key], data: record&.data }
   rescue ActiveRecord::RecordInvalid => e
     render json: { error: e.record.errors.full_messages.join(", ") }, status: :unprocessable_entity

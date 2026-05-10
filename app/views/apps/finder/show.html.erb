@@ -19,7 +19,7 @@
             <% @finder_sections.each do |section| %>
               <% active = section[:key] == @section_key %>
               <li class="finder-folder-item<%= " is-active" if active %><%= " finder-folder-item--separator" if section[:key] == "favorites" %>" data-finder-section-key="<%= section[:key] %>">
-                <%= link_to apps_finder_path({ section: section[:key], frame_id: frame_id }.merge(@finder_read_only ? { mode: "save_as" } : {})), class: "finder-folder-link", data: { turbo_frame: frame_id }, aria: { label: "Open #{section[:title]}" } do %>
+                <%= link_to apps_finder_path({ section: section[:key], frame_id: frame_id }.merge(@finder_read_only ? { mode: "save_as" } : {})), class: "finder-folder-link", data: { turbo_frame: frame_id, turbo_prefetch: false }, aria: { label: "Open #{section[:title]}" } do %>
                   <span class="finder-folder-icon" aria-hidden="true"><%= material_symbol_icon(section[:icon], size: :md) %></span>
                   <span class="finder-folder-name"><%= section[:title] %></span>
                 <% end %>

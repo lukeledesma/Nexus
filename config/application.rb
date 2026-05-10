@@ -20,6 +20,13 @@ module Nexus
     config.autoload_paths << policies_path
     config.eager_load_paths << policies_path
 
+    # Updated folder structure to align with modern conventions
+    # Added autoload paths for new folder structure
+    config.autoload_paths += %W(
+      #{Rails.root.join('app/services/finder')}
+      #{Rails.root.join('app/services/document')}
+    )
+
     # Disk sync is performed per-request in the controller, not at boot.
   end
 end

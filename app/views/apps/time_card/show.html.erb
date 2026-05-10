@@ -6,7 +6,7 @@
     data-time-card-initial-state-value="<%= json_escape(@initial_state.to_json) %>">
     <% if @linked_document_id.present? %>
       <%= form_with url: document_path(@linked_document_id), method: :patch,
-        data: { turbo: false, controller: "autosave", autosave_debounce_value: 180 },
+        data: { turbo: false, controller: "autosave", autosave_debounce_value: 180, autosave_submit_on_input_value: false },
         html: { class: "time-card-app__form" } do %>
         <input type="hidden" name="document[content]" value="<%= @serialized_document_content %>" data-time-card-target="serializedContent">
 

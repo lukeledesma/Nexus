@@ -70,4 +70,26 @@ class FinderWorkspaceInitializerTest < ActiveSupport::TestCase
     assert_equal roots["documents"].id, favorite_file.reload.parent_id
     assert_equal true, favorite_file.is_favorited?
   end
+
+  test "ensure_for_user handles missing root folder gracefully" do
+    FinderListedFolders.stub(:workspace_root_for, nil) do
+      result = FinderWorkspaceInitializer.ensure_for_user!(@user)
+      assert_equal({}, result, "Expected empty result when root folder is missing")
+    end
+  end
+
+  test "ensure_for_user handles migration service integration" do
+    FinderWorkspaceInitializer.ensure_for_user!(@user)
+
+    root = FinderListedFolders.workspace_root_for(@user)
+    finder = root.children.folders.find { |d| d.title.to_s.casecmp?("Finder") }
+
+    assert finder, "Finder root folder should exist"
+
+    Finder::MigrationService.migrate_legacy_documents_section!(finder)
+    Finder::MigrationService.migrate_legacy_notes_folder!(nil, nil)
+    Finder::MigrationService.migrate_legacy_favorites_folder!(finder, nil)
+
+    # Add assertions to verify migration behavior
+  end
 end

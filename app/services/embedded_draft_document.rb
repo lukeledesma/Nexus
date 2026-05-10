@@ -5,7 +5,8 @@ class EmbeddedDraftDocument
   APP_CONFIG = {
     "tasks" => { title: "Task Draft", content_type: "task_list" },
     "notes" => { title: "Note Draft", content_type: "note" },
-    "time-card" => { title: "Time Card Draft", content_type: "note" }
+    "time-card" => { title: "Time Card Draft", content_type: "note" },
+    "calendar" => { title: "Calendar", content_type: "calendar_events" }
   }.freeze
 
   class << self

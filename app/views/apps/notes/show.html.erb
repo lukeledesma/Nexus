@@ -6,10 +6,11 @@
                     data: {
                       turbo: false,
                       controller: "autosave",
-                      autosave_debounce_value: 180
+                      autosave_debounce_value: 180,
+                      autosave_submit_on_input_value: false
                     },
                     html: { class: "notes-app__form" } do |f| %>
-        <textarea name="document[content]" id="content" class="notes-app__textarea" placeholder="Write your note..." autocomplete="off" spellcheck="true"><%= @note_text %></textarea>
+        <textarea name="document[content]" id="content" class="notes-app__textarea" data-controller="notes-live" data-notes-live-document-id-value="<%= @linked_document_id %>" placeholder="Write your note..." autocomplete="off" spellcheck="true"><%= @note_text %></textarea>
       <% end %>
     <% else %>
       <div class="notes-app__form">

@@ -135,6 +135,32 @@ class DocumentsController < ApplicationController
 
     result = persist_document(@document, operation: :update)
     if result.success?
+      if @document.content_type == "note"
+        UserSyncChannel.broadcast_document_change(
+          user: current_user,
+          document_id: @document.id,
+          content_type: @document.content_type,
+          content: @document.content.to_s,
+          updated_at: @document.updated_at.utc.iso8601
+        )
+      end
+
+      if @document.content_type == "task_list"
+        normalized_tasks = normalize_tasks_for_broadcast(@document.tasks)
+        UserSyncChannel.broadcast_task_list_change(
+          user: current_user,
+          document_id: @document.id,
+          tasks: normalized_tasks,
+          updated_at: @document.updated_at.utc.iso8601
+        )
+        UserSyncChannel.broadcast_document_change(
+          user: current_user,
+          document_id: @document.id,
+          content_type: @document.content_type,
+          tasks: normalized_tasks,
+          updated_at: @document.updated_at.utc.iso8601
+        )
+      end
       head :no_content
     else
       render json: { error: @document.errors.full_messages.to_sentence }, status: :unprocessable_entity
@@ -144,6 +170,7 @@ class DocumentsController < ApplicationController
   def create_subfolder
     result = Documents::CreateSubfolder.call(parent: @document, title: params[:title])
     if result.success?
+      UserSyncChannel.broadcast_finder_change(user: current_user)
       render json: { ok: true, id: result.payload[:id], title: result.payload[:title] }
     else
       render json: { error: result.error }, status: result.status
@@ -153,6 +180,7 @@ class DocumentsController < ApplicationController
   def create_file
     result = Documents::CreateFile.call(parent: @document, content_type: params[:content_type])
     if result.success?
+      UserSyncChannel.broadcast_finder_change(user: current_user)
       if request.xhr? || request.format.json?
         render json: { ok: true, folder_id: result.payload[:folder_id], file_id: result.payload[:file_id] }
         return
@@ -179,6 +207,7 @@ class DocumentsController < ApplicationController
     )
 
     if result.success?
+      UserSyncChannel.broadcast_finder_change(user: current_user)
       render json: { ok: true, id: result.payload[:id], parent_id: result.payload[:parent_id] }
     else
       render json: { error: result.error }, status: result.status
@@ -194,6 +223,7 @@ class DocumentsController < ApplicationController
     )
 
     if result.success?
+      UserSyncChannel.broadcast_finder_change(user: current_user)
       render json: { ok: true, id: result.payload[:id], parent_id: result.payload[:parent_id] }
     else
       render json: { error: result.error }, status: result.status
@@ -205,6 +235,7 @@ class DocumentsController < ApplicationController
     result = Documents::UploadFiles.call(user: current_user, folder: @document, files: params[:files])
 
     if result.success?
+      UserSyncChannel.broadcast_finder_change(user: current_user)
       render json: { ok: true, ids: result.payload[:ids], files: result.payload[:files], errors: result.payload[:errors] }
     else
       render json: { error: result.error }, status: result.status
@@ -299,10 +330,42 @@ class DocumentsController < ApplicationController
       return
     end
 
+    UserSyncChannel.broadcast_finder_change(user: current_user)
+
     if request.xhr? || request.format.json?
       head :no_content
     else
       redirect_to root_path
+    end
+  end
+
+  def normalize_tasks_for_broadcast(value)
+    Array(value).filter_map do |task|
+      next unless task.respond_to?(:to_h)
+
+      hash = task.to_h
+      text = hash["text"].to_s.strip
+      subtasks = Array(hash["subtasks"]).filter_map do |subtask|
+        next unless subtask.respond_to?(:to_h)
+
+        sub_hash = subtask.to_h
+        sub_text = sub_hash["text"].to_s.strip
+        next if sub_text.empty?
+
+        {
+          "text" => sub_text,
+          "checked" => ActiveModel::Type::Boolean.new.cast(sub_hash["checked"])
+        }
+      end
+
+      next if text.empty? && subtasks.empty?
+
+      checked = subtasks.present? ? subtasks.all? { |sub| sub["checked"] } : ActiveModel::Type::Boolean.new.cast(hash["checked"])
+      {
+        "text" => text,
+        "checked" => checked,
+        "subtasks" => subtasks
+      }
     end
   end
 
@@ -540,11 +603,23 @@ class DocumentsController < ApplicationController
 
   def persist_document(document, operation:)
     result = DocumentPersistence.persist(document, operation: operation)
+
+    if result.success? && finder_structure_changed?(document, operation)
+      UserSyncChannel.broadcast_finder_change(user: current_user)
+    end
+
     return result if result.success?
 
     if result.error.present? && document.errors.empty?
       document.errors.add(:base, result.error)
     end
     result
+  end
+
+  def finder_structure_changed?(document, operation)
+    return true if operation.to_sym == :create
+
+    changed = document.previous_changes.keys.map(&:to_s)
+    (changed & %w[title parent_id content_type is_folder]).any?
   end
 end
