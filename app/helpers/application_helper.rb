@@ -22,7 +22,6 @@ module ApplicationHelper
       { window_key: "notes", pin_key: "notes", label: "Notes", icon: :edit_note },
       { window_key: "time-card", pin_key: "time-card", label: "Time Card", icon: :overview },
       { window_key: "calendar", pin_key: "calendar", label: "Calendar", icon: :calendar_month },
-      { window_key: "clock", pin_key: "clock", label: "Clock", icon: :timer },
       { window_key: "images", pin_key: "images", label: "Images", icon: :wallpaper },
       { window_key: "audio", pin_key: "audio", label: "Audio", icon: :graphic_eq }
     ].freeze

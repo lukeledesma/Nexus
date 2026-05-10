@@ -8,7 +8,6 @@ Rails.application.routes.draw do
     get "notes", to: "notes#show"
     get "time_card", to: "time_card#show"
     get "calendar", to: "calendar#show"
-    get "clock", to: "clock#show"
     get "images", to: "images#show"
     get "audio", to: "audio#show"
     get "wallpaper_iimage/files", to: "wallpaper_iimage#files"
