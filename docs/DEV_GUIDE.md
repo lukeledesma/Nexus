@@ -269,7 +269,19 @@ Does:
 - App path: configurable via `NEXUS_DEPLOY_APP`
 - Puma: systemd service `puma.service` with `RAILS_ENV=production`, `RAILS_MASTER_KEY`, `NEXUS_DATABASE_PASSWORD`
 - DB: PostgreSQL, user `nexus`, database `nexus_production`
-- Nginx: `/etc/nginx/sites-enabled/nexus` → proxies to `127.0.0.1:3000`
+- Nginx (active app vhost): `/etc/nginx/sites-enabled/nxs.tools` → proxies to `127.0.0.1:3000`
+
+### Production Realtime + Media Requirements
+- Action Cable route must be mounted at `/cable` in Rails routes.
+- Nginx must include a dedicated `/cable` location with websocket upgrade headers:
+  - `proxy_http_version 1.1`
+  - `proxy_set_header Upgrade $http_upgrade`
+  - `proxy_set_header Connection "Upgrade"`
+- Asset/image delivery should use nginx internal serving via `X-Accel-Redirect`:
+  - Rails `DocumentsController#asset_file` validates auth and returns `X-Accel-Redirect` in production.
+  - Nginx serves bytes from disk with an internal location `/assets-internal/` aliased to `/home/<user>/apps/nexus/storage/`.
+  - This avoids Puma thread blocking for image streaming and significantly improves wallpapers/images responsiveness.
+- If `/cable` appears down, confirm nginx and puma are both active and tail `journalctl -u puma` for `Successfully upgraded to WebSocket`.
 
 ### Credentials
 - `config/credentials.yml.enc` encrypted with `config/master.key`
@@ -326,5 +338,5 @@ Tests live in `test/`. Integration tests cover document import flows.
 ## 14. Known Technical Debt
 
 - DB user and database names should be managed via `NEXUS_DB_USER` / `NEXUS_DB_NAME`.
-- Nginx site config naming should follow `nexus` conventions.
+- Nginx vhost duplication should be consolidated to remove repeated warning noise about conflicting server names.
 - `test/integration/documents_import_test.rb` references old test patterns — review before expanding test suite.

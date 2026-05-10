@@ -217,6 +217,22 @@ Deploy guarantees:
 - Assets are clobbered then recompiled
 - If the app directory is missing, it is cloned from origin
 
+Post-deploy realtime/media checks:
+
+```bash
+ssh -i ~/.ssh/id_ed25519 user@your-server "systemctl is-active puma; systemctl is-active nginx; grep -n 'location /cable' /etc/nginx/sites-enabled/nxs.tools; grep -n 'location /assets-internal/' /etc/nginx/sites-enabled/nxs.tools"
+```
+
+```bash
+ssh -i ~/.ssh/id_ed25519 user@your-server "journalctl -u puma -n 120 --no-pager | grep -E 'WebSocket|UserSyncChannel|Successfully upgraded'"
+```
+
+Expected result:
+
+- Websocket lines include `Successfully upgraded to WebSocket`
+- Nginx config includes both `/cable` and `/assets-internal/`
+- Both services report `active`
+
 Verify live response:
 
 ```bash
@@ -227,3 +243,10 @@ If UI still appears stale after deploy:
 
 - Hard refresh browser
 - Or clear site data for nxs.tools
+
+If wallpapers/images are slow in production:
+
+- Verify Rails app commit is current on server (`git -C /home/<user>/apps/nexus rev-parse --short HEAD`)
+- Verify nginx has `location /assets-internal/` and reload nginx
+- Verify Puma restarted after code update to pick up `X-Accel-Redirect` response headers
+- Confirm files are under `/home/<user>/apps/nexus/storage/workspace/...` and readable by the deploy user
