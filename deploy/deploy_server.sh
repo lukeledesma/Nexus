@@ -129,7 +129,12 @@ cd $REMOTE_APP
 git config --global --add safe.directory $REMOTE_APP 2>/dev/null || true
 git fetch origin
 git reset --hard origin/$BRANCH
-$CLEAN_CMD
+if ! $CLEAN_CMD; then
+  echo "[server] Initial clean failed; retrying after clearing bootsnap cache"
+  rm -rf "$REMOTE_APP/tmp/cache/bootsnap" 2>/dev/null || true
+  rm -rf "$REMOTE_APP/tmp/cache" 2>/dev/null || true
+  $CLEAN_CMD
+fi
 EOF
 )
   FULL_CMD="$PULL_CMD
