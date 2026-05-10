@@ -106,9 +106,9 @@ if sudo nginx -t 2>/dev/null; then
   sudo systemctl reload nginx 2>/dev/null || true
 fi
 if systemctl is-active nginx >/dev/null 2>&1; then
-  NGINX_STATUS=$(systemctl is-active nginx)
+  NGINX_STATUS=\$(systemctl is-active nginx)
 elif sudo -n systemctl is-active nginx >/dev/null 2>&1; then
-  NGINX_STATUS=$(sudo -n systemctl is-active nginx)
+  NGINX_STATUS=\$(sudo -n systemctl is-active nginx)
 else
   NGINX_STATUS=unknown
 fi
