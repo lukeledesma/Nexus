@@ -28,6 +28,7 @@ class TimeCardDocumentCodec
       kind: NexusFileFormat::KIND_TIME_CARD,
       title: "Time Card",
       extra: {
+        "entry_date" => date_string(data["entryDate"], data["entry_date"]),
         "start_time" => time_string(data["clockInMinutes"], data["start_time"]),
         "end_time" => time_string(data["clockOutMinutes"], data["end_time"]),
         "running" => truthy?(data["running"]),
@@ -49,6 +50,7 @@ class TimeCardDocumentCodec
 
   def blank_state
     {
+      "entryDate" => nil,
       "clockInMinutes" => nil,
       "clockInAtMs" => nil,
       "clockOutAtMs" => nil,
@@ -93,6 +95,7 @@ class TimeCardDocumentCodec
 
   def state_from_meta(meta, notes)
     {
+      "entryDate" => parse_date(meta["entry_date"]),
       "clockInMinutes" => parse_time(meta["start_time"]),
       "clockInAtMs" => parse_integer(meta["clock_in_at_ms"]),
       "clockOutAtMs" => parse_integer(meta["clock_out_at_ms"]),
@@ -162,6 +165,15 @@ class TimeCardDocumentCodec
     v.to_i
   end
 
+  def parse_date(value)
+    v = value.to_s.strip
+    return nil unless v.match?(/\A\d{4}-\d{2}-\d{2}\z/)
+
+    Date.iso8601(v).iso8601
+  rescue ArgumentError
+    nil
+  end
+
   def parse_boolean(value)
     value.to_s.strip.casecmp?("true")
   end
@@ -177,6 +189,15 @@ class TimeCardDocumentCodec
   def integer_string(primary, fallback)
     value = primary.presence || fallback
     value.to_s.match?(/\A\d+\z/) ? value.to_s : ""
+  end
+
+  def date_string(primary, fallback)
+    [ primary, fallback ].each do |value|
+      normalized = parse_date(value)
+      return normalized if normalized.present?
+    end
+
+    ""
   end
 
   def truthy?(value)

@@ -5,6 +5,7 @@ module Apps
     def show
       @linked_document_id = nil
       @initial_state = {
+        entryDate: Date.current.iso8601,
         clockInMinutes: nil,
         clockInAtMs: nil,
         clockOutAtMs: nil,

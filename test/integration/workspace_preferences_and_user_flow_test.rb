@@ -36,6 +36,29 @@ class WorkspacePreferencesAndUserFlowTest < ActionDispatch::IntegrationTest
     assert_match(/gradient wallpaper is no longer supported/i, response.parsed_body.fetch("error"))
   end
 
+  test "workspace preferences show does not clear wallpaper when referenced doc is missing" do
+    manager = WorkspacePreferences::Manager.new(user: @user)
+    manager.payload
+    state_file = manager.send(:workspace_state_file)
+
+    File.write(state_file, JSON.pretty_generate({
+      active_theme_id: "default",
+      wallpaper_background_kind: "image",
+      wallpaper_image_document_id: 999_999
+    }) + "\n")
+
+    get workspace_preferences_path, as: :json
+
+    assert_response :success
+    body = response.parsed_body
+    assert_equal "image", body.fetch("wallpaper_background_kind")
+    assert_equal 999_999, body.fetch("wallpaper_image_document_id")
+
+    stored = JSON.parse(File.read(state_file))
+    assert_equal "image", stored.fetch("wallpaper_background_kind")
+    assert_equal 999_999, stored.fetch("wallpaper_image_document_id")
+  end
+
   test "update username rejects wrong current password" do
     patch apps_user_username_path,
       params: { username: "renamed_user", current_password: "wrong", frame_id: "user-pane" },

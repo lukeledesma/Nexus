@@ -7,6 +7,7 @@ import {
 
 const STORAGE_KEY = "nexus.workTimer.v1"
 const HOUR_MS = 3600000
+const ENTRY_DATE_WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]
 
 function pad2(n) {
   return String(n).padStart(2, "0")
@@ -486,11 +487,13 @@ function serializeTimeCardDocument(state) {
   const endTime = Number.isInteger(state.clockOutMinutes) ? minutesToTimeString(state.clockOutMinutes) : ""
   const clockInAtMs = Number.isFinite(Number(state.clockInAtMs)) && Number(state.clockInAtMs) > 0 ? String(Number(state.clockInAtMs)) : ""
   const clockOutAtMs = Number.isFinite(Number(state.clockOutAtMs)) && Number(state.clockOutAtMs) > 0 ? String(Number(state.clockOutAtMs)) : ""
+  const entryDate = normalizeEntryDate(state.entryDate, "")
 
   return [
     "# NEXUS_FILE v1",
     "# kind: time_card",
     "# title: Time Card",
+    `# entry_date: ${entryDate}`,
     `# start_time: ${startTime}`,
     `# end_time: ${endTime}`,
     `# running: ${state.running === true}`,
@@ -503,6 +506,7 @@ function serializeTimeCardDocument(state) {
 
 function buildDefaultState() {
   return {
+    entryDate: todayIsoDateString(),
     clockInMinutes: null,
     clockInAtMs: null,
     clockOutAtMs: null,
@@ -514,6 +518,7 @@ function buildDefaultState() {
 
 function normalizeState(raw, fallbackClockIn = null, defaultRunning = false) {
   const base = {
+    entryDate: todayIsoDateString(),
     clockInMinutes: fallbackClockIn,
     clockInAtMs: defaultRunning && fallbackClockIn != null ? Date.now() : null,
     clockOutAtMs: null,
@@ -534,8 +539,10 @@ function normalizeState(raw, fallbackClockIn = null, defaultRunning = false) {
   const clockOutMinutes = Number.isInteger(parsed?.clockOutMinutes) ? parsed.clockOutMinutes : null
   const running = clockInMinutes == null ? false : parsed?.running === false ? false : Boolean(parsed?.running ?? base.running)
   const notesText = normalizeTrailingTimeCardNotesNewlines(parsed?.notesText ?? base.notesText)
+  const entryDate = normalizeEntryDate(parsed?.entryDate, base.entryDate)
 
   return {
+    entryDate,
     clockInMinutes,
     clockInAtMs,
     clockOutAtMs,
@@ -586,7 +593,12 @@ export default class extends Controller {
     "notesInput",
     "notesBackdrop",
     "serializedContent",
-    "timelineBar"
+    "timelineBar",
+    "dateBadge",
+    "datePopover",
+    "datePopoverMonthLabel",
+    "datePopoverWeekdays",
+    "datePopoverGrid"
   ]
 
   static values = {
@@ -596,11 +608,16 @@ export default class extends Controller {
 
   connect() {
     this.boundChromeClearRequest = this.handleChromeClearRequest.bind(this)
+    this.boundChromeDatePickerRequest = this.handleChromeDatePickerRequest.bind(this)
     this.boundBeforeSavePicker = this.handleBeforeSavePicker.bind(this)
-    this.boundResize = () => {
+    this.boundDocumentPointerDown = this.handleDocumentPointerDown.bind(this)
+    this.boundDocumentKeydown = this.handleDocumentKeydown.bind(this)
+    this.boundDatePopoverClick = this.handleDatePopoverClick.bind(this)
+    this.boundViewportChange = () => {
       if (!this.hasNotesInputTarget) return
       this.renderBackdrop(this.notesInputTarget.value)
       this.renderTimeline()
+      this.positionDatePopover()
     }
     this.boundNotesScroll = () => this.syncBackdropScroll()
     this.boundBackdropScroll = () => {
@@ -608,14 +625,26 @@ export default class extends Controller {
       if (this.notesBackdropTarget.scrollLeft !== 0) this.notesBackdropTarget.scrollLeft = 0
     }
     window.addEventListener("nexus:time-card-clear-request", this.boundChromeClearRequest)
+    window.addEventListener("nexus:time-card-open-date-picker", this.boundChromeDatePickerRequest)
     window.addEventListener(LINKED_APP_BEFORE_SAVE_PICKER, this.boundBeforeSavePicker)
-    window.addEventListener("resize", this.boundResize)
+    window.addEventListener("resize", this.boundViewportChange)
+    window.addEventListener("scroll", this.boundViewportChange, true)
     this.backdropSyncFrame = null
     this.chromeHoursTicker = null
     this.currentHighlightedRangeId = null
+    this.datePopoverOpen = false
+    this.visibleEntryDateMonth = isoDateMonthString(todayIsoDateString())
+    this.datePopoverPlaceholder = null
+    this.datePopoverElement = this.hasDatePopoverTarget ? this.datePopoverTarget : null
+    this.datePopoverMonthLabelElement = this.hasDatePopoverMonthLabelTarget ? this.datePopoverMonthLabelTarget : null
+    this.datePopoverWeekdaysElement = this.hasDatePopoverWeekdaysTarget ? this.datePopoverWeekdaysTarget : null
+    this.datePopoverGridElement = this.hasDatePopoverGridTarget ? this.datePopoverGridTarget : null
     this.state = this.isLinkedDocumentMode()
       ? normalizeState(this.initialStateValue, null, false)
       : this.loadState()
+
+    this.mountDatePopoverToBody()
+    this.datePopoverElement?.addEventListener("click", this.boundDatePopoverClick)
 
     this.setupRangeHoverDelegation()
     this.renderAll()
@@ -630,8 +659,12 @@ export default class extends Controller {
   disconnect() {
     this.stopChromeHoursTicker()
     window.removeEventListener("nexus:time-card-clear-request", this.boundChromeClearRequest)
+    window.removeEventListener("nexus:time-card-open-date-picker", this.boundChromeDatePickerRequest)
     window.removeEventListener(LINKED_APP_BEFORE_SAVE_PICKER, this.boundBeforeSavePicker)
-    window.removeEventListener("resize", this.boundResize)
+    window.removeEventListener("resize", this.boundViewportChange)
+    window.removeEventListener("scroll", this.boundViewportChange, true)
+    document.removeEventListener("pointerdown", this.boundDocumentPointerDown, true)
+    document.removeEventListener("keydown", this.boundDocumentKeydown, true)
     this.element?.removeEventListener("mouseenter", this.boundRangeMouseEnter, true)
     this.element?.removeEventListener("mouseleave", this.boundRangeMouseLeave, true)
     if (this.backdropSyncFrame) {
@@ -644,6 +677,8 @@ export default class extends Controller {
     if (this.hasNotesBackdropTarget) {
       this.notesBackdropTarget.removeEventListener("scroll", this.boundBackdropScroll)
     }
+    this.datePopoverElement?.removeEventListener("click", this.boundDatePopoverClick)
+    this.unmountDatePopoverFromBody()
   }
 
   setupRangeHoverDelegation() {
@@ -699,6 +734,34 @@ export default class extends Controller {
     this.renderBackdrop(text)
     this.renderTimeline()
     this.updateChromeHoursBadge()
+  }
+
+  updateEntryDate(eventOrValue) {
+    const proposedValue = typeof eventOrValue === "string"
+      ? eventOrValue
+      : eventOrValue?.target?.value
+    const next = normalizeEntryDate(proposedValue, this.state.entryDate)
+    if (next === this.state.entryDate) {
+      this.renderEntryDate()
+      return
+    }
+    this.state.entryDate = next
+    this.saveState()
+    this.renderEntryDate()
+    this.requestDocumentAutosave()
+    this.closeDatePopover()
+  }
+
+  showPreviousEntryDateMonth(event) {
+    if (event) event.preventDefault()
+    this.visibleEntryDateMonth = shiftIsoMonth(this.visibleEntryDateMonth, -1)
+    this.renderDatePopoverCalendar()
+  }
+
+  showNextEntryDateMonth(event) {
+    if (event) event.preventDefault()
+    this.visibleEntryDateMonth = shiftIsoMonth(this.visibleEntryDateMonth, 1)
+    this.renderDatePopoverCalendar()
   }
 
   handleNotesKeydown(event) {
@@ -902,9 +965,28 @@ export default class extends Controller {
       this.notesInputTarget.value = this.state.notesText
     }
     this.updateSerializedContent()
+    this.renderEntryDate()
     this.renderBackdrop(this.state.notesText)
     this.renderTimeline()
     this.updateChromeHoursBadge()
+  }
+
+  renderEntryDate() {
+    const normalized = normalizeEntryDate(this.state.entryDate, todayIsoDateString())
+    this.state.entryDate = normalized
+    this.visibleEntryDateMonth = isoDateMonthString(normalized)
+
+    if (!this.hasDateBadgeTarget) return
+
+    const labelDate = new Date(`${normalized}T00:00:00`)
+    const validDate = Number.isFinite(labelDate.getTime()) ? labelDate : new Date()
+    const label = validDate.toLocaleDateString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric"
+    })
+    this.dateBadgeTarget.textContent = `Entry date: ${label}`
   }
 
   updateChromeHoursBadge() {
@@ -948,6 +1030,164 @@ export default class extends Controller {
     this.clearSessionData()
   }
 
+  handleChromeDatePickerRequest(event) {
+    const requestedFrameId = event.detail?.frameId
+    if (requestedFrameId && requestedFrameId !== this.currentFrameId()) return
+    this.toggleDatePopover()
+  }
+
+  toggleDatePopover() {
+    if (this.datePopoverOpen) {
+      this.closeDatePopover()
+      return
+    }
+    this.openDatePopover()
+  }
+
+  openDatePopover() {
+    if (!this.datePopoverElement) return
+    this.mountDatePopoverToBody()
+    this.visibleEntryDateMonth = isoDateMonthString(this.state.entryDate)
+    this.datePopoverOpen = true
+    this.datePopoverElement.hidden = false
+    this.renderDatePopoverCalendar()
+    this.positionDatePopover()
+    document.addEventListener("pointerdown", this.boundDocumentPointerDown, true)
+    document.addEventListener("keydown", this.boundDocumentKeydown, true)
+  }
+
+  closeDatePopover() {
+    if (!this.datePopoverElement) return
+    this.datePopoverOpen = false
+    this.datePopoverElement.hidden = true
+    document.removeEventListener("pointerdown", this.boundDocumentPointerDown, true)
+    document.removeEventListener("keydown", this.boundDocumentKeydown, true)
+  }
+
+  mountDatePopoverToBody() {
+    if (!this.datePopoverElement) return
+    if (this.datePopoverElement.parentElement === document.body) return
+    if (!this.datePopoverPlaceholder) {
+      this.datePopoverPlaceholder = document.createComment("time-card-date-popover")
+    }
+    this.datePopoverElement.parentNode?.insertBefore(this.datePopoverPlaceholder, this.datePopoverElement)
+    document.body.appendChild(this.datePopoverElement)
+  }
+
+  unmountDatePopoverFromBody() {
+    if (!this.datePopoverElement) return
+    if (!this.datePopoverPlaceholder?.parentNode) return
+    this.datePopoverPlaceholder.parentNode.insertBefore(this.datePopoverElement, this.datePopoverPlaceholder)
+    this.datePopoverPlaceholder.parentNode.removeChild(this.datePopoverPlaceholder)
+    this.datePopoverPlaceholder = null
+  }
+
+  handleDocumentPointerDown(event) {
+    if (!this.datePopoverOpen) return
+    const target = event.target
+    if (!(target instanceof Element)) return
+    if (target.closest(".time-card-date-popover")) return
+    const trigger = this.timeCardDateTriggerButton()
+    if (trigger && (target === trigger || trigger.contains(target))) return
+    this.closeDatePopover()
+  }
+
+  handleDocumentKeydown(event) {
+    if (!this.datePopoverOpen) return
+    if (event.key !== "Escape") return
+    event.preventDefault()
+    this.closeDatePopover()
+  }
+
+  handleDatePopoverClick(event) {
+    const target = event.target instanceof Element ? event.target.closest("button") : null
+    if (!target) return
+
+    if (target.classList.contains("time-card-date-popover__nav-prev")) {
+      event.preventDefault()
+      this.showPreviousEntryDateMonth()
+      return
+    }
+
+    if (target.classList.contains("time-card-date-popover__nav-next")) {
+      event.preventDefault()
+      this.showNextEntryDateMonth()
+      return
+    }
+
+    const nextDate = target.dataset.entryDate
+    if (nextDate) {
+      event.preventDefault()
+      this.updateEntryDate(nextDate)
+    }
+  }
+
+  renderDatePopoverCalendar() {
+    if (!this.datePopoverElement || !this.datePopoverGridElement || !this.datePopoverMonthLabelElement) return
+
+    const selected = datePartsFromIso(this.state.entryDate)
+    const visibleMonth = parseIsoMonth(this.visibleEntryDateMonth)
+    if (!visibleMonth) return
+
+    const today = datePartsFromIso(todayIsoDateString())
+    const weeks = buildCalendarWeeks(visibleMonth.year, visibleMonth.month)
+
+    this.datePopoverMonthLabelElement.textContent = formatMonthLabel(visibleMonth.year, visibleMonth.month)
+    if (this.datePopoverWeekdaysElement) {
+      this.datePopoverWeekdaysElement.innerHTML = ENTRY_DATE_WEEKDAYS
+        .map((label) => `<span class="time-card-date-popover__weekday">${escapeHtml(label)}</span>`)
+        .join("")
+    }
+    this.datePopoverGridElement.innerHTML = weeks.map((week) => week.map((cell) => {
+      const iso = isoDateFromParts(cell.year, cell.month, cell.day)
+      const classes = ["time-card-date-popover__day"]
+      if (!cell.inCurrentMonth) classes.push("is-outside-month")
+      if (selected && iso === isoDateFromParts(selected.year, selected.month, selected.day)) classes.push("is-selected")
+      if (today && iso === isoDateFromParts(today.year, today.month, today.day)) classes.push("is-today")
+      return `<button type="button" class="${classes.join(" ")}" data-entry-date="${iso}" data-action="click->time-card#selectEntryDateFromCalendar">${cell.day}</button>`
+    }).join("")).join("")
+  }
+
+  selectEntryDateFromCalendar(event) {
+    event.preventDefault()
+    const next = event.currentTarget?.dataset?.entryDate
+    if (!next) return
+    this.updateEntryDate(next)
+  }
+
+  positionDatePopover() {
+    if (!this.datePopoverOpen || !this.datePopoverElement) return
+    const trigger = this.timeCardDateTriggerButton()
+    if (!trigger) return
+
+    const triggerRect = trigger.getBoundingClientRect()
+    const popover = this.datePopoverElement
+    popover.style.left = "0px"
+    popover.style.top = "0px"
+
+    const popoverRect = popover.getBoundingClientRect()
+    const gap = 8
+    const viewportPadding = 12
+    let left = triggerRect.left + (triggerRect.width / 2) - (popoverRect.width / 2)
+    let top = triggerRect.bottom + gap
+    const maxLeft = window.innerWidth - popoverRect.width - viewportPadding
+    left = Math.min(Math.max(viewportPadding, left), Math.max(viewportPadding, maxLeft))
+
+    const maxTop = window.innerHeight - popoverRect.height - viewportPadding
+    if (top > maxTop) {
+      top = Math.max(viewportPadding, triggerRect.top - popoverRect.height - gap)
+    }
+
+    popover.style.left = `${Math.round(left)}px`
+    popover.style.top = `${Math.round(top)}px`
+  }
+
+  timeCardDateTriggerButton() {
+    const windowShell = this.element.closest("section.content-window")
+    if (!windowShell) return null
+    return windowShell.querySelector(".content-window-time-card-date")
+  }
+
   currentFrameId() {
     const frame = this.element.closest("turbo-frame")
     return frame?.id || "time-card-pane"
@@ -987,4 +1227,94 @@ export default class extends Controller {
     this.requestDocumentAutosave()
   }
 
+}
+
+function todayIsoDateString() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, "0")
+  const day = String(now.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+function isoDateMonthString(value) {
+  const normalized = normalizeEntryDate(value, todayIsoDateString())
+  return normalized.slice(0, 7)
+}
+
+function parseIsoMonth(value) {
+  const raw = String(value || "").trim()
+  const match = /^(\d{4})-(\d{2})$/.exec(raw)
+  if (!match) return null
+  const year = Number.parseInt(match[1], 10)
+  const month = Number.parseInt(match[2], 10)
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) return null
+  return { year, month }
+}
+
+function shiftIsoMonth(isoMonth, delta) {
+  const parsed = parseIsoMonth(isoMonth) || parseIsoMonth(isoDateMonthString(todayIsoDateString()))
+  const shifted = new Date(parsed.year, parsed.month - 1 + delta, 1)
+  return `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, "0")}`
+}
+
+function datePartsFromIso(value) {
+  const normalized = normalizeEntryDate(value, "")
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(normalized)
+  if (!match) return null
+  return {
+    year: Number.parseInt(match[1], 10),
+    month: Number.parseInt(match[2], 10),
+    day: Number.parseInt(match[3], 10)
+  }
+}
+
+function isoDateFromParts(year, month, day) {
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+}
+
+function buildCalendarWeeks(year, month) {
+  const first = new Date(year, month - 1, 1)
+  const firstWeekday = first.getDay()
+  const start = new Date(year, month - 1, 1 - firstWeekday)
+  const weeks = []
+
+  for (let weekIndex = 0; weekIndex < 6; weekIndex += 1) {
+    const week = []
+    for (let dayIndex = 0; dayIndex < 7; dayIndex += 1) {
+      const cell = new Date(start)
+      cell.setDate(start.getDate() + weekIndex * 7 + dayIndex)
+      week.push({
+        year: cell.getFullYear(),
+        month: cell.getMonth() + 1,
+        day: cell.getDate(),
+        inCurrentMonth: cell.getMonth() === month - 1
+      })
+    }
+    weeks.push(week)
+  }
+
+  return weeks
+}
+
+function formatMonthLabel(year, month) {
+  const date = new Date(year, month - 1, 1)
+  return date.toLocaleDateString(undefined, { month: "long", year: "numeric" })
+}
+
+function normalizeEntryDate(value, fallback = todayIsoDateString()) {
+  const raw = String(value || "").trim()
+  const fallbackRaw = String(fallback || "").trim()
+  const candidate = raw || fallbackRaw || todayIsoDateString()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(candidate)) return todayIsoDateString()
+
+  const [year, month, day] = candidate.split("-").map((n) => Number.parseInt(n, 10))
+  const parsed = new Date(year, month - 1, day)
+  if (!Number.isFinite(parsed.getTime())) return todayIsoDateString()
+  if (
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day
+  ) return todayIsoDateString()
+  return candidate
 }

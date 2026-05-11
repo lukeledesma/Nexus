@@ -2640,9 +2640,21 @@ export default class extends Controller {
 
   emitTimeCardClearRequest(event) {
     if (event) event.preventDefault()
-    if (this.appKeyValue !== "time-card") return
+    const isTimeCardWindow =
+      this.appKeyValue === "time-card" || this.appKeyValue.startsWith("time-card-spawn-")
+    if (!isTimeCardWindow) return
     if (!window.confirm("Clear all time card data? This cannot be undone.")) return
     window.dispatchEvent(new CustomEvent("nexus:time-card-clear-request", {
+      detail: { frameId: this.frameIdValue }
+    }))
+  }
+
+  emitTimeCardDatePickerRequest(event) {
+    if (event) event.preventDefault()
+    const isTimeCardWindow =
+      this.appKeyValue === "time-card" || this.appKeyValue.startsWith("time-card-spawn-")
+    if (!isTimeCardWindow) return
+    window.dispatchEvent(new CustomEvent("nexus:time-card-open-date-picker", {
       detail: { frameId: this.frameIdValue }
     }))
   }

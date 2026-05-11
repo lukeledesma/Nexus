@@ -51,6 +51,7 @@ class EmbeddedDraftDocument
         draft.tasks = []
         draft.content = TimeCardDocumentCodec.dump(
           {
+            entryDate: Date.current.iso8601,
             clockInMinutes: nil,
             clockInAtMs: nil,
             clockOutAtMs: nil,
@@ -122,6 +123,7 @@ class EmbeddedDraftDocument
         attrs[:tasks] = []
         attrs[:content] = TimeCardDocumentCodec.dump(
           {
+            entryDate: Date.current.iso8601,
             clockInMinutes: nil,
             clockInAtMs: nil,
             clockOutAtMs: nil,

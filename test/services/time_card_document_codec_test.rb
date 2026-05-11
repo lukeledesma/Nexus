@@ -37,6 +37,7 @@ class TimeCardDocumentCodecTest < ActiveSupport::TestCase
   test "dumps unified nexus format and round trips" do
     encoded = TimeCardDocumentCodec.dump(
       {
+        entryDate: "2026-05-11",
         clockInMinutes: 22 * 60 + 30,
         clockOutMinutes: 23 * 60,
         running: false,
@@ -46,10 +47,12 @@ class TimeCardDocumentCodecTest < ActiveSupport::TestCase
 
     assert_includes encoded, "# NEXUS_FILE v1"
     assert_includes encoded, "# kind: time_card"
+    assert_includes encoded, "# entry_date: 2026-05-11"
     assert_includes encoded, "# start_time: 22:30"
     assert_includes encoded, "# end_time: 23:00"
 
     parsed = TimeCardDocumentCodec.load(encoded)
+    assert_equal "2026-05-11", parsed["entryDate"]
     assert_equal 22 * 60 + 30, parsed["clockInMinutes"]
     assert_equal 23 * 60, parsed["clockOutMinutes"]
     assert_equal false, parsed["running"]

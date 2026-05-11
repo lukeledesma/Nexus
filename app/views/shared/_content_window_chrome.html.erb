@@ -7,6 +7,7 @@
 <% show_calendar_new_event = local_assigns.fetch(:show_calendar_new_event, false) %>
 <% show_set_wallpaper = local_assigns.fetch(:show_set_wallpaper, false) %>
 <% show_time_card_clear = local_assigns.fetch(:show_time_card_clear, false) %>
+<% show_time_card_pick_date = local_assigns.fetch(:show_time_card_pick_date, false) %>
 <% chrome_toolbar = show_finder_new_folder || show_task_list_add || linked_app_save_flow %>
 <header class="content-window-chrome<%= " content-window-chrome--with-save" if show_save %><%= " content-window-chrome--with-open-file" if open_file_badge %><%= " content-window-chrome--with-finder-toolbar" if chrome_toolbar %>">
   <% if open_file_badge %>
@@ -41,6 +42,15 @@
             aria-label="Set as wallpaper"
             title="Set as wallpaper"
           ><%= material_symbol_icon(:desktop_windows, size: :sm) %></button>
+        <% end %>
+        <% if show_time_card_pick_date %>
+          <button
+            type="button"
+            class="content-window-new-folder-btn settings-themes-item-action-btn theme-builder-save-btn content-window-time-card-date"
+            data-action="click->content-window#emitTimeCardDatePickerRequest"
+            title="Pick date"
+            aria-label="Pick date"
+          ><%= material_symbol_icon(:calendar_month, size: :sm) %></button>
         <% end %>
         <% if show_open %>
           <button
