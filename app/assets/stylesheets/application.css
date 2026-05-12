@@ -467,6 +467,45 @@
   overflow: hidden;
 }
 
+.calendar-app__month-cell.has-time-card .calendar-app__month-day {
+  padding-right: 1.05rem;
+}
+
+.calendar-app__time-card-marker {
+  position: absolute;
+  z-index: 6;
+  top: 0.18rem;
+  left: 0.22rem;
+  width: 1rem;
+  height: 1rem;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 0.22rem;
+}
+
+.calendar-app__time-card-marker:hover,
+.calendar-app__time-card-marker:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  outline: none;
+}
+
+.calendar-app__time-card-marker:active {
+  transform: scale(0.95);
+}
+
+.calendar-app__time-card-marker-icon {
+  width: 0.68rem;
+  height: 0.68rem;
+  display: block;
+}
+
 .calendar-app__month-cell.is-selected {
   background: rgba(59, 130, 246, 0.12);
 }
@@ -654,6 +693,14 @@
   padding: 0.28rem 0.35rem;
 }
 
+.calendar-app__time-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  width: 100%;
+}
+
 .calendar-app__week-day-time > header {
   cursor: pointer;
 }
@@ -664,6 +711,28 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
+}
+
+.calendar-app__time-card-marker--week,
+.calendar-app__time-card-marker--day {
+  top: 0.28rem;
+  left: 0.28rem;
+}
+
+.calendar-app__time-card-marker--month {
+  left: auto;
+  right: 0.2rem;
+}
+
+.calendar-app__time-card-marker--week-header,
+.calendar-app__time-card-marker--day-header {
+  position: static;
+  top: auto;
+  left: auto;
+  right: auto;
+  margin-left: auto;
+  width: 0.95rem;
+  height: 0.95rem;
 }
 
 .calendar-app__hour-grid {

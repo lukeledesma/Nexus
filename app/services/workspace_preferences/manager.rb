@@ -206,17 +206,7 @@ module WorkspacePreferences
 
     # Kept for WorkspaceThemeBoot compatibility and read-time state repair.
     def sync_state_wallpaper_from_theme!(themes, state, _theme, user: @user)
-      before_wp = wallpaper_state_slice(state)
-      if state["wallpaper_background_kind"].to_s == "image"
-        doc = Document.find_by(id: state["wallpaper_image_document_id"].to_i)
-        return [ wallpaper_state_slice(state) != before_wp, false ] if doc.nil?
-
-        valid = @user && user&.id == @user.id ? wallpaper_doc_eligible_for_user?(doc) :
-          doc&.file? && doc.content_type.to_s == "asset" && EmbeddedIimageFolder.eligible_asset?(doc) &&
-            (doc.parent_id == EmbeddedIimageFolder.document_for(user)&.id || ::DocumentPolicy.new(user: user, document: doc).in_finder_section?)
-        clear_wallpaper_picks!(state) unless valid
-      end
-      [ wallpaper_state_slice(state) != before_wp, false ]
+      [ false, false ]
     end
 
     private

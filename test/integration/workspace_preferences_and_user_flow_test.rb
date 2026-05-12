@@ -59,6 +59,38 @@ class WorkspacePreferencesAndUserFlowTest < ActionDispatch::IntegrationTest
     assert_equal 999_999, stored.fetch("wallpaper_image_document_id")
   end
 
+  test "workspace preferences show does not clear wallpaper when referenced doc is ineligible" do
+    manager = WorkspacePreferences::Manager.new(user: @user)
+    manager.payload
+    state_file = manager.send(:workspace_state_file)
+
+    workspace_root = Apps::FinderController.workspace_root_folder(@user)
+    ineligible = Document.create!(
+      parent: workspace_root,
+      is_folder: false,
+      title: "Ineligible Note",
+      content_type: "note",
+      content: "x"
+    )
+
+    File.write(state_file, JSON.pretty_generate({
+      active_theme_id: "default",
+      wallpaper_background_kind: "image",
+      wallpaper_image_document_id: ineligible.id
+    }) + "\n")
+
+    get workspace_preferences_path, as: :json
+
+    assert_response :success
+    body = response.parsed_body
+    assert_equal "image", body.fetch("wallpaper_background_kind")
+    assert_equal ineligible.id, body.fetch("wallpaper_image_document_id")
+
+    stored = JSON.parse(File.read(state_file))
+    assert_equal "image", stored.fetch("wallpaper_background_kind")
+    assert_equal ineligible.id, stored.fetch("wallpaper_image_document_id")
+  end
+
   test "update username rejects wrong current password" do
     patch apps_user_username_path,
       params: { username: "renamed_user", current_password: "wrong", frame_id: "user-pane" },

@@ -22,6 +22,7 @@ Rails.application.routes.draw do
     post "calendar/save_events", to: "calendar#save_events"
     get "calendar/draft_file", to: "calendar#draft_file"
     get "calendar/last_saved", to: "calendar#last_saved"
+    get "time_card/files_by_date", to: "time_card#files_by_date"
   end
 
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
