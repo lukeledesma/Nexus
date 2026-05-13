@@ -2,8 +2,6 @@
 
 module Apps
   class AudioController < BaseController
-    AUDIO_EXTENSIONS = %w[.wav .aif .aiff .mp3 .m4a .flac .ogg].freeze
-
     def show
       @linked_document_id = nil
       @linked_document_display_title = nil
@@ -21,7 +19,7 @@ module Apps
           @linked_document_display_title = helpers.finder_document_display_title(doc.title.to_s)
         end
       end
-      render layout: false if turbo_frame_request?
+      render_with_turbo_support layout: false
     end
 
     private
@@ -32,7 +30,7 @@ module Apps
       else
         File.extname(doc.title.to_s).downcase
       end
-      AUDIO_EXTENSIONS.include?(ext)
+      Document::AUDIO_EXTENSIONS.include?(ext)
     end
   end
 end

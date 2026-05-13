@@ -92,7 +92,7 @@ module Documents
     end
 
     def allowed_wallpaper_upload?(uploaded, ext)
-      return false unless %w[.jpg .jpeg .png].include?(ext)
+      return false unless Document::WALLPAPER_IMAGE_EXTENSIONS.include?(ext)
 
       mime = Marcel::MimeType.for(Pathname.new(uploaded.tempfile.path))
       %w[image/jpeg image/png].include?(mime)

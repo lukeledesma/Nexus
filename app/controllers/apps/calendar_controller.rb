@@ -5,7 +5,7 @@ module Apps
     skip_before_action :sync_from_disk, only: %i[save_events draft_file last_saved]
 
     def show
-      render layout: false if turbo_frame_request?
+      render_with_turbo_support layout: false
     end
 
     # POST /apps/calendar/save_events

@@ -60,4 +60,13 @@ class UserSyncChannel < ApplicationCable::Channel
       updated_at: Time.current.iso8601
     })
   end
+
+  def self.broadcast_wallpaper_change(user:, wallpaper_background_kind:, wallpaper_image_document_id:)
+    broadcast_to(user, {
+      type: "wallpaper_changed",
+      wallpaper_background_kind: wallpaper_background_kind,
+      wallpaper_image_document_id: wallpaper_image_document_id,
+      updated_at: Time.current.iso8601
+    })
+  end
 end

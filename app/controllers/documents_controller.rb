@@ -148,7 +148,10 @@ class DocumentsController < ApplicationController
 
     result = persist_document(@document, operation: :update)
     if result.success?
-      if @document.content_type == "note"
+      # Broadcast changes to all user sessions for real-time sync
+      case @document.content_type
+      when "note"
+        # Time card and regular notes both use "note" content type
         UserSyncChannel.broadcast_document_change(
           user: current_user,
           document_id: @document.id,
@@ -156,9 +159,7 @@ class DocumentsController < ApplicationController
           content: @document.content.to_s,
           updated_at: @document.updated_at.utc.iso8601
         )
-      end
-
-      if @document.content_type == "task_list"
+      when "task_list"
         normalized_tasks = normalize_tasks_for_broadcast(@document.tasks)
         UserSyncChannel.broadcast_task_list_change(
           user: current_user,
@@ -171,6 +172,11 @@ class DocumentsController < ApplicationController
           document_id: @document.id,
           content_type: @document.content_type,
           tasks: normalized_tasks,
+          updated_at: @document.updated_at.utc.iso8601
+        )
+      when "calendar_events"
+        UserSyncChannel.broadcast_calendar_change(
+          user: current_user,
           updated_at: @document.updated_at.utc.iso8601
         )
       end

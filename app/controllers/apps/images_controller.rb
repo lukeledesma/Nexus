@@ -4,8 +4,6 @@ module Apps
   class ImagesController < BaseController
     skip_before_action :sync_from_disk
 
-    IMAGE_EXTENSIONS = %w[.jpg .jpeg .png .gif .webp .bmp .tif .tiff .svg .heic .heif .avif].freeze
-
     def show
       @linked_document_id = nil
       @linked_document_display_title = nil
@@ -21,7 +19,7 @@ module Apps
           @linked_document_display_title = helpers.finder_document_display_title(doc.title.to_s)
         end
       end
-      render layout: false if turbo_frame_request?
+      render_with_turbo_support layout: false
     end
 
     private
@@ -32,7 +30,7 @@ module Apps
       else
         File.extname(doc.title.to_s).downcase
       end
-      IMAGE_EXTENSIONS.include?(ext)
+      Document::IMAGE_EXTENSIONS.include?(ext)
     end
   end
 end

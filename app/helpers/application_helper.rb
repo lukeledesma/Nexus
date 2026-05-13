@@ -2,9 +2,6 @@ module ApplicationHelper
   include NexusUiHelper
   include MaterialIconsHelper
 
-  IMAGE_ASSET_EXTENSIONS = %w[.jpg .jpeg .png .gif .webp .bmp .tif .tiff .svg .heic .heif .avif].freeze
-  AUDIO_ASSET_EXTENSIONS = %w[.wav .aif .aiff .mp3 .m4a .flac .ogg].freeze
-
   # Wraps turbo-frame in .window-content plus the “not enough space” resize overlay (content-window controller).
   # +linked_app_save_picker:+ when true, stacks an iframe layer for Finder so the app turbo-frame is not replaced.
   def content_window_shell(linked_app_save_picker: false, &block)
@@ -37,8 +34,8 @@ module ApplicationHelper
 
   def finder_asset_file_kind_from_extension(extension)
     ext = extension.to_s.downcase
-    return "image" if IMAGE_ASSET_EXTENSIONS.include?(ext)
-    return "audio" if AUDIO_ASSET_EXTENSIONS.include?(ext)
+    return "image" if Document::IMAGE_EXTENSIONS.include?(ext)
+    return "audio" if Document::AUDIO_EXTENSIONS.include?(ext)
 
     "other"
   end

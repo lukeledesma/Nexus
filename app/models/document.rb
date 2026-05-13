@@ -8,6 +8,11 @@ class Document < ApplicationRecord
 
   # Binary/media files on disk (bytes are not stored in `content`; sync reads/writes the file at storage_path).
   ASSET_FILE_EXTENSIONS = %w[.wav .aif .aiff .mp3 .m4a .flac .ogg .jpg .jpeg .png .gif .webp .bmp .tif .tiff .heic .heif .avif].freeze
+  
+  # Specialized subsets of asset extensions for type-specific validation
+  IMAGE_EXTENSIONS = %w[.jpg .jpeg .png .gif .webp .bmp .tif .tiff .svg .heic .heif .avif].freeze
+  AUDIO_EXTENSIONS = %w[.wav .aif .aiff .mp3 .m4a .flac .ogg].freeze
+  WALLPAPER_IMAGE_EXTENSIONS = %w[.jpg .jpeg .png].freeze
 
   # One-shot payload for creating a new asset from uploaded bytes (cleared by DocumentStorageSyncLite after write).
   attr_accessor :pending_asset_bytes, :pending_disk_extension

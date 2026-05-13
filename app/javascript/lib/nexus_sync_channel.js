@@ -35,6 +35,8 @@ function handleMessage(data) {
     handleDocumentChanged(data)
   } else if (data.type === "finder_changed") {
     handleFinderChanged(data)
+  } else if (data.type === "wallpaper_changed") {
+    handleWallpaperChanged(data)
   }
 }
 
@@ -88,6 +90,12 @@ function handleDocumentChanged({ document_id, content_type, content, tasks, upda
 function handleFinderChanged({ section_key }) {
   window.dispatchEvent(new CustomEvent("nexus:finder-structure-changed", {
     detail: { sectionKey: section_key || null }
+  }))
+}
+
+function handleWallpaperChanged({ wallpaper_background_kind, wallpaper_image_document_id }) {
+  window.dispatchEvent(new CustomEvent("nexus:wallpaper-changed", {
+    detail: { wallpaper_background_kind, wallpaper_image_document_id }
   }))
 }
 

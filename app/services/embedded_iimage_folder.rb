@@ -28,7 +28,7 @@ class EmbeddedIimageFolder
       return false unless doc&.file? && doc.content_type.to_s == "asset"
 
       ext = File.extname(doc.storage_path.to_s).downcase
-      %w[.jpg .jpeg .png].include?(ext)
+      Document::WALLPAPER_IMAGE_EXTENSIONS.include?(ext)
     end
 
     def known_folder_name?(doc)

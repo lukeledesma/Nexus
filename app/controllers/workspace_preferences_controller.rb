@@ -12,16 +12,6 @@ class WorkspacePreferencesController < ApplicationController
       return render json: result.payload, status: :unprocessable_entity unless result.success?
     end
 
-    if params[:apply_theme_gradient].present?
-      render json: { error: "Gradient wallpaper is no longer supported." }, status: :unprocessable_entity
-      return
-    end
-
-    if params[:appearance].present?
-      render json: { error: "Custom shell editing is no longer supported." }, status: :unprocessable_entity
-      return
-    end
-
     wallpaper_image_doc_id = WorkspacePreferences::Manager.wallpaper_apply_image_document_id_param(params[:apply_wallpaper_image])
     if wallpaper_image_doc_id.present?
       result = preferences_manager.apply_wallpaper_image(wallpaper_image_doc_id)
@@ -29,7 +19,16 @@ class WorkspacePreferencesController < ApplicationController
     end
 
     preferences_manager.persist!
-    render json: preferences_manager.payload.payload
+    payload = preferences_manager.payload.payload
+
+    # Broadcast wallpaper change to all user sessions
+    UserSyncChannel.broadcast_wallpaper_change(
+      user: current_user,
+      wallpaper_background_kind: payload["wallpaper_background_kind"],
+      wallpaper_image_document_id: payload["wallpaper_image_document_id"]
+    )
+
+    render json: payload
   end
 
   private

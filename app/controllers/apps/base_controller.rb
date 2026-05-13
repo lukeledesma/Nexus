@@ -4,6 +4,14 @@ module Apps
   class BaseController < ApplicationController
     before_action :sync_from_disk
 
+    protected
+
+    def render_with_turbo_support(*args, **options)
+      return render(*args, layout: false, **options) if turbo_frame_request?
+
+      render(*args, **options)
+    end
+
     private
 
     def sync_from_disk

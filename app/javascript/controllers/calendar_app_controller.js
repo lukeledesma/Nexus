@@ -88,11 +88,13 @@ export default class extends Controller {
     this.boundDragMove = (event) => this.handleEventDragMove(event)
     this.boundDragEnd = (event) => this.handleEventDragEnd(event)
     this.boundUserStateLoaded = (event) => this.handleUserStateLoaded(event)
+    this.boundRemoteDocumentChanged = (event) => this.handleRemoteDocumentChanged(event)
     this.activeDrag = null
     this.suppressEditUntil = 0
     window.addEventListener("keydown", this.boundGlobalKeydown)
     window.addEventListener("nexus:calendar-new-event", this.boundChromeNewEvent)
     window.addEventListener("nexus:user-state-loaded", this.boundUserStateLoaded)
+    window.addEventListener("nexus:document-remote-changed", this.boundRemoteDocumentChanged)
     this.renderAll()
 
     this.loadTimeCardFilesByDate().then((loaded) => {
@@ -126,6 +128,7 @@ export default class extends Controller {
     window.removeEventListener("keydown", this.boundGlobalKeydown)
     window.removeEventListener("nexus:calendar-new-event", this.boundChromeNewEvent)
     window.removeEventListener("nexus:user-state-loaded", this.boundUserStateLoaded)
+    window.removeEventListener("nexus:document-remote-changed", this.boundRemoteDocumentChanged)
     window.removeEventListener("pointermove", this.boundDragMove)
     window.removeEventListener("pointerup", this.boundDragEnd)
     window.removeEventListener("pointercancel", this.boundDragEnd)
@@ -148,6 +151,19 @@ export default class extends Controller {
       }
     }
     this.renderAll()
+  }
+
+  handleRemoteDocumentChanged(event) {
+    // When time card date changes, reload time cards to update calendar display
+    const detail = event?.detail || {}
+    if (String(detail.content_type || "") === "note") {
+      // Time card changed; reload time cards by date
+      this.loadTimeCardFilesByDate().then((loaded) => {
+        if (loaded) this.renderBody()
+      }).catch((_error) => {
+        // non-blocking
+      })
+    }
   }
 
   async handleCalendarRemoteChanged({ detail }) {

@@ -610,9 +610,11 @@ export default class extends Controller {
     this.boundChromeClearRequest = this.handleChromeClearRequest.bind(this)
     this.boundChromeDatePickerRequest = this.handleChromeDatePickerRequest.bind(this)
     this.boundBeforeSavePicker = this.handleBeforeSavePicker.bind(this)
+    this.boundAutosaveBeforeSubmit = this.handleAutosaveBeforeSubmit.bind(this)
     this.boundDocumentPointerDown = this.handleDocumentPointerDown.bind(this)
     this.boundDocumentKeydown = this.handleDocumentKeydown.bind(this)
     this.boundDatePopoverClick = this.handleDatePopoverClick.bind(this)
+    this.boundRemoteDocumentChanged = this.handleRemoteDocumentChanged.bind(this)
     this.boundViewportChange = () => {
       if (!this.hasNotesInputTarget) return
       this.renderBackdrop(this.notesInputTarget.value)
@@ -626,9 +628,11 @@ export default class extends Controller {
     }
     window.addEventListener("nexus:time-card-clear-request", this.boundChromeClearRequest)
     window.addEventListener("nexus:time-card-open-date-picker", this.boundChromeDatePickerRequest)
+    this.element.addEventListener("autosave:before-submit", this.boundAutosaveBeforeSubmit)
     window.addEventListener(LINKED_APP_BEFORE_SAVE_PICKER, this.boundBeforeSavePicker)
     window.addEventListener("resize", this.boundViewportChange)
     window.addEventListener("scroll", this.boundViewportChange, true)
+    window.addEventListener("nexus:document-remote-changed", this.boundRemoteDocumentChanged)
     this.backdropSyncFrame = null
     this.chromeHoursTicker = null
     this.currentHighlightedRangeId = null
@@ -660,9 +664,11 @@ export default class extends Controller {
     this.stopChromeHoursTicker()
     window.removeEventListener("nexus:time-card-clear-request", this.boundChromeClearRequest)
     window.removeEventListener("nexus:time-card-open-date-picker", this.boundChromeDatePickerRequest)
+    this.element.removeEventListener("autosave:before-submit", this.boundAutosaveBeforeSubmit)
     window.removeEventListener(LINKED_APP_BEFORE_SAVE_PICKER, this.boundBeforeSavePicker)
     window.removeEventListener("resize", this.boundViewportChange)
     window.removeEventListener("scroll", this.boundViewportChange, true)
+    window.removeEventListener("nexus:document-remote-changed", this.boundRemoteDocumentChanged)
     document.removeEventListener("pointerdown", this.boundDocumentPointerDown, true)
     document.removeEventListener("keydown", this.boundDocumentKeydown, true)
     this.element?.removeEventListener("mouseenter", this.boundRangeMouseEnter, true)
@@ -725,6 +731,95 @@ export default class extends Controller {
       app: "time_card",
       noteText: this.serializedContentTarget.value
     })
+  }
+
+  handleAutosaveBeforeSubmit(event) {
+    // Ensure serialized content is up-to-date before autosave form submission
+    this.saveState()
+    this.updateSerializedContent()
+  }
+
+  handleRemoteDocumentChanged(event) {
+    const detail = event?.detail || {}
+    const incomingId = Number(detail.document_id)
+    const linkedId = Number(this.linkedDocumentIdValue || 0)
+    if (!Number.isInteger(incomingId) || incomingId <= 0) return
+    if (!Number.isInteger(linkedId) || linkedId <= 0) return
+    if (incomingId !== linkedId) return
+    if (String(detail.content_type || "") !== "note") return
+
+    // Avoid clobbering active local editing
+    if (this.hasNotesInputTarget && document.activeElement === this.notesInputTarget) return
+
+    // Parse the incoming content and update state
+    const incoming = String(detail.content || "")
+    const decoded = this.#parseTimeCardContent(incoming)
+    if (!decoded) return
+
+    // Only update if content actually changed
+    const current = serializeTimeCardDocument(this.state)
+    if (incoming === current) return
+
+    this.state = decoded
+    this.renderAll()
+  }
+
+  #parseTimeCardContent(content) {
+    const lines = String(content || "").split(/\r?\n/)
+    const parsed = {
+      entryDate: todayIsoDateString(),
+      clockInMinutes: null,
+      clockInAtMs: null,
+      clockOutAtMs: null,
+      clockOutMinutes: null,
+      running: false,
+      notesText: ""
+    }
+
+    let headerEndIndex = lines.length
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]
+      if (!line.startsWith("#")) {
+        headerEndIndex = i
+        break
+      }
+
+      const match = /^#\s+(\w+):\s*(.*)$/.exec(line)
+      if (!match) continue
+
+      const key = match[1]
+      const value = match[2].trim()
+
+      switch (key) {
+        case "entry_date":
+          parsed.entryDate = normalizeEntryDate(value, parsed.entryDate)
+          break
+        case "start_time":
+          parsed.clockInMinutes = value ? parseTimeStringToMinutes(value) : null
+          break
+        case "end_time":
+          parsed.clockOutMinutes = value ? parseTimeStringToMinutes(value) : null
+          break
+        case "running":
+          parsed.running = value === "true"
+          break
+        case "clock_in_at_ms":
+          parsed.clockInAtMs = value ? Number(value) : null
+          break
+        case "clock_out_at_ms":
+          parsed.clockOutAtMs = value ? Number(value) : null
+          break
+      }
+    }
+
+    while (headerEndIndex < lines.length && lines[headerEndIndex].trim() === "") {
+      headerEndIndex++
+    }
+
+    const notesLines = lines.slice(headerEndIndex)
+    parsed.notesText = normalizeTrailingTimeCardNotesNewlines(notesLines.join("\n"))
+
+    return normalizeState(parsed, null, this.state.running)
   }
 
   updateNotes() {

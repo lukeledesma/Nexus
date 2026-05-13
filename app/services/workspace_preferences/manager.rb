@@ -279,14 +279,37 @@ module WorkspacePreferences
       state["gradient_source_theme_name"] = nil
       state["wallpaper_gradient_theme_id"] = nil
       state["wallpaper_gradient_theme_name"] = nil
+      
+      # NEVER clear wallpaper_background_kind or wallpaper_image_document_id here
+      # They are preserved from the merge above if present in the file
       state
     end
 
     def write_state_data(state)
+      # Always preserve existing wallpaper preference from disk.
+      disk_state = begin
+        payload = parse_json_file(workspace_state_file)
+        payload.respond_to?(:to_h) ? payload.to_h : {}
+      rescue
+        {}
+      end
+
+      # Use wallpaper from state if present, otherwise use disk values
+      wallpaper_kind = state["wallpaper_background_kind"].presence ||
+                       disk_state["wallpaper_background_kind"].presence
+      wallpaper_id = state["wallpaper_image_document_id"].presence ||
+                     disk_state["wallpaper_image_document_id"].presence
+
+      # Guard against accidental nil overwrite when current state omits wallpaper keys.
+      if wallpaper_kind.blank? && wallpaper_id.blank?
+        wallpaper_kind = disk_state["wallpaper_background_kind"]
+        wallpaper_id = disk_state["wallpaper_image_document_id"]
+      end
+      
       output = default_state.merge(
         "active_theme_id" => ALLOWED_THEME_IDS.include?(state["active_theme_id"].to_s) ? state["active_theme_id"] : DEFAULT_THEME_ID,
-        "wallpaper_background_kind" => state["wallpaper_background_kind"].presence,
-        "wallpaper_image_document_id" => state["wallpaper_image_document_id"].presence
+        "wallpaper_background_kind" => wallpaper_kind,
+        "wallpaper_image_document_id" => wallpaper_id
       )
       File.write(workspace_state_file, JSON.pretty_generate(output) + "\n")
     end

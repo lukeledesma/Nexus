@@ -21,7 +21,7 @@ module Apps
         @note_text = plain_text_from_note_html(doc.content.to_s)
       end
 
-      render layout: false if turbo_frame_request?
+      render_with_turbo_support layout: false
     end
 
     private

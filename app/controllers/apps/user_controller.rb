@@ -3,7 +3,7 @@
 module Apps
   class UserController < BaseController
     def show
-      render layout: false if turbo_frame_request?
+      render_with_turbo_support layout: false
     end
 
     def update_username

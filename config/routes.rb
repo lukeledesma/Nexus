@@ -12,7 +12,7 @@ Rails.application.routes.draw do
     get "calendar", to: "calendar#show"
     get "images", to: "images#show"
     get "audio", to: "audio#show"
-    get "wallpaper_iimage/files", to: "wallpaper_iimage#files"
+    get "wallpaper_image/files", to: "wallpaper_image#files"
     get "user", to: "user#show"
     patch "user/username", to: "user#update_username", as: :user_username
     patch "user/password", to: "user#update_password", as: :user_password
@@ -36,9 +36,6 @@ Rails.application.routes.draw do
   get    "user_app_states",       to: "user_app_states#index"
   patch  "user_app_states/:key",  to: "user_app_states#update", constraints: { key: %r{[^/]+} }
   delete "user_app_states/:key",  to: "user_app_states#destroy", constraints: { key: %r{[^/]+} }
-  # Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.erb)
-  # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
-  # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
 
   root "documents#index"
   post "/documents/create_root_folder", to: "documents#create_root_folder"

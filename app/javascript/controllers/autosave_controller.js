@@ -34,6 +34,14 @@ export default class extends Controller {
     if (!["INPUT", "SELECT", "TEXTAREA"].includes(t.tagName)) return
     if (t.type === "hidden") return
     if (e.type === "input" && !this.submitOnInputValue) return
+    
+    // For time card and similar controllers: ensure serialized state is updated before submit
+    const form = this.element
+    if (form && form.tagName === "FORM") {
+      const event = new CustomEvent("autosave:before-submit", { bubbles: true, cancelable: true })
+      form.dispatchEvent(event)
+    }
+    
     this.#publishDirtyState()
     this.submit()
   }
