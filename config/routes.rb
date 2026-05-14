@@ -55,6 +55,7 @@ Rails.application.routes.draw do
       patch :toggle_favorite
       get :file_list
       get :asset_file
+      get :thumbnail
     end
   end
 end

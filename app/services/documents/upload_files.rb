@@ -53,6 +53,7 @@ module Documents
         persist = doc ? DocumentPersistence.persist(doc, operation: :create) : nil
         if persist&.success?
           created_ids << doc.id
+          Documents::GenerateThumbnail.call(doc) if doc.content_type.to_s == "asset"
         else
           errors << "#{uploaded.original_filename}: #{error_message || doc&.errors&.full_messages&.to_sentence || "Could not upload."}"
         end

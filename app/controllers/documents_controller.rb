@@ -4,7 +4,7 @@ class DocumentsController < ApplicationController
   PANEL_SEARCH_MAX_RESULTS = 40
 
   before_action :sync_from_disk, only: %i[index organizer_fragment panel_search]
-  before_action :set_document, only: %i[show edit update destroy create_file create_subfolder move_folder move_file upload_images rename toggle_favorite file_list asset_file]
+  before_action :set_document, only: %i[show edit update destroy create_file create_subfolder move_folder move_file upload_images rename toggle_favorite file_list asset_file thumbnail]
 
   def index
     set_no_cache_headers
@@ -101,6 +101,31 @@ class DocumentsController < ApplicationController
                 type: ctype,
                 disposition: "inline",
                 filename: File.basename(path.to_s)
+    end
+  end
+
+  # Serve the generated WebP thumbnail for an image asset.
+  def thumbnail
+    unless @document.file? && @document.content_type.to_s == "asset"
+      head :not_found
+      return
+    end
+
+    path = @document.thumbnail_disk_path
+    unless path&.file?
+      head :not_found
+      return
+    end
+
+    if Rails.env.production?
+      internal_path = x_accel_path_for(path)
+      response.headers["X-Accel-Redirect"] = internal_path
+      response.headers["Content-Type"] = "image/webp"
+      response.headers["Content-Disposition"] = "inline; filename=thumb_#{@document.id}.webp"
+      response.headers["X-Accel-Buffering"] = "yes"
+      head :ok
+    else
+      send_file path.to_s, type: "image/webp", disposition: "inline"
     end
   end
 

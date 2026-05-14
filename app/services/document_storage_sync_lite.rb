@@ -83,6 +83,10 @@ class DocumentStorageSyncLite
   end
 
   def destroy
+    # Remove generated thumbnail (keyed by ID, independent of storage_path).
+    thumb_path = @document.thumbnail_disk_path
+    FileUtils.rm_f(thumb_path) if thumb_path
+
     return unless @document.id.present? && @document.storage_path.present?
 
     absolute_path = absolute_path_for(@document.storage_path)

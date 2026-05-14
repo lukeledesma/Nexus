@@ -50,6 +50,14 @@ class Document < ApplicationRecord
     DocumentStorageSyncLite.storage_root.join(rel)
   end
 
+  # Absolute path for the generated thumbnail WebP (28×28). Lives under .thumbnails/
+  # and is keyed by document ID so it survives renames.
+  def thumbnail_disk_path
+    return nil unless id.present? && file? && content_type.to_s == "asset"
+
+    DocumentStorageSyncLite.storage_root.join(".thumbnails", "#{id}.webp")
+  end
+
   def new_untitled_placeholder?
     false
   end

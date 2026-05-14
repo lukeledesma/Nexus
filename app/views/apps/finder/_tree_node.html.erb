@@ -109,6 +109,7 @@
     <% show_open_in_app = file_linked && open_in_app_content_types.include?(node[:content_type].to_s) %>
     <% finder_open_doc_title = finder_document_display_title(node[:title].to_s) %>
     <% effective_section_key = node[:origin_section_key].presence || section_key %>
+    <% thumb_url = node[:thumbnail_url].presence %>
     <div class="finder-tree__row-line" draggable="<%= (writable && !read_only) ? "true" : "false" %>" data-action="click->finder-browser#activateRowLine">
       <% if file_linked && !read_only %>
         <%= link_to "#",
@@ -126,9 +127,15 @@
               role: "treeitem",
               tabindex: "0",
               aria: { label: "Open #{node[:title]}" } do %>
-          <span class="finder-tree__icon finder-tree__icon--file" aria-hidden="true">
-            <%= material_symbol_icon(finder_file_icon_for_content_type(node[:content_type], source_extension: node[:source_extension], section_key: effective_section_key), size: :sm) %>
-          </span>
+          <% if thumb_url %>
+            <span class="finder-tree__icon finder-tree__icon--thumb" aria-hidden="true">
+              <img class="finder-tree__thumb" src="<%= thumb_url %>" alt="" loading="lazy" decoding="async">
+            </span>
+          <% else %>
+            <span class="finder-tree__icon finder-tree__icon--file" aria-hidden="true">
+              <%= material_symbol_icon(finder_file_icon_for_content_type(node[:content_type], source_extension: node[:source_extension], section_key: effective_section_key), size: :sm) %>
+            </span>
+          <% end %>
           <span class="finder-tree__label" data-finder-tree-label><%= node[:title] %></span>
         <% end %>
       <% elsif file_linked && read_only %>
@@ -147,9 +154,15 @@
               role: "treeitem",
               tabindex: "0",
               aria: { label: "Open #{node[:title]}" } do %>
-          <span class="finder-tree__icon finder-tree__icon--file" aria-hidden="true">
-            <%= material_symbol_icon(finder_file_icon_for_content_type(node[:content_type], source_extension: node[:source_extension], section_key: effective_section_key), size: :sm) %>
-          </span>
+          <% if thumb_url %>
+            <span class="finder-tree__icon finder-tree__icon--thumb" aria-hidden="true">
+              <img class="finder-tree__thumb" src="<%= thumb_url %>" alt="" loading="lazy" decoding="async">
+            </span>
+          <% else %>
+            <span class="finder-tree__icon finder-tree__icon--file" aria-hidden="true">
+              <%= material_symbol_icon(finder_file_icon_for_content_type(node[:content_type], source_extension: node[:source_extension], section_key: effective_section_key), size: :sm) %>
+            </span>
+          <% end %>
           <span class="finder-tree__label" data-finder-tree-label><%= node[:title] %></span>
         <% end %>
       <% else %>
@@ -159,9 +172,15 @@
           tabindex="0"
           aria-label="<%= node[:title] %> (no app for this type yet)"
         >
-          <span class="finder-tree__icon finder-tree__icon--file" aria-hidden="true">
-            <%= material_symbol_icon(finder_file_icon_for_content_type(node[:content_type], source_extension: node[:source_extension], section_key: effective_section_key), size: :sm) %>
-          </span>
+          <% if thumb_url %>
+            <span class="finder-tree__icon finder-tree__icon--thumb" aria-hidden="true">
+              <img class="finder-tree__thumb" src="<%= thumb_url %>" alt="" loading="lazy" decoding="async">
+            </span>
+          <% else %>
+            <span class="finder-tree__icon finder-tree__icon--file" aria-hidden="true">
+              <%= material_symbol_icon(finder_file_icon_for_content_type(node[:content_type], source_extension: node[:source_extension], section_key: effective_section_key), size: :sm) %>
+            </span>
+          <% end %>
           <span class="finder-tree__label" data-finder-tree-label><%= node[:title] %></span>
         </span>
       <% end %>

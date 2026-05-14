@@ -353,6 +353,7 @@ module Apps
         else
           false
         end
+      has_thumbnail = file_kind == "image" && doc.thumbnail_disk_path&.file?
       {
         kind: :file,
         id: doc.id,
@@ -363,7 +364,8 @@ module Apps
         source_extension: ext,
         writable: !doc.protected_workspace_structure?,
         has_linked_app: has_linked_app,
-        is_favorited: favorited_flag_for(doc)
+        is_favorited: favorited_flag_for(doc),
+        thumbnail_url: has_thumbnail ? helpers.thumbnail_document_path(doc.id) : nil
       }
     end
 
