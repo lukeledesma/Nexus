@@ -25,11 +25,11 @@ export default class extends Controller {
     this.boundRequestSave = this.handleRequestSave.bind(this)
     this.boundTaskListAddFromChrome = this.handleTaskListAddFromChrome.bind(this)
     this.boundBeforeSavePicker = this.handleBeforeSavePicker.bind(this)
-    this.boundRemoteTaskListChanged = this.handleRemoteTaskListChanged.bind(this)
+    this.boundRemoteDocumentChanged = this.handleRemoteDocumentChanged.bind(this)
     this.boundSyncPayloadInput = () => this.#syncPayload()
     window.addEventListener("app-window:state", this.boundWindowState)
     window.addEventListener("nexus:task-list-add-task", this.boundTaskListAddFromChrome)
-    window.addEventListener("nexus:task-list-remote-changed", this.boundRemoteTaskListChanged)
+    window.addEventListener("nexus:document-remote-changed", this.boundRemoteDocumentChanged)
     window.addEventListener(LINKED_APP_BEFORE_SAVE_PICKER, this.boundBeforeSavePicker)
     document.addEventListener("nexus:request-save", this.boundRequestSave)
     if (this.hasListTarget) {
@@ -55,7 +55,7 @@ export default class extends Controller {
   disconnect() {
     document.removeEventListener("nexus:request-save", this.boundRequestSave)
     window.removeEventListener("nexus:task-list-add-task", this.boundTaskListAddFromChrome)
-    window.removeEventListener("nexus:task-list-remote-changed", this.boundRemoteTaskListChanged)
+    window.removeEventListener("nexus:document-remote-changed", this.boundRemoteDocumentChanged)
     window.removeEventListener(LINKED_APP_BEFORE_SAVE_PICKER, this.boundBeforeSavePicker)
     if (this.hasListTarget && this.boundSyncPayloadInput) {
       this.listTarget.removeEventListener("input", this.boundSyncPayloadInput, true)
@@ -166,8 +166,11 @@ export default class extends Controller {
     this.addTask({ preventDefault() {} })
   }
 
-  handleRemoteTaskListChanged(event) {
+  handleRemoteDocumentChanged(event) {
     const detail = event?.detail || {}
+    // Only act on task_list updates — other content types are handled elsewhere.
+    if (String(detail.content_type || "") !== "task_list") return
+
     const incomingDocumentId = Number(detail.document_id)
     const linkedDocumentId = Number(this.element.dataset.taskListLinkedDocumentId || 0)
     if (!Number.isInteger(incomingDocumentId) || incomingDocumentId <= 0) return

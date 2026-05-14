@@ -44,7 +44,12 @@ module Calendar
           }
         )
           .tap do |result|
-            UserSyncChannel.broadcast_calendar_change(user: @user, updated_at: result.payload[:updated_at])
+            UserSyncChannel.broadcast_document_change(
+              user: @user,
+              document_id: doc.id,
+              content_type: "calendar_events",
+              updated_at: result.payload[:updated_at]
+            )
           end
       rescue StandardError => e
         Rails.logger.error("Error saving calendar events: #{e.message}")

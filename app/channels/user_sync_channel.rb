@@ -3,11 +3,20 @@
 # Broadcasts real-time state changes to all sessions belonging to the same user.
 #
 # Each user gets their own stream: "user_sync:<user_id>"
-# Messages have the shape:
-#   { type: "state_changed", key: "...", value: <json>, updated_at: "iso8601" }
-#   { type: "calendar_changed", updated_at: "iso8601" }
 #
-# The JS subscriber in nexus_user_state.js listens and applies changes in-place
+# Three message types:
+#
+#   state_changed     — a NexusUserState key was updated on another device
+#     { type: "state_changed", key: "...", value: <json>, updated_at: "iso8601" }
+#
+#   document_changed  — document content was saved (notes, tasks, calendar, assets)
+#     { type: "document_changed", document_id: <int>, content_type: "...",
+#       content: "...", tasks: [...], updated_at: "iso8601" }
+#
+#   workspace_changed — workspace structure or appearance changed (finder tree, wallpaper)
+#     { type: "workspace_changed", kind: "finder"|"wallpaper", updated_at: "iso8601", ...kind_payload }
+#
+# The JS subscriber in nexus_sync_channel.js listens and applies changes in-place
 # so no page refresh is needed when another device makes a change.
 class UserSyncChannel < ApplicationCable::Channel
   def subscribed
@@ -16,7 +25,8 @@ class UserSyncChannel < ApplicationCable::Channel
 
   def unsubscribed; end
 
-  # Convenience broadcast helpers called by controllers/services.
+  # --- State ---
+
   def self.broadcast_state_change(user:, key:, value:)
     broadcast_to(user, {
       type: "state_changed",
@@ -26,22 +36,10 @@ class UserSyncChannel < ApplicationCable::Channel
     })
   end
 
-  def self.broadcast_calendar_change(user:, updated_at:)
-    broadcast_to(user, {
-      type: "calendar_changed",
-      updated_at: updated_at
-    })
-  end
+  # --- Document content ---
 
-  def self.broadcast_task_list_change(user:, document_id:, tasks:, updated_at:)
-    broadcast_to(user, {
-      type: "task_list_changed",
-      document_id: document_id,
-      tasks: tasks,
-      updated_at: updated_at
-    })
-  end
-
+  # Covers notes, task lists, calendar events, and any future document content type.
+  # `content` and `tasks` are optional — pass whichever the content_type uses.
   def self.broadcast_document_change(user:, document_id:, content_type:, content: nil, tasks: nil, updated_at:)
     broadcast_to(user, {
       type: "document_changed",
@@ -53,20 +51,16 @@ class UserSyncChannel < ApplicationCable::Channel
     })
   end
 
-  def self.broadcast_finder_change(user:, section_key: nil)
-    broadcast_to(user, {
-      type: "finder_changed",
-      section_key: section_key,
-      updated_at: Time.current.iso8601
-    })
-  end
+  # --- Workspace structure / appearance ---
 
-  def self.broadcast_wallpaper_change(user:, wallpaper_background_kind:, wallpaper_image_document_id:)
+  # kind: "finder"    — finder tree changed; optional section_key narrows the affected section
+  # kind: "wallpaper" — wallpaper/theme changed; pass wallpaper_background_kind and wallpaper_image_document_id
+  def self.broadcast_workspace_change(user:, kind:, **payload)
     broadcast_to(user, {
-      type: "wallpaper_changed",
-      wallpaper_background_kind: wallpaper_background_kind,
-      wallpaper_image_document_id: wallpaper_image_document_id,
-      updated_at: Time.current.iso8601
+      type: "workspace_changed",
+      kind: kind,
+      updated_at: Time.current.iso8601,
+      **payload
     })
   end
 end

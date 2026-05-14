@@ -1,6 +1,6 @@
 # AI Handoff - Current Project State
 
-Last updated: 2026-05-13
+Last updated: 2026-05-14
 
 ## Project Purpose
 
@@ -35,7 +35,7 @@ Nexus is a browser-based OS-like workspace built on Rails. The core product prom
 2. Test suite fixes (2026-05-13):
 - Removed duplicate private `files_by_date` definition in TimeCardController (was causing 404 on the action).
 - Added `apply_theme_gradient` rejection to WorkspacePreferencesController (returns 422 as expected).
-- Added `require "minitest/mock"` to test_helper (Minitest 6 no longer auto-includes stub).
+- Removed `require "minitest/mock"` from test_helper (Minitest 6 merged mock into core — the separate file no longer exists).
 - Fixed `Finder::MigrationService` to use module nesting (required by Zeitwerk in Rails 8.1.3).
 - Implemented `migrate_legacy_favorites!` in FinderWorkspaceInitializer.
 - All 98 tests pass, 0 failures, 0 errors.
@@ -43,6 +43,15 @@ Nexus is a browser-based OS-like workspace built on Rails. The core product prom
 3. Realtime synchronization infrastructure:
 - User-scoped Action Cable channel for app/document/state updates.
 - Frontend subscription wiring for receiving and applying remote updates.
+
+10. Unified broadcast system (2026-05-14):
+- UserSyncChannel consolidated from 6 methods to 3: broadcast_state_change, broadcast_document_change, broadcast_workspace_change.
+- broadcast_workspace_change(kind: "finder"|"wallpaper") replaces broadcast_finder_change and broadcast_wallpaper_change.
+- Calendar now routes through broadcast_document_change(content_type: "calendar_events") instead of its own method.
+- Double broadcast for task_list saves eliminated (was calling both broadcast_task_list_change and broadcast_document_change).
+- nexus_sync_channel.js collapsed from 6 handlers to 3 (state_changed, document_changed, workspace_changed).
+- calendar_app_controller.js: nexus:calendar-remote-changed listener removed; calendar updates handled in handleRemoteDocumentChanged filtering by content_type.
+- task_list_editor_controller.js: nexus:task-list-remote-changed listener replaced with nexus:document-remote-changed filtered by content_type === "task_list".
 
 4. Production websocket reliability:
 - nginx /cable proxy configured with websocket upgrade headers.

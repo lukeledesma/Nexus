@@ -148,10 +148,11 @@ class DocumentsController < ApplicationController
 
     result = persist_document(@document, operation: :update)
     if result.success?
-      # Broadcast changes to all user sessions for real-time sync
+      # Broadcast content change to all user sessions for real-time sync.
+      # All document types go through the single broadcast_document_change path.
       case @document.content_type
       when "note"
-        # Time card and regular notes both use "note" content type
+        # Time card and regular notes both use "note" content type.
         UserSyncChannel.broadcast_document_change(
           user: current_user,
           document_id: @document.id,
@@ -161,12 +162,6 @@ class DocumentsController < ApplicationController
         )
       when "task_list"
         normalized_tasks = normalize_tasks_for_broadcast(@document.tasks)
-        UserSyncChannel.broadcast_task_list_change(
-          user: current_user,
-          document_id: @document.id,
-          tasks: normalized_tasks,
-          updated_at: @document.updated_at.utc.iso8601
-        )
         UserSyncChannel.broadcast_document_change(
           user: current_user,
           document_id: @document.id,
@@ -175,8 +170,10 @@ class DocumentsController < ApplicationController
           updated_at: @document.updated_at.utc.iso8601
         )
       when "calendar_events"
-        UserSyncChannel.broadcast_calendar_change(
+        UserSyncChannel.broadcast_document_change(
           user: current_user,
+          document_id: @document.id,
+          content_type: @document.content_type,
           updated_at: @document.updated_at.utc.iso8601
         )
       end
@@ -189,7 +186,7 @@ class DocumentsController < ApplicationController
   def create_subfolder
     result = Documents::CreateSubfolder.call(parent: @document, title: params[:title])
     if result.success?
-      UserSyncChannel.broadcast_finder_change(user: current_user)
+      UserSyncChannel.broadcast_workspace_change(user: current_user, kind: "finder")
       render json: { ok: true, id: result.payload[:id], title: result.payload[:title] }
     else
       render json: { error: result.error }, status: result.status
@@ -199,7 +196,7 @@ class DocumentsController < ApplicationController
   def create_file
     result = Documents::CreateFile.call(parent: @document, content_type: params[:content_type])
     if result.success?
-      UserSyncChannel.broadcast_finder_change(user: current_user)
+      UserSyncChannel.broadcast_workspace_change(user: current_user, kind: "finder")
       if request.xhr? || request.format.json?
         render json: { ok: true, folder_id: result.payload[:folder_id], file_id: result.payload[:file_id] }
         return
@@ -226,7 +223,7 @@ class DocumentsController < ApplicationController
     )
 
     if result.success?
-      UserSyncChannel.broadcast_finder_change(user: current_user)
+      UserSyncChannel.broadcast_workspace_change(user: current_user, kind: "finder")
       render json: { ok: true, id: result.payload[:id], parent_id: result.payload[:parent_id] }
     else
       render json: { error: result.error }, status: result.status
@@ -242,7 +239,7 @@ class DocumentsController < ApplicationController
     )
 
     if result.success?
-      UserSyncChannel.broadcast_finder_change(user: current_user)
+      UserSyncChannel.broadcast_workspace_change(user: current_user, kind: "finder")
       render json: { ok: true, id: result.payload[:id], parent_id: result.payload[:parent_id] }
     else
       render json: { error: result.error }, status: result.status
@@ -254,7 +251,7 @@ class DocumentsController < ApplicationController
     result = Documents::UploadFiles.call(user: current_user, folder: @document, files: params[:files])
 
     if result.success?
-      UserSyncChannel.broadcast_finder_change(user: current_user)
+      UserSyncChannel.broadcast_workspace_change(user: current_user, kind: "finder")
       render json: { ok: true, ids: result.payload[:ids], files: result.payload[:files], errors: result.payload[:errors] }
     else
       render json: { error: result.error }, status: result.status
@@ -349,7 +346,7 @@ class DocumentsController < ApplicationController
       return
     end
 
-    UserSyncChannel.broadcast_finder_change(user: current_user)
+    UserSyncChannel.broadcast_workspace_change(user: current_user, kind: "finder")
 
     if request.xhr? || request.format.json?
       head :no_content
@@ -624,7 +621,7 @@ class DocumentsController < ApplicationController
     result = DocumentPersistence.persist(document, operation: operation)
 
     if result.success? && finder_structure_changed?(document, operation)
-      UserSyncChannel.broadcast_finder_change(user: current_user)
+      UserSyncChannel.broadcast_workspace_change(user: current_user, kind: "finder")
     end
 
     return result if result.success?

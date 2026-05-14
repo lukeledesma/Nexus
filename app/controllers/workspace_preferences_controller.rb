@@ -26,8 +26,9 @@ class WorkspacePreferencesController < ApplicationController
     payload = preferences_manager.payload.payload
 
     # Broadcast wallpaper change to all user sessions
-    UserSyncChannel.broadcast_wallpaper_change(
+    UserSyncChannel.broadcast_workspace_change(
       user: current_user,
+      kind: "wallpaper",
       wallpaper_background_kind: payload["wallpaper_background_kind"],
       wallpaper_image_document_id: payload["wallpaper_image_document_id"]
     )

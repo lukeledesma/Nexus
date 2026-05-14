@@ -72,13 +72,18 @@ class FinderWorkspaceInitializerTest < ActiveSupport::TestCase
   end
 
   test "ensure_for_user handles missing root folder gracefully" do
-    FinderListedFolders.stub(:workspace_root_for, nil) do
+    # Temporarily override workspace_root_for to return nil without relying on Minitest stub.
+    original = FinderListedFolders.method(:workspace_root_for)
+    FinderListedFolders.define_singleton_method(:workspace_root_for) { |_user| nil }
+    begin
       result = FinderWorkspaceInitializer.ensure_for_user!(@user)
       assert_equal({}, result, "Expected empty result when root folder is missing")
+    ensure
+      FinderListedFolders.define_singleton_method(:workspace_root_for, original)
     end
   end
 
-  test "ensure_for_user handles migration service integration" do
+  test "ensure_for_user creates finder root and section folders" do
     FinderWorkspaceInitializer.ensure_for_user!(@user)
 
     root = FinderListedFolders.workspace_root_for(@user)
@@ -86,10 +91,13 @@ class FinderWorkspaceInitializerTest < ActiveSupport::TestCase
 
     assert finder, "Finder root folder should exist"
 
-    Finder::MigrationService.migrate_legacy_documents_section!(finder)
-    Finder::MigrationService.migrate_legacy_notes_folder!(nil, nil)
-    Finder::MigrationService.migrate_legacy_favorites_folder!(finder, nil)
+    section_titles = Apps::FinderController.workspace_section_definitions
+      .reject { |definition| definition[:key] == "favorites" }
+      .map { |definition| definition[:title] }
 
-    # Add assertions to verify migration behavior
+    section_titles.each do |title|
+      matching = finder.children.folders.select { |folder| folder.title.to_s.casecmp?(title) }
+      assert_equal 1, matching.size, "expected one section folder named #{title}"
+    end
   end
 end

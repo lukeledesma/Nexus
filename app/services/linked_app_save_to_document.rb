@@ -56,12 +56,6 @@ class LinkedAppSaveToDocument
           { "text" => text, "checked" => checked, "subtasks" => subtasks }
         end
 
-        UserSyncChannel.broadcast_task_list_change(
-          user: @user,
-          document_id: doc.id,
-          tasks: normalized_tasks,
-          updated_at: doc.updated_at.utc.iso8601
-        )
         UserSyncChannel.broadcast_document_change(
           user: @user,
           document_id: doc.id,
@@ -79,7 +73,7 @@ class LinkedAppSaveToDocument
         )
       end
 
-      UserSyncChannel.broadcast_finder_change(user: @user)
+      UserSyncChannel.broadcast_workspace_change(user: @user, kind: "finder")
       [ :ok, { document_id: doc.id, title: doc.title, storage_path: doc.storage_path.to_s } ]
     else
       [ :unprocessable_entity, { errors: doc.errors.full_messages } ]
