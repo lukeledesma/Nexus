@@ -43,7 +43,8 @@ class WorkspacePreferencesManagerTest < ActiveSupport::TestCase
     assert result.success?
 
     @manager.persist!
-    payload = @manager.payload.payload
+    fresh_manager = WorkspacePreferences::Manager.new(user: @user)
+    payload = fresh_manager.payload.payload
     assert_equal "image", payload["wallpaper_background_kind"]
     assert_equal doc.id, payload["wallpaper_image_document_id"]
   end

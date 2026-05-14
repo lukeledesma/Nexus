@@ -47,7 +47,8 @@
             type="button"
             class="desktop-side-panel-app-row"
             data-window-key="<%= entry[:window_key] %>"
-            data-action="click->organizer#launchApp"
+            data-app-label="<%= entry[:label] %>"
+            data-action="click->organizer#launchApp mouseenter->organizer#showAppPreview mouseleave->organizer#scheduleHideAppPreview focus->organizer#showAppPreview blur->organizer#scheduleHideAppPreview"
           >
             <span class="desktop-side-panel-app-icon" aria-hidden="true">
               <%= material_symbol_icon(entry[:icon], size: :sm) %>
@@ -114,6 +115,13 @@
       </div>
     </div>
   </aside>
+
+  <aside
+    id="desktop-side-panel-hover-preview"
+    class="desktop-side-panel-hover-preview"
+    data-preview-close-icon-html="<%= material_symbol_icon(:close, size: :xs) %>"
+    aria-hidden="true"
+  ></aside>
 </div>
 <%# Apply saved open state before first paint so the drawer does not animate on refresh. Matches side_panel_controller STORAGE_OPEN_KEY. %>
 <script>

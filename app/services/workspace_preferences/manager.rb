@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "tempfile"
 
 module WorkspacePreferences
   class Manager
@@ -108,6 +109,7 @@ module WorkspacePreferences
 
       @state["wallpaper_background_kind"] = "image"
       @state["wallpaper_image_document_id"] = doc.id
+      @state["wallpaper_image_storage_path"] = doc.storage_path
       @state["wallpaper_gradient_theme_id"] = nil
       @state["wallpaper_gradient_theme_name"] = nil
       @state["gradient_source_theme_id"] = nil
@@ -216,7 +218,9 @@ module WorkspacePreferences
 
       ensure_storage_files
       @state = read_state_data
+      state_dirty = reconcile_wallpaper_reference!(@state)
       @themes = ensure_default_theme(read_themes_data)
+      write_state_data(@state) if state_dirty
     end
 
     def workspace_storage_dir
@@ -243,6 +247,7 @@ module WorkspacePreferences
         "gradient_source_theme_name" => nil,
         "wallpaper_background_kind" => nil,
         "wallpaper_image_document_id" => nil,
+        "wallpaper_image_storage_path" => nil,
         "wallpaper_gradient_theme_id" => nil,
         "wallpaper_gradient_theme_name" => nil
       }
@@ -286,32 +291,23 @@ module WorkspacePreferences
     end
 
     def write_state_data(state)
-      # Always preserve existing wallpaper preference from disk.
-      disk_state = begin
-        payload = parse_json_file(workspace_state_file)
-        payload.respond_to?(:to_h) ? payload.to_h : {}
-      rescue
-        {}
+      normalized_wallpaper_kind = state["wallpaper_background_kind"].to_s == "image" ? "image" : nil
+      normalized_wallpaper_id = state["wallpaper_image_document_id"].presence&.to_i
+      normalized_wallpaper_path = state["wallpaper_image_storage_path"].presence
+
+      if normalized_wallpaper_kind != "image" || normalized_wallpaper_id.to_i <= 0
+        normalized_wallpaper_kind = nil
+        normalized_wallpaper_id = nil
+        normalized_wallpaper_path = nil
       end
 
-      # Use wallpaper from state if present, otherwise use disk values
-      wallpaper_kind = state["wallpaper_background_kind"].presence ||
-                       disk_state["wallpaper_background_kind"].presence
-      wallpaper_id = state["wallpaper_image_document_id"].presence ||
-                     disk_state["wallpaper_image_document_id"].presence
-
-      # Guard against accidental nil overwrite when current state omits wallpaper keys.
-      if wallpaper_kind.blank? && wallpaper_id.blank?
-        wallpaper_kind = disk_state["wallpaper_background_kind"]
-        wallpaper_id = disk_state["wallpaper_image_document_id"]
-      end
-      
       output = default_state.merge(
         "active_theme_id" => ALLOWED_THEME_IDS.include?(state["active_theme_id"].to_s) ? state["active_theme_id"] : DEFAULT_THEME_ID,
-        "wallpaper_background_kind" => wallpaper_kind,
-        "wallpaper_image_document_id" => wallpaper_id
+        "wallpaper_background_kind" => normalized_wallpaper_kind,
+        "wallpaper_image_document_id" => normalized_wallpaper_id,
+        "wallpaper_image_storage_path" => normalized_wallpaper_path
       )
-      File.write(workspace_state_file, JSON.pretty_generate(output) + "\n")
+      write_json_atomically(workspace_state_file, output)
     end
 
     def read_themes_data
@@ -322,7 +318,20 @@ module WorkspacePreferences
 
     def write_themes_data(themes)
       output = { "themes" => ensure_default_theme(themes) }
-      File.write(layout_themes_file, JSON.pretty_generate(output) + "\n")
+      write_json_atomically(layout_themes_file, output)
+    end
+
+    def write_json_atomically(path, payload)
+      dir = File.dirname(path)
+      FileUtils.mkdir_p(dir)
+
+      Tempfile.create([ File.basename(path), ".tmp" ], dir) do |tmp|
+        tmp.write(JSON.pretty_generate(payload))
+        tmp.write("\n")
+        tmp.flush
+        tmp.fsync
+        File.rename(tmp.path, path.to_s)
+      end
     end
 
     def parse_json_file(path)
@@ -346,17 +355,55 @@ module WorkspacePreferences
     def wallpaper_state_slice(state)
       {
         "wallpaper_background_kind" => state["wallpaper_background_kind"].presence,
-        "wallpaper_image_document_id" => state["wallpaper_image_document_id"].presence&.to_i
+        "wallpaper_image_document_id" => state["wallpaper_image_document_id"].presence&.to_i,
+        "wallpaper_image_storage_path" => state["wallpaper_image_storage_path"].presence
       }
     end
 
     def clear_wallpaper_picks!(state)
       state["wallpaper_background_kind"] = nil
       state["wallpaper_image_document_id"] = nil
+      state["wallpaper_image_storage_path"] = nil
       state["wallpaper_gradient_theme_id"] = nil
       state["wallpaper_gradient_theme_name"] = nil
       state["gradient_source_theme_id"] = nil
       state["gradient_source_theme_name"] = nil
+    end
+
+    # Keeps wallpaper stable across document row churn by resolving the saved
+    # storage_path back to a current document ID when possible.
+    def reconcile_wallpaper_reference!(state)
+      return false unless state.is_a?(Hash)
+      return false unless state["wallpaper_background_kind"].to_s == "image"
+
+      dirty = false
+      current_id = state["wallpaper_image_document_id"].presence&.to_i
+      current_path = state["wallpaper_image_storage_path"].to_s.presence
+
+      doc_by_id = current_id.present? ? Document.find_by(id: current_id) : nil
+      if wallpaper_doc_eligible_for_user?(doc_by_id)
+        if doc_by_id.storage_path.present? && current_path != doc_by_id.storage_path
+          state["wallpaper_image_storage_path"] = doc_by_id.storage_path
+          dirty = true
+        end
+        return dirty
+      end
+
+      return dirty if current_path.blank?
+
+      doc_by_path = Document.find_by(storage_path: current_path)
+      return dirty unless wallpaper_doc_eligible_for_user?(doc_by_path)
+
+      if state["wallpaper_image_document_id"].to_i != doc_by_path.id
+        state["wallpaper_image_document_id"] = doc_by_path.id
+        dirty = true
+      end
+      if state["wallpaper_image_storage_path"] != doc_by_path.storage_path
+        state["wallpaper_image_storage_path"] = doc_by_path.storage_path
+        dirty = true
+      end
+
+      dirty
     end
 
     def wallpaper_doc_eligible_for_user?(doc)

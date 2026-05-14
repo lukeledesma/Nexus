@@ -14,6 +14,10 @@ Primary objective is preserving and improving the "live and snappy" experience a
 - Confirm production latency improvements under normal and burst usage.
 - If needed, add objective timing checks and thresholds.
 
+3. Wallpaper persistence regression backlog item
+- Investigate and eliminate any flow where wallpaper can clear after unrelated UI changes.
+- Add a regression test that simulates side-panel preview interactions before/after reload and verifies wallpaper persistence in both API response and workspace state file.
+
 ## Near-Term Improvements
 
 1. Reduce remaining request noise

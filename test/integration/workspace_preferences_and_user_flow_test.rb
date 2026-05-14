@@ -36,6 +36,30 @@ class WorkspacePreferencesAndUserFlowTest < ActionDispatch::IntegrationTest
     assert_match(/gradient wallpaper is no longer supported/i, response.parsed_body.fetch("error"))
   end
 
+  test "workspace preferences update without wallpaper params preserves wallpaper" do
+    images_root = Apps::FinderController.workspace_section_root(@user, "images")
+    doc = images_root.children.create!(title: "preserve-wall.jpg", is_folder: false, content_type: "asset", content: "")
+    doc.update_columns(storage_path: "#{@user.username}/Finder/Images/preserve-wall.jpg")
+
+    manager = WorkspacePreferences::Manager.new(user: @user)
+    result = manager.apply_wallpaper_image(doc.id)
+    assert result.success?
+    manager.persist!
+
+    patch workspace_preferences_path,
+      params: { appearance: { hue: 210, saturation: 10, brightness: 20, transparency: 0.9 } },
+      as: :json
+
+    assert_response :success
+    body = response.parsed_body
+    assert_equal "image", body.fetch("wallpaper_background_kind")
+    assert_equal doc.id, body.fetch("wallpaper_image_document_id")
+
+    refreshed = WorkspacePreferences::Manager.new(user: @user).payload.payload
+    assert_equal "image", refreshed.fetch("wallpaper_background_kind")
+    assert_equal doc.id, refreshed.fetch("wallpaper_image_document_id")
+  end
+
   test "workspace preferences show does not clear wallpaper when referenced doc is missing" do
     manager = WorkspacePreferences::Manager.new(user: @user)
     manager.payload
@@ -89,6 +113,35 @@ class WorkspacePreferencesAndUserFlowTest < ActionDispatch::IntegrationTest
     stored = JSON.parse(File.read(state_file))
     assert_equal "image", stored.fetch("wallpaper_background_kind")
     assert_equal ineligible.id, stored.fetch("wallpaper_image_document_id")
+  end
+
+  test "workspace preferences show heals stale wallpaper id from storage path" do
+    manager = WorkspacePreferences::Manager.new(user: @user)
+    manager.payload
+    state_file = manager.send(:workspace_state_file)
+
+    images_root = Apps::FinderController.workspace_section_root(@user, "images")
+    doc = images_root.children.create!(title: "heal-wall.jpg", is_folder: false, content_type: "asset", content: "")
+    doc.update_columns(storage_path: "#{@user.username}/Finder/Images/heal-wall.jpg")
+
+    File.write(state_file, JSON.pretty_generate({
+      active_theme_id: "default",
+      wallpaper_background_kind: "image",
+      wallpaper_image_document_id: 999_999,
+      wallpaper_image_storage_path: doc.storage_path
+    }) + "\n")
+
+    get workspace_preferences_path, as: :json
+
+    assert_response :success
+    body = response.parsed_body
+    assert_equal "image", body.fetch("wallpaper_background_kind")
+    assert_equal doc.id, body.fetch("wallpaper_image_document_id")
+
+    stored = JSON.parse(File.read(state_file))
+    assert_equal "image", stored.fetch("wallpaper_background_kind")
+    assert_equal doc.id, stored.fetch("wallpaper_image_document_id")
+    assert_equal doc.storage_path, stored.fetch("wallpaper_image_storage_path")
   end
 
   test "update username rejects wrong current password" do
