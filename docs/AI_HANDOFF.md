@@ -1,6 +1,6 @@
 # AI Handoff - Current Project State
 
-Last updated: 2026-05-10
+Last updated: 2026-05-13
 
 ## Project Purpose
 
@@ -14,48 +14,66 @@ Nexus is a browser-based OS-like workspace built on Rails. The core product prom
 
 - Branch: main
 - Production host: nxs.tools
+- Rails version: 8.1.3
+- Ruby version: 3.2.3
 - Action Cable route: /cable
 - Deploy pipeline: script-based via deploy/deploy_server.sh
-- Latest known deployment commit (from recent run): ef1b5c9
 
 ## What Was Recently Completed
 
-1. Realtime synchronization infrastructure:
+1. Security dependency audit and full remediation (2026-05-13):
+- Upgraded Rails 8.1.2 → 8.1.3, resolving 9 CVEs across actionpack, actionview, activestorage, activesupport.
+- Upgraded rack 3.2.5 → 3.2.6, resolving 11 CVEs including High-severity static file exposure and multipart DoS.
+- Upgraded rack-session 2.1.1 → 2.1.2, resolving a Critical RCE via Marshal deserialization on session forgery (CVE-2026-39324).
+- Upgraded addressable 2.8.9 → 2.9.0, resolving High-severity ReDoS (CVE-2026-35611).
+- Upgraded nokogiri 1.19.1 → 1.19.3, resolving High-severity CSS selector ReDoS.
+- Upgraded mcp 0.8.0 → 0.15.0, resolving High-severity SSE stream hijacking (CVE-2026-33946).
+- secret_key_base rotated after rack-session upgrade (required to fully remediate session forgery CVE).
+- bundler-audit and brakeman both return clean after all upgrades.
+- See docs/SECURITY_AUDIT_2026_05_13.md for the full report.
+
+2. Test suite fixes (2026-05-13):
+- Removed duplicate private `files_by_date` definition in TimeCardController (was causing 404 on the action).
+- Added `apply_theme_gradient` rejection to WorkspacePreferencesController (returns 422 as expected).
+- Added `require "minitest/mock"` to test_helper (Minitest 6 no longer auto-includes stub).
+- Fixed `Finder::MigrationService` to use module nesting (required by Zeitwerk in Rails 8.1.3).
+- Implemented `migrate_legacy_favorites!` in FinderWorkspaceInitializer.
+- All 98 tests pass, 0 failures, 0 errors.
+
+3. Realtime synchronization infrastructure:
 - User-scoped Action Cable channel for app/document/state updates.
 - Frontend subscription wiring for receiving and applying remote updates.
 
-2. Production websocket reliability:
+4. Production websocket reliability:
 - nginx /cable proxy configured with websocket upgrade headers.
 - Production websocket upgrades verified in logs.
 
-3. Calendar persistence redesign:
+5. Calendar persistence redesign:
 - Calendar events persisted to a single Embedded Calendar file.
 - Save flow normalized through service layer.
 
-4. Save behavior tuning for UX:
+6. Save behavior tuning for UX:
 - Notes and Time Card changed from per-keystroke save to blur/unselect save.
 
-5. Finder noise/performance mitigation:
+7. Finder noise/performance mitigation:
 - Request noise reduction changes (including prefetch behavior tuning).
 
-6. Image/wallpaper performance improvement:
+8. Image/wallpaper performance improvement:
 - Production asset delivery shifted to nginx-backed X-Accel-Redirect flow.
 - Rails now authorizes then delegates file bytes to nginx for faster serving.
 
-7. Deploy script hardening:
+9. Deploy script hardening:
 - Handles git clean failures caused by bootsnap cache race conditions.
 - Fixes heredoc command-substitution bug so remote status checks run remotely.
 - Deploy summaries now report Puma and nginx status correctly.
 
 ## Known Working Expectations
 
-- Deploy script should complete and report:
-  - local commit
-  - server commit
-  - puma status active
-  - nginx status active
+- `./bin/audit` returns no vulnerabilities (bundler-audit + brakeman both clean).
+- `bin/rails test` passes 98 tests, 0 failures, 0 errors.
+- Deploy script should complete and report: local commit, server commit, puma status active, nginx status active.
 - Production realtime should not require manual refresh for supported features.
-- Production image/wallpaper loading should be materially faster than previous Rails-only serving path.
+- Production image/wallpaper loading should be materially faster than the previous Rails-only serving path.
 
 ## Active Priorities
 
@@ -73,9 +91,9 @@ Nexus is a browser-based OS-like workspace built on Rails. The core product prom
 
 Start with these files in this order:
 
-1. [README.md](README.md)
+1. [README.md](../README.md)
 2. [FEATURES.md](FEATURES.md)
 3. [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md)
 4. [COMMANDS.md](COMMANDS.md)
 
-Then run a production validation sweep before changing behavior.
+Then run `./bin/audit` and `bin/rails test` to confirm baseline health before changing anything.

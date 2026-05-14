@@ -19,6 +19,11 @@ This folder is organized so a new engineer or AI can get productive quickly.
 - Core architecture and runtime behavior: [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md)
 - Feature behavior and ownership map: [FEATURES.md](FEATURES.md)
 
+## Security & Maintenance Records
+
+- [SECURITY_AUDIT_2026_05_13.md](SECURITY_AUDIT_2026_05_13.md) — dependency security audit and remediation (May 2026)
+- [CLEANUP_SUMMARY_2026_05_12.md](CLEANUP_SUMMARY_2026_05_12.md) — code cleanup and consolidation log (May 2026)
+
 ## Legacy / Historical References
 
 The following files are historical audits and snapshots, useful for archaeology but not the first source for current behavior:
@@ -27,7 +32,6 @@ The following files are historical audits and snapshots, useful for archaeology 
 - [NEXUS_FULL_REPO_AUDIT_2026-05-06.md](NEXUS_FULL_REPO_AUDIT_2026-05-06.md)
 - [NEXUS_REBUILD_PHASE1_AUDIT.md](NEXUS_REBUILD_PHASE1_AUDIT.md)
 - [DB_DIAGNOSTICS.md](DB_DIAGNOSTICS.md)
-- [audit/](audit/)
 
 ## Documentation Update Rule
 

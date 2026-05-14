@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+echo "[audit] Running bundler-audit..."
+./bin/bundler-audit check --update
+
+echo "[audit] Running brakeman..."
+./bin/brakeman -q -w2
+
+if [[ -f package.json ]]; then
+  if [[ -f package-lock.json ]]; then
+    echo "[audit] Running npm audit..."
+    npm audit
+  else
+    echo "[audit] Skipping npm audit: package-lock.json not found."
+    echo "[audit] Create one with: npm i --package-lock-only"
+  fi
+else
+  echo "[audit] Skipping npm audit: package.json not found (importmap setup)."
+fi
+
+echo "[audit] Completed."

@@ -1,105 +1,133 @@
 # Nexus
 
-Nexus is a Rails workspace app with desktop-style windows and a folder-based organizer.
+A browser-based workspace application built with Rails. Provides desktop-style windows, a folder-based file organizer, and real-time synchronization across devices.
 
-Current modules include Notes, Tasks, Time Card, Images, and Audio.
+**Stack:** Ruby 3.2.3 · Rails 8.1.3 · PostgreSQL · Hotwire · Action Cable
 
-It stores data in PostgreSQL and mirrors workspace content to disk for predictable synchronization behavior.
+Source: [github.com/lukeledesma/Nexus](https://github.com/lukeledesma/Nexus)  
+Production: [nxs.tools](https://nxs.tools)
 
-Source: [github.com/lukeledesma/Nexus](https://github.com/lukeledesma/Nexus)
+---
 
-## What It Does
+## Overview
 
-- Organizer-style navigation for folders and documents.
-- App windows for Notes, Tasks, Time Card, Images, and Audio.
-- Autosave editing for text and task workflows.
-- Filesystem-aware sync under storage/workspace.
+Nexus delivers an OS-like experience in the browser. All content is stored in PostgreSQL and mirrored to disk under `storage/workspace/` for predictable sync behavior.
 
-## Included Apps
+**Included apps:**
 
-- Notes: rich text note editing with autosave.
-- Tasks: task lists with subtasks and inline notes.
-- Time Card: clock in/out workflow with saved note state.
-- Images: browse uploaded image assets in the workspace.
-- Audio: browse and preview supported audio assets.
+- **Finder** — folder tree with file operations (create, rename, move, delete, favorites)
+- **Notes** — rich text editor with autosave
+- **Tasks** — task lists with subtasks and inline notes
+- **Time Card** — clock in/out workflow with per-day saved state
+- **Calendar** — event scheduling with persistent embedded storage
+- **Images** — browse and view uploaded image assets
+- **Audio** — browse and preview audio files
 
-## Core Behavior
+**Core shell behavior:**
 
-- Open, rename, move, and delete files/folders from the organizer UI.
-- Save app content into Finder folders as workspace documents.
-- Keep draft flows for linked apps (task, note, time card) under Embedded.
-- Persist and restore window state across refresh.
+- Desktop-style windowing with open/close/toggle interactions
+- Organizer sidebar for navigating the workspace folder tree
+- Real-time sync across sessions via Action Cable
+- Window state persisted and restored across page refreshes
+- nginx-backed asset delivery via `X-Accel-Redirect` for fast image/audio serving
+
+---
 
 ## Quick Start
 
-### Requirements
-
-- Ruby 3.2.3
-- PostgreSQL
-- Bundler
-
-### Run Locally
+**Requirements:** Ruby 3.2.3, PostgreSQL, Bundler
 
 ```bash
 bundle install
-bin/rails db:create
-bin/rails db:migrate
+bin/rails db:create db:migrate
 bin/rails server
 ```
 
-Open http://localhost:3000
+Open [http://localhost:3000](http://localhost:3000)
 
-### Run Tests
+---
+
+## Testing
 
 ```bash
-bin/rails test
+bin/rails test           # unit + integration (98 tests)
+bin/rails test:system    # system tests via Capybara + Chrome
 ```
 
-## Repo Map
+---
 
-- docs/COMMANDS.md: command and deploy reference.
-- docs/UI_GUIDE.md: UI behavior and interaction rules.
-- docs/DEV_GUIDE.md: technical architecture and implementation details.
-- deploy/: deployment scripts and local deploy env template.
+## Security
+
+All dependencies are audited on every run of `./bin/audit`, which runs:
+
+- **bundler-audit** — checks gems against the ruby-advisory-db
+- **brakeman** — static analysis for Rails security vulnerabilities
+
+Run the audit locally before pushing:
+
+```bash
+./bin/audit
+```
+
+The latest security audit and remediation log is at [`docs/SECURITY_AUDIT_2026_05_13.md`](docs/SECURITY_AUDIT_2026_05_13.md).
+
+---
 
 ## Deployment
 
-Nexus includes two scripts for a GitHub-first deploy flow:
+Nexus uses a two-script GitHub-first deploy flow:
 
 ```bash
+# 1. Stage all changes, prompt for commit message, push to GitHub
 ./deploy/deploy_github.sh
+
+# 2. SSH to server, git pull, bundle install, precompile assets, restart Puma
 ./deploy/deploy_server.sh
+
+# Or do both in one shot:
+./deploy.sh
 ```
 
-Set deploy environment values in deploy/deploy.local.env using deploy/deploy.local.env.example.
+**Setup:** Copy `deploy/deploy.local.env.example` → `deploy/deploy.local.env` and fill in your server details. This file is gitignored and never committed.
 
-For full operations details, see docs/COMMANDS.md.
+See [`docs/COMMANDS.md`](docs/COMMANDS.md) for the full operations runbook.
+
+---
 
 ## Environment Variables
 
-Production database settings:
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `NEXUS_DEPLOY_HOST` | ✅ | — | Production server hostname |
+| `NEXUS_DATABASE_PASSWORD` | ✅ | — | PostgreSQL password |
+| `RAILS_MASTER_KEY` | ✅ | — | Must match `config/master.key` |
+| `NEXUS_DB_NAME` | — | `nexus_production` | Database name |
+| `NEXUS_DB_USER` | — | `nexus` | Database user |
+| `NEXUS_DEPLOY_USER` | — | `deploy` | SSH user |
+| `NEXUS_DEPLOY_APP` | — | `/home/deploy/apps/nexus` | App path on server |
+| `NEXUS_DEPLOY_SSH_KEY` | — | `~/.ssh/id_ed25519` | SSH key path |
+| `NEXUS_DEPLOY_RUBY` | — | rbenv default | Ruby bin path on server |
 
-- NEXUS_DATABASE_PASSWORD
-- NEXUS_DB_NAME (default: nexus_production)
-- NEXUS_DB_USER (default: nexus)
+---
 
-Deploy settings:
+## Documentation
 
-- NEXUS_DEPLOY_HOST (required)
-- NEXUS_DEPLOY_USER (optional)
-- NEXUS_DEPLOY_APP (optional)
-- NEXUS_DEPLOY_RUBY (optional)
-- NEXUS_DEPLOY_SSH_KEY (optional)
+| File | Purpose |
+|---|---|
+| [`docs/FEATURES.md`](docs/FEATURES.md) | Feature-level behavior map |
+| [`docs/SYSTEM_ARCHITECTURE.md`](docs/SYSTEM_ARCHITECTURE.md) | Data flow and system design |
+| [`docs/DEV_GUIDE.md`](docs/DEV_GUIDE.md) | Technical architecture and implementation details |
+| [`docs/COMMANDS.md`](docs/COMMANDS.md) | Deploy and operations reference |
+| [`docs/UI_GUIDE.md`](docs/UI_GUIDE.md) | UI behavior and interaction rules |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Planned work and open questions |
+| [`docs/AI_HANDOFF.md`](docs/AI_HANDOFF.md) | Current project state for AI continuity |
 
-Rails credentials:
+---
 
-- RAILS_MASTER_KEY must match config/master.key
+## Contributing
 
-## Contributing Notes
-
-When changing behavior:
-
-1. Keep backend and frontend changes cohesive.
-2. Preserve useful failure logs.
-3. Update docs when commands or deploy assumptions change.
-4. Validate create, edit, delete, and asset delivery in a production-like run.
+1. Run `./bin/audit` before pushing — must return no vulnerabilities.
+2. Run `bin/rails test` — must pass with 0 failures and 0 errors.
+3. Keep backend and frontend changes cohesive.
+4. Update [`docs/AI_HANDOFF.md`](docs/AI_HANDOFF.md) after any significant work.
+5. Validate create, edit, delete, and asset delivery before deploying to production.

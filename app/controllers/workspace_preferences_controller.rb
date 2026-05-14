@@ -7,6 +7,10 @@ class WorkspacePreferencesController < ApplicationController
   end
 
   def update
+    if params[:apply_theme_gradient].present?
+      return render json: { error: "Gradient wallpaper is no longer supported." }, status: :unprocessable_entity
+    end
+
     if params[:theme].present?
       result = preferences_manager.apply_theme(params[:theme])
       return render json: result.payload, status: :unprocessable_entity unless result.success?

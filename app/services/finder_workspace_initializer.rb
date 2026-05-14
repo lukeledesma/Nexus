@@ -24,6 +24,7 @@ class FinderWorkspaceInitializer
     migrate_documents_section_to_tasks!(finder_root)
 
     roots = ensure_section_roots!(finder_root)
+    migrate_legacy_favorites!(finder_root, roots["documents"])
 
     roots
   rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid
@@ -74,6 +75,18 @@ class FinderWorkspaceInitializer
       title = definition[:title]
       existing = finder_root.children.folders.find { |d| d.title.to_s.strip.casecmp?(title) }
       out[definition[:key]] = existing || finder_root.children.create!(is_folder: true, title: title)
+    end
+  end
+
+  def migrate_legacy_favorites!(finder_root, tasks_root)
+    favorites = finder_root.children.folders.find { |d| d.title.to_s.strip.casecmp?(Apps::FinderController::FAVORITES_SECTION_TITLE) }
+    return unless favorites && tasks_root
+
+    Document.transaction do
+      favorites.children.where(is_folder: false).find_each do |child|
+        child.update!(parent: tasks_root, is_favorited: true)
+      end
+      favorites.destroy!
     end
   end
 
