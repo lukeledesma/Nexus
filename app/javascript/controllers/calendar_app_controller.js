@@ -119,6 +119,9 @@ export default class extends Controller {
       console.error("Failed to load events from file:", error)
     })
 
+    // Listen for push notifications from the Action Cable sync channel.
+    this.boundCalendarRemoteChanged = (event) => this.handleCalendarRemoteChanged(event)
+    window.addEventListener("nexus:calendar-remote-changed", this.boundCalendarRemoteChanged)
   }
 
   disconnect() {
@@ -129,6 +132,7 @@ export default class extends Controller {
     window.removeEventListener("pointermove", this.boundDragMove)
     window.removeEventListener("pointerup", this.boundDragEnd)
     window.removeEventListener("pointercancel", this.boundDragEnd)
+    window.removeEventListener("nexus:calendar-remote-changed", this.boundCalendarRemoteChanged)
   }
 
   handleUserStateLoaded(event) {
@@ -149,27 +153,27 @@ export default class extends Controller {
     this.renderAll()
   }
 
-  async handleRemoteDocumentChanged(event) {
+  handleRemoteDocumentChanged(event) {
+    // When time card date changes, reload time cards to update calendar display
     const detail = event?.detail || {}
-    const contentType = String(detail.content_type || "")
-
-    if (contentType === "note") {
-      // Time card changed; reload time card markers on the calendar display.
+    if (String(detail.content_type || "") === "note") {
+      // Time card changed; reload time cards by date
       this.loadTimeCardFilesByDate().then((loaded) => {
         if (loaded) this.renderBody()
       }).catch((_error) => {
         // non-blocking
       })
-    } else if (contentType === "calendar_events") {
-      // Calendar document saved on another device — re-fetch and re-render.
-      // Skip if our own write just echoed back (timestamps match).
-      if (detail.updated_at && detail.updated_at === this.remoteTimestamp) return
-      // Skip if we have a local write in progress — our version will win.
-      if (this.saveInFlight || this.savePending || this.latestSaveToken !== this.lastPersistedToken) return
-      this.remoteTimestamp = detail.updated_at || null
-      const loaded = await this.loadEventsFromFile()
-      if (loaded) this.renderAll()
     }
+  }
+
+  async handleCalendarRemoteChanged({ detail }) {
+    // Skip if our own write just echoed back (timestamps match).
+    if (detail?.updated_at && detail.updated_at === this.remoteTimestamp) return
+    // Skip if we have a local write in progress — our version will win.
+    if (this.saveInFlight || this.savePending || this.latestSaveToken !== this.lastPersistedToken) return
+    this.remoteTimestamp = detail?.updated_at || null
+    const loaded = await this.loadEventsFromFile()
+    if (loaded) this.renderAll()
   }
 
   readCalendars() {

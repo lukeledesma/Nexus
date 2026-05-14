@@ -68,10 +68,14 @@ class Document < ApplicationRecord
     value = title.to_s.strip.downcase
     return false if value.blank?
 
-    identities = User.pluck(:username, :email).flatten.compact.map { |v| v.to_s.strip.downcase }.reject(&:blank?).uniq
-    identities.any? do |identity|
-      value == identity || value.match?(/\A#{Regexp.escape(identity)} \d+\z/)
-    end
+    # Fast path: exact match against any username or email (single EXISTS query).
+    return true if User.where("LOWER(username) = :v OR LOWER(email) = :v", v: value).exists?
+
+    # Handle "username 2", "username 3" style duplicate workspace roots.
+    stem = value.sub(/\s+\d+\z/, "")
+    return false if stem == value # no trailing number — already ruled out by exact match above
+
+    User.where("LOWER(username) = :v OR LOWER(email) = :v", v: stem).exists?
   end
 
   # Embedded and fixed Finder section roots under the user workspace cannot be renamed/deleted from the UI.

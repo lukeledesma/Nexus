@@ -357,48 +357,4 @@ class DocumentStorageSyncLite
     "#{prefix}[#{marker}] #{text}"
   end
 
-  # Extracted reusable utility methods for file and folder operations
-  # Created a shared module for file and folder handling logic
-  module FileAndFolderOperations
-    def next_available_filename(base_path, title, extension: ".txt", exclude_path: nil)
-      base_name = normalize_name(title, fallback: "Untitled Item")
-      candidate = "#{base_name}#{extension}"
-      return candidate unless path_taken?(base_path.join(candidate), exclude_path)
-
-      suffix = 2
-      loop do
-        numbered = "#{base_name} #{suffix}#{extension}"
-        return numbered unless path_taken?(base_path.join(numbered), exclude_path)
-
-        suffix += 1
-      end
-    end
-
-    def next_available_directory_name(base_path, title, exclude_path: nil)
-      base_name = normalize_name(title, fallback: "Untitled Folder")
-      return base_name unless path_taken?(base_path.join(base_name), exclude_path)
-
-      suffix = 2
-      loop do
-        numbered = "#{base_name} #{suffix}"
-        return numbered unless path_taken?(base_path.join(numbered), exclude_path)
-
-        suffix += 1
-      end
-    end
-
-    private
-
-    def normalize_name(value, fallback:)
-      normalized = value.to_s.strip
-      normalized.present? ? normalized : fallback
-    end
-
-    def path_taken?(candidate_path, exclude_path)
-      return false unless candidate_path.exist?
-      return true if exclude_path.blank?
-
-      candidate_path.to_s != Pathname.new(exclude_path).to_s
-    end
-  end
 end

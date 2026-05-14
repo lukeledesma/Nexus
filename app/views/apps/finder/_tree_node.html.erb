@@ -129,7 +129,7 @@
               aria: { label: "Open #{node[:title]}" } do %>
           <% if thumb_url %>
             <span class="finder-tree__icon finder-tree__icon--thumb" aria-hidden="true">
-              <img class="finder-tree__thumb" src="<%= thumb_url %>" alt="" loading="lazy" decoding="async">
+              <img class="finder-tree__thumb" src="<%= thumb_url %>" alt="" loading="lazy" decoding="async" onerror="this.style.visibility='hidden'">
             </span>
           <% else %>
             <span class="finder-tree__icon finder-tree__icon--file" aria-hidden="true">
@@ -156,7 +156,7 @@
               aria: { label: "Open #{node[:title]}" } do %>
           <% if thumb_url %>
             <span class="finder-tree__icon finder-tree__icon--thumb" aria-hidden="true">
-              <img class="finder-tree__thumb" src="<%= thumb_url %>" alt="" loading="lazy" decoding="async">
+              <img class="finder-tree__thumb" src="<%= thumb_url %>" alt="" loading="lazy" decoding="async" onerror="this.style.visibility='hidden'">
             </span>
           <% else %>
             <span class="finder-tree__icon finder-tree__icon--file" aria-hidden="true">
@@ -174,7 +174,7 @@
         >
           <% if thumb_url %>
             <span class="finder-tree__icon finder-tree__icon--thumb" aria-hidden="true">
-              <img class="finder-tree__thumb" src="<%= thumb_url %>" alt="" loading="lazy" decoding="async">
+              <img class="finder-tree__thumb" src="<%= thumb_url %>" alt="" loading="lazy" decoding="async" onerror="this.style.visibility='hidden'">
             </span>
           <% else %>
             <span class="finder-tree__icon finder-tree__icon--file" aria-hidden="true">

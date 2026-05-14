@@ -1,6 +1,6 @@
 # AI Handoff - Current Project State
 
-Last updated: 2026-05-14
+Last updated: 2026-05-14 (evening)
 
 ## Project Purpose
 
@@ -43,6 +43,15 @@ Nexus is a browser-based OS-like workspace built on Rails. The core product prom
 3. Realtime synchronization infrastructure:
 - User-scoped Action Cable channel for app/document/state updates.
 - Frontend subscription wiring for receiving and applying remote updates.
+
+11. Image thumbnails (2026-05-14):
+- Documents::GenerateThumbnail service uses ImageMagick (via image_processing/mini_magick) to generate 28×28 WebP thumbnails.
+- Thumbnails stored at storage/workspace/.thumbnails/{doc_id}.webp — keyed by ID so they survive renames.
+- Generated automatically on upload; deleted when document is destroyed.
+- Served via GET /documents/:id/thumbnail with X-Accel-Redirect in production, send_file in development.
+- Finder tree node includes thumbnail_url when thumbnail exists on disk; _tree_node.html.erb shows <img> instead of the file icon for image files.
+- bin/rails nexus:backfill_thumbnails generates missing thumbnails for all existing image assets.
+- Requires ImageMagick installed: `brew install imagemagick` (macOS) / `sudo apt install imagemagick` (server).
 
 10. Unified broadcast system (2026-05-14):
 - UserSyncChannel consolidated from 6 methods to 3: broadcast_state_change, broadcast_document_change, broadcast_workspace_change.

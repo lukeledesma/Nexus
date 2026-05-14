@@ -545,13 +545,17 @@ class DocumentsController < ApplicationController
     folders = Document.folders.includes(:children).order(Arel.sql("LOWER(title) ASC"))
 
     @browser_folders = folders.map do |folder|
-      files = folder.children.files.order(Arel.sql("LOWER(title) ASC")).map do |file_doc|
-        {
-          name: file_doc.title,
-          document: file_doc,
-          content_type: file_doc.content_type
-        }
-      end
+      # Use the preloaded :children association and filter in Ruby — avoids one query per folder.
+      files = folder.children
+        .reject(&:folder?)
+        .sort_by { |f| f.title.to_s.downcase }
+        .map do |file_doc|
+          {
+            name: file_doc.title,
+            document: file_doc,
+            content_type: file_doc.content_type
+          }
+        end
 
       {
         name: folder.title,
@@ -567,7 +571,8 @@ class DocumentsController < ApplicationController
 
   def next_folder_name
     base = "Untitled Folder"
-    names = Document.folders.pluck(:title).map(&:to_s)
+    # Scope to root-level folders only — no need to scan the entire documents table.
+    names = Document.where(is_folder: true, parent_id: nil).pluck(:title).map(&:to_s)
     return base unless names.include?(base)
 
     nums = names

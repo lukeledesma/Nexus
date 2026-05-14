@@ -3,14 +3,9 @@
 // Subscribes to UserSyncChannel when a user is logged in and applies incoming
 // changes in-place so no page refresh is needed on other devices.
 //
-// Three message types from the server:
-//
-//   state_changed     — a NexusUserState key changed on another device
-//   document_changed  — document content saved (notes, tasks, calendar events, assets)
-//   workspace_changed — finder structure or wallpaper changed
-//
-// Each is translated into a DOM CustomEvent so downstream controllers
-// don't need to know about Action Cable directly.
+// Message types handled:
+//   state_changed  — a NexusUserState key was updated on another device
+//   calendar_changed — Calendar.txt was updated on another device
 
 import { createConsumer } from "@rails/actioncable"
 
@@ -32,10 +27,16 @@ let consumer = null
 function handleMessage(data) {
   if (data.type === "state_changed") {
     handleStateChanged(data)
+  } else if (data.type === "calendar_changed") {
+    handleCalendarChanged(data)
+  } else if (data.type === "task_list_changed") {
+    handleTaskListChanged(data)
   } else if (data.type === "document_changed") {
     handleDocumentChanged(data)
-  } else if (data.type === "workspace_changed") {
-    handleWorkspaceChanged(data)
+  } else if (data.type === "finder_changed") {
+    handleFinderChanged(data)
+  } else if (data.type === "wallpaper_changed") {
+    handleWallpaperChanged(data)
   }
 }
 
@@ -66,26 +67,36 @@ function handleStateChanged({ key, value }) {
   }))
 }
 
-// Dispatch a single nexus:document-remote-changed event. Downstream controllers
-// filter by document_id and/or content_type to decide whether to act.
+// Signal the calendar controller that a remote change happened.
+// The controller already knows how to re-fetch and re-render.
+function handleCalendarChanged({ updated_at }) {
+  window.dispatchEvent(new CustomEvent("nexus:calendar-remote-changed", {
+    detail: { updated_at }
+  }))
+}
+
+function handleTaskListChanged({ document_id, tasks, updated_at }) {
+  window.dispatchEvent(new CustomEvent("nexus:task-list-remote-changed", {
+    detail: { document_id, tasks, updated_at }
+  }))
+}
+
 function handleDocumentChanged({ document_id, content_type, content, tasks, updated_at }) {
   window.dispatchEvent(new CustomEvent("nexus:document-remote-changed", {
     detail: { document_id, content_type, content, tasks, updated_at }
   }))
 }
 
-// Translate workspace_changed into the specific DOM event each downstream
-// controller already listens for, so those controllers need no changes.
-function handleWorkspaceChanged({ kind, section_key, wallpaper_background_kind, wallpaper_image_document_id }) {
-  if (kind === "finder") {
-    window.dispatchEvent(new CustomEvent("nexus:finder-structure-changed", {
-      detail: { sectionKey: section_key || null }
-    }))
-  } else if (kind === "wallpaper") {
-    window.dispatchEvent(new CustomEvent("nexus:wallpaper-changed", {
-      detail: { wallpaper_background_kind, wallpaper_image_document_id }
-    }))
-  }
+function handleFinderChanged({ section_key }) {
+  window.dispatchEvent(new CustomEvent("nexus:finder-structure-changed", {
+    detail: { sectionKey: section_key || null }
+  }))
+}
+
+function handleWallpaperChanged({ wallpaper_background_kind, wallpaper_image_document_id }) {
+  window.dispatchEvent(new CustomEvent("nexus:wallpaper-changed", {
+    detail: { wallpaper_background_kind, wallpaper_image_document_id }
+  }))
 }
 
 function connect() {

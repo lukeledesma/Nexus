@@ -84,27 +84,28 @@ class DocumentDiskLoader
 
     def sync_from_disk!(purge_missing:)
       seen_paths = []
+      folder_paths = disk_folder_paths
+      file_entries = disk_file_entries
+      known_paths = folder_paths + file_entries.map { |entry| entry[:relative_path] }
+      existing_documents_by_storage_path = preload_documents_by_storage_path(known_paths)
 
-      folder_docs = upsert_folders_from_disk!(seen_paths)
-      upsert_files_from_disk!(seen_paths, folder_docs)
+      folder_docs = upsert_folders_from_disk!(seen_paths, folder_paths, existing_documents_by_storage_path)
+      upsert_files_from_disk!(seen_paths, folder_docs, file_entries, existing_documents_by_storage_path)
       purge_missing_from_database!(seen_paths) if purge_missing
     end
 
-    def upsert_folders_from_disk!(seen_paths)
-      folder_paths = Find.find(storage_root.to_s)
-        .select { |path| File.directory?(path) }
-        .map { |path| relative_disk_path(path) }
-        .reject(&:blank?)
-        .reject { |path| hidden_path?(path) }
-        .sort_by { |path| [ path.count("/"), path ] }
-
+    def upsert_folders_from_disk!(seen_paths, folder_paths, existing_documents_by_storage_path)
       folders = {}
       folder_paths.each do |relative_path|
         parent_relative = File.dirname(relative_path)
         parent_relative = nil if parent_relative == "."
         parent = parent_relative.present? ? folders[parent_relative] : nil
 
-        document = find_or_initialize_by_storage_path(relative_path, is_folder: true)
+        document = find_or_initialize_by_storage_path(
+          relative_path,
+          is_folder: true,
+          existing_documents_by_storage_path: existing_documents_by_storage_path
+        )
         document.assign_attributes(
           is_folder: true,
           parent: parent,
@@ -126,14 +127,10 @@ class DocumentDiskLoader
       folders
     end
 
-    def upsert_files_from_disk!(seen_paths, folder_docs)
-      Find.find(storage_root.to_s) do |path|
-        next unless File.file?(path)
-        next unless supported_file_extension?(path)
-
-        relative_path = relative_disk_path(path)
-        next if hidden_path?(relative_path)
-
+    def upsert_files_from_disk!(seen_paths, folder_docs, file_entries, existing_documents_by_storage_path)
+      file_entries.each do |entry|
+        absolute_path = entry[:absolute_path]
+        relative_path = entry[:relative_path]
         parent_relative = File.dirname(relative_path)
         parent = if parent_relative == "."
           nil
@@ -141,15 +138,19 @@ class DocumentDiskLoader
           folder_docs[parent_relative]
         end
 
-        upsert_file_from_path!(path, relative_path, parent)
+        upsert_file_from_path!(absolute_path, relative_path, parent, existing_documents_by_storage_path)
         seen_paths << relative_path
       end
     end
 
-    def upsert_file_from_path!(absolute_file, relative_path, parent)
+    def upsert_file_from_path!(absolute_file, relative_path, parent, existing_documents_by_storage_path)
       parsed = disk_asset_file?(absolute_file) ? asset_file_attributes : parse_nexus_file(absolute_file)
       title = basename_without_supported_extension(absolute_file)
-      document = find_or_initialize_by_storage_path(relative_path, is_folder: false)
+      document = find_or_initialize_by_storage_path(
+        relative_path,
+        is_folder: false,
+        existing_documents_by_storage_path: existing_documents_by_storage_path
+      )
 
       attributes = {
         is_folder: false,
@@ -215,11 +216,44 @@ class DocumentDiskLoader
       EmbeddedDraftDocument.draft_document?(doc)
     end
 
-    def find_or_initialize_by_storage_path(storage_path, is_folder:)
-      document = Document.find_by(storage_path: storage_path)
+    def find_or_initialize_by_storage_path(storage_path, is_folder:, existing_documents_by_storage_path: nil)
+      document = existing_documents_by_storage_path&.[](storage_path)
       return document if document.present?
 
-      Document.new
+      document = Document.new
+      existing_documents_by_storage_path[storage_path] = document if existing_documents_by_storage_path
+      document
+    end
+
+    def disk_folder_paths
+      Find.find(storage_root.to_s)
+        .select { |path| File.directory?(path) }
+        .map { |path| relative_disk_path(path) }
+        .reject(&:blank?)
+        .reject { |path| hidden_path?(path) }
+        .sort_by { |path| [ path.count("/"), path ] }
+    end
+
+    def disk_file_entries
+      entries = []
+
+      Find.find(storage_root.to_s) do |path|
+        next unless File.file?(path)
+        next unless supported_file_extension?(path)
+
+        relative_path = relative_disk_path(path)
+        next if hidden_path?(relative_path)
+
+        entries << { absolute_path: path, relative_path: relative_path }
+      end
+
+      entries
+    end
+
+    def preload_documents_by_storage_path(paths)
+      return {} if paths.blank?
+
+      Document.where(storage_path: paths.uniq).index_by(&:storage_path)
     end
 
     def relative_disk_path(path)

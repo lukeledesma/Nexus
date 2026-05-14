@@ -4,6 +4,8 @@ require "set"
 
 module Apps
   class FinderController < BaseController
+    skip_before_action :sync_from_disk
+
     DEFAULT_SECTION_KEY = "documents"
     TASKS_SECTION_TITLE = "Tasks"
     TIME_CARD_SECTION_TITLE = "Time Card"
@@ -353,7 +355,6 @@ module Apps
         else
           false
         end
-      has_thumbnail = file_kind == "image" && doc.thumbnail_disk_path&.file?
       {
         kind: :file,
         id: doc.id,
@@ -365,7 +366,10 @@ module Apps
         writable: !doc.protected_workspace_structure?,
         has_linked_app: has_linked_app,
         is_favorited: favorited_flag_for(doc),
-        thumbnail_url: has_thumbnail ? helpers.thumbnail_document_path(doc.id) : nil
+        # Always include thumbnail_url for image assets — no disk stat() on every render.
+        # The thumbnail action returns 404 if the file doesn't exist; the img onerror
+        # handler in the template falls back to the file icon gracefully.
+        thumbnail_url: file_kind == "image" ? helpers.thumbnail_document_path(doc.id) : nil
       }
     end
 
