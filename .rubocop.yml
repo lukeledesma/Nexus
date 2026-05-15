@@ -7,12 +7,9 @@ inherit_gem: { rubocop-rails-omakase: rubocop.yml }
 # Layout/SpaceInsideArrayLiteralBrackets:
 #   Enabled: false
 
-inherit_from:
-  - https://raw.githubusercontent.com/rubocop/rubocop/master/config/default.yml
-
 AllCops:
   NewCops: enable
-  TargetRubyVersion: 3.1
+  TargetRubyVersion: 3.2
 
 Layout/LineLength:
   Max: 120

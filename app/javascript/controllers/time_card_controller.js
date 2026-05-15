@@ -82,6 +82,30 @@ function expandOpenRangeTimeShorthand(token) {
   return expandFlexibleTimeToken(normalized)
 }
 
+function normalizeTopLevelOpenRangeShorthand(text) {
+  const lines = String(text || "").replaceAll("\r", "").split("\n")
+  let changed = false
+
+  const normalized = lines.map((line) => {
+    const lineWithoutTrailing = line.replace(/\s+$/g, "")
+    if (/^\s/.test(lineWithoutTrailing)) return line
+
+    const match = /^(\w+)\s*[-–]\s*$/.exec(lineWithoutTrailing)
+    if (!match) return line
+
+    const expanded = expandOpenRangeTimeShorthand(match[1])
+    if (!expanded) return line
+
+    changed = true
+    return `${expanded}-`
+  })
+
+  return {
+    text: normalized.join("\n"),
+    changed
+  }
+}
+
 function elapsedFromClockInMinutes(clockInMinutes) {
   const now = new Date()
   const start = new Date(now)
@@ -855,7 +879,12 @@ export default class extends Controller {
   }
 
   updateNotes() {
-    const text = this.notesInputTarget.value
+    const rawText = this.notesInputTarget.value
+    const normalized = normalizeTopLevelOpenRangeShorthand(rawText)
+    const text = normalized.text
+    if (normalized.changed && this.notesInputTarget.value !== text) {
+      this.notesInputTarget.value = text
+    }
     this.state.notesText = text
     this.saveState()
     this.renderBackdrop(text)
@@ -892,7 +921,7 @@ export default class extends Controller {
   }
 
   handleNotesKeydown(event) {
-    if (event.key === "-") {
+    if (["-", "Minus", "Subtract", "NumpadSubtract"].includes(String(event.key || ""))) {
       this.handleNotesDashTimeShorthand(event)
       return
     }
