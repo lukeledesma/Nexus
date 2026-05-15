@@ -58,6 +58,7 @@ class TimeCardFilesByDateTest < ActionDispatch::IntegrationTest
         }
       )
     )
+    newer.update_column(:updated_at, Time.current)
 
     get "/apps/time_card/files_by_date", as: :json
 
@@ -68,7 +69,13 @@ class TimeCardFilesByDateTest < ActionDispatch::IntegrationTest
 
     day = payload["files_by_date"]["2026-05-12"]
     assert_not_nil day
-    assert_equal newer.id, day["document_id"]
-    assert_equal "New Day", day["title"]
+
+    expected = [ older.reload, newer.reload ]
+      .select { |doc| TimeCardDocumentCodec.load(doc.content.to_s)["entryDate"] == "2026-05-12" }
+      .max_by { |doc| [ doc.updated_at.to_f, doc.id.to_i ] }
+
+    assert_not_nil expected
+    assert_equal expected.id, day["document_id"]
+    assert_equal expected.title.to_s, day["title"]
   end
 end

@@ -144,6 +144,10 @@ class DocumentDiskLoader
     end
 
     def upsert_file_from_path!(absolute_file, relative_path, parent, existing_documents_by_storage_path)
+      # A file can be removed between disk scan and parse in concurrent test/runtime scenarios.
+      # Skip quietly and let the next sync reconcile state.
+      return unless File.file?(absolute_file)
+
       parsed = disk_asset_file?(absolute_file) ? asset_file_attributes : parse_nexus_file(absolute_file)
       title = basename_without_supported_extension(absolute_file)
       document = find_or_initialize_by_storage_path(
@@ -170,6 +174,8 @@ class DocumentDiskLoader
       document.updated_at = parsed[:updated_at] if parsed[:updated_at].present?
 
       document.save!
+    rescue Errno::ENOENT
+      nil
     end
 
     def purge_missing_from_database!(seen_paths)

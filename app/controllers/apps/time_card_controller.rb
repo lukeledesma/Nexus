@@ -36,27 +36,25 @@ module Apps
       root = Apps::FinderController.workspace_section_root(current_user, "time_card")
       return render json: { ok: true, files_by_date: {} } unless root
 
-      by_date = {}
+      docs_by_date = Hash.new { |hash, key| hash[key] = [] }
       time_card_documents_for_root(root).each do |doc|
         date_key = extract_entry_date(doc)
         next if date_key.blank?
+        docs_by_date[date_key] << doc
+      end
 
-        existing = by_date[date_key]
-        next if existing && existing[:updated_at].to_i >= doc.updated_at.to_i
-
-        by_date[date_key] = {
-          document_id: doc.id,
-          title: doc.title.to_s,
-          updated_at: doc.updated_at
-        }
+      by_date = docs_by_date.transform_values do |documents|
+        documents.max_by do |doc|
+          [ doc.updated_at&.to_f.to_f, doc.id.to_i ]
+        end
       end
 
       render json: {
         ok: true,
         files_by_date: by_date.transform_values do |entry|
           {
-            document_id: entry[:document_id],
-            title: entry[:title]
+            document_id: entry.id,
+            title: entry.title.to_s
           }
         end
       }

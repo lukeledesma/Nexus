@@ -111,8 +111,8 @@ class DocumentsController < ApplicationController
       return
     end
 
-    path = @document.thumbnail_disk_path
-    unless path&.file?
+    path = safe_thumbnail_path_for(@document)
+    unless path
       head :not_found
       return
     end
@@ -125,7 +125,7 @@ class DocumentsController < ApplicationController
       response.headers["X-Accel-Buffering"] = "yes"
       head :ok
     else
-      send_file path.to_s, type: "image/webp", disposition: "inline"
+      send_data path.binread, type: "image/webp", disposition: "inline"
     end
   end
 
@@ -667,6 +667,32 @@ class DocumentsController < ApplicationController
 
     changed = document.previous_changes.keys.map(&:to_s)
     (changed & %w[title parent_id content_type is_folder]).any?
+  end
+
+  def safe_thumbnail_path_for(document)
+    return nil unless document&.id.present?
+
+    thumbnails_root = DocumentStorageSyncLite.storage_root.join(".thumbnails")
+    candidate = thumbnails_root.join("#{document.id}.webp")
+
+    begin
+      root_real = thumbnails_root.realpath
+    rescue StandardError
+      root_real = thumbnails_root.expand_path
+    end
+
+    begin
+      candidate_real = candidate.realpath
+    rescue StandardError
+      candidate_real = candidate.expand_path
+    end
+
+    root_real_str = root_real.to_s
+    candidate_real_str = candidate_real.to_s
+    return nil unless candidate_real_str.start_with?("#{root_real_str}/")
+    return nil unless candidate_real.file?
+
+    candidate_real
   end
 end
 
