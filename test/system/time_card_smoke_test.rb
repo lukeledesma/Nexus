@@ -1,4 +1,5 @@
 require "application_system_test_case"
+# frozen_string_literal: true
 
 class TimeCardSmokeTest < ApplicationSystemTestCase
   setup do
@@ -19,8 +20,8 @@ class TimeCardSmokeTest < ApplicationSystemTestCase
   test "renders time card editor shell" do
     assert_selector ".time-card-app"
     assert_selector ".time-card-notes-textarea"
-    assert_selector "#time-card-clockin-input"
-    assert_selector "#time-card-clockout-input"
+    assert_selector ".time-card-app__date-badge"
+    assert_selector ".time-card-timeline-shell"
   end
 
   test "expands top-level dash shorthand and skips customer and entry lines" do
@@ -28,10 +29,10 @@ class TimeCardSmokeTest < ApplicationSystemTestCase
     textarea.click
 
     textarea.send_keys("10-")
-    assert_equal "10:00-", textarea.value
+    assert_textarea_value(textarea, "10:00-")
 
     textarea.send_keys(:enter, "1345-")
-    assert_equal "10:00-\n13:45-", textarea.value
+    assert_textarea_value(textarea, "10:00-\n13:45-")
 
     textarea.send_keys(:enter, "now-")
     lines = textarea.value.split("\n")
@@ -46,7 +47,7 @@ class TimeCardSmokeTest < ApplicationSystemTestCase
 
     textarea.send_keys(:enter)
     textarea.send_keys("10-")
-    assert_equal "  10-", textarea.value.split("\n").last
+    assert_textarea_value(textarea, "10:00-\n13:45-\n#{lines[2]}\n  10-")
 
     textarea.send_keys(:enter)
     textarea.send_keys("hello")
@@ -62,5 +63,16 @@ class TimeCardSmokeTest < ApplicationSystemTestCase
     fill_in "identifier", with: identifier
     fill_in "password", with: password
     click_on "Sign In"
+  end
+
+  def assert_textarea_value(textarea, expected)
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + Capybara.default_max_wait_time
+    loop do
+      actual = textarea.value
+      return if actual == expected
+      break if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+      sleep 0.05
+    end
+    assert_equal expected, textarea.value
   end
 end
