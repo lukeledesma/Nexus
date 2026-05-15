@@ -45,6 +45,7 @@ export default class extends Controller {
     this.clearPreviewHideTimer()
     this.clearPreviewShowTimer()
     this.clearPeekRestoreTimer()
+    this.clearQueuedPreviewRefreshes()
   }
 
   async launchApp(event) {
@@ -312,6 +313,27 @@ export default class extends Controller {
     this.showPreviewTimer = null
   }
 
+  clearQueuedPreviewRefreshes() {
+    if (!Array.isArray(this.previewRefreshTimers) || this.previewRefreshTimers.length === 0) {
+      this.previewRefreshTimers = []
+      return
+    }
+    this.previewRefreshTimers.forEach((timer) => window.clearTimeout(timer))
+    this.previewRefreshTimers = []
+  }
+
+  queuePreviewRefreshForApp(appKey) {
+    if (!appKey) return
+    this.clearQueuedPreviewRefreshes()
+
+    const refresh = () => this.refreshPreviewIfShowingApp(appKey)
+    requestAnimationFrame(refresh)
+
+    this.previewRefreshTimers ||= []
+    this.previewRefreshTimers.push(window.setTimeout(refresh, 80))
+    this.previewRefreshTimers.push(window.setTimeout(refresh, 220))
+  }
+
   buildPreviewMarkup(appLabel, appKey, instances) {
     const rows = instances.map((windowEl, index) => {
       const instanceKey = String(windowEl.dataset.contentWindowAppKeyValue || appKey)
@@ -430,6 +452,16 @@ export default class extends Controller {
     this.positionPreviewNearRow(row)
     this.previewHost.classList.add("is-visible")
     this.previewHost.setAttribute("aria-hidden", "false")
+  }
+
+  refreshPreviewIfShowingApp(appKey) {
+    if (!appKey) return
+    if (!this.isPreviewVisible()) return
+
+    const sourceAppKey = String(this.previewHost?.dataset.previewSourceAppKey || "").trim()
+    if (sourceAppKey !== String(appKey)) return
+
+    this.refreshPreviewForApp(appKey)
   }
 
   findPanelRowByAppKey(appKey) {
@@ -592,6 +624,8 @@ export default class extends Controller {
         isDraft: true
       }
     }))
+
+    this.queuePreviewRefreshForApp(appKey)
   }
 
   async fetchDraftFile(appKey) {
@@ -607,20 +641,38 @@ export default class extends Controller {
   }
 
   handleAppWindowState(event) {
-    const appKey = event.detail?.appKey
-    if (appKey === "tasks") {
+    const appKey = String(event.detail?.appKey || "").trim()
+    const panelAppKey = this.panelAppKeyForWindowKey(appKey)
+
+    if (panelAppKey === "tasks") {
       this.updateRowState("tasks", this.anyTaskWindowOpen())
+      this.refreshPreviewIfShowingApp("tasks")
       return
     }
-    if (appKey === "notes") {
+    if (panelAppKey === "notes") {
       this.updateRowState("notes", this.anyNoteWindowOpen())
+      this.refreshPreviewIfShowingApp("notes")
       return
     }
-    if (appKey === "time-card") {
+    if (panelAppKey === "time-card") {
       this.updateRowState("time-card", this.anyTimeCardWindowOpen())
+      this.refreshPreviewIfShowingApp("time-card")
       return
     }
-    this.updateRowState(appKey, Boolean(event.detail?.open))
+
+    const resolvedKey = panelAppKey || appKey
+    this.updateRowState(resolvedKey, Boolean(event.detail?.open))
+    this.refreshPreviewIfShowingApp(resolvedKey)
+  }
+
+  panelAppKeyForWindowKey(appKey) {
+    const key = String(appKey || "").trim()
+    if (!key) return ""
+    if (key === "tasks" || key.startsWith("task-spawn-")) return "tasks"
+    if (key === "notes" || key.startsWith("note-spawn-")) return "notes"
+    if (key === "time-card" || key.startsWith("time-card-spawn-")) return "time-card"
+    if (key === "images" || key.startsWith("image-spawn-")) return "images"
+    return key
   }
 
   anyTaskWindowOpen() {

@@ -786,6 +786,21 @@ export default class extends Controller {
       const actionLabel = isFavorited ? "Remove from Favorites" : "Add to Favorites"
       button.title = actionLabel
       button.setAttribute("aria-label", actionLabel)
+
+      // In Favorites view, remove the row immediately when unfavorited.
+      if (this.sectionKeyValue === "favorites" && !isFavorited) {
+        const li = button.closest("li.finder-tree__node--file")
+        if (li instanceof Element) li.remove()
+      }
+
+      // Keep Favorites views in sync across open Finder windows.
+      window.dispatchEvent(new CustomEvent("nexus:finder-structure-changed", {
+        detail: {
+          type: "favorite_toggled",
+          documentId: String(documentId),
+          sectionKey: "favorites"
+        }
+      }))
     } catch (_error) {
       window.alert("Could not update favorite status.")
     }

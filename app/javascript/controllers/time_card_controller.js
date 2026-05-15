@@ -55,6 +55,28 @@ function parseTimeStringToMinutes(value) {
   return h * 60 + min
 }
 
+function roundedNowMinutesToNearestFive() {
+  const now = new Date()
+  const totalMinutes = now.getHours() * 60 + now.getMinutes()
+  const rounded = Math.round(totalMinutes / 5) * 5
+  return rounded % (24 * 60)
+}
+
+function expandOpenRangeTimeShorthand(token) {
+  const normalized = String(token || "").trim().toLowerCase()
+  if (!normalized) return null
+
+  if (normalized === "now") {
+    return minutesToTimeString(roundedNowMinutesToNearestFive())
+  }
+
+  if (!/^\d{1,4}$/.test(normalized)) return null
+
+  const minutes = parseTimeStringToMinutes(normalized)
+  if (!Number.isInteger(minutes)) return null
+  return minutesToTimeString(minutes)
+}
+
 function elapsedFromClockInMinutes(clockInMinutes) {
   const now = new Date()
   const start = new Date(now)
@@ -860,6 +882,11 @@ export default class extends Controller {
   }
 
   handleNotesKeydown(event) {
+    if (event.key === "-") {
+      this.handleNotesDashTimeShorthand(event)
+      return
+    }
+
     if (event.key !== "Enter") return
     if (event.defaultPrevented) return
     if (!this.hasNotesInputTarget) return
@@ -917,6 +944,46 @@ export default class extends Controller {
       textarea.scrollTop = newMaxScroll
     }
 
+    textarea.dispatchEvent(new Event("input", { bubbles: true }))
+  }
+
+  isCustomerOrEntryNotesLine(line) {
+    return /^\s{2,}(?!-)\S.*$/.test(line) || /^(\s*)-\s.*$/.test(line)
+  }
+
+  handleNotesDashTimeShorthand(event) {
+    if (event.defaultPrevented) return
+    if (!this.hasNotesInputTarget) return
+
+    const textarea = this.notesInputTarget
+    const start = Number(textarea.selectionStart)
+    const end = Number(textarea.selectionEnd)
+    if (!Number.isInteger(start) || !Number.isInteger(end)) return
+    if (start !== end) return
+
+    const text = textarea.value
+    const lineStart = text.lastIndexOf("\n", Math.max(0, start - 1)) + 1
+    const lineEndIndex = text.indexOf("\n", end)
+    const lineEnd = lineEndIndex === -1 ? text.length : lineEndIndex
+    const currentLine = text.slice(lineStart, lineEnd)
+    if (this.isCustomerOrEntryNotesLine(currentLine)) return
+
+    const caretOffset = start - lineStart
+    const beforeCaret = currentLine.slice(0, caretOffset)
+    const afterCaret = currentLine.slice(caretOffset)
+    if (/\S/.test(afterCaret)) return
+
+    const shorthand = /^(\s*)(\w+)\s*$/.exec(beforeCaret)
+    if (!shorthand) return
+
+    const leadingWhitespace = shorthand[1] || ""
+    const token = shorthand[2]
+    const expanded = expandOpenRangeTimeShorthand(token)
+    if (!expanded) return
+
+    event.preventDefault()
+    const replacement = `${leadingWhitespace}${expanded}-`
+    textarea.setRangeText(replacement, lineStart, lineEnd, "end")
     textarea.dispatchEvent(new Event("input", { bubbles: true }))
   }
 

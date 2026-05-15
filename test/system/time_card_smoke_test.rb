@@ -23,6 +23,38 @@ class TimeCardSmokeTest < ApplicationSystemTestCase
     assert_selector "#time-card-clockout-input"
   end
 
+  test "expands top-level dash shorthand and skips customer and entry lines" do
+    textarea = find(".time-card-notes-textarea")
+    textarea.click
+
+    textarea.send_keys("10-")
+    assert_equal "10:00-", textarea.value
+
+    textarea.send_keys(:enter, "1345-")
+    assert_equal "10:00-\n13:45-", textarea.value
+
+    textarea.send_keys(:enter, "now-")
+    lines = textarea.value.split("\n")
+    assert_equal "10:00-", lines[0]
+    assert_equal "13:45-", lines[1]
+
+    now_line = String(lines[2]).sub(/-\z/, "")
+    assert_match(/\A\d{2}:\d{2}\z/, now_line)
+    now_hour, now_minute = now_line.split(":").map(&:to_i)
+    assert_includes(0..23, now_hour)
+    assert_equal 0, now_minute % 5
+
+    textarea.send_keys(:enter)
+    textarea.send_keys("10-")
+    assert_equal "  10-", textarea.value.split("\n").last
+
+    textarea.send_keys(:enter)
+    textarea.send_keys("hello")
+    textarea.send_keys(:enter)
+    textarea.send_keys("10-")
+    assert_equal "  - 10-", textarea.value.split("\n").last
+  end
+
   private
 
   def sign_in(identifier, password)
