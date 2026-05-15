@@ -62,7 +62,7 @@ function roundedNowMinutesToNearestFive() {
   return rounded % (24 * 60)
 }
 
-function expandOpenRangeTimeShorthand(token) {
+function expandFlexibleTimeToken(token) {
   const normalized = String(token || "").trim().toLowerCase()
   if (!normalized) return null
 
@@ -70,11 +70,16 @@ function expandOpenRangeTimeShorthand(token) {
     return minutesToTimeString(roundedNowMinutesToNearestFive())
   }
 
-  if (!/^\d{1,4}$/.test(normalized)) return null
-
   const minutes = parseTimeStringToMinutes(normalized)
   if (!Number.isInteger(minutes)) return null
   return minutesToTimeString(minutes)
+}
+
+function expandOpenRangeTimeShorthand(token) {
+  const normalized = String(token || "").trim().toLowerCase()
+  if (!normalized) return null
+  if (normalized !== "now" && !/^\d{1,4}$/.test(normalized)) return null
+  return expandFlexibleTimeToken(normalized)
 }
 
 function elapsedFromClockInMinutes(clockInMinutes) {
@@ -126,11 +131,12 @@ function validSentenceCountFromNotes(text, requiredCount = Infinity) {
   let inTimeBlock = false
 
   for (const raw of lines) {
-    const trimmed = raw.replace(/\s+$/g, "").trim()
+    const lineWithoutTrailing = raw.replace(/\s+$/g, "")
+    const trimmed = lineWithoutTrailing.trim()
     if (!trimmed) continue
 
     // Check if this is a time range header
-    if (timeRangePrefix.test(trimmed)) {
+    if (timeRangePrefix.test(lineWithoutTrailing)) {
       inTimeBlock = true
       continue
     }
@@ -170,7 +176,8 @@ function escapeHtml(str) {
 // Parses "HH:MM-HH:MM" or "HH:MM - HH:MM" at the start of a line.
 // Returns { startMin, endMin, durationMin, raw } or null.
 function parseTimeRangePrefix(line) {
-  const m = /^(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})/.exec(line.trim())
+  const lineWithoutTrailing = String(line || "").replace(/\s+$/g, "")
+  const m = /^(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})/.exec(lineWithoutTrailing)
   if (!m) return null
   const startMin = parseTimeStringToMinutes(m[1])
   const endMin = parseTimeStringToMinutes(m[2])
@@ -191,11 +198,12 @@ function parseEntriesFromNotes(text) {
   let rangeIdCounter = 0
 
   for (const line of lines) {
-    const trimmed = line.trim()
+    const lineWithoutTrailing = line.replace(/\s+$/g, "")
+    const trimmed = lineWithoutTrailing.trim()
     if (!trimmed) continue
 
     // Check if this is a closed time range: HH:MM-HH:MM
-    const closedMatch = /^(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})(.*)$/.exec(trimmed)
+    const closedMatch = /^(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})(.*)$/.exec(lineWithoutTrailing)
     if (closedMatch) {
       // Save previous range if exists
       if (currentRange) {
@@ -227,7 +235,7 @@ function parseEntriesFromNotes(text) {
     }
 
     // Check if this is an open time range: HH:MM-
-    const openMatch = /^(\d{1,2}:\d{2})\s*[-–]\s*(?!\d)(.*)$/.exec(trimmed)
+    const openMatch = /^(\d{1,2}:\d{2})\s*[-–]\s*(?!\d)(.*)$/.exec(lineWithoutTrailing)
     if (openMatch) {
       // Save previous range if exists
       if (currentRange) {
@@ -255,7 +263,7 @@ function parseEntriesFromNotes(text) {
     }
 
     // Check if this is a dash-prefixed entry
-    if (trimmed.startsWith("-")) {
+    if (/^\s*-/.test(lineWithoutTrailing)) {
       if (currentRange) {
         const body = trimmed.replace(/^\s*-\s*/, "")
         if (/\S/.test(body)) currentEntryCount++
@@ -345,10 +353,10 @@ function extractTimeSpanFromNotes(text) {
   let isOngoing = false
 
   for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i].trim()
+    const lineWithoutTrailing = lines[i].replace(/\s+$/g, "")
     
     // Check for closed range: HH:MM-HH:MM
-    const closedMatch = /^(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})/.exec(trimmed)
+    const closedMatch = /^(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})/.exec(lineWithoutTrailing)
     if (closedMatch) {
       const startMin = parseTimeStringToMinutes(closedMatch[1])
       const endMin = parseTimeStringToMinutes(closedMatch[2])
@@ -361,7 +369,7 @@ function extractTimeSpanFromNotes(text) {
     }
 
     // Check for open range: HH:MM- (no end time)
-    const openMatch = /^(\d{1,2}:\d{2})\s*[-–]\s*(?!\d)/.exec(trimmed)
+    const openMatch = /^(\d{1,2}:\d{2})\s*[-–]\s*(?!\d)/.exec(lineWithoutTrailing)
     if (openMatch) {
       const startMin = parseTimeStringToMinutes(openMatch[1])
       if (startMin !== null) {
@@ -395,9 +403,10 @@ function buildNotesHtml(text) {
   let timeRangeIdCounter = 0
   let lastTimeRangeIndex = -1
   for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i].trim()
-    const closedMatch = closedTimeRangePrefix.test(trimmed)
-    const openMatch = /^(\d{1,2}:\d{2})\s*[-–]\s*(?!\d)/.test(trimmed)
+    const lineWithoutTrailing = lines[i].replace(/\s+$/g, "")
+    const trimmed = lineWithoutTrailing.trim()
+    const closedMatch = closedTimeRangePrefix.test(lineWithoutTrailing)
+    const openMatch = /^(\d{1,2}:\d{2})\s*[-–]\s*(?!\d)/.test(lineWithoutTrailing)
     
     if (closedMatch) {
       lastTimeRangeIndex = i
@@ -411,8 +420,8 @@ function buildNotesHtml(text) {
       timeRangeLabelMap.set(i, "")
       timeRangeIdMap.set(i, String(timeRangeIdCounter++))
       timeRangeIsOpenMap.set(i, true)
-    } else if (lastTimeRangeIndex >= 0 && dashPrefix.test(trimmed)) {
-      const dashMatch = dashPrefix.exec(trimmed)
+    } else if (lastTimeRangeIndex >= 0 && dashPrefix.test(lineWithoutTrailing)) {
+      const dashMatch = dashPrefix.exec(lineWithoutTrailing)
       const body = String(dashMatch[3] || "").trim()
       if (/\S/.test(body)) {
         timeRangeCompletionMap.set(lastTimeRangeIndex, (timeRangeCompletionMap.get(lastTimeRangeIndex) || 0) + 1)
@@ -428,23 +437,24 @@ function buildNotesHtml(text) {
   // Render each line
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
-    const trimmed = line.trim()
+    const lineWithoutTrailing = line.replace(/\s+$/g, "")
+    const trimmed = lineWithoutTrailing.trim()
 
     // Empty indented line directly after a time range => ghost customer hint.
     if (/^\s+$/.test(line)) {
       let prevIndex = i - 1
       while (prevIndex >= 0 && lines[prevIndex].trim() === "") prevIndex -= 1
-      const prevTrimmed = prevIndex >= 0 ? lines[prevIndex].trim() : ""
-      if (closedTimeRangePrefix.test(prevTrimmed) || /^(\d{1,2}:\d{2})\s*[-–]\s*(?!\d)/.test(prevTrimmed)) {
+      const prevLineWithoutTrailing = prevIndex >= 0 ? lines[prevIndex].replace(/\s+$/g, "") : ""
+      if (closedTimeRangePrefix.test(prevLineWithoutTrailing) || /^(\d{1,2}:\d{2})\s*[-–]\s*(?!\d)/.test(prevLineWithoutTrailing)) {
         result.push(`${escapeHtml(line)}<span class="time-card-app__ghost-text">Customer</span>`)
         continue
       }
     }
 
     // Closed time-range line: color-code based on completion
-    const closedMatch = closedTimeRangePrefix.exec(trimmed)
+    const closedMatch = closedTimeRangePrefix.exec(lineWithoutTrailing)
     if (closedMatch) {
-      const range = parseTimeRangePrefix(trimmed)
+      const range = parseTimeRangePrefix(lineWithoutTrailing)
       if (range) {
         const completedCount = timeRangeCompletionMap.get(i) || 0
         const rangeRequiredCount = Math.ceil(range.durationMin / 60)
@@ -469,7 +479,7 @@ function buildNotesHtml(text) {
     }
 
     // Open time-range line: always purple
-    const openMatch = openTimeRangePrefix.exec(trimmed)
+    const openMatch = openTimeRangePrefix.exec(lineWithoutTrailing)
     if (openMatch) {
       let cls = 'time-card-app__notes-prefix time-card-app__notes-prefix--time-range time-card-app__notes-prefix--ongoing'
       const rangeId = timeRangeIdMap.get(i)
@@ -901,6 +911,7 @@ export default class extends Controller {
     const lineEndIndex = text.indexOf("\n", end)
     const lineEnd = lineEndIndex === -1 ? text.length : lineEndIndex
     const currentLine = text.slice(lineStart, lineEnd)
+    let normalizedCurrentLine = currentLine.replace(/\s+$/g, "")
 
     // Enter on an empty dash entry should exit the block:
     // remove the placeholder entry line and place cursor on a clean line.
@@ -915,15 +926,27 @@ export default class extends Controller {
     // 1) Time range line (closed or open) => next line starts as customer label (2-space indent)
     // 2) Customer label line => next line starts as dash entry
     // 3) Dash entry line => continue dash entry list
+    const endTimeShorthand = /^(\d{1,2}:\d{2})\s*[-–]\s*(\S+)\s*$/.exec(normalizedCurrentLine)
+    if (endTimeShorthand) {
+      const rawEndToken = endTimeShorthand[2]
+      const alreadyClock = /^\d{1,2}:\d{2}$/.test(rawEndToken)
+      if (!alreadyClock) {
+        const expandedEnd = expandFlexibleTimeToken(rawEndToken)
+        if (expandedEnd) {
+          normalizedCurrentLine = `${endTimeShorthand[1]}-${expandedEnd}`
+        }
+      }
+    }
+
     let nextPrefix = ""
-    const closedTimeRangeAtEnd = /^\s*\d{1,2}:\d{2}\s*[-–]\s*\d{1,2}:\d{2}\s*$/.test(currentLine)
-    const openTimeRangeAtEnd = /^\s*\d{1,2}:\d{2}\s*[-–]\s*$/.test(currentLine)
+    const closedTimeRangeAtEnd = /^\d{1,2}:\d{2}\s*[-–]\s*\d{1,2}:\d{2}\s*$/.test(normalizedCurrentLine)
+    const openTimeRangeAtEnd = /^\d{1,2}:\d{2}\s*[-–]\s*$/.test(normalizedCurrentLine)
     if (closedTimeRangeAtEnd || openTimeRangeAtEnd) {
       nextPrefix = "  "
-    } else if (/^\s{2,}(?!-)\S.*$/.test(currentLine)) {
+    } else if (/^\s{2,}(?!-)\S.*$/.test(normalizedCurrentLine)) {
       nextPrefix = "  - "
     } else {
-      const entry = /^(\s*)-\s.*$/.exec(currentLine)
+      const entry = /^(\s*)-\s.*$/.exec(normalizedCurrentLine)
       if (entry) {
         nextPrefix = `${entry[1]}- `
       }
@@ -935,7 +958,12 @@ export default class extends Controller {
     const oldScrollTop = textarea.scrollTop
     const oldMaxScroll = textarea.scrollHeight - textarea.clientHeight
 
-    textarea.setRangeText(`\n${nextPrefix}`, start, end, "end")
+    const useWholeLineReplacement = normalizedCurrentLine !== currentLine
+    if (useWholeLineReplacement) {
+      textarea.setRangeText(`${normalizedCurrentLine}\n${nextPrefix}`, lineStart, lineEnd, "end")
+    } else {
+      textarea.setRangeText(`\n${nextPrefix}`, start, end, "end")
+    }
 
     // Reading scrollHeight forces a synchronous layout flush so the value is current.
     const newMaxScroll = textarea.scrollHeight - textarea.clientHeight
