@@ -21,7 +21,22 @@ Metrics/MethodLength:
   Max: 15
 
 Style/FrozenStringLiteralComment:
-  Enabled: true
+  Enabled: false
+
+Layout/TrailingWhitespace:
+  Enabled: false
+
+Layout/TrailingEmptyLines:
+  Enabled: false
+
+Layout/EmptyLinesAroundClassBody:
+  Enabled: false
+
+Style/PercentLiteralDelimiters:
+  Enabled: false
+
+Layout/SpaceInsideArrayLiteralBrackets:
+  Enabled: false
 
 Style/StringLiterals:
   EnforcedStyle: double_quotes

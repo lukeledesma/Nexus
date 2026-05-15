@@ -170,8 +170,7 @@ jobs:
           - 5432:5432
         env:
           POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: password
-          POSTGRES_DB: test_db
+          POSTGRES_PASSWORD: postgres
 
     steps:
     - uses: actions/checkout@v3
@@ -183,6 +182,9 @@ jobs:
         bundler-cache: true
 
     - name: Run tests
+      env:
+        RAILS_ENV: test
+        DATABASE_URL: postgres://postgres:postgres@localhost:5432
+        CI: true
       run: |
-        bin/rails db:create db:schema:load
-        bin/rails test
+        bin/rails db:test:prepare test
