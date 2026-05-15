@@ -18,6 +18,7 @@ Nexus is a browser-based OS-like workspace built on Rails. The core product prom
 - Ruby version: 3.2.3
 - Action Cable route: /cable
 - Deploy pipeline: script-based via deploy/deploy_server.sh
+- Current health: `./bin/audit` is clean with 0 active Brakeman warnings and 2 intentionally ignored warnings; `bin/rails test` passes 100 tests, 372 assertions.
 
 ## What Was Recently Completed
 
@@ -85,10 +86,21 @@ Nexus is a browser-based OS-like workspace built on Rails. The core product prom
 - Fixes heredoc command-substitution bug so remote status checks run remotely.
 - Deploy summaries now report Puma and nginx status correctly.
 
+10. Finder live UX updates (2026-05-14):
+- Unfavoriting a file inside the Favorites view removes the row immediately instead of requiring a section refresh.
+- Side-panel hover previews now refresh in place when a draft is opened with the `+` action, so new instances appear without leaving/re-entering hover.
+- Hover preview refresh is normalized across spawned app window keys (`task-spawn-*`, `note-spawn-*`, `time-card-spawn-*`, `image-spawn-*`).
+
+11. Time Card shorthand and sync hardening (2026-05-14):
+- Notes input now expands top-level shorthand like `10-` → `10:00-`, `1345-` → `13:45-`, and `now-` → current time rounded to the nearest 5 minutes.
+- Customer and entry lines are excluded from the shorthand expansion path.
+- `DocumentDiskLoader` now tolerates files disappearing between directory scan and read, which removes the flaky `ENOENT` race seen in linked-document tests.
+- Time Card "files by date" selection is deterministic and test-stable for records that share the same entry date.
+
 ## Known Working Expectations
 
-- `./bin/audit` returns no vulnerabilities (bundler-audit + brakeman both clean).
-- `bin/rails test` passes 98 tests, 0 failures, 0 errors.
+- `./bin/audit` returns clean security output with 0 active vulnerabilities; 2 Brakeman findings are intentionally ignored and documented.
+- `bin/rails test` passes 100 tests, 0 failures, 0 errors.
 - Deploy script should complete and report: local commit, server commit, puma status active, nginx status active.
 - Production realtime should not require manual refresh for supported features.
 - Production image/wallpaper loading should be materially faster than the previous Rails-only serving path.
@@ -96,13 +108,13 @@ Nexus is a browser-based OS-like workspace built on Rails. The core product prom
 ## Active Priorities
 
 1. Validate end-to-end live sync across all app surfaces on production with a single structured pass.
-2. Confirm no remaining slow paths for wallpapers/images under realistic concurrency.
-3. Continue tightening system responsiveness while preserving current behavior contracts.
+2. Continue tightening system responsiveness while preserving current behavior contracts.
+3. Decide whether to remove the remaining intentionally ignored Brakeman findings or keep them documented.
 
 ## Open Questions / Follow-ups
 
-1. Should nginx site duplication/warning noise be cleaned up now or deferred?
-2. Do we want thumbnail generation/previews for large images as next perf step?
+1. Should the remaining ignored Brakeman findings be eliminated now, or stay documented as accepted risk?
+2. Do we want thumbnail generation/previews for large images as the next perf step?
 3. Should polling fallbacks be removed entirely in areas now covered by reliable cable events?
 
 ## If You Are The Next AI
