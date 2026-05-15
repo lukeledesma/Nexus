@@ -13,6 +13,7 @@
 
 # Ignore bundler config.
 /.bundle
+/vendor/bundle
 
 # Ignore all environment files.
 /.env*
@@ -42,4 +43,3 @@
 
 # Local deploy target (host, SSH user, paths) — never commit.
 /deploy/deploy.local.env
-
