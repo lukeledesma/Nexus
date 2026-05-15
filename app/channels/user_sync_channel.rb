@@ -61,6 +61,19 @@ class UserSyncChannel < ApplicationCable::Channel
     })
   end
 
+  # Backwards-compatible API used across controllers/services.
+  # Maps older workspace "kind" dispatches to current specific broadcasts.
+  def self.broadcast_workspace_change(user:, kind:, section_key: nil, updated_at: Time.current.iso8601)
+    case kind.to_s
+    when "finder"
+      broadcast_finder_change(user: user, section_key: section_key)
+    when "calendar"
+      broadcast_calendar_change(user: user, updated_at: updated_at)
+    else
+      broadcast_finder_change(user: user, section_key: section_key)
+    end
+  end
+
   def self.broadcast_wallpaper_change(user:, wallpaper_background_kind:, wallpaper_image_document_id:)
     broadcast_to(user, {
       type: "wallpaper_changed",
