@@ -1,0 +1,29 @@
+<%# Shared editor shell — used in both linked-document and standalone modes. %>
+
+<%# ── Text surface ─────────────────────────────────────────────────────── %>
+<section class="quartz-app__entries">
+  <div class="quartz-notes-shell">
+    <%# Backdrop: renders styled HTML behind the transparent textarea %>
+    <div class="quartz-notes-backdrop"
+         aria-hidden="true"
+         data-quartz-target="notesBackdrop"></div>
+
+    <%# Textarea: transparent text, caret visible, native editing behavior %>
+        <textarea class="quartz-notes-textarea"
+                  data-quartz-target="notesInput"
+                  data-action="input->quartz#updateNotes
+                               scroll->quartz#syncBackdropScroll
+                               keydown->quartz#handleNotesKeydown
+                               click->quartz#handleNotesClick
+                               mousemove->quartz#handleNotesMousemove"
+                  placeholder="#math #tasklist #timecard #timer"
+                  autocomplete="off"
+                  spellcheck="true"></textarea>
+  </div>
+</section>
+
+<%# ── Contextual timeline (only shown when timecard data present) ──────── %>
+<div class="quartz-timeline-shell"
+  data-quartz-target="timelineBar"
+  hidden
+  aria-hidden="true"></div>

@@ -133,7 +133,11 @@
             </span>
           <% else %>
             <span class="finder-tree__icon finder-tree__icon--file" aria-hidden="true">
-              <%= material_symbol_icon(finder_file_icon_for_content_type(node[:content_type], source_extension: node[:source_extension], section_key: effective_section_key), size: :sm) %>
+              <% if finder_quartz_note_file?(node[:content_type], section_key: effective_section_key) %>
+                <%= render "shared/quartz_icon" %>
+              <% else %>
+                <%= material_symbol_icon(finder_file_icon_for_content_type(node[:content_type], source_extension: node[:source_extension], section_key: effective_section_key), size: :sm) %>
+              <% end %>
             </span>
           <% end %>
           <span class="finder-tree__label" data-finder-tree-label><%= node[:title] %></span>
@@ -160,7 +164,11 @@
             </span>
           <% else %>
             <span class="finder-tree__icon finder-tree__icon--file" aria-hidden="true">
-              <%= material_symbol_icon(finder_file_icon_for_content_type(node[:content_type], source_extension: node[:source_extension], section_key: effective_section_key), size: :sm) %>
+              <% if finder_quartz_note_file?(node[:content_type], section_key: effective_section_key) %>
+                <%= render "shared/quartz_icon" %>
+              <% else %>
+                <%= material_symbol_icon(finder_file_icon_for_content_type(node[:content_type], source_extension: node[:source_extension], section_key: effective_section_key), size: :sm) %>
+              <% end %>
             </span>
           <% end %>
           <span class="finder-tree__label" data-finder-tree-label><%= node[:title] %></span>
@@ -178,7 +186,11 @@
             </span>
           <% else %>
             <span class="finder-tree__icon finder-tree__icon--file" aria-hidden="true">
-              <%= material_symbol_icon(finder_file_icon_for_content_type(node[:content_type], source_extension: node[:source_extension], section_key: effective_section_key), size: :sm) %>
+              <% if finder_quartz_note_file?(node[:content_type], section_key: effective_section_key) %>
+                <%= render "shared/quartz_icon" %>
+              <% else %>
+                <%= material_symbol_icon(finder_file_icon_for_content_type(node[:content_type], source_extension: node[:source_extension], section_key: effective_section_key), size: :sm) %>
+              <% end %>
             </span>
           <% end %>
           <span class="finder-tree__label" data-finder-tree-label><%= node[:title] %></span>

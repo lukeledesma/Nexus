@@ -4,8 +4,7 @@
 class LinkedAppSaveToDocument
   FRAME_MAP = {
     "tasks-pane" => { content_type: "task_list", app_key: "tasks" },
-    "notes-pane" => { content_type: "note", app_key: "notes" },
-    "time-card-pane" => { content_type: "note", app_key: "time-card" }
+    "quartz-pane" => { content_type: "note", app_key: "quartz" }
   }.freeze
 
   def initialize(user:, folder_id:, frame_id:, filename:, document_id: nil, note_text: nil, task_payload: nil)
@@ -16,6 +15,7 @@ class LinkedAppSaveToDocument
     @document_id = document_id&.to_i
     @note_text = note_text.to_s
     @task_payload = task_payload.to_s
+    @quartz_validation = nil
   end
 
   def call
@@ -25,8 +25,6 @@ class LinkedAppSaveToDocument
 
     config = FRAME_MAP[@frame_id]
     config ||= { content_type: "task_list", app_key: "tasks" } if @frame_id.start_with?("task-spawn-")
-    config ||= { content_type: "note", app_key: "notes" } if @frame_id.start_with?("note-spawn-")
-    config ||= { content_type: "note", app_key: "time-card" } if @frame_id.start_with?("time-card-spawn-")
     return [ :bad_request, { error: "Unknown frame" } ] unless config
 
     title = basename_from_filename(@filename)
@@ -74,7 +72,9 @@ class LinkedAppSaveToDocument
       end
 
       UserSyncChannel.broadcast_workspace_change(user: @user, kind: "finder")
-      [ :ok, { document_id: doc.id, title: doc.title, storage_path: doc.storage_path.to_s } ]
+      payload = { document_id: doc.id, title: doc.title, storage_path: doc.storage_path.to_s }
+      payload[:quartz_validation] = @quartz_validation if @quartz_validation.present?
+      [ :ok, payload ]
     else
       [ :unprocessable_entity, { errors: doc.errors.full_messages } ]
     end
@@ -129,6 +129,7 @@ class LinkedAppSaveToDocument
       doc.last_reset_at = nil
     when "note"
       doc.content = @note_text
+      @quartz_validation = QuartzDocumentCodec.validate_body(@note_text) if app_key.to_s == "quartz"
       doc.tasks = []
       doc.reset_mode = "none"
       doc.reset_days = []

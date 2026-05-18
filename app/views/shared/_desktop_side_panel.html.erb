@@ -51,12 +51,16 @@
             data-action="click->organizer#launchApp mouseenter->organizer#showAppPreview mouseleave->organizer#scheduleHideAppPreview focus->organizer#showAppPreview blur->organizer#scheduleHideAppPreview"
           >
             <span class="desktop-side-panel-app-icon" aria-hidden="true">
-              <%= material_symbol_icon(entry[:icon], size: :sm) %>
+              <% if entry[:icon_svg] %>
+                <%= render "shared/quartz_icon" %>
+              <% else %>
+                <%= material_symbol_icon(entry[:icon], size: :sm) %>
+              <% end %>
             </span>
             <span class="desktop-side-panel-app-label"><%= entry[:label] %></span>
-            <% if entry[:window_key] == "tasks" || entry[:window_key] == "notes" || entry[:window_key] == "time-card" %>
+            <% if entry[:window_key] == "tasks" || entry[:window_key] == "quartz" %>
               <span class="desktop-side-panel-app-actions" aria-hidden="true">
-                <span class="row-plus desktop-side-panel-app-action" data-action="<%= entry[:window_key] == "notes" ? "click->organizer#addNoteFromPanel mousedown->organizer#noopAppAction" : (entry[:window_key] == "time-card" ? "click->organizer#addTimeCardFromPanel mousedown->organizer#noopAppAction" : "click->organizer#addTaskFromPanel mousedown->organizer#noopAppAction") %>">
+                <span class="row-plus desktop-side-panel-app-action" data-action="<%= entry[:window_key] == "quartz" ? "click->organizer#addQuartzFromPanel mousedown->organizer#noopAppAction" : "click->organizer#addTaskFromPanel mousedown->organizer#noopAppAction" %>">
                   <%= material_symbol_icon(:add, size: :xs) %>
                 </span>
               </span>

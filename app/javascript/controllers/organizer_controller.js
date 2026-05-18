@@ -68,8 +68,7 @@ export default class extends Controller {
 
     const draftOnFirstOpenKeys = new Set([
       "tasks",
-      "notes",
-      "time-card"
+      "quartz"
     ])
 
     const blankOnFirstOpenKeys = new Set([
@@ -102,8 +101,7 @@ export default class extends Controller {
   findInstancesForAppRow(appKey) {
     const selectorByApp = {
       "tasks": 'section.content-window[data-content-window-app-key-value="tasks"], section.content-window[data-content-window-app-key-value^="task-spawn-"]',
-      "notes": 'section.content-window[data-content-window-app-key-value="notes"], section.content-window[data-content-window-app-key-value^="note-spawn-"]',
-      "time-card": 'section.content-window[data-content-window-app-key-value="time-card"], section.content-window[data-content-window-app-key-value^="time-card-spawn-"]',
+      "quartz": 'section.content-window[data-content-window-app-key-value="quartz"], section.content-window[data-content-window-app-key-value^="quartz-spawn-"]',
       "images": 'section.content-window[data-content-window-app-key-value="images"], section.content-window[data-content-window-app-key-value^="image-spawn-"]',
       "audio": 'section.content-window[data-content-window-app-key-value="audio"]'
     }
@@ -600,16 +598,10 @@ export default class extends Controller {
     await this.openEmbeddedDraft("tasks")
   }
 
-  async addNoteFromPanel(event) {
+  async addQuartzFromPanel(event) {
     event.preventDefault()
     event.stopPropagation()
-    await this.openEmbeddedDraft("notes")
-  }
-
-  async addTimeCardFromPanel(event) {
-    event.preventDefault()
-    event.stopPropagation()
-    await this.openEmbeddedDraft("time-card")
+    await this.openEmbeddedDraft("quartz")
   }
 
   async openEmbeddedDraft(appKey) {
@@ -649,16 +641,6 @@ export default class extends Controller {
       this.refreshPreviewIfShowingApp("tasks")
       return
     }
-    if (panelAppKey === "notes") {
-      this.updateRowState("notes", this.anyNoteWindowOpen())
-      this.refreshPreviewIfShowingApp("notes")
-      return
-    }
-    if (panelAppKey === "time-card") {
-      this.updateRowState("time-card", this.anyTimeCardWindowOpen())
-      this.refreshPreviewIfShowingApp("time-card")
-      return
-    }
 
     const resolvedKey = panelAppKey || appKey
     this.updateRowState(resolvedKey, Boolean(event.detail?.open))
@@ -669,27 +651,14 @@ export default class extends Controller {
     const key = String(appKey || "").trim()
     if (!key) return ""
     if (key === "tasks" || key.startsWith("task-spawn-")) return "tasks"
-    if (key === "notes" || key.startsWith("note-spawn-")) return "notes"
-    if (key === "time-card" || key.startsWith("time-card-spawn-")) return "time-card"
     if (key === "images" || key.startsWith("image-spawn-")) return "images"
+    if (key === "quartz" || key.startsWith("quartz-spawn-")) return "quartz"
     return key
   }
 
   anyTaskWindowOpen() {
     const spawnedOpen = document.querySelector('[data-content-window-app-key-value^="task-spawn-"]:not(.is-hidden)')
     const primaryOpen = document.querySelector('[data-content-window-app-key-value="tasks"]:not(.is-hidden)')
-    return Boolean(spawnedOpen || primaryOpen)
-  }
-
-  anyNoteWindowOpen() {
-    const spawnedOpen = document.querySelector('[data-content-window-app-key-value^="note-spawn-"]:not(.is-hidden)')
-    const primaryOpen = document.querySelector('[data-content-window-app-key-value="notes"]:not(.is-hidden)')
-    return Boolean(spawnedOpen || primaryOpen)
-  }
-
-  anyTimeCardWindowOpen() {
-    const spawnedOpen = document.querySelector('[data-content-window-app-key-value^="time-card-spawn-"]:not(.is-hidden)')
-    const primaryOpen = document.querySelector('[data-content-window-app-key-value="time-card"]:not(.is-hidden)')
     return Boolean(spawnedOpen || primaryOpen)
   }
 

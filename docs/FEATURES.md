@@ -49,7 +49,7 @@ Expected behavior:
 ## Tasks
 
 Purpose:
-- Task list editing with subtasks and inline notes.
+- Task list editing with subtasks.
 
 Routes:
 - GET /apps/tasks
@@ -64,62 +64,6 @@ Implementation anchors:
 Expected behavior:
 - Fast edits and consistent save state.
 - Live update propagation across active clients.
-
-## Notes
-
-Purpose:
-- Rich note editing tied to document model.
-
-Routes:
-- GET /apps/notes
-
-Implementation anchors:
-- app/controllers/apps/notes_controller.rb
-- app/javascript/controllers/notes_live_controller.js
-- app/javascript/controllers/autosave_controller.js
-- app/views/apps/notes/show.html.erb
-
-Expected behavior:
-- Save on blur/unselect rather than every keystroke.
-- Apply remote changes safely without interrupting active typing.
-
-## Time Card
-
-Purpose:
-- Time-focused note-like workflow with linked persistence.
-
-Routes:
-- GET /apps/time_card
-
-Implementation anchors:
-- app/controllers/apps/time_card_controller.rb
-- app/javascript/controllers/autosave_controller.js
-- app/views/apps/time_card/show.html.erb
-
-Expected behavior:
-- Save cadence matches Notes (blur/unselect-driven).
-- Cross-device consistency where linked state is used.
-
-## Calendar
-
-Purpose:
-- Calendar event management with consistent persistence.
-
-Routes:
-- GET /apps/calendar
-- POST /apps/calendar/save_events
-- GET /apps/calendar/draft_file
-- GET /apps/calendar/last_saved
-
-Implementation anchors:
-- app/controllers/apps/calendar_controller.rb
-- app/services/calendar/save_events.rb
-- app/services/calendar_event_document_codec.rb
-
-Expected behavior:
-- Events persisted to the Embedded Calendar document flow.
-- End times preserved.
-- Efficient remote-change detection path available.
 
 ## Images
 

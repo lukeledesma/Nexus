@@ -114,11 +114,8 @@ export default class extends Controller {
       })
     }
 
-    const notesArea = root.querySelector(".notes-app__textarea")
-    if (notesArea && String(notesArea.value || "").trim().length > 0) return true
-
-    const timeCardNotes = root.querySelector(".time-card-notes-textarea")
-    if (timeCardNotes && String(timeCardNotes.value || "").trim().length > 0) return true
+    const quartzNotes = root.querySelector(".quartz-notes-textarea")
+    if (quartzNotes && String(quartzNotes.value || "").trim().length > 0) return true
 
     return false
   }

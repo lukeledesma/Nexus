@@ -36,7 +36,7 @@ class FinderWorkspaceInitializerTest < ActiveSupport::TestCase
 
     roots = FinderWorkspaceInitializer.section_roots_for(@user)
     assert_equal Apps::FinderController::TASKS_SECTION_TITLE, roots["documents"]&.title
-    assert_equal Apps::FinderController::NOTES_SECTION_TITLE, roots["notes"]&.title
+    assert_equal Apps::FinderController::QUARTZ_SECTION_TITLE, roots["quartz"]&.title
     assert_nil roots["favorites"]
   end
 
@@ -46,10 +46,8 @@ class FinderWorkspaceInitializerTest < ActiveSupport::TestCase
     root = FinderListedFolders.workspace_root_for(@user)
     finder = root.children.folders.find { |d| d.title.to_s.casecmp?("Finder") }
     tasks = finder.children.folders.find { |d| d.title.to_s.casecmp?(Apps::FinderController::TASKS_SECTION_TITLE) }
-    notes = finder.children.folders.find { |d| d.title.to_s.casecmp?(Apps::FinderController::NOTES_SECTION_TITLE) }
 
     tasks.update!(title: "Documents")
-    notes.update!(parent: tasks)
 
     legacy_favorites = finder.children.create!(is_folder: true, title: Apps::FinderController::FAVORITES_SECTION_TITLE)
     favorite_file = legacy_favorites.children.create!(
@@ -63,8 +61,8 @@ class FinderWorkspaceInitializerTest < ActiveSupport::TestCase
 
     assert roots["documents"]
     assert_equal Apps::FinderController::TASKS_SECTION_TITLE, roots["documents"].title
-    assert roots["notes"]
-    assert_equal finder.id, roots["notes"].parent_id
+  assert roots["quartz"]
+  assert_equal finder.id, roots["quartz"].parent_id
 
     assert_not Document.exists?(legacy_favorites.id)
     assert_equal roots["documents"].id, favorite_file.reload.parent_id

@@ -24,6 +24,37 @@ class DocumentPersistenceTest < ActiveSupport::TestCase
     FileUtils.rm_rf(DocumentStorageSyncLite.storage_root.join(folder&.storage_path.to_s)) if folder&.storage_path.present?
   end
 
+  test "persists nexus file notes as plain text" do
+    folder = Document.create!(is_folder: true, title: "persist-folder-#{SecureRandom.hex(4)}")
+    quartz_payload = [
+      "# NEXUS_FILE v1",
+      "# kind: quartz",
+      "# title: Quartz",
+      "",
+      "#timecard",
+      "10:00-11:00 Client",
+      "- Entry"
+    ].join("\n")
+
+    doc = Document.new(
+      is_folder: false,
+      parent: folder,
+      title: "persist-quartz-#{SecureRandom.hex(4)}",
+      content_type: "note",
+      content: quartz_payload
+    )
+
+    result = DocumentPersistence.persist(doc, operation: :create)
+
+    assert result.success?
+    assert doc.storage_path.end_with?(".txt")
+    path = DocumentStorageSyncLite.storage_root.join(doc.storage_path)
+    assert_equal quartz_payload, File.read(path)
+  ensure
+    Document.where(id: [ doc&.id, folder&.id ].compact).delete_all
+    FileUtils.rm_rf(DocumentStorageSyncLite.storage_root.join(folder&.storage_path.to_s)) if folder&.storage_path.present?
+  end
+
   test "rolls back database save when disk sync fails" do
     folder = Document.create!(is_folder: true, title: "persist-folder-#{SecureRandom.hex(4)}")
     doc_title = "persist-fail-note-#{SecureRandom.hex(4)}"

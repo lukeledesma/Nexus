@@ -246,7 +246,7 @@ class DocumentStorageSyncLite
   def disk_extension_for_file
     case @document.content_type.to_s
     when "note"
-      ".rtf"
+      nexus_file_note? ? ".txt" : ".rtf"
     when "asset"
       ext = File.extname(@document.storage_path.to_s).downcase
       return ext if Document::ASSET_FILE_EXTENSIONS.include?(ext)
@@ -265,7 +265,7 @@ class DocumentStorageSyncLite
     when "task_list"
       unified_task_list_contents
     when "note"
-      note_rtf_file_body
+      nexus_file_note? ? @document.content.to_s : note_rtf_file_body
     when "calendar_events"
       @document.content.to_s
     when "asset"
@@ -355,6 +355,10 @@ class DocumentStorageSyncLite
     marker = ActiveModel::Type::Boolean.new.cast(checked) ? "x" : " "
     prefix = subtask ? "- " : ""
     "#{prefix}[#{marker}] #{text}"
+  end
+
+  def nexus_file_note?
+    @document.content.to_s.lstrip.start_with?(NexusFileFormat::FIRST_LINE)
   end
 
 end

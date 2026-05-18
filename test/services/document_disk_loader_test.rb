@@ -59,6 +59,23 @@ class DocumentDiskLoaderTest < ActiveSupport::TestCase
     assert_equal "Backlog", DocumentDiskLoader.send(:basename_without_supported_extension, "/tmp/Kanban/Backlog.md")
   end
 
+  test "unified quartz files preserve full nexus content" do
+    lines = [
+      "# NEXUS_FILE v1",
+      "# kind: quartz",
+      "# title: Quartz",
+      "",
+      "#timecard",
+      "10:00-11:00 Client",
+      "- Entry"
+    ]
+
+    parsed = DocumentDiskLoader.send(:parse_unified_file, lines)
+
+    assert_equal "note", parsed[:content_type]
+    assert_equal lines.join("\n"), parsed[:content]
+  end
+
   test "purge removes missing folders and files" do
     stale_folder = Document.create!(is_folder: true, title: "Stale Folder", storage_path: "stale-folder")
     stale_file = Document.create!(

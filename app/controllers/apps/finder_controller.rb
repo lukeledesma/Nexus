@@ -8,26 +8,19 @@ module Apps
 
     DEFAULT_SECTION_KEY = "documents"
     TASKS_SECTION_TITLE = "Tasks"
-    TIME_CARD_SECTION_TITLE = "Time Card"
-    NOTES_SECTION_TITLE = "Notes"
     FAVORITES_SECTION_TITLE = "Favorites"
+    QUARTZ_SECTION_TITLE = "Quartz"
     FINDER_SECTION_DEFINITIONS = [
       { key: "documents", title: TASKS_SECTION_TITLE, icon: "task_checklist" },
-      { key: "notes", title: NOTES_SECTION_TITLE, icon: "edit_note" },
-      { key: "time_card", title: TIME_CARD_SECTION_TITLE, icon: "overview" },
+      { key: "quartz", title: QUARTZ_SECTION_TITLE, icon: "sticky_note", icon_svg: true },
       { key: "images", title: "Images", icon: "wallpaper" },
       { key: "audio", title: "Audio", icon: "graphic_eq" },
       { key: "favorites", title: FAVORITES_SECTION_TITLE, icon: "star_rounded" }
     ].freeze
     READ_ONLY_FRAME_CONFIG = {
       "tasks-pane" => { section_key: "documents", content_type: "task_list", allow_save: true },
-      "notes-pane" => {
-        section_key: "notes",
-        content_type: "note",
-        allow_save: true
-      },
-      "time-card-pane" => {
-        section_key: "time_card",
+      "quartz-pane" => {
+        section_key: "quartz",
         content_type: "note",
         allow_save: true
       },
@@ -140,8 +133,7 @@ module Apps
       read_only_config = READ_ONLY_FRAME_CONFIG[frame_id]
       if read_only_config.nil?
         read_only_config = READ_ONLY_FRAME_CONFIG["tasks-pane"] if frame_id.start_with?("task-spawn-")
-        read_only_config = READ_ONLY_FRAME_CONFIG["notes-pane"] if frame_id.start_with?("note-spawn-")
-        read_only_config = READ_ONLY_FRAME_CONFIG["time-card-pane"] if frame_id.start_with?("time-card-spawn-")
+        read_only_config = READ_ONLY_FRAME_CONFIG["quartz-pane"] if frame_id.start_with?("quartz-spawn-")
         read_only_config = READ_ONLY_FRAME_CONFIG["images-pane"] if frame_id.start_with?("image-spawn-")
       end
       read_only_content_type = read_only_config&.[](:content_type)
@@ -190,7 +182,9 @@ module Apps
 
       @linked_app_save_icon =
         if @finder_read_only
-          if read_only_content_type
+          if frame_id == "quartz-pane"
+            "quartz_svg"
+          elsif read_only_content_type
             helpers.finder_file_icon_for_content_type(read_only_content_type, section_key: @section_key).to_s
           else
             "file_document"

@@ -10,12 +10,8 @@ import { NexusUserState } from "lib/nexus_user_state"
 const DESKTOP_WINDOW_LAYERS_KEY = "nexus.desktop.windowLayers"
 /** Server-synced registries of spawned per-document windows (open across devices). */
 const TASK_WINDOW_REGISTRY_KEY = "windows.tasks"
-const NOTE_WINDOW_REGISTRY_KEY = "windows.notes"
-const TIMECARD_WINDOW_REGISTRY_KEY = "windows.timeCard"
 /** Legacy device-local localStorage keys; consulted once at first read for migration. */
 const LEGACY_TASK_REGISTRY_KEY = "nexus.taskWindowRegistry"
-const LEGACY_NOTE_REGISTRY_KEY = "nexus.noteWindowRegistry"
-const LEGACY_TIMECARD_REGISTRY_KEY = "nexus.timeCardWindowRegistry"
 
 function readRegistry(key, legacyKey) {
   const synced = NexusUserState.get(key)
@@ -49,7 +45,6 @@ export default class extends Controller {
     "frame",
     "chromeAppTools",
     "chromePickerTools",
-    "chromeTimeCardClear",
     "savePickerLayer",
     "savePickerIframe"
   ]
@@ -64,8 +59,7 @@ export default class extends Controller {
   connect() {
     if (!window.__nexusSpawnedTasksByDocumentId) window.__nexusSpawnedTasksByDocumentId = {}
     if (!window.__nexusSpawnedImagesByDocumentId) window.__nexusSpawnedImagesByDocumentId = {}
-    if (!window.__nexusSpawnedNotesByDocumentId) window.__nexusSpawnedNotesByDocumentId = {}
-    if (!window.__nexusSpawnedTimeCardsByDocumentId) window.__nexusSpawnedTimeCardsByDocumentId = {}
+    if (!window.__nexusSpawnedQuartzByDocumentId) window.__nexusSpawnedQuartzByDocumentId = {}
     this.currentUrl = this.buildAppUrl({ blank: this.shouldStartBlank() })
     this.restoreLinkedAppUrlAndBadge()
     this.isAutoSizedWindow = false
@@ -79,18 +73,15 @@ export default class extends Controller {
     const finderLikeMin = { width: 760, height: 460 }
     const taskListMin = { width: 320, height: 320 }
     const audioMin = { width: 320, height: 320 }
-      const imagesMin = { width: 320, height: 320 }
-      const notesMin = { width: 320, height: 320 }
-      const timeCardMin = { width: 320, height: 320 }
-      const clockMin = taskListMin
+    const imagesMin = { width: 320, height: 320 }
+    const clockMin = taskListMin
     const minByAppKey = {
       tasks: taskListMin,
       finder: finderLikeMin,
       calendar: finderLikeMin,
       audio: audioMin,
       images: imagesMin,
-      notes: notesMin,
-      "time-card": timeCardMin,
+      quartz: taskListMin,
       clock: clockMin,
       user: { width: 320, height: 220 },
     }
@@ -131,20 +122,12 @@ export default class extends Controller {
     if (this.hasFrameTarget) this.frameTarget.addEventListener("turbo:frame-load", this.boundFrameLoad)
     this.boundSpawnBlankTaskWindow = this.handleSpawnBlankTaskWindow.bind(this)
     window.addEventListener("nexus:task-list-spawn-blank-window", this.boundSpawnBlankTaskWindow)
-    this.boundSpawnBlankNoteWindow = this.handleSpawnBlankNoteWindow.bind(this)
-    window.addEventListener("nexus:notes-spawn-blank-window", this.boundSpawnBlankNoteWindow)
-    this.boundSpawnBlankTimeCardWindow = this.handleSpawnBlankTimeCardWindow.bind(this)
-    window.addEventListener("nexus:time-card-spawn-blank-window", this.boundSpawnBlankTimeCardWindow)
     this.boundCloseRequest = this.handleCloseRequest.bind(this)
     window.addEventListener("app-window:close", this.boundCloseRequest)
     this.boundLinkedAppSaved = this.onLinkedAppDocumentSaved.bind(this)
     window.addEventListener("nexus:linked-app-document-saved", this.boundLinkedAppSaved)
     this.boundFinderItemRenamed = this.onFinderItemRenamed.bind(this)
     window.addEventListener("nexus:finder-item-renamed", this.boundFinderItemRenamed)
-    this.boundTimeCardClearState = this.handleTimeCardClearState.bind(this)
-    window.addEventListener("nexus:time-card-clear-state", this.boundTimeCardClearState)
-    this.boundTimeCardChromeHours = this.handleTimeCardChromeHours.bind(this)
-    window.addEventListener("nexus:time-card-chrome-hours", this.boundTimeCardChromeHours)
     this.boundItemDirtyState = this.handleItemDirtyState.bind(this)
     window.addEventListener("nexus:item-dirty", this.boundItemDirtyState)
     this.boundItemSavingState = this.handleItemSavingState.bind(this)
@@ -187,8 +170,6 @@ export default class extends Controller {
     syncOrganizerAboveVisibleContentWindows()
     this.restoreWindowBounds()
     this.restorePersistedSpawnedTaskWindows()
-    this.restorePersistedSpawnedNoteWindows()
-    this.restorePersistedSpawnedTimeCardWindows()
     this.restoreOpenState()
 
     // Frames restored by boot scripts may already be loaded before connect(),
@@ -217,12 +198,8 @@ export default class extends Controller {
     if (this.boundFrameLoad && this.hasFrameTarget) this.frameTarget.removeEventListener("turbo:frame-load", this.boundFrameLoad)
     window.removeEventListener("app-window:close", this.boundCloseRequest)
     window.removeEventListener("nexus:task-list-spawn-blank-window", this.boundSpawnBlankTaskWindow)
-    window.removeEventListener("nexus:notes-spawn-blank-window", this.boundSpawnBlankNoteWindow)
-    window.removeEventListener("nexus:time-card-spawn-blank-window", this.boundSpawnBlankTimeCardWindow)
     window.removeEventListener("nexus:linked-app-document-saved", this.boundLinkedAppSaved)
     window.removeEventListener("nexus:finder-item-renamed", this.boundFinderItemRenamed)
-    window.removeEventListener("nexus:time-card-clear-state", this.boundTimeCardClearState)
-    window.removeEventListener("nexus:time-card-chrome-hours", this.boundTimeCardChromeHours)
     window.removeEventListener("nexus:item-dirty", this.boundItemDirtyState)
     window.removeEventListener("nexus:item-saving", this.boundItemSavingState)
     window.removeEventListener("nexus:item-saved", this.boundItemSavedState)
@@ -259,25 +236,6 @@ export default class extends Controller {
     this.close()
   }
 
-  handleTimeCardClearState(event) {
-    if (this.appKeyValue !== "time-card") return
-    if (!this.hasChromeTimeCardClearTarget) return
-    const { frameId, show } = event.detail || {}
-    if (frameId !== this.frameIdValue) return
-    this.chromeTimeCardClearTarget.hidden = !Boolean(show)
-  }
-
-  handleTimeCardChromeHours(event) {
-    const isTimeCardWindow =
-      this.appKeyValue === "time-card" || this.appKeyValue.startsWith("time-card-spawn-")
-    if (!isTimeCardWindow) return
-
-    const { frameId, label, isOpen } = event.detail || {}
-    if (String(frameId || "") !== String(this.frameIdValue || "")) return
-
-    this.syncTimeCardHoursBadge(label, { isOpen: Boolean(isOpen) })
-  }
-
   handleItemDirtyState(event) {
     const frameId = String(event?.detail?.frameId || "")
     if (!frameId || frameId !== this.frameIdValue) return
@@ -302,19 +260,16 @@ export default class extends Controller {
     if (!this.hasLinkedAppSavePickerValue || !this.hasFrameIdValue) return
     const canHandleEmbeddedTaskOpen =
       this.appKeyValue === "tasks" || this.appKeyValue.startsWith("task-spawn-")
-    const canHandleEmbeddedNotesOpen =
-      this.appKeyValue === "notes" || this.appKeyValue.startsWith("note-spawn-")
-    const canHandleEmbeddedTimeCardOpen =
-      this.appKeyValue === "time-card" || this.appKeyValue.startsWith("time-card-spawn-")
+    const canHandleEmbeddedQuartzOpen =
+      this.appKeyValue === "quartz" || this.appKeyValue.startsWith("quartz-spawn-")
     const appKeyMatches =
       appKey === this.appKeyValue ||
       (canHandleEmbeddedTaskOpen && appKey === "tasks") ||
-      (canHandleEmbeddedNotesOpen && appKey === "notes") ||
-      (canHandleEmbeddedTimeCardOpen && appKey === "time-card")
+      (canHandleEmbeddedQuartzOpen && appKey === "quartz")
     if (frameId !== this.frameIdValue || !appKeyMatches) return
 
-    // Enforce one-open-instance for saved task documents when opened from the embedded picker.
-    if (documentId && this.isLinkedApp()) {
+    // Enforce one-open-instance for saved linked documents when opened from embedded picker.
+    if (documentId && canHandleEmbeddedTaskOpen) {
       const docId = String(documentId)
       const existingWindow = this.findVisibleTaskWindowByDocumentId(docId)
       if (existingWindow) {
@@ -322,17 +277,9 @@ export default class extends Controller {
         return
       }
     }
-    if (documentId && (this.appKeyValue === "notes" || this.appKeyValue.startsWith("note-spawn-"))) {
+    if (documentId && canHandleEmbeddedQuartzOpen) {
       const docId = String(documentId)
-      const existingWindow = this.findVisibleNoteWindowByDocumentId(docId)
-      if (existingWindow) {
-        this.focusAndFlashWindow(existingWindow)
-        return
-      }
-    }
-    if (documentId && (this.appKeyValue === "time-card" || this.appKeyValue.startsWith("time-card-spawn-"))) {
-      const docId = String(documentId)
-      const existingWindow = this.findVisibleTimeCardWindowByDocumentId(docId)
+      const existingWindow = this.findQuartzWindowByDocumentId(docId, { includeHidden: false })
       if (existingWindow) {
         this.focusAndFlashWindow(existingWindow)
         return
@@ -388,7 +335,9 @@ export default class extends Controller {
 
     // When a specific document is requested for the linked-app task list window,
     // check if it's already open (spawned window). If so, focus and flash it.
-    if (documentId && this.isLinkedApp()) {
+    const isTaskLinkedWindow =
+      this.appKeyValue === "tasks" || this.appKeyValue.startsWith("task-spawn-")
+    if (documentId && isTaskLinkedWindow) {
       const docId = String(documentId)
       const existingWindow = this.findTaskWindowByDocumentId(docId, { includeHidden: true })
       if (existingWindow) {
@@ -418,33 +367,20 @@ export default class extends Controller {
       }
     }
 
-    if (documentId && this.appKeyValue === "notes") {
+    if (documentId && this.appKeyValue === "quartz") {
       const docId = String(documentId)
-      const existingWindow = this.findNoteWindowByDocumentId(docId, { includeHidden: true })
+      const existingWindow = this.findQuartzWindowByDocumentId(docId, { includeHidden: true })
       if (existingWindow) {
         this.focusOrOpenWindow(existingWindow)
         return
       }
       const isPrimaryWindowVisible = !this.element.classList.contains("is-hidden")
       if (isPrimaryWindowVisible && (!isDraft || this.shouldSpawnDraftWindow(String(documentId)))) {
-        this.spawnNoteWindow(documentId, documentTitle)
+        this.spawnQuartzWindow(documentId, documentTitle)
         return
       }
     }
 
-    if (documentId && this.appKeyValue === "time-card") {
-      const docId = String(documentId)
-      const existingWindow = this.findTimeCardWindowByDocumentId(docId, { includeHidden: true })
-      if (existingWindow) {
-        this.focusOrOpenWindow(existingWindow)
-        return
-      }
-      const isPrimaryWindowVisible = !this.element.classList.contains("is-hidden")
-      if (isPrimaryWindowVisible && (!isDraft || this.shouldSpawnDraftWindow(String(documentId)))) {
-        this.spawnTimeCardWindow(documentId, documentTitle)
-        return
-      }
-    }
 
       // Blank open request while window is already visible — just bring to front
       // without reloading, regardless of whether a file is loaded or not.
@@ -480,9 +416,6 @@ export default class extends Controller {
       this.clearOpenFileBadge()
     }
 
-    if (this.appKeyValue === "time-card" || this.appKeyValue.startsWith("time-card-spawn-")) {
-      this.clearTimeCardHoursBadge()
-    }
 
     if (this.hasFrameTarget) {
       const mustHardReload =
@@ -608,40 +541,17 @@ export default class extends Controller {
     return this.findImageWindowByDocumentId(documentId, { includeHidden: false })
   }
 
-  findNoteWindowByDocumentId(documentId, options = {}) {
-    const includeHidden = Boolean(options.includeHidden)
+  findQuartzWindowByDocumentId(documentId, { includeHidden = true } = {}) {
     const docId = String(documentId || "")
     if (!docId) return null
-    const noteWindows = document.querySelectorAll(
-      'section.content-window[data-content-window-app-key-value="notes"], section.content-window[data-content-window-app-key-value^="note-spawn-"]'
+    const quartzWindows = document.querySelectorAll(
+      'section.content-window[data-content-window-app-key-value="quartz"], section.content-window[data-content-window-app-key-value^="quartz-spawn-"]'
     )
-    for (const windowEl of noteWindows) {
+    for (const windowEl of quartzWindows) {
       if (!includeHidden && windowEl.classList.contains("is-hidden")) continue
       if (this.windowMatchesLinkedDocumentId(windowEl, docId)) return windowEl
     }
     return null
-  }
-
-  findVisibleNoteWindowByDocumentId(documentId) {
-    return this.findNoteWindowByDocumentId(documentId, { includeHidden: false })
-  }
-
-  findTimeCardWindowByDocumentId(documentId, options = {}) {
-    const includeHidden = Boolean(options.includeHidden)
-    const docId = String(documentId || "")
-    if (!docId) return null
-    const windows = document.querySelectorAll(
-      'section.content-window[data-content-window-app-key-value="time-card"], section.content-window[data-content-window-app-key-value^="time-card-spawn-"]'
-    )
-    for (const windowEl of windows) {
-      if (!includeHidden && windowEl.classList.contains("is-hidden")) continue
-      if (this.windowMatchesLinkedDocumentId(windowEl, docId)) return windowEl
-    }
-    return null
-  }
-
-  findVisibleTimeCardWindowByDocumentId(documentId) {
-    return this.findTimeCardWindowByDocumentId(documentId, { includeHidden: false })
   }
 
   /** Clone the Tasks window shell to display a document in a new, independent window. */
@@ -736,14 +646,14 @@ export default class extends Controller {
     this.element.parentElement.appendChild(clone)
   }
 
-  spawnNoteWindow(documentId, documentTitle) {
-    const existingWindow = this.findNoteWindowByDocumentId(documentId, { includeHidden: true })
+  spawnQuartzWindow(documentId, documentTitle) {
+    const existingWindow = this.findQuartzWindowByDocumentId(documentId, { includeHidden: true })
     if (existingWindow) {
       this.focusOrOpenWindow(existingWindow)
       return
     }
 
-    const uid = `note-spawn-${Date.now()}`
+    const uid = `quartz-spawn-${Date.now()}`
     const title = (documentTitle || "").trim()
 
     try {
@@ -755,7 +665,7 @@ export default class extends Controller {
       if (title) window.localStorage.setItem(`nexus.linkedAppOpenTitle.${uid}`, title)
     } catch (_) {}
 
-    window.__nexusSpawnedNotesByDocumentId[String(documentId)] = uid
+    window.__nexusSpawnedQuartzByDocumentId[String(documentId)] = uid
 
     const clone = this.element.cloneNode(true)
     clone.dataset.contentWindowAppKeyValue = uid
@@ -763,7 +673,7 @@ export default class extends Controller {
     clone.dataset.contentWindowStorageKeyValue = uid
     clone.dataset.contentWindowHasLinkedAppSavePickerValue = "true"
     clone.dataset.openOnConnect = "true"
-    clone.dataset.isSpawnedNoteWindow = "true"
+    clone.dataset.isSpawnedQuartzWindow = "true"
     clone.dataset.spawnedFromDocumentId = String(documentId)
 
     this.prepareClonedWindowShell(clone, { frameId: uid, title, openOnConnect: true })
@@ -774,61 +684,6 @@ export default class extends Controller {
     clone.style.width = `${Math.round(rect.width)}px`
     clone.style.height = `${Math.round(rect.height)}px`
 
-    this.persistSpawnedNoteWindow({
-      appKey: uid,
-      frameId: uid,
-      storageKey: uid,
-      documentId: String(documentId),
-      documentTitle: title
-    })
-
-    this.element.parentElement.appendChild(clone)
-  }
-
-  spawnTimeCardWindow(documentId, documentTitle) {
-    const existingWindow = this.findTimeCardWindowByDocumentId(documentId, { includeHidden: true })
-    if (existingWindow) {
-      this.focusOrOpenWindow(existingWindow)
-      return
-    }
-
-    const uid = `time-card-spawn-${Date.now()}`
-    const title = (documentTitle || "").trim()
-
-    try {
-      window.sessionStorage.setItem(`nexus.linkedAppDocument.${uid}`, String(documentId))
-      if (title) window.sessionStorage.setItem(`nexus.linkedAppOpenTitle.${uid}`, title)
-    } catch (_) {}
-    try {
-      window.localStorage.setItem(`nexus.linkedAppDocument.${uid}`, String(documentId))
-      if (title) window.localStorage.setItem(`nexus.linkedAppOpenTitle.${uid}`, title)
-    } catch (_) {}
-
-    const clone = this.element.cloneNode(true)
-    clone.dataset.contentWindowAppKeyValue = uid
-    clone.dataset.contentWindowFrameIdValue = uid
-    clone.dataset.contentWindowStorageKeyValue = uid
-    clone.dataset.contentWindowHasLinkedAppSavePickerValue = "true"
-    clone.dataset.openOnConnect = "true"
-    clone.dataset.isSpawnedTimeCardWindow = "true"
-    clone.dataset.spawnedFromDocumentId = String(documentId)
-
-    this.prepareClonedWindowShell(clone, { frameId: uid, title, openOnConnect: true, clearTimeCardHours: true })
-
-    const rect = this.element.getBoundingClientRect()
-    clone.style.left = `${Math.round(rect.left) + 24}px`
-    clone.style.top = `${Math.round(rect.top) + 24}px`
-    clone.style.width = `${Math.round(rect.width)}px`
-    clone.style.height = `${Math.round(rect.height)}px`
-
-    this.persistSpawnedTimeCardWindow({
-      appKey: uid,
-      frameId: uid,
-      storageKey: uid,
-      documentId: String(documentId),
-      documentTitle: title
-    })
-
     this.element.parentElement.appendChild(clone)
   }
 
@@ -837,14 +692,6 @@ export default class extends Controller {
     if (this.appKeyValue === "tasks" && changed.has(TASK_WINDOW_REGISTRY_KEY)) {
       window.__nexusTaskWindowsRestored = false
       this.restorePersistedSpawnedTaskWindows()
-    }
-    if (this.appKeyValue === "notes" && changed.has(NOTE_WINDOW_REGISTRY_KEY)) {
-      window.__nexusNoteWindowsRestored = false
-      this.restorePersistedSpawnedNoteWindows()
-    }
-    if (this.appKeyValue === "time-card" && changed.has(TIMECARD_WINDOW_REGISTRY_KEY)) {
-      window.__nexusTimeCardWindowsRestored = false
-      this.restorePersistedSpawnedTimeCardWindows()
     }
   }
 
@@ -929,163 +776,6 @@ export default class extends Controller {
     this.writePersistedSpawnedTaskWindows(entries)
   }
 
-  restorePersistedSpawnedNoteWindows() {
-    if (this.appKeyValue !== "notes") return
-    if (window.__nexusNoteWindowsRestored) return
-    window.__nexusNoteWindowsRestored = true
-
-    const primaryLinkedDocId = this.readLinkedDocumentIdForCurrentFrame()
-    const entries = this.readPersistedSpawnedNoteWindows()
-    const seenNoteDocIds = new Set()
-    entries.forEach((entry) => {
-      if (!entry?.appKey || !entry?.documentId) return
-      const entryDocId = String(entry.documentId)
-      if (seenNoteDocIds.has(entryDocId)) {
-        this.removePersistedSpawnedNoteWindow(String(entry.appKey))
-        return
-      }
-      seenNoteDocIds.add(entryDocId)
-      if (primaryLinkedDocId && String(entry.documentId) === String(primaryLinkedDocId)) {
-        this.removePersistedSpawnedNoteWindow(String(entry.appKey))
-        return
-      }
-      const restoredFrameId = String(entry.frameId || entry.appKey)
-      const restoredTitle = (entry.documentTitle || "").trim()
-
-      try {
-        window.sessionStorage.setItem(`nexus.linkedAppDocument.${restoredFrameId}`, String(entry.documentId))
-        if (restoredTitle) window.sessionStorage.setItem(`nexus.linkedAppOpenTitle.${restoredFrameId}`, restoredTitle)
-      } catch (_) {}
-      try {
-        window.localStorage.setItem(`nexus.linkedAppDocument.${restoredFrameId}`, String(entry.documentId))
-        if (restoredTitle) window.localStorage.setItem(`nexus.linkedAppOpenTitle.${restoredFrameId}`, restoredTitle)
-      } catch (_) {}
-
-      if (document.querySelector(`[data-content-window-app-key-value="${entry.appKey}"]`)) return
-
-      const clone = this.element.cloneNode(true)
-      clone.dataset.contentWindowAppKeyValue = String(entry.appKey)
-      clone.dataset.contentWindowFrameIdValue = String(entry.frameId || entry.appKey)
-      clone.dataset.contentWindowStorageKeyValue = String(entry.storageKey || entry.appKey)
-      clone.dataset.contentWindowHasLinkedAppSavePickerValue = "true"
-      clone.dataset.isSpawnedNoteWindow = "true"
-      clone.dataset.spawnedFromDocumentId = String(entry.documentId)
-
-      this.prepareClonedWindowShell(clone, {
-        frameId: String(entry.frameId || entry.appKey),
-        title: restoredTitle,
-        openOnConnect: false
-      })
-
-      this.element.parentElement.appendChild(clone)
-    })
-  }
-
-  readPersistedSpawnedNoteWindows() {
-    return readRegistry(NOTE_WINDOW_REGISTRY_KEY, LEGACY_NOTE_REGISTRY_KEY)
-  }
-
-  writePersistedSpawnedNoteWindows(entries) {
-    writeRegistry(NOTE_WINDOW_REGISTRY_KEY, entries)
-  }
-
-  persistSpawnedNoteWindow(entry) {
-    const entryDocId = String(entry?.documentId || "")
-    const entries = this.readPersistedSpawnedNoteWindows().filter((item) => {
-      if (item?.appKey === entry.appKey) return false
-      if (!entryDocId) return true
-      return String(item?.documentId || "") !== entryDocId
-    })
-    entries.push(entry)
-    this.writePersistedSpawnedNoteWindows(entries)
-  }
-
-  removePersistedSpawnedNoteWindow(appKey) {
-    const entries = this.readPersistedSpawnedNoteWindows().filter((item) => item?.appKey !== appKey)
-    this.writePersistedSpawnedNoteWindows(entries)
-  }
-
-  restorePersistedSpawnedTimeCardWindows() {
-    if (this.appKeyValue !== "time-card") return
-    if (window.__nexusTimeCardWindowsRestored) return
-    window.__nexusTimeCardWindowsRestored = true
-
-    const primaryLinkedDocId = this.readLinkedDocumentIdForCurrentFrame()
-    const entries = this.readPersistedSpawnedTimeCardWindows()
-    const seenTimeCardDocIds = new Set()
-    entries.forEach((entry) => {
-      if (!entry?.appKey || !entry?.documentId) return
-      const entryDocId = String(entry.documentId)
-      if (seenTimeCardDocIds.has(entryDocId)) {
-        this.removePersistedSpawnedTimeCardWindow(String(entry.appKey))
-        return
-      }
-      seenTimeCardDocIds.add(entryDocId)
-      if (primaryLinkedDocId && String(entry.documentId) === String(primaryLinkedDocId)) {
-        this.removePersistedSpawnedTimeCardWindow(String(entry.appKey))
-        return
-      }
-      const restoredFrameId = String(entry.frameId || entry.appKey)
-      const restoredTitle = (entry.documentTitle || "").trim()
-
-      try {
-        window.sessionStorage.setItem(`nexus.linkedAppDocument.${restoredFrameId}`, String(entry.documentId))
-        if (restoredTitle) window.sessionStorage.setItem(`nexus.linkedAppOpenTitle.${restoredFrameId}`, restoredTitle)
-      } catch (_) {}
-      try {
-        window.localStorage.setItem(`nexus.linkedAppDocument.${restoredFrameId}`, String(entry.documentId))
-        if (restoredTitle) window.localStorage.setItem(`nexus.linkedAppOpenTitle.${restoredFrameId}`, restoredTitle)
-      } catch (_) {}
-
-      if (document.querySelector(`[data-content-window-app-key-value="${entry.appKey}"]`)) {
-        window.__nexusSpawnedTimeCardsByDocumentId[String(entry.documentId)] = String(entry.appKey)
-        return
-      }
-
-      const clone = this.element.cloneNode(true)
-      clone.dataset.contentWindowAppKeyValue = String(entry.appKey)
-      clone.dataset.contentWindowFrameIdValue = String(entry.frameId || entry.appKey)
-      clone.dataset.contentWindowStorageKeyValue = String(entry.storageKey || entry.appKey)
-      clone.dataset.contentWindowHasLinkedAppSavePickerValue = "true"
-      clone.dataset.isSpawnedTimeCardWindow = "true"
-      clone.dataset.spawnedFromDocumentId = String(entry.documentId)
-
-      this.prepareClonedWindowShell(clone, {
-        frameId: String(entry.frameId || entry.appKey),
-        title: restoredTitle,
-        clearTimeCardHours: true,
-        openOnConnect: false
-      })
-
-      window.__nexusSpawnedTimeCardsByDocumentId[String(entry.documentId)] = String(entry.appKey)
-      this.element.parentElement.appendChild(clone)
-    })
-  }
-
-  readPersistedSpawnedTimeCardWindows() {
-    return readRegistry(TIMECARD_WINDOW_REGISTRY_KEY, LEGACY_TIMECARD_REGISTRY_KEY)
-  }
-
-  writePersistedSpawnedTimeCardWindows(entries) {
-    writeRegistry(TIMECARD_WINDOW_REGISTRY_KEY, entries)
-  }
-
-  persistSpawnedTimeCardWindow(entry) {
-    const entryDocId = String(entry?.documentId || "")
-    const entries = this.readPersistedSpawnedTimeCardWindows().filter((item) => {
-      if (item?.appKey === entry.appKey) return false
-      if (!entryDocId) return true
-      return String(item?.documentId || "") !== entryDocId
-    })
-    entries.push(entry)
-    this.writePersistedSpawnedTimeCardWindows(entries)
-  }
-
-  removePersistedSpawnedTimeCardWindow(appKey) {
-    const entries = this.readPersistedSpawnedTimeCardWindows().filter((item) => item?.appKey !== appKey)
-    this.writePersistedSpawnedTimeCardWindows(entries)
-  }
-
   syncOpenFileBadge(title) {
     this.syncOpenFileBadgeFor(this.element, title)
   }
@@ -1106,36 +796,6 @@ export default class extends Controller {
     nameEl.textContent = t
     nameEl.setAttribute("title", t)
     this.syncOpenFileNameStateFor(windowEl, "saved")
-  }
-
-  syncTimeCardHoursBadge(label, { isOpen = false } = {}) {
-    this.syncTimeCardHoursBadgeFor(this.element, label, { isOpen })
-  }
-
-  syncTimeCardHoursBadgeFor(windowEl, label, { isOpen = false } = {}) {
-    if (!windowEl) return
-    const sep = windowEl.querySelector("[data-nexus-time-card-hours-separator]")
-    const hoursEl = windowEl.querySelector("[data-nexus-time-card-hours]")
-    if (!sep || !hoursEl) return
-
-    const text = String(label || "").trim()
-
-    if (!text) {
-      sep.hidden = true
-      hoursEl.hidden = true
-      hoursEl.textContent = ""
-      hoursEl.removeAttribute("title")
-      return
-    }
-
-    sep.hidden = false
-    hoursEl.hidden = false
-    hoursEl.textContent = text
-    hoursEl.setAttribute("title", `Worked ${text}`)
-  }
-
-  clearTimeCardHoursBadge() {
-    this.syncTimeCardHoursBadge("", { isOpen: false })
   }
 
   isDraftOpenFileTitle(title) {
@@ -1207,26 +867,6 @@ export default class extends Controller {
     this.writePersistedSpawnedTaskWindows(next)
   }
 
-  syncPersistedSpawnedNoteTitle(documentTitle) {
-    if (!this.appKeyValue.startsWith("note-spawn-")) return
-    const entries = this.readPersistedSpawnedNoteWindows()
-    const next = entries.map((item) => {
-      if (item?.appKey !== this.appKeyValue) return item
-      return { ...item, documentTitle: (documentTitle || "").trim() }
-    })
-    this.writePersistedSpawnedNoteWindows(next)
-  }
-
-  syncPersistedSpawnedTimeCardTitle(documentTitle) {
-    if (!this.appKeyValue.startsWith("time-card-spawn-")) return
-    const entries = this.readPersistedSpawnedTimeCardWindows()
-    const next = entries.map((item) => {
-      if (item?.appKey !== this.appKeyValue) return item
-      return { ...item, documentTitle: (documentTitle || "").trim() }
-    })
-    this.writePersistedSpawnedTimeCardWindows(next)
-  }
-
   syncSpawnedTaskDocumentRegistration(documentId) {
     if (!this.appKeyValue.startsWith("task-spawn-")) return
     if (!window.__nexusSpawnedTasksByDocumentId) window.__nexusSpawnedTasksByDocumentId = {}
@@ -1254,11 +894,11 @@ export default class extends Controller {
     })
   }
 
-  syncSpawnedNoteDocumentRegistration(documentId) {
-    if (!this.appKeyValue.startsWith("note-spawn-")) return
-    if (!window.__nexusSpawnedNotesByDocumentId) window.__nexusSpawnedNotesByDocumentId = {}
+  syncSpawnedQuartzDocumentRegistration(documentId) {
+    if (!this.appKeyValue.startsWith("quartz-spawn-")) return
+    if (!window.__nexusSpawnedQuartzByDocumentId) window.__nexusSpawnedQuartzByDocumentId = {}
 
-    const map = window.__nexusSpawnedNotesByDocumentId
+    const map = window.__nexusSpawnedQuartzByDocumentId
     const nextDocId = String(documentId || "")
 
     Object.keys(map).forEach((docId) => {
@@ -1272,54 +912,15 @@ export default class extends Controller {
 
     map[nextDocId] = this.appKeyValue
     this.element.dataset.spawnedFromDocumentId = nextDocId
-    this.persistSpawnedNoteWindow({
-      appKey: this.appKeyValue,
-      frameId: this.frameIdValue,
-      storageKey: this.storageKeyValue,
-      documentId: nextDocId,
-      documentTitle: this.readOpenTitleForFrame(this.frameIdValue)
-    })
-  }
-
-  syncSpawnedTimeCardDocumentRegistration(documentId) {
-    if (!this.appKeyValue.startsWith("time-card-spawn-")) return
-    if (!window.__nexusSpawnedTimeCardsByDocumentId) window.__nexusSpawnedTimeCardsByDocumentId = {}
-
-    const map = window.__nexusSpawnedTimeCardsByDocumentId
-
-    const nextDocId = String(documentId || "")
-    Object.keys(map).forEach((docId) => {
-      if (map[docId] === this.appKeyValue && docId !== nextDocId) delete map[docId]
-    })
-
-    if (!nextDocId) {
-      Object.keys(map).forEach((docId) => {
-        if (map[docId] === this.appKeyValue) delete map[docId]
-      })
-      delete this.element.dataset.spawnedFromDocumentId
-      return
-    }
-
-    map[nextDocId] = this.appKeyValue
-    this.element.dataset.spawnedFromDocumentId = nextDocId
-    this.persistSpawnedTimeCardWindow({
-      appKey: this.appKeyValue,
-      frameId: this.frameIdValue,
-      storageKey: this.storageKeyValue,
-      documentId: nextDocId,
-      documentTitle: this.readOpenTitleForFrame(this.frameIdValue)
-    })
   }
 
   syncSpawnedLinkedDocumentRegistration(documentId) {
     this.syncSpawnedTaskDocumentRegistration(documentId)
-    this.syncSpawnedNoteDocumentRegistration(documentId)
-    this.syncSpawnedTimeCardDocumentRegistration(documentId)
+    this.syncSpawnedQuartzDocumentRegistration(documentId)
   }
 
   clearOpenFileBadge() {
     this.syncOpenFileBadge("")
-    this.clearTimeCardHoursBadge()
     if (this.isLinkedDocumentApp() && this.hasFrameIdValue) this.clearLinkedAppOpenTitleStorage()
   }
 
@@ -1352,8 +953,6 @@ export default class extends Controller {
       // non-blocking
     }
     this.syncPersistedSpawnedTaskTitle(t)
-    this.syncPersistedSpawnedNoteTitle(t)
-    this.syncPersistedSpawnedTimeCardTitle(t)
   }
 
   clearLinkedAppOpenTitleStorage() {
@@ -1370,8 +969,6 @@ export default class extends Controller {
       // non-blocking
     }
     this.syncPersistedSpawnedTaskTitle("")
-    this.syncPersistedSpawnedNoteTitle("")
-    this.syncPersistedSpawnedTimeCardTitle("")
   }
 
   /** After reload, reattach document_id to the iframe URL and title chrome from sessionStorage. */
@@ -1768,8 +1365,7 @@ export default class extends Controller {
   isSpawnedWindow() {
     return this.appKeyValue.startsWith("task-spawn-") ||
       this.appKeyValue.startsWith("image-spawn-") ||
-      this.appKeyValue.startsWith("note-spawn-") ||
-      this.appKeyValue.startsWith("time-card-spawn-")
+      this.appKeyValue.startsWith("quartz-spawn-")
   }
 
   finalizeSpawnedWindowClose() {
@@ -1778,12 +1374,9 @@ export default class extends Controller {
     if (docId) {
       if (this.appKeyValue.startsWith("task-spawn-")) delete window.__nexusSpawnedTasksByDocumentId[docId]
       if (this.appKeyValue.startsWith("image-spawn-")) delete window.__nexusSpawnedImagesByDocumentId[docId]
-      if (this.appKeyValue.startsWith("note-spawn-")) delete window.__nexusSpawnedNotesByDocumentId[docId]
-      if (this.appKeyValue.startsWith("time-card-spawn-")) delete window.__nexusSpawnedTimeCardsByDocumentId[docId]
+      if (this.appKeyValue.startsWith("quartz-spawn-")) delete window.__nexusSpawnedQuartzByDocumentId[docId]
     }
     if (this.appKeyValue.startsWith("task-spawn-")) this.removePersistedSpawnedTaskWindow(this.appKeyValue)
-    if (this.appKeyValue.startsWith("note-spawn-")) this.removePersistedSpawnedNoteWindow(this.appKeyValue)
-    if (this.appKeyValue.startsWith("time-card-spawn-")) this.removePersistedSpawnedTimeCardWindow(this.appKeyValue)
     try {
       window.localStorage.removeItem(`nexus.linkedAppDocument.${this.frameIdValue}`)
       window.sessionStorage.removeItem(`nexus.linkedAppDocument.${this.frameIdValue}`)
@@ -1794,16 +1387,12 @@ export default class extends Controller {
       ? document.querySelectorAll('[data-content-window-app-key-value^="task-spawn-"]:not(.is-hidden)').length > 0
       : this.appKeyValue.startsWith("image-spawn-")
         ? document.querySelectorAll('[data-content-window-app-key-value^="image-spawn-"]:not(.is-hidden)').length > 0
-        : this.appKeyValue.startsWith("note-spawn-")
-          ? document.querySelectorAll('[data-content-window-app-key-value^="note-spawn-"]:not(.is-hidden)').length > 0
-          : document.querySelectorAll('[data-content-window-app-key-value^="time-card-spawn-"]:not(.is-hidden)').length > 0
+        : document.querySelectorAll('[data-content-window-app-key-value^="quartz-spawn-"]:not(.is-hidden)').length > 0
     const hasPrimaryOpen = this.appKeyValue.startsWith("task-spawn-")
       ? Boolean(document.querySelector('[data-content-window-app-key-value="tasks"]:not(.is-hidden)'))
       : this.appKeyValue.startsWith("image-spawn-")
         ? Boolean(document.querySelector('[data-content-window-app-key-value="images"]:not(.is-hidden)'))
-        : this.appKeyValue.startsWith("note-spawn-")
-          ? Boolean(document.querySelector('[data-content-window-app-key-value="notes"]:not(.is-hidden)'))
-          : Boolean(document.querySelector('[data-content-window-app-key-value="time-card"]:not(.is-hidden)'))
+        : Boolean(document.querySelector('[data-content-window-app-key-value="quartz"]:not(.is-hidden)'))
     if (!hasOtherSpawned && !hasPrimaryOpen) {
       this.emitWindowState(false)
     }
@@ -1912,20 +1501,21 @@ export default class extends Controller {
   }
 
   isLinkedApp() {
-    return this.appKeyValue === "tasks" || this.appKeyValue.startsWith("task-spawn-")
+    return this.appKeyValue === "tasks" ||
+      this.appKeyValue.startsWith("task-spawn-") ||
+      this.appKeyValue === "quartz" ||
+      this.appKeyValue.startsWith("quartz-spawn-")
   }
 
-  /** Finder-linked document windows (Tasks, Audio) share sessionStorage restore + title badge. */
+  /** Finder-linked document windows (Tasks, Quartz, Audio, Images) share restore + title badge behavior. */
   isLinkedDocumentApp() {
     return this.appKeyValue === "tasks" ||
       this.appKeyValue.startsWith("task-spawn-") ||
       this.appKeyValue === "audio" ||
       this.appKeyValue === "images" ||
       this.appKeyValue.startsWith("image-spawn-") ||
-      this.appKeyValue === "notes" ||
-      this.appKeyValue.startsWith("note-spawn-") ||
-      this.appKeyValue === "time-card" ||
-      this.appKeyValue.startsWith("time-card-spawn-")
+      this.appKeyValue === "quartz" ||
+      this.appKeyValue.startsWith("quartz-spawn-")
   }
 
   buildAppUrl(options = {}) {
@@ -2524,7 +2114,6 @@ export default class extends Controller {
   prepareClonedWindowShell(clone, {
     frameId,
     title = "",
-    clearTimeCardHours = false,
     openOnConnect = false
   } = {}) {
     clone.classList.add("is-hidden")
@@ -2534,7 +2123,6 @@ export default class extends Controller {
     this.syncOpenFileBadgeFor(clone, title)
     const editedEl = clone.querySelector("[data-nexus-open-file-edited]")
     if (editedEl) editedEl.hidden = true
-    if (clearTimeCardHours) this.syncTimeCardHoursBadgeFor(clone, "", { isOpen: false })
     const pickerLayer = clone.querySelector("[data-content-window-target='savePickerLayer']")
     if (pickerLayer) {
       pickerLayer.hidden = true
@@ -2542,18 +2130,6 @@ export default class extends Controller {
     }
     const pickerIframe = clone.querySelector("[data-content-window-target='savePickerIframe']")
     if (pickerIframe) pickerIframe.removeAttribute("src")
-  }
-
-  /** Spawns a new blank notes window instance (unsaved). */
-  handleSpawnBlankNoteWindow() {
-    if (this.appKeyValue !== "notes") return
-    this.spawnBlankNoteWindow()
-  }
-
-  /** Spawns a new blank time card window instance (unsaved). */
-  handleSpawnBlankTimeCardWindow() {
-    if (this.appKeyValue !== "time-card") return
-    this.spawnBlankTimeCardWindow()
   }
 
   /** Clone the primary window shell into a new blank (unsaved) task window and open it. */
@@ -2567,46 +2143,6 @@ export default class extends Controller {
     clone.dataset.isSpawnedTaskWindow = "true"
     // No spawnedFromDocumentId — blank window hasn't been saved yet
     this.prepareClonedWindowShell(clone, { frameId: uid, title: "", openOnConnect: true })
-    const rect = this.element.getBoundingClientRect()
-    clone.style.left = `${Math.round(rect.left) + 24}px`
-    clone.style.top  = `${Math.round(rect.top)  + 24}px`
-    clone.style.width  = `${Math.round(rect.width)}px`
-    clone.style.height = `${Math.round(rect.height)}px`
-    this.element.parentElement.appendChild(clone)
-    return uid
-  }
-
-  /** Clone the primary notes window shell into a new blank (unsaved) notes window and open it. */
-  spawnBlankNoteWindow() {
-    const uid = `note-spawn-${Date.now()}`
-    const clone = this.element.cloneNode(true)
-    clone.dataset.contentWindowAppKeyValue = uid
-    clone.dataset.contentWindowFrameIdValue = uid
-    clone.dataset.contentWindowStorageKeyValue = uid
-    clone.dataset.contentWindowHasLinkedAppSavePickerValue = "true"
-    clone.dataset.isSpawnedNoteWindow = "true"
-    // No spawnedFromDocumentId — blank window hasn't been saved yet
-    this.prepareClonedWindowShell(clone, { frameId: uid, title: "", openOnConnect: true })
-    const rect = this.element.getBoundingClientRect()
-    clone.style.left = `${Math.round(rect.left) + 24}px`
-    clone.style.top  = `${Math.round(rect.top)  + 24}px`
-    clone.style.width  = `${Math.round(rect.width)}px`
-    clone.style.height = `${Math.round(rect.height)}px`
-    this.element.parentElement.appendChild(clone)
-    return uid
-  }
-
-  /** Clone the primary time card window shell into a new blank (unsaved) time card window and open it. */
-  spawnBlankTimeCardWindow() {
-    const uid = `time-card-spawn-${Date.now()}`
-    const clone = this.element.cloneNode(true)
-    clone.dataset.contentWindowAppKeyValue = uid
-    clone.dataset.contentWindowFrameIdValue = uid
-    clone.dataset.contentWindowStorageKeyValue = uid
-    clone.dataset.contentWindowHasLinkedAppSavePickerValue = "true"
-    clone.dataset.isSpawnedTimeCardWindow = "true"
-    // No spawnedFromDocumentId — blank window hasn't been saved yet
-    this.prepareClonedWindowShell(clone, { frameId: uid, title: "", openOnConnect: true, clearTimeCardHours: true })
     const rect = this.element.getBoundingClientRect()
     clone.style.left = `${Math.round(rect.left) + 24}px`
     clone.style.top  = `${Math.round(rect.top)  + 24}px`
@@ -2636,27 +2172,6 @@ export default class extends Controller {
         detail: { frameId: this.hasFrameIdValue ? this.frameIdValue : "calendar-pane" }
       })
     )
-  }
-
-  emitTimeCardClearRequest(event) {
-    if (event) event.preventDefault()
-    const isTimeCardWindow =
-      this.appKeyValue === "time-card" || this.appKeyValue.startsWith("time-card-spawn-")
-    if (!isTimeCardWindow) return
-    if (!window.confirm("Clear all time card data? This cannot be undone.")) return
-    window.dispatchEvent(new CustomEvent("nexus:time-card-clear-request", {
-      detail: { frameId: this.frameIdValue }
-    }))
-  }
-
-  emitTimeCardDatePickerRequest(event) {
-    if (event) event.preventDefault()
-    const isTimeCardWindow =
-      this.appKeyValue === "time-card" || this.appKeyValue.startsWith("time-card-spawn-")
-    if (!isTimeCardWindow) return
-    window.dispatchEvent(new CustomEvent("nexus:time-card-open-date-picker", {
-      detail: { frameId: this.frameIdValue }
-    }))
   }
 
   async setLinkedImageAsWallpaper(event) {
@@ -2697,11 +2212,9 @@ export default class extends Controller {
         ? "tasks"
         : this.element.dataset.isSpawnedImageWindow === "true"
           ? "images"
-          : this.element.dataset.isSpawnedNoteWindow === "true"
-            ? "notes"
-            : this.element.dataset.isSpawnedTimeCardWindow === "true"
-              ? "time-card"
-              : this.appKeyValue
+          : this.element.dataset.isSpawnedQuartzWindow === "true"
+            ? "quartz"
+            : this.appKeyValue
     window.dispatchEvent(new CustomEvent("app-window:state", {
       detail: {
         appKey: reportedAppKey,

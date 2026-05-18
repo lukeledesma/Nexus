@@ -16,9 +16,8 @@ Nexus delivers an OS-like experience in the browser. All content is stored in Po
 **Included apps:**
 
 - **Finder** — folder tree with file operations (create, rename, move, delete, favorites)
-- **Notes** — rich text editor with autosave
-- **Tasks** — task lists with subtasks and inline notes
-- **Time Card** — clock in/out workflow with per-day saved state
+- **Quartz** — A powerful and expandable text-based application for all workflows.
+- **Tasks** — Task lists with subtasks and inline notes
 - **Calendar** — event scheduling with persistent embedded storage
 - **Images** — browse and view uploaded image assets
 - **Audio** — browse and preview audio files

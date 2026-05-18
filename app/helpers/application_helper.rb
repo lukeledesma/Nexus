@@ -16,8 +16,7 @@ module ApplicationHelper
     [
       { window_key: "finder", pin_key: "finder", label: "Finder", icon: :folder },
       { window_key: "tasks", pin_key: "tasks", label: "Tasks", icon: :task_checklist },
-      { window_key: "notes", pin_key: "notes", label: "Notes", icon: :edit_note },
-      { window_key: "time-card", pin_key: "time-card", label: "Time Card", icon: :overview },
+      { window_key: "quartz", pin_key: "quartz", label: "Quartz", icon: :article, icon_svg: true },
       { window_key: "calendar", pin_key: "calendar", label: "Calendar", icon: :calendar_month },
       { window_key: "images", pin_key: "images", label: "Images", icon: :wallpaper },
       { window_key: "audio", pin_key: "audio", label: "Audio", icon: :graphic_eq }
@@ -44,7 +43,7 @@ module ApplicationHelper
     section = section_key.to_s.strip.downcase
     case content_type.to_s
     when "note"
-      return :overview if section == "time_card"
+      return :article if finder_quartz_note_file?(content_type, section_key: section)
       :edit_note
     when "task_list" then :task_checklist
     when "asset"
@@ -55,6 +54,10 @@ module ApplicationHelper
       end
     else :file_document
     end
+  end
+
+  def finder_quartz_note_file?(content_type, section_key: nil)
+    content_type.to_s == "note" && section_key.to_s.strip.downcase == "quartz"
   end
 
   # First-paint workspace chrome (avoids default theme flash before /workspace_preferences fetch).

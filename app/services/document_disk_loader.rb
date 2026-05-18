@@ -331,6 +331,8 @@ class DocumentDiskLoader
         parse_note_from_unified(metadata, body)
       when NexusFileFormat::KIND_TASK_LIST
         build_task_list_attributes(metadata, body)
+      when "quartz"
+        parse_quartz_from_unified(metadata, lines)
       when "stickynotes"
         parse_note_from_unified(
           metadata,
@@ -381,6 +383,19 @@ class DocumentDiskLoader
       {
         content_type: "note",
         content: body,
+        tasks: [],
+        reset_mode: "none",
+        reset_days: [],
+        last_reset_at: nil,
+        created_at: parse_time(metadata["created_at"]),
+        updated_at: parse_time(metadata["updated_at"])
+      }
+    end
+
+    def parse_quartz_from_unified(metadata, lines)
+      {
+        content_type: "note",
+        content: lines.join("\n"),
         tasks: [],
         reset_mode: "none",
         reset_days: [],

@@ -177,7 +177,6 @@ class DocumentsController < ApplicationController
       # All document types go through the single broadcast_document_change path.
       case @document.content_type
       when "note"
-        # Time card and regular notes both use "note" content type.
         UserSyncChannel.broadcast_document_change(
           user: current_user,
           document_id: @document.id,
@@ -516,7 +515,7 @@ class DocumentsController < ApplicationController
 
     case content_type
     when "note"
-      section_key == "time_card" ? "time-card" : "notes"
+      "quartz"
     when "task_list"
       "tasks"
     when "asset"
@@ -531,9 +530,8 @@ class DocumentsController < ApplicationController
 
   def panel_search_icon_for(app_key)
     {
-      "notes" => "edit_note",
+      "quartz" => "sticky_note",
       "tasks" => "task_checklist",
-      "time-card" => "overview",
       "images" => "wallpaper",
       "audio" => "graphic_eq"
     }[app_key.to_s] || "file_document"

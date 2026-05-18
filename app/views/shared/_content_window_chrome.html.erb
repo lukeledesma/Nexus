@@ -6,8 +6,6 @@
 <% show_task_list_add = local_assigns.fetch(:show_task_list_add, false) %>
 <% show_calendar_new_event = local_assigns.fetch(:show_calendar_new_event, false) %>
 <% show_set_wallpaper = local_assigns.fetch(:show_set_wallpaper, false) %>
-<% show_time_card_clear = local_assigns.fetch(:show_time_card_clear, false) %>
-<% show_time_card_pick_date = local_assigns.fetch(:show_time_card_pick_date, false) %>
 <% chrome_toolbar = show_finder_new_folder || show_task_list_add || linked_app_save_flow %>
 <header class="content-window-chrome<%= " content-window-chrome--with-save" if show_save %><%= " content-window-chrome--with-open-file" if open_file_badge %><%= " content-window-chrome--with-finder-toolbar" if chrome_toolbar %>">
   <% if open_file_badge %>
@@ -16,8 +14,6 @@
         <span class="content-window-open-file-name" data-nexus-open-file-name><%= title %></span>
         <span class="content-window-open-file-edited" data-nexus-open-file-edited hidden aria-hidden="true">saving</span>
       </h2>
-      <span class="content-window-open-file-separator" data-nexus-time-card-hours-separator hidden aria-hidden="true">|</span>
-      <span class="content-window-time-card-hours" data-nexus-time-card-hours hidden></span>
     </div>
   <% else %>
     <h2 class="content-window-chrome-title"><%= title %></h2>
@@ -42,15 +38,6 @@
             aria-label="Set as wallpaper"
             title="Set as wallpaper"
           ><%= material_symbol_icon(:desktop_windows, size: :sm) %></button>
-        <% end %>
-        <% if show_time_card_pick_date %>
-          <button
-            type="button"
-            class="content-window-new-folder-btn settings-themes-item-action-btn theme-builder-save-btn content-window-time-card-date"
-            data-action="click->content-window#emitTimeCardDatePickerRequest"
-            title="Pick date"
-            aria-label="Pick date"
-          ><%= material_symbol_icon(:calendar_month, size: :sm) %></button>
         <% end %>
         <% if show_open %>
           <button
@@ -126,17 +113,6 @@
           title="Set as wallpaper"
         ><%= material_symbol_icon(:desktop_windows, size: :sm) %></button>
       <% end %>
-    <% end %>
-    <% if show_time_card_clear %>
-      <button
-        type="button"
-        class="tools-close-btn content-window-time-card-clear"
-        data-content-window-target="chromeTimeCardClear"
-        data-action="click->content-window#emitTimeCardClearRequest"
-        aria-label="Clear time card session"
-        title="Clear time card session"
-        hidden
-      ><%= material_symbol_icon(:ink_eraser, size: :xs) %></button>
     <% end %>
     <%= render "shared/content_window_close_button" %>
   </div>

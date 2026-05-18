@@ -129,12 +129,13 @@
         <% end %>
       </section>
 
+
       <section class="content-window os-window is-hidden"
         data-controller="content-window"
-        data-content-window-app-key-value="notes"
-        data-content-window-app-url-value="/apps/notes"
-        data-content-window-storage-key-value="nexus.contentWindow.notes.bounds"
-        data-content-window-frame-id-value="notes-pane"
+        data-content-window-app-key-value="quartz"
+        data-content-window-app-url-value="/apps/quartz"
+        data-content-window-storage-key-value="nexus.contentWindow.quartz.bounds"
+        data-content-window-frame-id-value="quartz-pane"
         data-content-window-has-linked-app-save-picker-value="true"
         aria-live="polite">
         <%= render "shared/content_window_chrome", title: "", open_file_badge: true, linked_app_save_flow: true, show_open: true %>
@@ -147,29 +148,7 @@
         <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
         <%= content_window_shell(linked_app_save_picker: true) do %>
-          <turbo-frame id="notes-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
-        <% end %>
-      </section>
-
-      <section class="content-window os-window is-hidden"
-        data-controller="content-window"
-        data-content-window-app-key-value="time-card"
-        data-content-window-app-url-value="/apps/time_card"
-        data-content-window-storage-key-value="nexus.contentWindow.timeCard.bounds"
-        data-content-window-frame-id-value="time-card-pane"
-        data-content-window-has-linked-app-save-picker-value="true"
-        aria-live="polite">
-        <%= render "shared/content_window_chrome", title: "", open_file_badge: true, linked_app_save_flow: true, show_open: true, show_time_card_pick_date: true, show_time_card_clear: true %>
-        <div class="pane-resize-handle pane-resize-handle--top" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--top-left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--top-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom-left" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <div class="pane-resize-handle pane-resize-handle--bottom-right" data-action="pointerdown->content-window#startResize mousedown->content-window#startResize touchstart->content-window#startResize"></div>
-        <%= content_window_shell(linked_app_save_picker: true) do %>
-          <turbo-frame id="time-card-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
+          <turbo-frame id="quartz-pane" class="finder-app-frame" data-content-window-target="frame"></turbo-frame>
         <% end %>
       </section>
 

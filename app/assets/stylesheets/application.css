@@ -467,44 +467,7 @@
   overflow: hidden;
 }
 
-.calendar-app__month-cell.has-time-card .calendar-app__month-day {
-  padding-right: 1.05rem;
-}
-
-.calendar-app__time-card-marker {
-  position: absolute;
-  z-index: 6;
-  top: 0.18rem;
-  left: 0.22rem;
-  width: 1rem;
-  height: 1rem;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  border-radius: 0.22rem;
-}
-
-.calendar-app__time-card-marker:hover,
-.calendar-app__time-card-marker:focus-visible {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text);
-  outline: none;
-}
-
-.calendar-app__time-card-marker:active {
-  transform: scale(0.95);
-}
-
-.calendar-app__time-card-marker-icon {
-  width: 0.68rem;
-  height: 0.68rem;
-  display: block;
-}
+/* Removed styles for Time Card markers */
 
 .calendar-app__month-cell.is-selected {
   background: rgba(59, 130, 246, 0.12);
@@ -6656,641 +6619,6 @@ input.app-save-dialog__btn {
   text-align: center;
 }
 
-.content-window[data-content-window-app-key-value="notes"] .window-content > .finder-app-frame,
-.content-window[data-content-window-app-key-value^="note-spawn-"] .window-content > .finder-app-frame {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.notes-app {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  padding: 0.5rem;
-}
-
-.notes-app__form {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-}
-
-.notes-app__textarea {
-  width: 100%;
-  flex: 1 1 auto;
-  min-height: 0;
-  border: 1px solid var(--border-hairline);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.14);
-  color: var(--text);
-  padding: 0.75rem;
-  resize: none;
-  line-height: 1.45;
-}
-
-.notes-app__textarea:focus {
-  outline: none;
-  border-color: var(--border-hairline);
-}
-
-.notes-app__empty-wrap {
-  flex: 1 1 auto;
-  min-height: 0;
-  border: 1px dashed var(--border-hairline);
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-}
-
-.notes-app__empty {
-  margin: 0;
-  font-size: 0.76rem;
-  color: var(--text-muted);
-  text-align: center;
-}
-
-.content-window[data-content-window-app-key-value="time-card"] .window-content > .finder-app-frame {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.time-card-app {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.5rem;
-  container-type: size;
-  position: relative;
-}
-
-.time-card-app__form {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.time-card-app__meta {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  min-height: 1.1rem;
-}
-
-.time-card-app__date-badge {
-  margin: 0;
-  font-size: 0.67rem;
-  color: var(--text-muted);
-  letter-spacing: 0.015em;
-}
-
-.time-card-date-popover {
-  position: fixed;
-  z-index: 22000;
-  width: min(17.5rem, calc(100vw - 1.5rem));
-  padding: 0.45rem;
-  border: 1px solid var(--border);
-  border-radius: 0.9rem;
-  background: color-mix(in oklab, var(--surface-raised) 92%, white 8%);
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.32);
-  backdrop-filter: blur(16px) saturate(1.1);
-}
-
-.time-card-date-popover[hidden] {
-  display: none !important;
-}
-
-.time-card-date-popover__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.time-card-date-popover__title {
-  margin: 0;
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--text);
-}
-
-.time-card-date-popover__nav {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.time-card-date-popover__nav-next svg.material-icon {
-  transform: rotate(180deg);
-}
-
-.time-card-date-popover__weekday-row,
-.time-card-date-popover__grid {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-}
-
-.time-card-date-popover__weekday-row {
-  margin-bottom: 0.12rem;
-}
-
-.time-card-date-popover__weekday {
-  text-align: center;
-  font-size: 0.64rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--text-muted);
-  padding: 0.15rem 0;
-}
-
-.time-card-date-popover__grid {
-  gap: 0.12rem;
-}
-
-.time-card-date-popover__day {
-  border: none;
-  border-radius: 999px;
-  min-width: 0;
-  min-height: 2.05rem;
-  padding: 0;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  cursor: pointer;
-  transition: background 120ms ease, color 120ms ease, transform 120ms ease;
-}
-
-.time-card-date-popover__day:hover,
-.time-card-date-popover__day:focus-visible {
-  background: rgba(255, 255, 255, 0.08);
-  outline: none;
-}
-
-.time-card-date-popover__day:active {
-  transform: scale(0.96);
-}
-
-.time-card-date-popover__day.is-outside-month {
-  color: color-mix(in oklab, var(--text-muted) 88%, transparent);
-}
-
-.time-card-date-popover__day.is-selected {
-  background: color-mix(in oklab, var(--accent) 28%, transparent);
-  color: var(--text);
-}
-
-.time-card-date-popover__day.is-today {
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 72%, transparent);
-}
-
-.time-card-app__header {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: stretch;
-  gap: 0.45rem;
-  overflow-x: auto;
-  overflow-y: hidden;
-  flex: 0 0 auto;
-}
-
-.time-card-app__clockin-group,
-.time-card-app__clockout-group,
-.time-card-app__elapsed-group {
-  border: 1px solid var(--border-hairline);
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.02);
-  padding: 0.35rem 0.5rem;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  min-width: 0;
-  flex: 1 1 0;
-}
-
-.time-card-app__clockin-group,
-.time-card-app__clockout-group {
-  width: auto;
-}
-
-.time-card-app__elapsed-group {
-  width: auto;
-}
-
-.time-card-app__label {
-  margin: 0 0 0.2rem;
-  font-size: 0.62rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.time-card-app__time-input {
-  width: 100%;
-  border: 1px solid var(--border-hairline);
-  border-radius: 5px;
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--text);
-  padding: 0.2rem 0.35rem;
-  font-size: 0.82rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
-  letter-spacing: 0.02em;
-}
-
-.time-card-app__time-input::placeholder {
-  color: color-mix(in srgb, var(--text) 72%, var(--text-muted) 28%);
-  opacity: 1;
-}
-
-.time-card-app__time-display {
-  margin: 0;
-  font-size: 0.82rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
-  color: var(--text);
-}
-
-.time-card-app__elapsed {
-  margin: 0;
-  font-size: 0.82rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
-}
-
-
-/* Keep controls in one row at all sizes; never hide or wrap. */
-
-.time-card-app__status {
-  border: 1px solid var(--border-hairline);
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.02);
-  padding: 0.4rem 0.45rem;
-  flex: 0 0 auto;
-}
-
-.time-card-app__status-line {
-  margin: 0;
-  font-size: 0.7rem;
-  color: var(--text-muted);
-}
-
-.time-card-app__progress {
-  margin-top: 0.32rem;
-  height: 0.35rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  overflow: hidden;
-}
-
-.time-card-app__progress-fill {
-  width: 0;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, rgba(127, 211, 255, 0.8), rgba(68, 172, 255, 0.85));
-  transition: width 180ms ease;
-}
-
-.time-card-app__progress-fill.is-danger {
-  background: linear-gradient(90deg, rgba(248, 113, 113, 0.9), rgba(220, 38, 38, 0.9));
-}
-
-.time-card-app__status-foot {
-  margin-top: 0.25rem;
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-
-.time-card-app__status-line--alert {
-  margin-top: 0;
-  color: #f87171;
-  opacity: 0.4;
-}
-
-.time-card-app__status-line--alert.is-visible {
-  opacity: 1;
-}
-
-.time-card-app__status-line--alert.is-good {
-  color: #34d399;
-  opacity: 1;
-}
-
-:root[data-nexus-shell-mode="light"] .time-card-app__status-line--alert.is-good {
-  color: #15803d;
-}
-
-.time-card-app__status-line--ratio {
-  color: var(--text-muted);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.time-card-app__status-line--ratio.is-danger {
-  color: #f87171;
-}
-
-.time-card-app__entries {
-  flex: 1 1 auto;
-  min-height: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-/* Shell — positions backdrop + textarea on top of each other */
-.time-card-notes-shell {
-  /* Grid stack: both children share the same cell so they overlap.
-     This keeps them in normal flow — shell gets height from the flex parent,
-     avoiding the collapsed-shell / escape-to-wallpaper problem. */
-  display: grid;
-  grid-template-rows: 1fr;
-  flex: 1 1 auto;
-  min-height: 0;
-  border-radius: 6px;
-  overflow: clip;
-}
-
-/* Shared layout for both layers — must be pixel-identical */
-.time-card-notes-backdrop,
-.time-card-notes-textarea {
-  grid-area: 1 / 1;
-  margin: 0;
-  padding: 0.5rem 0.5rem 1.2rem;
-  border: 1px solid var(--border-hairline);
-  border-radius: 6px;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  font-size: 0.76rem;
-  font-weight: normal;
-  line-height: 1.35;
-  letter-spacing: normal;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  overflow: auto;
-  scrollbar-gutter: stable;
-  tab-size: 2;
-  box-sizing: border-box;
-  width: 100%;
-  min-height: 0;
-}
-
-/* Backdrop — renders the styled HTML behind the transparent textarea */
-.time-card-notes-backdrop {
-  color: var(--text);
-  background: rgba(0, 0, 0, 0.14);
-  pointer-events: none;
-  user-select: none;
-  z-index: 0;
-  overflow: clip;
-  overscroll-behavior: none;
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-}
-
-.time-card-notes-backdrop::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-.time-card-notes-backdrop::-webkit-scrollbar-thumb {
-  background: transparent;
-}
-
-.time-card-notes-backdrop::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-/* Textarea — sits on top, transparent text so backdrop shows through */
-.time-card-notes-textarea {
-  color: transparent;
-  caret-color: var(--text, #e5e7eb);
-  background: transparent;
-  resize: none;
-  z-index: 1;
-  outline: none;
-  scrollbar-width: thin;
-  overscroll-behavior: none;
-}
-
-.time-card-notes-textarea::placeholder {
-  color: rgba(156, 163, 175, 0.45);
-}
-
-.time-card-notes-textarea:focus {
-  border-color: rgba(130, 214, 255, 0.45);
-  box-shadow: 0 0 0 1px rgba(130, 214, 255, 0.5);
-  outline: none;
-}
-
-/* Green H-prefix spans rendered in the backdrop */
-.time-card-app__notes-prefix {
-  font-weight: inherit;
-  position: relative;
-}
-
-.time-card-app__notes-prefix--time-range {
-  display: inline;
-}
-
-.time-card-app__notes-prefix--time-range.is-highlighted {
-  color: #60a5fa;
-}
-
-.time-card-app__time-range-label {
-  position: absolute;
-  left: calc(100% + 0.45rem);
-  top: 0;
-  color: var(--text);
-  opacity: 0.82;
-  font-weight: 600;
-  white-space: nowrap;
-  pointer-events: none;
-  transition: color 0.1s, opacity 0.1s;
-}
-
-.time-card-app__notes-prefix--time-range.is-highlighted .time-card-app__time-range-label {
-  color: #60a5fa;
-  opacity: 1;
-}
-
-/* Dash prefix for entry lines */
-.time-card-app__entry-dash {
-  color: var(--text-muted);
-  opacity: 0.65;
-}
-
-.time-card-app__ghost-text {
-  color: var(--text-muted);
-  opacity: 0.52;
-  font-style: italic;
-  pointer-events: none;
-}
-
-.time-card-app__notes-prefix--done .time-card-app__entry-dash {
-  color: #34d399;
-}
-
-.time-card-app__notes-prefix--done {
-  color: #34d399;
-}
-
-.time-card-app__notes-prefix--pending {
-  color: #fbbf24;
-}
-
-:root[data-nexus-shell-mode="light"] .time-card-app__notes-prefix--done {
-  color: #15803d;
-}
-
-:root[data-nexus-shell-mode="light"] .time-card-app__notes-prefix--pending {
-  color: #9a8700;
-}
-
-.time-card-app__notes-prefix--missing {
-  color: #f87171;
-}
-
-.time-card-app__notes-prefix--ongoing {
-  color: #a78bfa;
-}
-
-:root[data-nexus-shell-mode="light"] .time-card-app__notes-prefix--missing {
-  color: #dc2626;
-}
-
-:root[data-nexus-shell-mode="light"] .time-card-app__notes-prefix--ongoing {
-  color: #7c3aed;
-}
-
-/* 24-hour timeline bar */
-.time-card-timeline-shell {
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 0 1px;
-}
-
-.time-card-timeline__track {
-  position: relative;
-  height: 9px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border-hairline);
-  overflow: hidden;
-}
-
-.time-card-timeline__labels {
-  position: relative;
-  height: 10px;
-}
-
-.time-card-timeline__band {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  background: rgba(130, 214, 255, 0.12);
-  pointer-events: none;
-}
-
-.time-card-timeline__segment {
-  position: absolute;
-  top: 1px;
-  bottom: 1px;
-  border-radius: 2px;
-  background: #34d399;
-  opacity: 0.82;
-  cursor: default;
-  min-width: 3px;
-  transition: opacity 0.1s, background 0.1s;
-}
-
-.time-card-timeline__segment--done {
-  background: #34d399;
-}
-
-.time-card-timeline__segment--pending {
-  background: #fbbf24;
-}
-
-.time-card-timeline__segment--missing {
-  background: #f87171;
-}
-
-.time-card-timeline__segment--ongoing {
-  background: #a78bfa;
-}
-
-:root[data-nexus-shell-mode="light"] .time-card-timeline__segment--done {
-  background: #15803d;
-}
-
-:root[data-nexus-shell-mode="light"] .time-card-timeline__segment--pending {
-  background: #9a8700;
-}
-
-:root[data-nexus-shell-mode="light"] .time-card-timeline__segment--missing {
-  background: #dc2626;
-}
-
-:root[data-nexus-shell-mode="light"] .time-card-timeline__segment--ongoing {
-  background: #7c3aed;
-}
-
-.time-card-timeline__segment:hover,
-.time-card-timeline__segment.is-highlighted {
-  background: #60a5fa;
-  opacity: 1;
-}
-
-.time-card-timeline__tick {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: rgba(255, 255, 255, 0.18);
-  pointer-events: none;
-}
-
-.time-card-timeline__label {
-  position: absolute;
-  transform: translateX(-50%);
-  font-size: 0.52rem;
-  color: var(--text-muted);
-  white-space: nowrap;
-  line-height: 1;
-  top: 0;
-  letter-spacing: 0.04em;
-}
-
-:root[data-nexus-shell-mode="light"] .time-card-timeline__segment {
-  background: #15803d;
-}
-
-:root[data-nexus-shell-mode="light"] .time-card-timeline__tick {
-  background: rgba(0, 0, 0, 0.15);
-}
 
 
 /* List rows keep natural height; flex parent scrolls (same idea as Tasks — expanded rows don’t compress). */
@@ -8890,5 +8218,414 @@ a.finder-tree__row--file:focus-visible {
   .clock-app__panel--centered {
     justify-content: flex-start;
   }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Quartz — unified command-driven text app
+   Naming convention: quartz-app__, quartz-notes-, quartz-timeline__, quartz-*
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.quartz-app {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  container-type: size;
+  position: relative;
+}
+
+.quartz-app__form {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* ── Editor shell ────────────────────────────────────────────────────────── */
+
+.quartz-app__entries {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.quartz-notes-shell {
+  display: grid;
+  grid-template-rows: 1fr;
+  flex: 1 1 auto;
+  min-height: 0;
+  border-radius: 6px;
+  overflow: clip;
+}
+
+/* Backdrop and textarea share identical geometry — pixel-perfect overlap */
+.quartz-notes-backdrop,
+.quartz-notes-textarea {
+  grid-area: 1 / 1;
+  margin: 0;
+  padding: 0.5rem 0.5rem 1.2rem;
+  border: 1px solid var(--border-hairline);
+  border-radius: 6px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 0.76rem;
+  font-weight: normal;
+  line-height: 1.35;
+  letter-spacing: normal;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  overflow: auto;
+  scrollbar-gutter: stable;
+  tab-size: 2;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 0;
+}
+
+/* Backdrop: renders styled HTML behind the transparent textarea */
+.quartz-notes-backdrop {
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.14);
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+  overflow: clip;
+  overscroll-behavior: none;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.quartz-notes-backdrop::-webkit-scrollbar { width: 8px; height: 8px; }
+.quartz-notes-backdrop::-webkit-scrollbar-thumb { background: transparent; }
+.quartz-notes-backdrop::-webkit-scrollbar-track { background: transparent; }
+
+/* Textarea: transparent text so backdrop shows through; only caret is visible */
+.quartz-notes-textarea {
+  color: transparent;
+  caret-color: var(--text, #e5e7eb);
+  background: transparent;
+  resize: none;
+  z-index: 1;
+  outline: none;
+  scrollbar-width: thin;
+  overscroll-behavior: none;
+}
+
+.quartz-notes-textarea::placeholder {
+  color: rgba(156, 163, 175, 0.4);
+  font-style: italic;
+}
+
+.quartz-notes-textarea:focus {
+  border-color: rgba(130, 214, 255, 0.42);
+  box-shadow: 0 0 0 1px rgba(130, 214, 255, 0.48);
+  outline: none;
+}
+
+/* ── Mode trigger labels (#timecard, #timer, etc.) ───────────────────────── */
+
+.quartz-trigger {
+  color: var(--text-muted);
+  opacity: 0.48;
+}
+
+.quartz-trigger--invalid {
+  color: #f87171;
+  opacity: 1;
+}
+
+:root[data-nexus-shell-mode="light"] .quartz-trigger--invalid {
+  color: #dc2626;
+}
+
+/* ── Shared ghost / hint text ────────────────────────────────────────────── */
+
+.quartz-ghost-text {
+  color: var(--text-muted);
+  opacity: 0.5;
+  font-style: italic;
+  pointer-events: none;
+}
+
+/* ── Timecard mode ───────────────────────────────────────────────────────── */
+
+.quartz-timecard__range {
+  font-weight: inherit;
+  position: relative;
+  display: inline;
+}
+
+/* Completion-state colors */
+.quartz-timecard__range--done    { color: #34d399; }
+.quartz-timecard__range--pending { color: #fbbf24; }
+.quartz-timecard__range--missing { color: #f87171; }
+.quartz-timecard__range--ongoing { color: #a78bfa; }
+
+:root[data-nexus-shell-mode="light"] .quartz-timecard__range--done    { color: #15803d; }
+:root[data-nexus-shell-mode="light"] .quartz-timecard__range--pending { color: #9a8700; }
+:root[data-nexus-shell-mode="light"] .quartz-timecard__range--missing { color: #dc2626; }
+:root[data-nexus-shell-mode="light"] .quartz-timecard__range--ongoing { color: #7c3aed; }
+
+.quartz-timecard__range.is-highlighted { color: #60a5fa; }
+
+/* Projected label floated to the right of the range */
+.quartz-timecard__range-label {
+  position: absolute;
+  left: calc(100% + 0.45rem);
+  top: 0;
+  color: var(--text);
+  opacity: 0.8;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: color 0.1s, opacity 0.1s;
+}
+
+.quartz-timecard__range.is-highlighted .quartz-timecard__range-label {
+  color: #60a5fa;
+  opacity: 1;
+}
+
+.quartz-entry-dash {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+/* ── Timer mode ──────────────────────────────────────────────────────────── */
+
+.quartz-timer__spec {
+  color: inherit;
+}
+
+.quartz-timer__line1,
+.quartz-timer__line2 {
+  display: inline;
+}
+
+.quartz-timer__duration {
+  color: #34d399;
+  opacity: 1;
+}
+
+:root[data-nexus-shell-mode="light"] .quartz-timer__duration { color: #15803d; }
+
+.quartz-timer__wall {
+  color: var(--text-muted);
+  opacity: 0.6;
+  font-size: 0.72rem;
+}
+
+/* Live countdown — inherits base color from parent */
+.quartz-timer__countdown {
+  color: #34d399;
+  font-weight: inherit;
+  font-variant-numeric: normal;
+  transition: color 0.3s ease;
+}
+
+.quartz-timer__countdown--warning {
+  color: #fbbf24;
+}
+
+.quartz-timer__countdown--done {
+  color: #f87171;
+}
+
+.quartz-timer__countdown--blocked {
+  animation: quartzTimerBlockedFlash 220ms ease;
+}
+
+@keyframes quartzTimerBlockedFlash {
+  0%   { color: #f87171; }
+  100% { color: inherit; }
+}
+
+:root[data-nexus-shell-mode="light"] .quartz-timer__countdown         { color: #15803d; }
+:root[data-nexus-shell-mode="light"] .quartz-timer__countdown--warning { color: #9a8700; }
+:root[data-nexus-shell-mode="light"] .quartz-timer__countdown--done    { color: #dc2626; }
+
+.quartz-timer__line1.is-highlighted .quartz-timer__duration,
+.quartz-timer__line1.is-highlighted .quartz-timer__wall,
+.quartz-timer__line2.is-highlighted .quartz-timer__countdown,
+.quartz-timer__line2.is-highlighted .quartz-timer__wall {
+  color: #60a5fa;
+  opacity: 1;
+}
+
+/* ── Tasklist mode ───────────────────────────────────────────────────────── */
+
+.quartz-task__checkbox {
+  color: inherit;
+}
+
+.quartz-task__checkbox--done {
+  color: inherit;
+  opacity: 1;
+}
+
+:root[data-nexus-shell-mode="light"] .quartz-task__checkbox--done { color: inherit; }
+
+.quartz-task__body {
+  display: inline;
+}
+
+.quartz-task__body--done {
+  color: inherit;
+  text-decoration: none;
+  opacity: 1;
+}
+
+:root[data-nexus-shell-mode="light"] .quartz-task__body--done { color: inherit; }
+
+/* ── Contextual timeline bar ─────────────────────────────────────────────── */
+
+
+.quartz-timeline-shell {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0 1px;
+}
+
+.quartz-timeline-shell[hidden] {
+  display: none;
+}
+
+.quartz-timeline__track {
+  position: relative;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-hairline);
+  overflow: hidden;
+}
+
+
+.quartz-timeline__labels {
+  display: none;
+}
+
+.quartz-timeline__segment {
+  position: absolute;
+  inset: 0;
+  border-radius: 2px;
+  opacity: 0.82;
+  min-width: 3px;
+  transition: opacity 0.1s, background 0.1s;
+  cursor: default;
+}
+
+.quartz-timeline__segment--done    { background: #34d399; }
+.quartz-timeline__segment--pending { background: #fbbf24; }
+.quartz-timeline__segment--missing { background: #f87171; }
+.quartz-timeline__segment--ongoing { background: #a78bfa; }
+.quartz-timeline__segment--timer   { background: #38bdf8; }
+
+:root[data-nexus-shell-mode="light"] .quartz-timeline__segment--done    { background: #15803d; }
+:root[data-nexus-shell-mode="light"] .quartz-timeline__segment--pending { background: #9a8700; }
+:root[data-nexus-shell-mode="light"] .quartz-timeline__segment--missing { background: #dc2626; }
+:root[data-nexus-shell-mode="light"] .quartz-timeline__segment--ongoing { background: #7c3aed; }
+:root[data-nexus-shell-mode="light"] .quartz-timeline__segment--timer   { background: #0284c7; }
+
+.quartz-timeline__segment:hover,
+.quartz-timeline__segment.is-highlighted {
+  background: #60a5fa !important;
+  opacity: 1;
+}
+
+.quartz-timeline__tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.18);
+  pointer-events: none;
+}
+
+.quartz-timeline__label {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 0.52rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  line-height: 1;
+  top: 0;
+  letter-spacing: 0.04em;
+}
+
+:root[data-nexus-shell-mode="light"] .quartz-timeline__tick { background: rgba(0, 0, 0, 0.15); }
+
+/* ── Per-timer progress bars ───────────────────────────────────────────── */
+
+.quartz-timer-bar {
+  display: flex;
+  align-items: center;
+  padding: 0 1px;
+  height: 14px;
+}
+
+.quartz-timer-bar__track {
+  flex: 1 1 auto;
+  position: relative;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-hairline);
+  overflow: hidden;
+}
+
+.quartz-timer-bar__fill {
+  position: absolute;
+  inset: 0;
+  width: 0%;
+  background: #34d399;
+  border-radius: 2px;
+  transition: width 0.4s linear;
+}
+
+.quartz-timer-bar__fill--warning { background: #fbbf24; }
+.quartz-timer-bar__fill--done    { background: #f87171; transition: none; }
+
+:root[data-nexus-shell-mode="light"] .quartz-timer-bar__fill           { background: #15803d; }
+:root[data-nexus-shell-mode="light"] .quartz-timer-bar__fill--warning  { background: #9a8700; }
+:root[data-nexus-shell-mode="light"] .quartz-timer-bar__fill--done     { background: #dc2626; }
+
+.quartz-timer-bar.is-highlighted .quartz-timer-bar__fill,
+.quartz-timer-bar__fill.is-highlighted {
+  background: #60a5fa !important;
+}
+
+/* Quartz gem icon in side panel */
+.quartz-gem-icon {
+  display: block;
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+.quartz-hover-tip {
+  position: fixed;
+  z-index: 30000;
+  pointer-events: none;
+  max-width: min(24rem, calc(100vw - 1rem));
+  white-space: pre-line;
+  font-size: 0.52rem;
+  line-height: 1.28;
+  letter-spacing: 0.01em;
+  color: var(--text);
+  background: color-mix(in oklab, var(--surface-raised) 92%, black 8%);
+  border: 1px solid var(--border-hairline);
+  border-radius: 0.35rem;
+  padding: 0.35rem 0.45rem;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
+}
+
+.quartz-hover-tip[hidden] {
+  display: none !important;
 }
 

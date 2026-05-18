@@ -60,10 +60,8 @@ module Tasks
       case frame_id
       when "tasks-pane", /^task-spawn-/
         "tasks"
-      when "notes-pane", /^note-spawn-/
-        "notes"
-      when "time-card-pane", /^time-card-spawn-/
-        "time-card"
+      when "quartz-pane"
+        "quartz"
       end
     end
 

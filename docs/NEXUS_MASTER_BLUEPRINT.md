@@ -10,9 +10,6 @@ Nexus is a Rails desktop-style workspace where one authenticated user operates a
 
 Primary apps:
 - Tasks
-- Notes
-- Time Card
-- Calendar
 - Images
 - Audio
 - Finder (file system browser and save/open host)
@@ -164,8 +161,6 @@ Under root:
 
 Under Finder, section roots are provisioned:
 - Tasks (section key documents)
-- Notes
-- Time Card
 - Images
 - Audio
 - Favorites is logical and represented by favorited files, not required as physical root

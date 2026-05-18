@@ -3,7 +3,7 @@
 # Per-user JSON key/value store for client-driven app state that needs to follow
 # the user across devices (calendar events, draft window registries, app prefs).
 #
-# Keys are namespaced strings such as "calendar.events", "windows.notes". The
+# Keys are namespaced strings such as "calendar.events", "windows.tasks". The
 # `data` jsonb column stores arbitrary JSON (objects, arrays, scalars). Reads
 # and writes are always scoped to a user; the controller enforces this.
 class UserAppState < ApplicationRecord

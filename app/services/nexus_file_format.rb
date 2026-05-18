@@ -8,7 +8,7 @@ module NexusFileFormat
 
   KIND_NOTE = "note"
   KIND_TASK_LIST = "task_list"
-  KIND_TIME_CARD = "time_card"
+  KIND_QUARTZ = "quartz"
 
   module_function
 

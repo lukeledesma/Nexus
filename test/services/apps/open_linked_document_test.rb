@@ -19,14 +19,14 @@ class AppsOpenLinkedDocumentTest < ActiveSupport::TestCase
   end
 
   test "returns ok for a note in requested section" do
-    notes_root = Apps::FinderController.workspace_section_root(@user, "notes")
-    doc = notes_root.children.create!(title: "Daily Note", is_folder: false, content_type: "note", content: "Hello")
+    quartz_root = Apps::FinderController.workspace_section_root(@user, "quartz")
+    doc = quartz_root.children.create!(title: "Daily Note", is_folder: false, content_type: "note", content: "Hello")
 
     result = Apps::OpenLinkedDocument.call(
       user: @user,
       document_id: doc.id,
       content_type: "note",
-      section_key: "notes",
+      section_key: "quartz",
       allow_embedded: true
     )
 
@@ -40,7 +40,7 @@ class AppsOpenLinkedDocumentTest < ActiveSupport::TestCase
       user: @user,
       document_id: "abc",
       content_type: "note",
-      section_key: "notes",
+      section_key: "quartz",
       allow_embedded: true
     )
 
@@ -53,7 +53,7 @@ class AppsOpenLinkedDocumentTest < ActiveSupport::TestCase
       user: @user,
       document_id: 999_999,
       content_type: "note",
-      section_key: "notes",
+      section_key: "quartz",
       allow_embedded: true
     )
 
@@ -69,7 +69,7 @@ class AppsOpenLinkedDocumentTest < ActiveSupport::TestCase
       user: @user,
       document_id: doc.id,
       content_type: "note",
-      section_key: "notes",
+      section_key: "quartz",
       allow_embedded: true
     )
 

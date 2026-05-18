@@ -20,82 +20,81 @@ class AppsLinkedOpenTest < ActionDispatch::IntegrationTest
     User.where(id: @user&.id).delete_all
   end
 
-  test "notes opens linked note when allowed" do
-    notes_root = Apps::FinderController.workspace_section_root(@user, "notes")
-    doc = notes_root.children.create!(
-      title: "Design Notes",
+  test "quartz opens linked note when allowed" do
+    quartz_root = Apps::FinderController.workspace_section_root(@user, "quartz")
+    doc = quartz_root.children.create!(
+      title: "Quartz Log",
       is_folder: false,
       content_type: "note",
-      content: "<p>Hello<br>World</p>"
+      content: QuartzDocumentCodec.dump("#timer\n09:00")
     )
 
-    get apps_notes_path, params: { document_id: doc.id }
+    get apps_quartz_path, params: { document_id: doc.id }
 
     assert_response :success
     assert_includes response.body, %(name="document[content]")
     assert_includes response.body, document_path(doc.id)
+    assert_includes response.body, %(data-controller="quartz")
   end
 
-  test "notes rehydrates without trailing blank line after disk round-trip" do
-    notes_root = Apps::FinderController.workspace_section_root(@user, "notes")
-    doc = notes_root.children.create!(
+  test "quartz rehydrates without trailing blank line after disk round-trip" do
+    quartz_root = Apps::FinderController.workspace_section_root(@user, "quartz")
+    doc = quartz_root.children.create!(
       title: "Single Line",
       is_folder: false,
       content_type: "note",
-      content: "hello"
+      content: QuartzDocumentCodec.dump("hello")
     )
 
     DocumentDiskLoader.sync!
     doc.reload
 
-    get apps_notes_path, params: { document_id: doc.id }
+    get apps_quartz_path, params: { document_id: doc.id }
 
     assert_response :success
-    textarea = Nokogiri::HTML(response.body).at_css('textarea[name="document[content]"]')
-    assert_equal "hello", textarea&.text
+    shell = Nokogiri::HTML(response.body).at_css("section[data-controller='quartz']")
+    assert shell
+    assert_includes response.body, %(data-quartz-linked-document-id-value="#{doc.id}")
   end
 
-  test "notes falls back to draft editor for invalid id" do
-    get apps_notes_path, params: { document_id: "nope" }
+  test "quartz falls back to draft editor for invalid id" do
+    get apps_quartz_path, params: { document_id: "nope" }
 
     assert_response :success
-    assert_includes response.body, %(data-notes-editor-frame-id-value="notes-pane")
-    assert_includes response.body, %(data-linked-app-has-linked-document="false")
+    assert_includes response.body, %(data-controller="quartz")
+    assert_match(/data-quartz-linked-document-id-value="\d+"/, response.body)
   end
 
-  test "notes falls back to draft editor for missing document" do
-    get apps_notes_path, params: { document_id: 999_999 }
+  test "quartz falls back to draft editor for missing document" do
+    get apps_quartz_path, params: { document_id: 999_999 }
 
     assert_response :success
-    assert_includes response.body, %(data-linked-app-has-linked-document="false")
+    assert_includes response.body, %(data-controller="quartz")
+    assert_match(/data-quartz-linked-document-id-value="\d+"/, response.body)
   end
 
-  test "time card opens linked note in time card section" do
-    time_card_root = Apps::FinderController.workspace_section_root(@user, "time_card")
-    payload = TimeCardDocumentCodec.dump(
-      {
-        clockInMinutes: 480,
-        clockInAtMs: nil,
-        clockOutAtMs: nil,
-        clockOutMinutes: nil,
-        running: false,
-        notesText: "entry"
-      }
+  test "quartz opens linked note in quartz section" do
+    quartz_root = Apps::FinderController.workspace_section_root(@user, "quartz")
+    doc = quartz_root.children.create!(
+      title: "Today",
+      is_folder: false,
+      content_type: "note",
+      content: QuartzDocumentCodec.dump("#timecard\n10:00-11:00 Client")
     )
-    doc = time_card_root.children.create!(title: "Today", is_folder: false, content_type: "note", content: payload)
 
-    get apps_time_card_path, params: { document_id: doc.id }
+    get apps_quartz_path, params: { document_id: doc.id }
 
     assert_response :success
-    assert_includes response.body, %(data-time-card-linked-document-id-value="#{doc.id}")
+    assert_includes response.body, %(data-quartz-linked-document-id-value="#{doc.id}")
     assert_includes response.body, document_path(doc.id)
   end
 
-  test "time card keeps default state for non numeric id" do
-    get apps_time_card_path, params: { document_id: "bad" }
+  test "quartz falls back to embedded draft for non numeric id" do
+    get apps_quartz_path, params: { document_id: "bad" }
 
     assert_response :success
-    assert_includes response.body, %(data-time-card-linked-document-id-value="0")
+    assert_includes response.body, %(data-controller="quartz")
+    assert_match(/data-quartz-linked-document-id-value="\d+"/, response.body)
   end
 
   test "calendar app renders standalone shell" do

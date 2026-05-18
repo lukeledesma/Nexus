@@ -41,8 +41,6 @@ const MONTHS = ["January", "February", "March", "April", "May", "June", "July", 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 const EVENT_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"]
 const MINUTES_PER_DAY = 24 * 60
-const TIME_CARD_FILES_BY_DATE_URL = "/apps/time_card/files_by_date"
-const TIME_CARD_MARKER_ICON = '<svg class="calendar-app__time-card-marker-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true"><path d="m787-145 28-28-75-75v-112h-40v128l87 87Zm-587 25q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v268q-19-9-39-15.5t-41-9.5v-243H200v560h242q3 22 9.5 42t15.5 38H200Zm0-120v40-560 243-3 280Zm80-40h163q3-21 9.5-41t14.5-39H280v80Zm0-160h244q32-30 71.5-50t84.5-27v-3H280v80Zm0-160h400v-80H280v80ZM720-40q-83 0-141.5-58.5T520-240q0-83 58.5-141.5T720-440q83 0 141.5 58.5T920-240q0 83-58.5 141.5T720-40Z"/></svg>'
 const DEFAULT_CALS = [
   { id: "personal", name: "Personal", color: "#3b82f6", checked: true },
   { id: "work", name: "Work", color: "#10b981", checked: true },
@@ -76,7 +74,6 @@ export default class extends Controller {
     this.latestSaveToken = 0
     this.lastPersistedToken = 0
     this.remoteTimestamp = null
-    this.timeCardFilesByDate = {}
     
     // Start from synced state (if any), then load from file as source of truth.
     const restoredEvents = readSyncedOrMigrate(STORAGE_KEY)
@@ -88,20 +85,12 @@ export default class extends Controller {
     this.boundDragMove = (event) => this.handleEventDragMove(event)
     this.boundDragEnd = (event) => this.handleEventDragEnd(event)
     this.boundUserStateLoaded = (event) => this.handleUserStateLoaded(event)
-    this.boundRemoteDocumentChanged = (event) => this.handleRemoteDocumentChanged(event)
     this.activeDrag = null
     this.suppressEditUntil = 0
     window.addEventListener("keydown", this.boundGlobalKeydown)
     window.addEventListener("nexus:calendar-new-event", this.boundChromeNewEvent)
     window.addEventListener("nexus:user-state-loaded", this.boundUserStateLoaded)
-    window.addEventListener("nexus:document-remote-changed", this.boundRemoteDocumentChanged)
     this.renderAll()
-
-    this.loadTimeCardFilesByDate().then((loaded) => {
-      if (loaded) this.renderBody()
-    }).catch((_error) => {
-      // non-blocking
-    })
     
     // Load from file as the authoritative source. Only seed samples when no file exists.
     this.loadEventsFromFile().then((loaded) => {
@@ -128,7 +117,6 @@ export default class extends Controller {
     window.removeEventListener("keydown", this.boundGlobalKeydown)
     window.removeEventListener("nexus:calendar-new-event", this.boundChromeNewEvent)
     window.removeEventListener("nexus:user-state-loaded", this.boundUserStateLoaded)
-    window.removeEventListener("nexus:document-remote-changed", this.boundRemoteDocumentChanged)
     window.removeEventListener("pointermove", this.boundDragMove)
     window.removeEventListener("pointerup", this.boundDragEnd)
     window.removeEventListener("pointercancel", this.boundDragEnd)
@@ -151,19 +139,6 @@ export default class extends Controller {
       }
     }
     this.renderAll()
-  }
-
-  handleRemoteDocumentChanged(event) {
-    // When time card date changes, reload time cards to update calendar display
-    const detail = event?.detail || {}
-    if (String(detail.content_type || "") === "note") {
-      // Time card changed; reload time cards by date
-      this.loadTimeCardFilesByDate().then((loaded) => {
-        if (loaded) this.renderBody()
-      }).catch((_error) => {
-        // non-blocking
-      })
-    }
   }
 
   async handleCalendarRemoteChanged({ detail }) {
@@ -497,15 +472,12 @@ export default class extends Controller {
       const dayEvents = events.filter((e) => e.date === dateKey)
         .sort((a, b) => (a.start || "").localeCompare(b.start || ""))
         .slice(0, 3)
-      const timeCardMarker = this.renderTimeCardMarker(dateKey, "month")
       const classes = ["calendar-app__month-cell"]
       if (!current) classes.push("is-other")
       if (this.sameDay(dateObj, this.today)) classes.push("is-today")
       if (this.sameDay(dateObj, this.selectedDate)) classes.push("is-selected")
-      if (timeCardMarker) classes.push("has-time-card")
       cells.push(`
         <div class="${classes.join(" ")}" data-action="click->calendar-app#pickDate" data-date="${dateKey}">
-          ${timeCardMarker}
           <span class="calendar-app__month-day">${day}</span>
           <span class="calendar-app__month-events">
             ${dayEvents.map((e) => `<button type="button" class="calendar-app__month-event" data-action="pointerdown->calendar-app#startEventDrag click->calendar-app#editEvent" data-event-id="${e.id}" style="background:${e.color}" title="${this.escape(e.title)}">${this.escape(e.title)}</button>`).join("")}
@@ -545,13 +517,12 @@ export default class extends Controller {
       const d = new Date(start)
       d.setDate(start.getDate() + i)
       const key = this.fmt(d)
-      const timeCardMarker = this.renderTimeCardMarker(key, "week-header")
       const dayEvents = events.filter((e) => e.date === key)
       const timedEvents = dayEvents.filter((e) => !e.allDay)
       const allDayEvents = dayEvents.filter((e) => e.allDay)
       return `
         <section class="calendar-app__week-day-time">
-          <header data-action="click->calendar-app#openWeekHeaderDay" data-date="${key}"><span class="calendar-app__time-header-row"><span>${DAYS[d.getDay()]} ${d.getDate()}</span>${timeCardMarker}</span></header>
+          <header data-action="click->calendar-app#openWeekHeaderDay" data-date="${key}"><span class="calendar-app__time-header-row"><span>${DAYS[d.getDay()]} ${d.getDate()}</span></span></header>
           <div class="calendar-app__week-track" data-date-key="${key}">
             <div class="calendar-app__hour-grid"></div>
             ${allDayEvents.map((e) => `<button type="button" class="calendar-app__week-event calendar-app__week-event--all-day" data-action="pointerdown->calendar-app#startEventDrag click->calendar-app#editEvent" data-event-id="${e.id}" style="background:${e.color}" title="${this.escape(e.title)}">${this.escape(e.title)}</button>`).join("")}
@@ -585,7 +556,6 @@ export default class extends Controller {
     const events = this.filteredEvents().filter((e) => e.date === dateKey)
     const timedEvents = events.filter((e) => !e.allDay)
     const allDayEvents = events.filter((e) => e.allDay)
-    const timeCardMarker = this.renderTimeCardMarker(dateKey, "day-header")
     const timeGutter = `
       <section class="calendar-app__time-gutter">
         <header></header>
@@ -604,7 +574,7 @@ export default class extends Controller {
           <div class="calendar-app__week-grid-time calendar-app__week-grid-time--day">
             ${timeGutter}
             <section class="calendar-app__day-time">
-              <header><span class="calendar-app__time-header-row"><span>${DAYS[this.viewDate.getDay()]} ${this.viewDate.getDate()}</span>${timeCardMarker}</span></header>
+              <header><span class="calendar-app__time-header-row"><span>${DAYS[this.viewDate.getDay()]} ${this.viewDate.getDate()}</span></span></header>
               <div class="calendar-app__day-track" data-date-key="${dateKey}">
                 <div class="calendar-app__hour-grid"></div>
                 ${allDayEvents.map((e) => `<button type="button" class="calendar-app__day-event calendar-app__day-event--all-day" data-action="pointerdown->calendar-app#startEventDrag click->calendar-app#editEvent" data-event-id="${e.id}" style="background:${e.color}">${this.escape(e.title)}<small>All day</small></button>`).join("")}
@@ -738,46 +708,6 @@ export default class extends Controller {
   handleSearch() {
     this.searchQuery = this.hasSearchInputTarget ? (this.searchInputTarget.value || "") : ""
     this.renderBody()
-  }
-
-  async loadTimeCardFilesByDate() {
-    try {
-      const response = await fetch(TIME_CARD_FILES_BY_DATE_URL, { headers: { Accept: "application/json" } })
-      if (!response.ok) return false
-      const payload = await response.json()
-      this.timeCardFilesByDate = payload && typeof payload.files_by_date === "object" ? payload.files_by_date : {}
-      return true
-    } catch (_error) {
-      this.timeCardFilesByDate = {}
-      return false
-    }
-  }
-
-  renderTimeCardMarker(dateKey, context) {
-    const entry = this.timeCardFilesByDate?.[dateKey]
-    if (!entry?.document_id) return ""
-
-    const label = this.escape(entry.title || "Time Card")
-    const contextClass = context ? ` calendar-app__time-card-marker--${context}` : ""
-    return `<button type="button" class="calendar-app__time-card-marker${contextClass}" data-action="click->calendar-app#openTimeCardFromMarker" data-date="${dateKey}" data-document-id="${entry.document_id}" data-document-title="${this.escapeAttr(entry.title || "Time Card")}" title="Open Time Card: ${label}">${TIME_CARD_MARKER_ICON}</button>`
-  }
-
-  openTimeCardFromMarker(event) {
-    event.preventDefault()
-    event.stopPropagation()
-
-    const button = event.currentTarget
-    const documentId = String(button?.dataset?.documentId || "").trim()
-    if (!documentId) return
-    const documentTitle = String(button?.dataset?.documentTitle || "").trim()
-
-    window.dispatchEvent(new CustomEvent("app-window:open", {
-      detail: {
-        appKey: "time-card",
-        documentId,
-        documentTitle
-      }
-    }))
   }
 
   handleTimeHover() {}

@@ -42,7 +42,7 @@ class EmbeddedDraftDocumentTest < ActiveSupport::TestCase
   end
 
   test "draft_document recognizes canonical embedded draft" do
-    draft = EmbeddedDraftDocument.fetch_or_create(user: @user, app_key: "notes")
+    draft = EmbeddedDraftDocument.fetch_or_create(user: @user, app_key: "quartz")
 
     assert EmbeddedDraftDocument.draft_document?(draft)
   end

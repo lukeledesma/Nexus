@@ -4,9 +4,8 @@
 class EmbeddedDraftDocument
   APP_CONFIG = {
     "tasks" => { title: "Task Draft", content_type: "task_list" },
-    "notes" => { title: "Note Draft", content_type: "note" },
-    "time-card" => { title: "Time Card Draft", content_type: "note" },
-    "calendar" => { title: "Calendar", content_type: "calendar_events" }
+    "calendar" => { title: "Calendar", content_type: "calendar_events" },
+    "quartz" => { title: "Quartz Draft", content_type: "note" }
   }.freeze
 
   class << self
@@ -47,19 +46,6 @@ class EmbeddedDraftDocument
       when "tasks"
         draft.tasks = []
         draft.content = nil
-      when "time-card"
-        draft.tasks = []
-        draft.content = TimeCardDocumentCodec.dump(
-          {
-            entryDate: Date.current.iso8601,
-            clockInMinutes: nil,
-            clockInAtMs: nil,
-            clockOutAtMs: nil,
-            clockOutMinutes: nil,
-            running: false,
-            notesText: ""
-          }
-        )
       else
         draft.tasks = []
         draft.content = ""
@@ -93,6 +79,14 @@ class EmbeddedDraftDocument
       root = FinderListedFolders.workspace_root_for(user)
       return nil unless root
 
+      existing = root.children.folders.find { |d| d.title.to_s.strip.casecmp?("embedded") }
+      return existing if existing
+
+      root.with_lock do
+        root.children.folders.find { |d| d.title.to_s.strip.casecmp?("embedded") } ||
+          root.children.create!(is_folder: true, title: "Embedded")
+      end
+    rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid
       root.children.folders.find { |d| d.title.to_s.strip.casecmp?("embedded") }
     end
 
@@ -119,19 +113,6 @@ class EmbeddedDraftDocument
       when "tasks"
         attrs[:tasks] = []
         attrs[:content] = nil
-      when "time-card"
-        attrs[:tasks] = []
-        attrs[:content] = TimeCardDocumentCodec.dump(
-          {
-            entryDate: Date.current.iso8601,
-            clockInMinutes: nil,
-            clockInAtMs: nil,
-            clockOutAtMs: nil,
-            clockOutMinutes: nil,
-            running: false,
-            notesText: ""
-          }
-        )
       else
         attrs[:tasks] = []
         attrs[:content] = ""

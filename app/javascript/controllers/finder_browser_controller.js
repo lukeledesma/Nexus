@@ -16,7 +16,10 @@ function appKeyForLinkedFile(contentType, fileKind, sectionKey = "") {
   const ct = String(contentType || "").toLowerCase()
   const kind = String(fileKind || "").toLowerCase()
   const section = String(sectionKey || "").toLowerCase()
-  if (ct === "note") return section === "time_card" ? "time-card" : "notes"
+  if (ct === "note") {
+    if (section === "quartz") return "quartz"
+    return "quartz"
+  }
   if (ct === "task_list") return "tasks"
   if (ct !== "asset") return null
   if (kind === "image") return "images"
@@ -37,6 +40,17 @@ function finderDisplayTitleFromStorageName(title) {
   const s = String(title || "").trim()
   if (!s) return "Untitled"
   return s.replace(/\.(txt|md|nexus|rtf)$/i, "").trim() || "Untitled"
+}
+
+function quartzIconSvg() {
+  return (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" class="quartz-gem-icon">' +
+      '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">' +
+        '<path d="m18.612 10.82l-5.737-7.879a1.06 1.06 0 0 0-.382-.322a1.1 1.1 0 0 0-.986 0a1.06 1.06 0 0 0-.381.322l-5.738 7.88A2 2 0 0 0 5 12c0 .422.135.834.388 1.18l5.738 7.879c.098.135.229.246.38.322a1.1 1.1 0 0 0 .987 0c.152-.076.283-.187.381-.322l5.738-7.88a1.99 1.99 0 0 0 0-2.359" />' +
+        '<path d="M5.015 12.195L12 15.078l6.985-2.883M12 2.5v19" />' +
+      '</g>' +
+    '</svg>'
+  )
 }
 
 /**
@@ -135,7 +149,11 @@ export default class extends Controller {
     icon.className = "finder-tree__icon finder-tree__icon--file"
     icon.setAttribute("aria-hidden", "true")
     const iconKey = this.linkedAppSaveIconValue || "file_document"
-    icon.innerHTML = materialSymbolSvg(iconKey, "sm") || materialSymbolSvg("file_document", "sm")
+    if (iconKey === "quartz_svg") {
+      icon.innerHTML = quartzIconSvg()
+    } else {
+      icon.innerHTML = materialSymbolSvg(iconKey, "sm") || materialSymbolSvg("file_document", "sm")
+    }
 
     const input = document.createElement("input")
     input.type = "text"
@@ -186,12 +204,10 @@ export default class extends Controller {
       body.set("filename", trimmed)
       if (documentId) body.set("document_id", documentId)
 
-      const isNotesFrame =
-        this.frameIdValue === "notes-pane" || String(this.frameIdValue || "").startsWith("note-spawn-")
-      const isTimeCardFrame = this.frameIdValue === "time-card-pane"
+      const isQuartzFrame = this.frameIdValue === "quartz-pane"
       const isTaskFrame =
         this.frameIdValue === "tasks-pane" || String(this.frameIdValue || "").startsWith("task-spawn-")
-      
+
       if (isTaskFrame) {
         let taskPayload = ""
         try {
@@ -205,12 +221,11 @@ export default class extends Controller {
           // non-blocking
         }
         if (taskPayload) body.set("task_payload", taskPayload)
-      } else if (isNotesFrame || isTimeCardFrame) {
+      } else if (isQuartzFrame) {
         let noteText = ""
         try {
           const draft = readLinkedAppPickerDraft(this.frameIdValue)
-          if (draft?.app === "notes") noteText = String(draft.noteText || "")
-          if (draft?.app === "time_card") noteText = String(draft.noteText || "")
+          if (draft?.app === "quartz") noteText = String(draft.noteText || "")
         } catch (_e) {
           // non-blocking
         }
@@ -218,13 +233,8 @@ export default class extends Controller {
           try {
             const host = linkedAppHostWindow()
             const frame = host?.document?.getElementById(this.frameIdValue)
-            if (isNotesFrame) {
-              const textarea = frame?.querySelector(".notes-app__textarea")
-              noteText = (textarea?.value || "").toString()
-            } else if (isTimeCardFrame) {
-              const contentInput = frame?.querySelector('[data-time-card-target="serializedContent"]')
-              noteText = (contentInput?.value || "").toString()
-            }
+            const textarea = frame?.querySelector(".quartz-notes-textarea")
+            noteText = (textarea?.value || "").toString()
           } catch (_e) {
             // non-blocking
           }

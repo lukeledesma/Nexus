@@ -51,7 +51,7 @@ module Apps
       end
     end
 
-    # GET /apps/tasks/draft_file?app_key=notes|time-card|tasks
+    # GET /apps/tasks/draft_file?app_key=tasks|quartz
     def draft_file
       app_key = params[:app_key].to_s
       doc = EmbeddedDraftDocument.fetch_or_create(user: current_user, app_key: app_key)
