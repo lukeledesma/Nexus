@@ -113,6 +113,7 @@ See [`docs/COMMANDS.md`](docs/COMMANDS.md) for the full operations runbook.
 
 | File | Purpose |
 |---|---|
+| [`docs/USER_MANUAL.md`](docs/USER_MANUAL.md) | End-user manual covering app functions and workflows |
 | [`docs/FEATURES.md`](docs/FEATURES.md) | Feature-level behavior map |
 | [`docs/SYSTEM_ARCHITECTURE.md`](docs/SYSTEM_ARCHITECTURE.md) | Data flow and system design |
 | [`docs/DEV_GUIDE.md`](docs/DEV_GUIDE.md) | Technical architecture and implementation details |

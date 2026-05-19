@@ -2,15 +2,18 @@
 
 This folder is organized so a new engineer or AI can get productive quickly.
 
+For end users, use [USER_MANUAL.md](USER_MANUAL.md).
+
 ## Start Here
 
 1. Product and current state: [AI_HANDOFF.md](AI_HANDOFF.md)
-2. Feature-level behavior map: [FEATURES.md](FEATURES.md)
-3. System architecture and data flow: [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md)
-4. Operations and deploy commands: [COMMANDS.md](COMMANDS.md)
-5. Deep developer implementation notes: [DEV_GUIDE.md](DEV_GUIDE.md)
-6. UI implementation details: [UI_GUIDE.md](UI_GUIDE.md)
-7. Roadmap and open questions: [ROADMAP.md](ROADMAP.md)
+2. End-user manual: [USER_MANUAL.md](USER_MANUAL.md)
+3. Feature-level behavior map: [FEATURES.md](FEATURES.md)
+4. System architecture and data flow: [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md)
+5. Operations and deploy commands: [COMMANDS.md](COMMANDS.md)
+6. Deep developer implementation notes: [DEV_GUIDE.md](DEV_GUIDE.md)
+7. UI implementation details: [UI_GUIDE.md](UI_GUIDE.md)
+8. Roadmap and open questions: [ROADMAP.md](ROADMAP.md)
 
 ## What Is Canonical
 
