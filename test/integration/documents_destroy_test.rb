@@ -11,13 +11,15 @@ class DocumentsDestroyTest < ActionDispatch::IntegrationTest
   end
 
   teardown do
+    UserAppState.delete_all
     Document.delete_all
     User.where(id: @user&.id).delete_all
   end
 
-  test "destroys regular file via json request" do
+  test "moves regular file to Trash via json request" do
     root = FinderListedFolders.workspace_root_for(@user)
     docs = Apps::FinderController.workspace_section_root(@user, "documents")
+    trash = Apps::FinderController.workspace_trash_root(@user)
     file = Document.create!(
       is_folder: false,
       parent: docs,
@@ -28,13 +30,36 @@ class DocumentsDestroyTest < ActionDispatch::IntegrationTest
 
     assert Document.exists?(file.id)
     assert DocumentStorageSyncLite.storage_root.join(file.storage_path).file?
+    assert trash
 
     delete document_path(file), as: :json
 
     assert_response :no_content
-    assert_not Document.exists?(file.id)
-    assert_not DocumentStorageSyncLite.storage_root.join(file.storage_path).exist?
+    assert Document.exists?(file.id)
+    assert_equal Apps::FinderController::TRASH_SECTION_TITLE, file.reload.parent.title
+    assert DocumentStorageSyncLite.storage_root.join(file.storage_path).exist?
     assert root
+  end
+
+  test "restores file from Trash to original parent" do
+    docs = Apps::FinderController.workspace_section_root(@user, "documents")
+    trash = Apps::FinderController.workspace_trash_root(@user)
+    file = Document.create!(
+      is_folder: false,
+      parent: docs,
+      title: "restore_me",
+      content_type: "note",
+      content: "<p>restore</p>"
+    )
+
+    delete document_path(file), as: :json
+    assert_response :no_content
+    assert_equal Apps::FinderController::TRASH_SECTION_TITLE, file.reload.parent.title
+
+    patch restore_from_trash_document_path(file), as: :json
+
+    assert_response :success
+    assert_equal Apps::FinderController::TASKS_SECTION_TITLE, file.reload.parent.title
   end
 
   test "rejects destroy for protected workspace structure" do

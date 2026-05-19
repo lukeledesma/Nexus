@@ -14,6 +14,7 @@ class AppsOpenLinkedDocumentTest < ActiveSupport::TestCase
   end
 
   teardown do
+    UserAppState.delete_all
     Document.delete_all
     User.where(id: @user&.id).delete_all
   end
@@ -102,6 +103,25 @@ class AppsOpenLinkedDocumentTest < ActiveSupport::TestCase
       document_id: doc.id,
       content_type: "asset",
       section_key: "audio",
+      allow_embedded: true
+    )
+
+    assert_equal :unauthorized, result.status
+    assert_not result.success?
+  end
+
+  test "returns unauthorized for document in trash" do
+    quartz_root = Apps::FinderController.workspace_section_root(@user, "quartz")
+    doc = quartz_root.children.create!(title: "Trashed Note", is_folder: false, content_type: "note", content: "Hello")
+
+    trash_result = Documents::TrashDocument.call(user: @user, document: doc)
+    assert_equal true, trash_result.success?
+
+    result = Apps::OpenLinkedDocument.call(
+      user: @user,
+      document_id: doc.id,
+      content_type: "note",
+      section_key: "quartz",
       allow_embedded: true
     )
 

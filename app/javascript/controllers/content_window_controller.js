@@ -128,6 +128,8 @@ export default class extends Controller {
     window.addEventListener("nexus:linked-app-document-saved", this.boundLinkedAppSaved)
     this.boundFinderItemRenamed = this.onFinderItemRenamed.bind(this)
     window.addEventListener("nexus:finder-item-renamed", this.boundFinderItemRenamed)
+    this.boundLinkedDocumentUnavailable = this.onLinkedDocumentUnavailable.bind(this)
+    window.addEventListener("nexus:linked-document-unavailable", this.boundLinkedDocumentUnavailable)
     this.boundItemDirtyState = this.handleItemDirtyState.bind(this)
     window.addEventListener("nexus:item-dirty", this.boundItemDirtyState)
     this.boundItemSavingState = this.handleItemSavingState.bind(this)
@@ -200,6 +202,7 @@ export default class extends Controller {
     window.removeEventListener("nexus:task-list-spawn-blank-window", this.boundSpawnBlankTaskWindow)
     window.removeEventListener("nexus:linked-app-document-saved", this.boundLinkedAppSaved)
     window.removeEventListener("nexus:finder-item-renamed", this.boundFinderItemRenamed)
+    window.removeEventListener("nexus:linked-document-unavailable", this.boundLinkedDocumentUnavailable)
     window.removeEventListener("nexus:item-dirty", this.boundItemDirtyState)
     window.removeEventListener("nexus:item-saving", this.boundItemSavingState)
     window.removeEventListener("nexus:item-saved", this.boundItemSavedState)
@@ -1039,6 +1042,20 @@ export default class extends Controller {
     
     this.persistLinkedAppOpenTitle(newTitle)
     this.syncOpenFileBadge(newTitle)
+  }
+
+  onLinkedDocumentUnavailable(event) {
+    const documentId = String(event?.detail?.documentId || "")
+    if (!documentId) return
+    if (!this.windowMatchesLinkedDocumentId(this.element, documentId)) return
+
+    this.resetLinkedDocumentSessionState()
+    if (this.element.classList.contains("is-hidden")) {
+      if (this.isSpawnedWindow()) this.finalizeSpawnedWindowClose()
+      return
+    }
+
+    this.close()
   }
 
   handleFrameLoad(event) {

@@ -44,12 +44,24 @@ class DocumentPolicy
     false
   end
 
+  def in_trash?
+    return false unless user && document
+
+    trash_root = Apps::FinderController.workspace_trash_root(user)
+    return false unless trash_root
+
+    Apps::FinderController.document_in_finder_subtree?(trash_root, document)
+  rescue StandardError
+    false
+  end
+
   def can_view?
     file? && (in_finder_section? || in_embedded_subtree?)
   end
 
   def can_open_in_app?(content_type:, section_key: nil, allow_embedded: true)
     return false unless can_view?
+    return false if in_trash?
     return false if content_type.present? && document.content_type.to_s != content_type.to_s
 
     if section_key.present?

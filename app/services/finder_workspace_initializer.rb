@@ -22,6 +22,8 @@ class FinderWorkspaceInitializer
     return {} unless finder_root
 
     migrate_documents_section_to_tasks!(finder_root)
+    migrate_recently_deleted_to_trash!(finder_root)
+    ensure_trash_root!(finder_root)
 
     roots = ensure_section_roots!(finder_root)
     migrate_legacy_favorites!(finder_root, roots["documents"])
@@ -76,6 +78,22 @@ class FinderWorkspaceInitializer
       existing = finder_root.children.folders.find { |d| d.title.to_s.strip.casecmp?(title) }
       out[definition[:key]] = existing || finder_root.children.create!(is_folder: true, title: title)
     end
+  end
+
+  def ensure_trash_root!(finder_root)
+    title = Apps::FinderController::TRASH_SECTION_TITLE
+    finder_root.children.folders.find { |d| d.title.to_s.strip.casecmp?(title) } ||
+      finder_root.children.create!(is_folder: true, title: title)
+  end
+
+  def migrate_recently_deleted_to_trash!(finder_root)
+    legacy = finder_root.children.folders.find { |d| d.title.to_s.strip.casecmp?("Recently Deleted") }
+    return unless legacy
+    return if finder_root.children.folders.any? { |d| d.title.to_s.strip.casecmp?(Apps::FinderController::TRASH_SECTION_TITLE) }
+
+    legacy.update!(title: Apps::FinderController::TRASH_SECTION_TITLE)
+  rescue StandardError => e
+    Rails.logger.warn("[FinderWorkspaceInitializer] Could not migrate Recently Deleted to Trash: #{e.message}")
   end
 
   def migrate_legacy_favorites!(finder_root, tasks_root)

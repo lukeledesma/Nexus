@@ -179,7 +179,7 @@ class DocumentStorageSyncLite
     target_relative = File.join(parent_relative, target_filename)
     target_path = absolute_path_for(target_relative)
 
-    if previous_path.exist? && previous_path != target_path
+    if previous_relative.present? && previous_path.exist? && previous_path != target_path
       FileUtils.mv(previous_path, target_path)
     end
 

@@ -73,7 +73,7 @@
           ><%= material_symbol_icon(:add, size: :xs) %></button>
           <button
             type="button"
-            class="item-action-btn"
+            class="item-action-btn item-action-rename"
             title="Rename"
             aria-label="Rename folder <%= node[:title] %>"
             data-action="click->finder-browser#renameFolder"
@@ -105,12 +105,14 @@
       </ul>
     <% end %>
   <% else %>
+    <% in_trash = node.fetch(:in_trash, false) %>
     <% file_linked = node.fetch(:has_linked_app, false) %>
+    <% file_linked = false if in_trash %>
     <% show_open_in_app = file_linked && open_in_app_content_types.include?(node[:content_type].to_s) %>
     <% finder_open_doc_title = finder_document_display_title(node[:title].to_s) %>
     <% effective_section_key = node[:origin_section_key].presence || section_key %>
     <% thumb_url = node[:thumbnail_url].presence %>
-    <div class="finder-tree__row-line" draggable="<%= (writable && !read_only) ? "true" : "false" %>" data-action="click->finder-browser#activateRowLine">
+    <div class="finder-tree__row-line" draggable="<%= (writable && !read_only) ? "true" : "false" %>" data-action="click->finder-browser#activateRowLine<%= " dragstart->finder-browser#fileDragStart dragend->finder-browser#fileDragEnd" if writable && !read_only && !in_trash %>">
       <% if file_linked && !read_only %>
         <%= link_to "#",
               class: "finder-tree__row finder-tree__row--file",
@@ -200,29 +202,48 @@
       <% if writable && !read_only %>
         <% is_favorited = node.fetch(:is_favorited, false) %>
         <div class="finder-tree__row-actions">
-          <button
-            type="button"
-            class="item-action-btn item-action-favorite"
-            title="<%= is_favorited ? "Remove from Favorites" : "Add to Favorites" %>"
-            aria-label="<%= is_favorited ? "Remove from Favorites" : "Add to Favorites" %>"
-            data-document-id="<%= node[:id] %>"
-            data-is-favorited="<%= is_favorited %>"
-            data-action="click->finder-browser#toggleFavorite"
-          ><span class="item-action-favorite__filled"><%= material_symbol_icon(:star_rounded, size: :xs) %></span><span class="item-action-favorite__outline"><%= material_symbol_icon(:star_outline_rounded, size: :xs) %></span></button>
-          <button
-            type="button"
-            class="item-action-btn"
-            title="Rename"
-            aria-label="Rename <%= node[:title] %>"
-            data-action="click->finder-browser#renameFile"
-          ><%= material_symbol_icon(:edit, size: :xs) %></button>
-          <button
-            type="button"
-            class="item-action-btn item-action-delete"
-            title="Delete"
-            aria-label="Delete <%= node[:title] %>"
-            data-action="click->finder-browser#deleteFile"
-          ><%= material_symbol_icon(:delete, size: :xs) %></button>
+          <% if in_trash %>
+            <button
+              type="button"
+              class="item-action-btn item-action-restore"
+              title="Restore"
+              aria-label="Restore <%= node[:title] %>"
+              data-action="click->finder-browser#restoreFromTrash"
+            ><%= render "shared/restore_from_trash_icon" %></button>
+            <button
+              type="button"
+              class="item-action-btn item-action-delete-forever"
+              title="Delete permanently"
+              aria-label="Delete <%= node[:title] %> permanently"
+              data-document-id="<%= node[:id] %>"
+              data-display-title="<%= node[:title] %>"
+              data-action="click->finder-browser#permanentDeleteFromTrash"
+            ><%= render "shared/delete_forever_icon" %></button>
+          <% else %>
+            <button
+              type="button"
+              class="item-action-btn item-action-favorite"
+              title="<%= is_favorited ? "Remove from Favorites" : "Add to Favorites" %>"
+              aria-label="<%= is_favorited ? "Remove from Favorites" : "Add to Favorites" %>"
+              data-document-id="<%= node[:id] %>"
+              data-is-favorited="<%= is_favorited %>"
+              data-action="click->finder-browser#toggleFavorite"
+            ><span class="item-action-favorite__filled"><%= material_symbol_icon(:star_rounded, size: :xs) %></span><span class="item-action-favorite__outline"><%= material_symbol_icon(:star_outline_rounded, size: :xs) %></span></button>
+            <button
+              type="button"
+              class="item-action-btn item-action-rename"
+              title="Rename"
+              aria-label="Rename <%= node[:title] %>"
+              data-action="click->finder-browser#renameFile"
+            ><%= material_symbol_icon(:edit, size: :xs) %></button>
+            <button
+              type="button"
+              class="item-action-btn item-action-delete"
+              title="Delete"
+              aria-label="Delete <%= node[:title] %>"
+              data-action="click->finder-browser#deleteFile"
+            ><%= material_symbol_icon(:delete, size: :xs) %></button>
+          <% end %>
         </div>
       <% end %>
     </div>

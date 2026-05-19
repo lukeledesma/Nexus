@@ -27,7 +27,7 @@
                   <span class="task-progress-label"><%= completed_subtasks %>/<%= total_subtasks %></span>
                 <% end %>
                 <span class="row-plus" title="Add subtask"><%= material_symbol_icon(:add, size: :xs) %></span>
-                <span class="item-action-btn" title="Rename"><%= material_symbol_icon(:edit, size: :xs) %></span>
+                <span class="item-action-btn item-action-rename" title="Rename"><%= material_symbol_icon(:edit, size: :xs) %></span>
                 <span class="item-action-btn item-action-delete" title="Delete"><%= material_symbol_icon(:delete, size: :xs) %></span>
               </div>
             </li>
@@ -42,7 +42,7 @@
                   <span class="task-item-text task-item-text--subtask" data-role="task-text"><%= subtask["text"] %></span>
                 </div>
                 <div class="organizer-row-right">
-                  <span class="item-action-btn" title="Rename"><%= material_symbol_icon(:edit, size: :xs) %></span>
+                  <span class="item-action-btn item-action-rename" title="Rename"><%= material_symbol_icon(:edit, size: :xs) %></span>
                   <span class="item-action-btn item-action-delete" title="Delete"><%= material_symbol_icon(:delete, size: :xs) %></span>
                 </div>
               </li>

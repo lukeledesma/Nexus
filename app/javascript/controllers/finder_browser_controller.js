@@ -686,16 +686,128 @@ export default class extends Controller {
     await this.deleteItem(li, "file")
   }
 
+  async restoreFromTrash(event) {
+    if (this.readOnlyValue) return
+    event.preventDefault()
+    event.stopPropagation()
+    const li = event.currentTarget.closest("li.finder-tree__node--file")
+    if (!li) return
+
+    const id = li.dataset.finderTreeNodeId
+    if (!id) return
+
+    const response = await fetch(`/documents/${id}/restore_from_trash`, {
+      method: "PATCH",
+      headers: finderApiHeaders({ jsonBody: false })
+    })
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}))
+      window.alert(payload.error || "Could not restore item.")
+      return
+    }
+
+    // Removes the restored row from the Trash section immediately.
+    li.remove()
+    window.dispatchEvent(new CustomEvent("nexus:finder-structure-changed", {
+      detail: { type: "file_restored", sectionKey: "trash" }
+    }))
+  }
+
+  async permanentDeleteFromTrash(event) {
+    if (this.readOnlyValue) return
+    event.preventDefault()
+    event.stopPropagation()
+    const btn = event.currentTarget
+    const li = btn.closest("li.finder-tree__node--file")
+    if (!li) return
+
+    const id = li.dataset.finderTreeNodeId || btn.dataset.documentId
+    if (!id) return
+
+    const name = btn.dataset.displayTitle || li.dataset.displayTitle || "this item"
+    if (!window.confirm(`Permanently delete "${name}"? This cannot be undone.`)) return
+
+    const response = await fetch(`/documents/${id}/permanent_delete`, {
+      method: "DELETE",
+      headers: finderApiHeaders({ jsonBody: false })
+    })
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}))
+      window.alert(payload.error || "Could not permanently delete item.")
+      return
+    }
+
+    this.dispatchLinkedDocumentUnavailable(id, { reason: "permanent_delete" })
+    li.remove()
+    window.dispatchEvent(new CustomEvent("nexus:finder-structure-changed", {
+      detail: { type: "file_permanently_deleted", sectionKey: "trash" }
+    }))
+  }
+
+  // ── Drag-to-Trash ──────────────────────────────────────────────────────────
+  // File rows in any section can be dragged onto the Trash sidebar item.
+
+  fileDragStart(event) {
+    const li = event.currentTarget.closest("li.finder-tree__node--file")
+    if (!li) return
+    const id = li.dataset.finderTreeNodeId
+    if (!id) return
+    event.dataTransfer.effectAllowed = "move"
+    event.dataTransfer.setData("application/nexus-document-id", id)
+    event.currentTarget.classList.add("finder-tree__row-line--dragging")
+  }
+
+  fileDragEnd(event) {
+    event.currentTarget.classList.remove("finder-tree__row-line--dragging")
+  }
+
+  trashSidebarDragOver(event) {
+    if (!event.dataTransfer.types.includes("application/nexus-document-id")) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = "move"
+    event.currentTarget.classList.add("finder-folder-item--drag-over")
+  }
+
+  trashSidebarDragLeave(event) {
+    event.currentTarget.classList.remove("finder-folder-item--drag-over")
+  }
+
+  async trashSidebarDrop(event) {
+    event.currentTarget.classList.remove("finder-folder-item--drag-over")
+    const id = event.dataTransfer.getData("application/nexus-document-id")
+    if (!id) return
+    event.preventDefault()
+
+    const li = this.element.querySelector(`li[data-finder-tree-node-id="${id}"]`)
+    const deleteUrl = li?.dataset.deleteUrl || `/documents/${id}`
+
+    const response = await fetch(deleteUrl, {
+      method: "DELETE",
+      headers: finderApiHeaders({ jsonBody: false })
+    })
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}))
+      window.alert(payload.error || "Could not move item to Trash.")
+      return
+    }
+
+    this.dispatchLinkedDocumentUnavailable(id, { reason: "trash" })
+    if (li) li.remove()
+    window.dispatchEvent(new CustomEvent("nexus:finder-structure-changed", {
+      detail: { type: "file_trashed", sectionKey: this.sectionKeyValue }
+    }))
+  }
+
   async deleteItem(li, kind) {
     if (!li) return
     const deleteUrl = li.dataset.deleteUrl
     if (!deleteUrl) return
     const name = li.dataset.displayTitle || "this item"
-    const msg =
-      kind === "folder"
-        ? `Delete "${name}" and everything inside it?`
-        : `Delete "${name}"?`
-    if (!window.confirm(msg)) return
+    if (kind === "folder") {
+      if (!window.confirm(`Delete "${name}" and everything inside it?`)) return
+    }
 
     const response = await fetch(deleteUrl, {
       method: "DELETE",
@@ -708,6 +820,9 @@ export default class extends Controller {
     }
 
     const deletedId = li.dataset.finderTreeNodeId
+    if (kind === "file" && deletedId) {
+      this.dispatchLinkedDocumentUnavailable(deletedId, { reason: "trash" })
+    }
     const currentBrowse = this.selectedBrowseId() || String(this.rootFolderIdValue || "")
     const nextBrowse = currentBrowse === deletedId ? this.rootFolderIdValue : currentBrowse
     this.reloadFrameWithBrowseId(nextBrowse, { pruneSubtreeLi: li })
@@ -716,6 +831,15 @@ export default class extends Controller {
         detail: { type: "folder_deleted", folderId: deletedId, sectionKey: this.sectionKeyValue }
       }))
     }
+  }
+
+  dispatchLinkedDocumentUnavailable(documentId, { reason = "trash" } = {}) {
+    const id = String(documentId || "")
+    if (!id) return
+
+    window.dispatchEvent(new CustomEvent("nexus:linked-document-unavailable", {
+      detail: { documentId: id, reason }
+    }))
   }
 
   selectedBrowseId() {

@@ -4,7 +4,7 @@ class DocumentsController < ApplicationController
   PANEL_SEARCH_MAX_RESULTS = 40
 
   before_action :sync_from_disk, only: %i[index organizer_fragment panel_search]
-  before_action :set_document, only: %i[show edit update destroy create_file create_subfolder move_folder move_file upload_images rename toggle_favorite file_list asset_file thumbnail]
+  before_action :set_document, only: %i[show edit update destroy restore_from_trash permanent_delete create_file create_subfolder move_folder move_file upload_images rename toggle_favorite file_list asset_file thumbnail]
 
   def index
     set_no_cache_headers
@@ -337,6 +337,43 @@ class DocumentsController < ApplicationController
     render json: { is_favorited: favorited_flag_for(@document) }, status: :ok
   end
 
+  def restore_from_trash
+    result = Documents::RestoreFromTrash.call(user: current_user, document: @document)
+    unless result.success?
+      render json: { error: result.error.presence || "Could not restore item." }, status: :unprocessable_entity
+      return
+    end
+
+    UserSyncChannel.broadcast_workspace_change(user: current_user, kind: "finder")
+    render json: {
+      ok: true,
+      id: result.payload[:id],
+      parent_id: result.payload[:parent_id]
+    }
+  end
+
+  def permanent_delete
+    unless @document.file?
+      render json: { error: "Only files can be permanently deleted." }, status: :unprocessable_entity
+      return
+    end
+
+    trash_root = Apps::FinderController.workspace_trash_root(current_user)
+    unless trash_root && @document.parent_id == trash_root.id
+      render json: { error: "Only items in Trash can be permanently deleted." }, status: :forbidden
+      return
+    end
+
+    result = DocumentPersistence.destroy(@document)
+    unless result.success?
+      render json: { error: result.error.presence || "Could not permanently delete item." }, status: :unprocessable_entity
+      return
+    end
+
+    UserSyncChannel.broadcast_workspace_change(user: current_user, kind: "finder")
+    head :no_content
+  end
+
   def destroy
     policy = ::DocumentPolicy.new(user: current_user, document: @document)
     if policy.user_workspace_root?
@@ -359,7 +396,12 @@ class DocumentsController < ApplicationController
       return
     end
 
-    result = DocumentPersistence.destroy(@document)
+    result =
+      if @document.file?
+        Documents::TrashDocument.call(user: current_user, document: @document)
+      else
+        DocumentPersistence.destroy(@document)
+      end
     unless result.success?
       message = result.error.presence || "Could not delete item."
       if request.xhr? || request.format.json?

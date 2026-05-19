@@ -3925,9 +3925,35 @@ input.connection-inline {
   background: rgba(239, 68, 68, 0.12);
 }
 
+.item-action-rename:hover,
+.item-action-rename:focus-visible {
+  color: #60a5fa;
+  background: rgba(96, 165, 250, 0.14);
+}
+
+.task-item-row .row-plus:hover,
+.task-item-row .row-plus:focus-visible {
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.16);
+}
+
+.task-item-row .row-pencil:hover,
+.task-item-row .row-pencil:focus-visible,
+.task-item-row .item-action-rename:hover,
+.task-item-row .item-action-rename:focus-visible {
+  color: #60a5fa;
+  background: rgba(96, 165, 250, 0.14);
+}
+
 .item-action-favorite__filled,
 .item-action-favorite__outline {
   display: contents;
+}
+
+.item-action-favorite:hover,
+.item-action-favorite:focus-visible {
+  color: #facc15;
+  background: rgba(250, 204, 21, 0.14);
 }
 
 .item-action-favorite[data-is-favorited="false"] .item-action-favorite__filled,
@@ -7383,6 +7409,35 @@ a.finder-tree__row {
   border-radius: 4px;
 }
 
+.finder-tree__row-actions .item-action-restore {
+  color: var(--text-muted, #a0a0a0);
+}
+
+.finder-tree__row-actions .item-action-restore:hover,
+.finder-tree__row-actions .item-action-restore:focus-visible {
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.16);
+}
+
+.finder-tree__row-actions .item-action-delete-forever {
+  color: var(--text-muted, #a0a0a0);
+}
+
+.finder-tree__row-actions .item-action-delete-forever:hover,
+.finder-tree__row-actions .item-action-delete-forever:focus-visible {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.14);
+}
+
+.finder-folder-item--drag-over > .finder-folder-link {
+  background: rgba(248, 113, 113, 0.18);
+  color: #f87171;
+}
+
+.finder-tree__row-line--dragging {
+  opacity: 0.45;
+}
+
 .finder-tree__row--pending {
   cursor: text;
 }
@@ -7661,6 +7716,8 @@ a.finder-tree__row--file:focus-visible {
   padding: 0;
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
   gap: 4px;
 }
 
@@ -7670,9 +7727,25 @@ a.finder-tree__row--file:focus-visible {
 }
 
 .finder-folder-item--separator {
-  border-top: 1px solid var(--border-hairline);
-  padding-top: 4px;
-  margin-top: 4px;
+  padding-top: 0.65rem;
+  margin-top: 0;
+}
+
+.finder-folder-item--separator::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 0;
+  pointer-events: none;
+}
+
+.finder-folder-item--bottom {
+  margin-top: auto;
+  margin-bottom: 0;
 }
 
 .finder-folder-item.is-active .finder-folder-link {

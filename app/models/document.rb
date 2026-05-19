@@ -83,7 +83,7 @@ class Document < ApplicationRecord
     return false unless folder?
     return false if user_workspace_root?
 
-    protected_titles = %w[Embedded Documents Tasks Images Audio]
+    protected_titles = ["Embedded", "Documents", "Tasks", "Images", "Audio", "Trash"]
     return false unless protected_titles.any? { |name| title.to_s.casecmp?(name) }
 
     p = parent

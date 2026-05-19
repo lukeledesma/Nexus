@@ -10,12 +10,14 @@ module Apps
     TASKS_SECTION_TITLE = "Tasks"
     FAVORITES_SECTION_TITLE = "Favorites"
     QUARTZ_SECTION_TITLE = "Quartz"
+    TRASH_SECTION_TITLE = "Trash"
     FINDER_SECTION_DEFINITIONS = [
       { key: "documents", title: TASKS_SECTION_TITLE, icon: "task_checklist" },
       { key: "quartz", title: QUARTZ_SECTION_TITLE, icon: "sticky_note", icon_svg: true },
       { key: "images", title: "Images", icon: "wallpaper" },
       { key: "audio", title: "Audio", icon: "graphic_eq" },
-      { key: "favorites", title: FAVORITES_SECTION_TITLE, icon: "star_rounded" }
+      { key: "favorites", title: FAVORITES_SECTION_TITLE, icon: "star_rounded" },
+      { key: "trash", title: TRASH_SECTION_TITLE, icon: "delete" }
     ].freeze
     READ_ONLY_FRAME_CONFIG = {
       "tasks-pane" => { section_key: "documents", content_type: "task_list", allow_save: true },
@@ -56,7 +58,7 @@ module Apps
         return nil if section_title.blank?
 
         workspace_section_definitions
-          .reject { |d| d[:key] == "favorites" }
+          .reject { |d| ["favorites", "trash"].include?(d[:key]) }
           .find { |d| d[:title].casecmp?(section_title) }&.fetch(:key, nil)
       end
 
@@ -78,6 +80,38 @@ module Apps
 
       def workspace_section_root(user, section_key)
         workspace_section_roots(user)[normalized_section_key(section_key)]
+      end
+
+      def workspace_trash_root(user)
+        FinderWorkspaceInitializer.ensure_for_user!(user)
+        root = workspace_root_folder(user)
+        return nil unless root
+
+        finder = root.children.folders.find { |d| d.title.to_s.strip.casecmp?("Finder") }
+        finder ||= root.children.create!(is_folder: true, title: "Finder")
+
+        folder = finder.children.folders.find { |d| d.title.to_s.strip.casecmp?(TRASH_SECTION_TITLE) } ||
+          finder.children.create!(is_folder: true, title: TRASH_SECTION_TITLE)
+        ensure_folder_storage_path!(finder, folder)
+        folder
+      rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique
+        root = workspace_root_folder(user)
+        finder = root&.children&.folders&.find { |d| d.title.to_s.strip.casecmp?("Finder") }
+        folder = finder&.children&.folders&.find { |d| d.title.to_s.strip.casecmp?(TRASH_SECTION_TITLE) }
+        ensure_folder_storage_path!(finder, folder) if finder && folder
+        folder
+      end
+
+      def ensure_folder_storage_path!(finder_root, folder)
+        return unless finder_root&.folder? && folder&.folder?
+        return if folder.storage_path.to_s.strip.present?
+
+        parent_path = finder_root.storage_path.to_s.strip
+        return if parent_path.blank?
+
+        relative = File.join(parent_path, folder.title.to_s)
+        FileUtils.mkdir_p(DocumentStorageSyncLite.storage_root.join(relative))
+        folder.update_column(:storage_path, relative)
       end
 
       def workspace_designated_folder(user, section_key, folder_title)
@@ -155,7 +189,14 @@ module Apps
       end
 
       workspace_root = self.class.workspace_root_folder(current_user)
-      @root_folder = @section_key == "favorites" ? workspace_root : section_roots[@section_key]
+      @root_folder =
+        if @section_key == "favorites"
+          workspace_root
+        elsif @section_key == "trash"
+          self.class.workspace_trash_root(current_user)
+        else
+          section_roots[@section_key]
+        end
       @finder_section_label = self.class.finder_section_label(@section_key)
       @finder_empty_message = nil
       @tree_nodes = []
@@ -172,6 +213,10 @@ module Apps
         @browse_folder = @root_folder
         @expanded_folder_ids = Set.new
         @tree_nodes = build_favorites_tree_nodes(@root_folder)
+      elsif @section_key == "trash"
+        @browse_folder = @root_folder
+        @expanded_folder_ids = Set.new
+        @tree_nodes = build_trash_tree_nodes(@root_folder)
       else
         @browse_folder = resolve_browse_folder(@root_folder, params[:browse_id])
         allowed_folder_ids = finder_folder_ids_in_subtree(@root_folder)
@@ -256,26 +301,37 @@ module Apps
     end
 
     def build_favorites_tree_nodes(workspace_root)
-      return [] unless favorites_column_available?
+      nodes = []
+      if favorites_column_available?
+        sql = <<~SQL.squish
+          WITH RECURSIVE subtree AS (
+            SELECT documents.*
+            FROM documents
+            WHERE parent_id = ?
+            UNION ALL
+            SELECT d.*
+            FROM documents d
+            INNER JOIN subtree t ON d.parent_id = t.id
+          )
+          SELECT *
+          FROM subtree
+          WHERE is_favorited = TRUE AND is_folder = FALSE
+          ORDER BY LOWER(title) ASC
+        SQL
 
-      sql = <<~SQL.squish
-        WITH RECURSIVE subtree AS (
-          SELECT documents.*
-          FROM documents
-          WHERE parent_id = ?
-          UNION ALL
-          SELECT d.*
-          FROM documents d
-          INNER JOIN subtree t ON d.parent_id = t.id
-        )
-        SELECT *
-        FROM subtree
-        WHERE is_favorited = TRUE AND is_folder = FALSE
-        ORDER BY LOWER(title) ASC
-      SQL
+        docs = Document.find_by_sql(Document.sanitize_sql_array([ sql, workspace_root.id ]))
+        nodes = docs.map { |doc| tree_node_for_favorite(doc) }
+      end
+      nodes
+    end
 
-      docs = Document.find_by_sql(Document.sanitize_sql_array([ sql, workspace_root.id ]))
-      docs.map { |doc| tree_node_for_favorite(doc) }
+    def build_trash_tree_nodes(trash_root)
+      return [] unless trash_root
+
+      descendant_documents_for_finder_tree(trash_root)
+        .select(&:file?)
+        .sort_by { |doc| doc.title.to_s.downcase }
+        .map { |doc| tree_node_for_trash(doc) }
     end
 
     def tree_node_for_favorite(doc)
@@ -283,6 +339,14 @@ module Apps
       tree_node_for_file(doc).merge(
         is_favorited: true,
         origin_section_key: origin_key
+      )
+    end
+
+    def tree_node_for_trash(doc)
+      tree_node_for_file(doc).merge(
+        in_trash: true,
+        is_favorited: false,
+        origin_section_key: nil
       )
     end
 

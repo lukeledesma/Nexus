@@ -49,6 +49,8 @@ Rails.application.routes.draw do
       post :move_folder
       post :move_file
       post :upload_images
+      patch :restore_from_trash
+      delete :permanent_delete
       patch :rename
       patch :toggle_favorite
       get :file_list

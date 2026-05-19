@@ -18,7 +18,8 @@
           <ul class="finder-folder-list settings-sections-list">
             <% @finder_sections.each do |section| %>
               <% active = section[:key] == @section_key %>
-              <li class="finder-folder-item<%= " is-active" if active %><%= " finder-folder-item--separator" if section[:key] == "favorites" %>" data-finder-section-key="<%= section[:key] %>">
+              <li class="finder-folder-item<%= " is-active" if active %><%= " finder-folder-item--separator" if ["favorites", "trash"].include?(section[:key]) %><%= " finder-folder-item--bottom" if section[:key] == "trash" %>" data-finder-section-key="<%= section[:key] %>"
+                <% if section[:key] == "trash" && !@finder_read_only %>data-action="dragover->finder-browser#trashSidebarDragOver dragleave->finder-browser#trashSidebarDragLeave drop->finder-browser#trashSidebarDrop"<% end %>>
                 <%= link_to apps_finder_path({ section: section[:key], frame_id: frame_id }.merge(@finder_read_only ? { mode: "save_as" } : {})), class: "finder-folder-link", data: { turbo_frame: frame_id, turbo_prefetch: false }, aria: { label: "Open #{section[:title]}" } do %>
                   <span class="finder-folder-icon" aria-hidden="true">
                     <% if section[:icon_svg] && section[:key] == "quartz" %>
