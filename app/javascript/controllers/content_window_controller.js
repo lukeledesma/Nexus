@@ -110,6 +110,8 @@ export default class extends Controller {
 
     this.boundDragMove = this.handleDragMove.bind(this)
     this.boundDragEnd = this.stopDrag.bind(this)
+    this.boundPointerDragMove = this.handleDragMove.bind(this)
+    this.boundPointerDragEnd = this.stopDrag.bind(this)
     this.boundResizeMove = this.handleResizeMove.bind(this)
     this.boundResizeEnd = this.stopResize.bind(this)
     this.boundLostPointerCaptureResize = this.handleLostPointerCaptureResize.bind(this)
@@ -155,6 +157,10 @@ export default class extends Controller {
     this.element.addEventListener("mousedown", this.boundTitleShellPointerDown)
     this.element.addEventListener("touchstart", this.boundTitleShellPointerDown, { passive: false })
     this.element.addEventListener("mousedown", () => this.bringToFront())
+    this.boundEdgeDragPointerDown = this.handleEdgeDragPointerDown.bind(this)
+    this.boundEdgeDragPointerMove = this.handleEdgeDragPointerMove.bind(this)
+    this.boundEdgeDragPointerLeave = this.handleEdgeDragPointerLeave.bind(this)
+    this.installEdgeDragRails()
 
     if (this.isAutoSizedWindow) {
       this.windowSizer = createOsWindowSizer({
@@ -216,6 +222,7 @@ export default class extends Controller {
     }
     this.element.removeEventListener("mousedown", this.boundTitleShellPointerDown)
     this.element.removeEventListener("touchstart", this.boundTitleShellPointerDown)
+    this.removeEdgeDragRails()
   }
 
   onTitleShellPointerDown(event) {
@@ -224,8 +231,305 @@ export default class extends Controller {
     if (this.activeResize) return
     if (target.closest(".pane-resize-handle")) return
     if (target.closest(".content-window-close, button, a, input, textarea, select, [role='button']")) return
-    if (!target.closest(".content-window-chrome")) return
+    if (!target.closest(".content-window-chrome, .content-window-bottom-shell")) return
     this.startDrag(event)
+  }
+
+  installEdgeDragRails() {
+    if (this.edgeDragRailsElement?.isConnected) return
+    const rails = document.createElement("div")
+    rails.className = "content-window-drag-rails"
+    rails.setAttribute("aria-hidden", "true")
+
+    const ns = "http://www.w3.org/2000/svg"
+    const svg = document.createElementNS(ns, "svg")
+    svg.classList.add("content-window-drag-ghost")
+
+    // High-resolution taper: many tiny path slices with gaussian alpha.
+    const taperPaths = []
+    const taperSegmentCount = 56
+    for (let i = 0; i < taperSegmentCount; i += 1) {
+      const taperPath = document.createElementNS(ns, "path")
+      taperPath.classList.add("content-window-drag-ghost-taper-path")
+      svg.appendChild(taperPath)
+      taperPaths.push(taperPath)
+    }
+    rails.appendChild(svg)
+
+    // 4 edge + 4 corner hit zones: pointerdown to start drag, pointermove to activate ghost
+    // when cursor is outside the window's own layout bounds (hit zones extend beyond window)
+    for (const zone of ["top", "right", "bottom", "left", "corner-tl", "corner-tr", "corner-br", "corner-bl"]) {
+      const hit = document.createElement("div")
+      hit.className = `content-window-drag-hit content-window-drag-hit--${zone}`
+      hit.addEventListener("pointerdown", this.boundEdgeDragPointerDown)
+      hit.addEventListener("pointermove", this.boundEdgeDragPointerMove)
+      rails.appendChild(hit)
+    }
+    // pointermove/pointerleave on the window element avoids ghost flicker when
+    // the cursor transitions between adjacent hit zones
+    this.element.addEventListener("pointermove", this.boundEdgeDragPointerMove)
+    this.element.addEventListener("pointerleave", this.boundEdgeDragPointerLeave)
+
+    this.edgeDragRailsElement = rails
+    this.edgeDragTaperPathElements = taperPaths
+    this.edgeDragPathElement = taperPaths[0] || null
+    this.element.appendChild(rails)
+    this.updateEdgeDragPathGeometry()
+  }
+
+  removeEdgeDragRails() {
+    if (!this.edgeDragRailsElement) return
+    this.edgeDragRailsElement
+      .querySelectorAll(".content-window-drag-hit")
+      .forEach((hit) => {
+        hit.removeEventListener("pointerdown", this.boundEdgeDragPointerDown)
+        hit.removeEventListener("pointermove", this.boundEdgeDragPointerMove)
+      })
+    this.element.removeEventListener("pointermove", this.boundEdgeDragPointerMove)
+    this.element.removeEventListener("pointerleave", this.boundEdgeDragPointerLeave)
+    this.edgeDragRailsElement.remove()
+    this.edgeDragRailsElement = null
+    this.edgeDragTaperPathElements = null
+    this.edgeDragPathElement = null
+    this.edgeDragPathMetrics = null
+  }
+
+  handleEdgeDragPointerDown(event) {
+    if (this.activeResize) return
+    if (event.button !== undefined && event.button !== 0) return
+    if (event.buttons !== undefined && event.buttons !== 1) return
+    if (!this.updateEdgeDragGhost(event)) return
+    this.startDrag(event)
+  }
+
+  handleEdgeDragPointerMove(event) {
+    this.updateEdgeDragGhost(event)
+  }
+
+  handleEdgeDragPointerLeave(_event) {
+    if (this.activeDrag) return
+    this.clearAllEdgeGhosts()
+  }
+
+  updateEdgeDragGhost(event) {
+    // While dragging, keep the ghost locked at full opacity regardless of cursor distance
+    if (this.activeDrag) {
+      if (this.edgeDragRailsElement) this.edgeDragRailsElement.classList.add("is-edge-drag-hot")
+      return true
+    }
+
+    const hit = this.computeEdgePathHit(event)
+    if (!hit) {
+      this.clearAllEdgeGhosts()
+      return false
+    }
+
+    if (!this.edgeDragPathElement) return false
+    const { offset, strength, totalLength: total, segmentLength: segLen } = hit
+    const intensity = strength
+
+    const taperPaths = this.edgeDragTaperPathElements || []
+    const visibleLength = Math.min(total - 1, segLen + 38)
+    const n = Math.max(1, taperPaths.length)
+    const baseSliceLength = visibleLength / n
+    const sliceLength = Math.max(1.2, baseSliceLength * 1.55)
+    const sigma = 0.27
+
+    const applySlice = (pathElement, centerDistance, length, alpha) => {
+      if (!pathElement) return
+      const start = ((centerDistance - (length / 2)) % total + total) % total
+      const end = start + length
+      let dasharray
+      let dashoffset
+      if (end <= total) {
+        dasharray = `${length} ${total - length}`
+        dashoffset = String(-start)
+      } else {
+        const part1 = total - start
+        const part2 = length - part1
+        const gap = total - length
+        dasharray = `${part2} ${gap} ${part1} 0`
+        dashoffset = "0"
+      }
+      pathElement.style.opacity = String(alpha)
+      pathElement.style.strokeDasharray = dasharray
+      pathElement.style.strokeDashoffset = dashoffset
+    }
+
+    for (let i = 0; i < n; i += 1) {
+      const pathElement = taperPaths[i]
+      const t = n === 1 ? 0.5 : ((i + 0.5) / n)
+      const signed = (2 * t) - 1
+      const gaussian = Math.exp(-0.5 * Math.pow(signed / sigma, 2))
+      const alpha = intensity * gaussian * 0.98
+      const centerDistance = (offset - (visibleLength / 2)) + (t * visibleLength)
+      applySlice(pathElement, centerDistance, sliceLength, alpha)
+    }
+
+    if (this.edgeDragRailsElement) this.edgeDragRailsElement.classList.add("is-edge-drag-hot")
+    return true
+  }
+
+  computeEdgePathHit(event) {
+    if (!this.edgeDragRailsElement || !this.edgeDragPathElement) return null
+    const eventTarget = event.target
+    if (eventTarget instanceof Element && eventTarget.closest(".pane-resize-handle")) return null
+    if (!this.isPointerOutsideWindow(event)) return null
+
+    this.updateEdgeDragPathGeometry()
+    const metrics = this.edgeDragPathMetrics
+    if (!metrics) return null
+
+    const railsRect = this.edgeDragRailsElement.getBoundingClientRect()
+    const localX = event.clientX - railsRect.left
+    const localY = event.clientY - railsRect.top
+    const nearest = this.nearestRoundedRectPathPoint(localX, localY, metrics)
+    if (!nearest) return null
+
+    const hoverBand = 25
+    if (nearest.distance > hoverBand) return null
+    return {
+      offset: nearest.offset,
+      distance: nearest.distance,
+      strength: 1,
+      totalLength: metrics.totalLength,
+      segmentLength: 60
+    }
+  }
+
+  isPointerOutsideWindow(event) {
+    const rect = this.element.getBoundingClientRect()
+    const x = event.clientX
+    const y = event.clientY
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false
+    return x < rect.left || x > rect.right || y < rect.top || y > rect.bottom
+  }
+
+  updateEdgeDragPathGeometry() {
+    if (!this.edgeDragRailsElement || !this.edgeDragPathElement) return
+    const rect = this.edgeDragRailsElement.getBoundingClientRect()
+    const width = Math.max(2, rect.width)
+    const height = Math.max(2, rect.height)
+    const inset = 9
+    const pathWidth = Math.max(2, width - inset * 2)
+    const pathHeight = Math.max(2, height - inset * 2)
+    const radius = Math.max(1, Math.min(10, (Math.min(pathWidth, pathHeight) / 2) - 0.5))
+
+    const x = inset
+    const y = inset
+    const d = [
+      `M ${x + radius} ${y}`,
+      `H ${x + pathWidth - radius}`,
+      `A ${radius} ${radius} 0 0 1 ${x + pathWidth} ${y + radius}`,
+      `V ${y + pathHeight - radius}`,
+      `A ${radius} ${radius} 0 0 1 ${x + pathWidth - radius} ${y + pathHeight}`,
+      `H ${x + radius}`,
+      `A ${radius} ${radius} 0 0 1 ${x} ${y + pathHeight - radius}`,
+      `V ${y + radius}`,
+      `A ${radius} ${radius} 0 0 1 ${x + radius} ${y}`
+    ].join(" ")
+
+    const svg = this.edgeDragPathElement.ownerSVGElement
+    if (svg) svg.setAttribute("viewBox", `0 0 ${width} ${height}`)
+    if (Array.isArray(this.edgeDragTaperPathElements)) {
+      this.edgeDragTaperPathElements.forEach((taperPath) => taperPath.setAttribute("d", d))
+    }
+    this.edgeDragPathElement?.setAttribute("d", d)
+
+    const straightH = Math.max(0, pathWidth - radius * 2)
+    const straightV = Math.max(0, pathHeight - radius * 2)
+    const totalLength = (2 * straightH) + (2 * straightV) + (2 * Math.PI * radius)
+    this.edgeDragPathMetrics = {
+      x,
+      y,
+      width: pathWidth,
+      height: pathHeight,
+      radius,
+      totalLength
+    }
+  }
+
+  nearestRoundedRectPathPoint(localX, localY, metrics) {
+    const px = localX - metrics.x
+    const py = localY - metrics.y
+    const w = metrics.width
+    const h = metrics.height
+    const r = metrics.radius
+
+    if (w <= 0 || h <= 0) return null
+
+    const topLen = Math.max(0, w - (2 * r))
+    const rightLen = Math.max(0, h - (2 * r))
+    const quarter = (Math.PI * r) / 2
+    const perimeter = metrics.totalLength
+
+    const candidates = []
+    const addCandidate = (qx, qy, offset) => {
+      const dx = px - qx
+      const dy = py - qy
+      candidates.push({ distance: Math.hypot(dx, dy), offset })
+    }
+
+    // Top edge
+    const topX = Math.max(r, Math.min(w - r, px))
+    addCandidate(topX, 0, topX - r)
+
+    // Top-right arc
+    const tr = this.closestArcPoint(px, py, w - r, r, r, -Math.PI / 2, 0)
+    addCandidate(tr.x, tr.y, topLen + ((tr.angle + (Math.PI / 2)) * r))
+
+    // Right edge
+    const rightY = Math.max(r, Math.min(h - r, py))
+    addCandidate(w, rightY, topLen + quarter + (rightY - r))
+
+    // Bottom-right arc
+    const br = this.closestArcPoint(px, py, w - r, h - r, r, 0, Math.PI / 2)
+    addCandidate(br.x, br.y, topLen + quarter + rightLen + ((br.angle - 0) * r))
+
+    // Bottom edge (right -> left)
+    const bottomX = Math.max(r, Math.min(w - r, px))
+    addCandidate(bottomX, h, topLen + quarter + rightLen + quarter + ((w - r) - bottomX))
+
+    // Bottom-left arc
+    const bl = this.closestArcPoint(px, py, r, h - r, r, Math.PI / 2, Math.PI)
+    addCandidate(bl.x, bl.y, topLen + quarter + rightLen + quarter + topLen + ((bl.angle - (Math.PI / 2)) * r))
+
+    // Left edge (bottom -> top)
+    const leftY = Math.max(r, Math.min(h - r, py))
+    addCandidate(0, leftY, topLen + quarter + rightLen + quarter + topLen + quarter + ((h - r) - leftY))
+
+    // Top-left arc
+    const tl = this.closestArcPoint(px, py, r, r, r, Math.PI, (3 * Math.PI) / 2)
+    addCandidate(tl.x, tl.y, topLen + quarter + rightLen + quarter + topLen + quarter + rightLen + ((tl.angle - Math.PI) * r))
+
+    let best = candidates[0]
+    for (let i = 1; i < candidates.length; i += 1) {
+      if (candidates[i].distance < best.distance) best = candidates[i]
+    }
+
+    const wrappedOffset = ((best.offset % perimeter) + perimeter) % perimeter
+    return { distance: best.distance, offset: wrappedOffset }
+  }
+
+  closestArcPoint(px, py, cx, cy, radius, startAngle, endAngle) {
+    let angle = Math.atan2(py - cy, px - cx)
+    // Normalize into [startAngle, endAngle] span to handle atan2 wrap-around at ±π
+    while (angle < startAngle - 1e-9) angle += 2 * Math.PI
+    while (angle > endAngle + 1e-9) angle -= 2 * Math.PI
+    angle = Math.max(startAngle, Math.min(endAngle, angle))
+    const x = cx + Math.cos(angle) * radius
+    const y = cy + Math.sin(angle) * radius
+    return { x, y, angle }
+  }
+
+  clearAllEdgeGhosts() {
+    if (!this.edgeDragPathElement) return
+    if (Array.isArray(this.edgeDragTaperPathElements)) {
+      this.edgeDragTaperPathElements.forEach((taperPath) => {
+        taperPath.style.opacity = "0"
+      })
+    }
+    if (this.edgeDragRailsElement) this.edgeDragRailsElement.classList.remove("is-edge-drag-hot")
   }
 
   handleToggleRequest(event) {
@@ -1663,6 +1967,9 @@ export default class extends Controller {
 
     document.addEventListener("mousemove", this.boundDragMove)
     document.addEventListener("mouseup", this.boundDragEnd)
+    document.addEventListener("pointermove", this.boundPointerDragMove)
+    document.addEventListener("pointerup", this.boundPointerDragEnd)
+    document.addEventListener("pointercancel", this.boundPointerDragEnd)
     document.addEventListener("touchmove", this.boundDragMove, { passive: false })
     document.addEventListener("touchend", this.boundDragEnd)
   }
@@ -1699,8 +2006,12 @@ export default class extends Controller {
     this.element.classList.remove("content-window--suppress-position-transition")
     document.removeEventListener("mousemove", this.boundDragMove)
     document.removeEventListener("mouseup", this.boundDragEnd)
+    document.removeEventListener("pointermove", this.boundPointerDragMove)
+    document.removeEventListener("pointerup", this.boundPointerDragEnd)
+    document.removeEventListener("pointercancel", this.boundPointerDragEnd)
     document.removeEventListener("touchmove", this.boundDragMove)
     document.removeEventListener("touchend", this.boundDragEnd)
+    this.clearAllEdgeGhosts()
     /* reconcile bails out while activeDrag is set — clear first so snap + saveWindowBounds run. */
     if (hadDrag && didMove) {
       this.reconcileWindowOnViewportResize()

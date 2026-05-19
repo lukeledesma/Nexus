@@ -5614,7 +5614,7 @@ html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden)
   width: min(550px, calc(100vw - 2rem));
   height: min(480px, calc(100vh - 2rem));
   z-index: 1500;
-  overflow: hidden;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   transform: translateY(0) scale(1);
@@ -5648,6 +5648,103 @@ html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden)
   transform-origin: center center;
   transform: scale(1.011);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.56);
+}
+
+/* VR-style move affordance: hover near outer edge to reveal a thin ghost drag line. */
+.content-window-drag-rails {
+  position: absolute;
+  inset: -10px;
+  pointer-events: none;
+  z-index: 66;
+}
+
+.content-window-drag-ghost {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.content-window-drag-ghost-taper-path {
+  fill: none;
+  stroke: rgba(227, 227, 227, 1);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+  transition: opacity 90ms ease;
+}
+
+.content-window-drag-hit {
+  position: absolute;
+  pointer-events: auto;
+  cursor: auto;
+}
+
+.content-window-drag-rails.is-edge-drag-hot .content-window-drag-hit {
+  cursor: grab;
+}
+
+.content-window--drag-lift .content-window-drag-hit {
+  cursor: grabbing;
+}
+
+.content-window-drag-hit--top {
+  top: -3px;
+  left: -10px;
+  right: -10px;
+  height: 15px;
+}
+
+.content-window-drag-hit--bottom {
+  bottom: -3px;
+  left: -10px;
+  right: -10px;
+  height: 15px;
+}
+
+.content-window-drag-hit--left {
+  top: -10px;
+  bottom: -10px;
+  left: -3px;
+  width: 15px;
+}
+
+.content-window-drag-hit--right {
+  top: -10px;
+  bottom: -10px;
+  right: -3px;
+  width: 15px;
+}
+
+.content-window-drag-hit--corner-tl {
+  top: -10px;
+  left: -10px;
+  width: 18px;
+  height: 18px;
+}
+
+.content-window-drag-hit--corner-tr {
+  top: -10px;
+  right: -10px;
+  width: 18px;
+  height: 18px;
+}
+
+.content-window-drag-hit--corner-br {
+  bottom: -10px;
+  right: -10px;
+  width: 18px;
+  height: 18px;
+}
+
+.content-window-drag-hit--corner-bl {
+  bottom: -10px;
+  left: -10px;
+  width: 18px;
+  height: 18px;
 }
 
 /* Finder: match JS minimum (760×460) so first paint lines up with Settings. */
@@ -5860,7 +5957,8 @@ html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden)
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
-  margin-left: auto;
+  margin-left: 0;
+  transition: none;
 }
 
 .app-placeholder-app-body {
@@ -5895,17 +5993,18 @@ html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden)
 .content-window-chrome {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  min-height: 2.7rem;
-  padding: 0.4rem 0.75rem 0.35rem;
+  justify-content: flex-end;
+  gap: var(--nexus-small-action-gap);
+  min-height: 2.15rem;
+  padding: 0.28rem 0.55rem 0.24rem;
   border-bottom: 1px solid var(--border-hairline);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.008));
   user-select: none;
   -webkit-user-select: none;
 }
 
 .content-window-chrome > :first-child {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
 }
 
@@ -5941,6 +6040,11 @@ html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden)
   color: var(--text);
   line-height: 1;
 }
+.content-window-chrome--with-open-file .content-window-chrome-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+}
 
 /* Open-file badge shares the title row with the H2; don’t let the toolbar rule flex-grow the H2 or "| filename" is pushed to the right. */
 .content-window-chrome--with-open-file .content-window-title-shell .content-window-chrome-title {
@@ -5973,7 +6077,7 @@ html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden)
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
-  max-width: min(14rem, 28vw);
+  max-width: min(16rem, 38vw);
 }
 
 .content-window-open-file-edited {
