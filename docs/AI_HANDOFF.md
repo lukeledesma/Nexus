@@ -1,6 +1,6 @@
 # AI Handoff - Current Project State
 
-Last updated: 2026-05-14 (evening)
+Last updated: 2026-05-18
 
 ## Project Purpose
 
@@ -18,7 +18,7 @@ Nexus is a browser-based OS-like workspace built on Rails. The core product prom
 - Ruby version: 3.2.3
 - Action Cable route: /cable
 - Deploy pipeline: script-based via deploy/deploy_server.sh
-- Current health: `./bin/audit` is clean with 0 active Brakeman warnings and 2 intentionally ignored warnings; `bin/rails test` passes 100 tests, 372 assertions.
+- Current health: `./bin/audit` is clean with 0 active Brakeman warnings and 2 intentionally ignored warnings; `bin/rails test` passes 99 tests, 365 assertions.
 
 ## What Was Recently Completed
 
@@ -71,8 +71,10 @@ Nexus is a browser-based OS-like workspace built on Rails. The core product prom
 - Calendar events persisted to a single Embedded Calendar file.
 - Save flow normalized through service layer.
 
-6. Save behavior tuning for UX:
-- Notes and Time Card changed from per-keystroke save to blur/unselect save.
+6. Quartz and storage cleanup:
+- Quartz is the active note-style app surface; legacy Notes and Time Card app routes/controllers are retired.
+- Dead `time_card_controller.js` was deleted, and Calendar no longer probes Time Card files by date.
+- Legacy workspace clutter was purged from `storage/workspace` and `storage/workspace_test` (`apps_open_user_*`, `json_api_user_*`, `LayoutThemes*.rtf`, `WorkspaceState*.rtf`, and old Note/Time Card draft artifacts).
 
 7. Finder noise/performance mitigation:
 - Request noise reduction changes (including prefetch behavior tuning).
@@ -91,11 +93,11 @@ Nexus is a browser-based OS-like workspace built on Rails. The core product prom
 - Side-panel hover previews now refresh in place when a draft is opened with the `+` action, so new instances appear without leaving/re-entering hover.
 - Hover preview refresh is normalized across spawned app window keys (`task-spawn-*`, `note-spawn-*`, `time-card-spawn-*`, `image-spawn-*`).
 
-11. Time Card shorthand and sync hardening (2026-05-14):
-- Notes input now expands top-level shorthand like `10-` → `10:00-`, `1345-` → `13:45-`, and `now-` → current time rounded to the nearest 5 minutes.
+11. Quartz note shorthand and sync hardening (2026-05-14):
+- Quartz note input now expands top-level shorthand like `10-` → `10:00-`, `1345-` → `13:45-`, and `now-` → current time rounded to the nearest 5 minutes.
 - Customer and entry lines are excluded from the shorthand expansion path.
 - `DocumentDiskLoader` now tolerates files disappearing between directory scan and read, which removes the flaky `ENOENT` race seen in linked-document tests.
-- Time Card "files by date" selection is deterministic and test-stable for records that share the same entry date.
+- Quartz linked-document handling stays stable across disk round-trips and invalid draft fallbacks.
 
 ## Known Working Expectations
 
@@ -116,6 +118,18 @@ Nexus is a browser-based OS-like workspace built on Rails. The core product prom
 1. Should the remaining ignored Brakeman findings be eliminated now, or stay documented as accepted risk?
 2. Do we want thumbnail generation/previews for large images as the next perf step?
 3. Should polling fallbacks be removed entirely in areas now covered by reliable cable events?
+
+## Current Cleanup Note
+
+- Quartz is the only active note-style editor surface.
+- Notes and Time Card app routes/controllers were intentionally retired.
+- Legacy storage artifact buildup from test usernames was cleaned out of `storage/workspace` and `storage/workspace_test`.
+
+## Quartz Migration Complete
+
+- Active editor surfaces: Tasks and Quartz.
+- Retired surfaces: Notes app and Time Card app (controllers/routes/frontend controllers removed).
+- First code entry points for Quartz behavior: `app/controllers/apps/quartz_controller.rb`, `app/javascript/controllers/quartz_controller.js`, and `app/services/quartz_document_codec.rb`.
 
 ## If You Are The Next AI
 

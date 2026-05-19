@@ -7,7 +7,7 @@ Primary objective is preserving and improving the "live and snappy" experience a
 ## In-Flight / High Priority
 
 1. Production end-to-end realtime validation pass
-- Verify calendar, notes, tasks, finder, time card all update without refresh.
+- Verify calendar, quartz, tasks, finder, and other active surfaces update without refresh.
 - Record any lagging routes/controllers and fix at source.
 
 2. Image and wallpaper responsiveness hard validation

@@ -37,10 +37,9 @@ Nexus_Dev/
 │   │   ├── documents_controller.rb
 │   │   └── apps/
 │   │       ├── base_controller.rb
-│   │       ├── notes_controller.rb
 │   │       ├── tasks_controller.rb
 │   │       ├── finder_controller.rb
-│   │       ├── time_card_controller.rb
+│   │       ├── quartz_controller.rb
 │   │       ├── images_controller.rb
 │   │       ├── audio_controller.rb
 │   │       ├── wallpaper_iimage_controller.rb
@@ -75,7 +74,7 @@ Nexus_Dev/
 │   │   ├── embedded_draft_document.rb
 │   │   ├── linked_app_save_to_document.rb
 │   │   ├── note_rtf_converter.rb
-│   │   └── time_card_document_codec.rb
+│   │   └── quartz_document_codec.rb
 │   └── views/
 │       ├── layouts/application.html.erb
 │       ├── shared/_desktop_side_panel.html.erb
@@ -116,7 +115,7 @@ Nexus_Dev/
 - Older migrations may reference `folders` / `items` through migration-local classes.
 - Runtime app behavior is document-backed.
 
-### Content format (Note)
+### Content format (Note / Quartz)
 ```json
 { "body": "..." }
 ```

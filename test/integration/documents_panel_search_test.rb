@@ -21,7 +21,7 @@ class DocumentsPanelSearchTest < ActionDispatch::IntegrationTest
   end
 
   test "panel search returns filename matches before content matches" do
-    notes_root = Apps::FinderController.workspace_section_root(@user, "notes")
+    notes_root = Apps::FinderController.workspace_section_root(@user, "quartz")
 
     file_name_match = notes_root.children.create!(
       title: "Sprint Plan",
@@ -48,7 +48,7 @@ class DocumentsPanelSearchTest < ActionDispatch::IntegrationTest
   end
 
   test "panel search hides dotfield suffix from title matching" do
-    notes_root = Apps::FinderController.workspace_section_root(@user, "notes")
+    notes_root = Apps::FinderController.workspace_section_root(@user, "quartz")
     notes_root.children.create!(
       title: "test.dotfield",
       is_folder: false,

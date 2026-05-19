@@ -18,8 +18,8 @@ class DocumentPolicyTest < ActiveSupport::TestCase
     User.where(id: @user&.id).delete_all
   end
 
-  test "allows opening note document in notes app" do
-    notes_root = Apps::FinderController.workspace_section_root(@user, "notes")
+  test "allows opening note document in quartz app" do
+    notes_root = Apps::FinderController.workspace_section_root(@user, "quartz")
     note = Document.create!(
       is_folder: false,
       parent: notes_root,
@@ -30,8 +30,8 @@ class DocumentPolicyTest < ActiveSupport::TestCase
 
     policy = DocumentPolicy.new(user: @user, document: note)
 
-    assert policy.can_open_in_app?(content_type: "note", section_key: "notes", allow_embedded: true)
-    assert_not policy.can_open_in_app?(content_type: "task_list", section_key: "notes", allow_embedded: true)
+    assert policy.can_open_in_app?(content_type: "note", section_key: "quartz", allow_embedded: true)
+    assert_not policy.can_open_in_app?(content_type: "task_list", section_key: "quartz", allow_embedded: true)
   end
 
   test "allows saving only into finder folders" do

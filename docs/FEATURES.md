@@ -65,6 +65,24 @@ Expected behavior:
 - Fast edits and consistent save state.
 - Live update propagation across active clients.
 
+## Quartz
+
+Purpose:
+- Unified note-style editor for shorthand, timer, timecard, math, and tasklist syntax.
+
+Routes:
+- GET /apps/quartz
+
+Implementation anchors:
+- app/controllers/apps/quartz_controller.rb
+- app/javascript/controllers/quartz_controller.js
+- app/views/apps/quartz/
+
+Expected behavior:
+- Draft mode opens from the canonical embedded Quartz draft.
+- Linked Quartz documents preserve the unified file wrapper and keep the editor stable across reloads.
+- Legacy Notes and Time Card app routes are retired in favor of this single surface.
+
 ## Images
 
 Purpose:
@@ -147,3 +165,7 @@ Expected behavior:
 Clock app removal:
 - App-level clock feature routes/views/controllers were removed in recent work.
 - Desktop clock utility behavior may still exist as shell-level controller.
+
+Legacy note/time-card apps:
+- Notes and Time Card app routes/controllers were retired and consolidated into Quartz.
+- Workspace cleanup now removes old Note Draft / Time Card Draft artifacts and stale test-generated workspace folders.

@@ -10,6 +10,7 @@ Nexus is a Rails desktop-style workspace where one authenticated user operates a
 
 Primary apps:
 - Tasks
+- Quartz
 - Images
 - Audio
 - Finder (file system browser and save/open host)
@@ -83,7 +84,7 @@ Fields in active schema:
 - is_folder (boolean)
 - title
 - content_type (note, task_list, asset)
-- content (text payload for notes/time-card note documents)
+- content (text payload for note/quartz documents)
 - tasks (jsonb for task list payload)
 - storage_path (disk relative path)
 - reset_mode
@@ -179,8 +180,7 @@ Service: EmbeddedDraftDocument
 
 One canonical draft per app under Embedded folder:
 - Task Draft (task_list)
-- Note Draft (note)
-- Time Card Draft (note)
+- Quartz Draft (note)
 
 Key operations:
 - fetch_or_create
@@ -198,7 +198,7 @@ File:
 
 Main route groups:
 - Auth: /login /logout
-- App windows: /apps/finder, /apps/tasks, /apps/notes, /apps/time_card, /apps/calendar, /apps/images, /apps/audio, /apps/user
+- App windows: /apps/finder, /apps/tasks, /apps/quartz, /apps/calendar, /apps/images, /apps/audio, /apps/user
 - Draft and save bridge: /apps/tasks/draft_file and /apps/tasks/save_file
 - Workspace preferences: /workspace_preferences GET/PATCH
 - Document CRUD and file operations under /documents
@@ -256,22 +256,22 @@ Files:
 - app/controllers/apps/tasks_controller.rb
 - app/services/tasks/save_file.rb
 
-### 9.4 Apps::NotesController
+### 9.4 Apps::QuartzController
 Capabilities:
 - open linked note document
-- HTML note payload converted to plain text for textarea initialization
+- unified Quartz note payload converted to editor state for textarea initialization
 
 File:
-- app/controllers/apps/notes_controller.rb
+- app/controllers/apps/quartz_controller.rb
 
-### 9.5 Apps::TimeCardController
+### 9.5 Removed Notes / Time Card surfaces
 Capabilities:
-- open linked time-card document
-- decode/encode serialized state with TimeCardDocumentCodec
+- Quartz now owns the note-style editor and time-entry workflows that used to live in Notes / Time Card.
 
 Files:
-- app/controllers/apps/time_card_controller.rb
-- app/services/time_card_document_codec.rb
+- app/controllers/apps/notes_controller.rb (removed)
+- app/controllers/apps/time_card_controller.rb (removed)
+- app/services/time_card_document_codec.rb (removed)
 
 ### 9.6 Apps::ImagesController and Apps::AudioController
 Capabilities:
@@ -336,7 +336,7 @@ Boot files:
 Key controllers:
 - organizer_controller.js
   - app launcher behavior
-  - open draft on first launch for tasks/notes/time-card
+  - open draft on first launch for tasks/quartz
 - finder_browser_controller.js
   - tree interactions, create/rename/delete, save-as picker, open-in-app dispatch
 - autosave_controller.js
@@ -363,8 +363,7 @@ Layout file contains all desktop windows and turbo frames.
 Window frames include:
 - finder-pane
 - tasks-pane
-- notes-pane
-- time-card-pane
+- quartz-pane
 - calendar-pane
 - images-pane
 - audio-pane
@@ -394,9 +393,9 @@ Persistence:
 - documents.content_type task_list
 - documents.tasks JSON payload
 
-### Notes
+### Quartz
 User actions:
-- edit note body
+- edit Quartz note body
 - autosave
 - save-as into Finder via linked picker
 
@@ -404,15 +403,14 @@ Persistence:
 - documents.content_type note
 - documents.content text payload (stored and mirrored as RTF on disk)
 
-### Time Card
+### Removed Notes / Time Card
 User actions:
-- clock state tracking and notes
-- open linked file in Time Card app
-- save-through linked flow
+- Quartz absorbed the note editor and time-entry workflows.
+- Old notes and time-card routes are retired.
 
 Persistence:
-- documents.content_type note in Time Card section
-- content serialized by TimeCardDocumentCodec
+- documents.content_type note in Quartz section
+- content serialized by Quartz document codec
 
 ### Calendar
 User actions:
@@ -459,8 +457,8 @@ Task list serialization:
 Note serialization:
 - RTF conversion via NoteRtfConverter for disk writes
 
-Time card serialization:
-- unified header + body text via TimeCardDocumentCodec
+Quartz note serialization:
+- unified header + body text via Quartz document codec
 
 ## 15. Diagnostics And Operations
 
@@ -533,7 +531,7 @@ References:
 ## 18. Verification Checklist For Any Change
 
 1. Login and open desktop shell.
-2. Open Tasks, Notes, Time Card from launcher (draft path).
+2. Open Tasks or Quartz from launcher (draft path).
 3. Save each into Finder folder from picker.
 4. Reopen saved documents from Finder open-in-app.
 5. Upload image and audio assets and open them.

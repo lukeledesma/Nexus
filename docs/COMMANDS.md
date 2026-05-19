@@ -157,6 +157,24 @@ What it does:
 - Includes row counts, columns, and max updated_at when present
 - Provides a repeatable before/after baseline for cleanup work
 
+Workspace storage cleanup (legacy/test artifacts):
+
+```bash
+bin/rake nexus:cleanup_workspace_storage
+```
+
+Dry run preview:
+
+```bash
+DRY_RUN=1 bin/rake nexus:cleanup_workspace_storage
+```
+
+What it does:
+
+- Removes known test-generated folder patterns from `storage/workspace` and `storage/workspace_test`.
+- Removes legacy `Note Draft` / `Time Card Draft` files and stale numbered `LayoutThemes*.rtf` / `WorkspaceState*.rtf` artifacts.
+- Preserves canonical `.txt` files such as `LayoutThemes.txt` and `WorkspaceState.txt`.
+
 List routes:
 
 ```bash
