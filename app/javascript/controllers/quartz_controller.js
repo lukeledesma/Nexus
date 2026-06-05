@@ -191,33 +191,26 @@ function normalizeMathInput(expr) {
 function renderMathResult(value) {
   if (value == null) return null
 
-  let raw
   if (typeof value === "number") {
     if (!Number.isFinite(value)) return null
-    raw = formatMathResult(value, { precision: 14, lowerExp: -9, upperExp: 20 })
-  } else if (typeof value === "bigint") {
-    raw = value.toString()
-  } else {
-    const constructorName = value?.constructor?.name
-    if (constructorName === "BigNumber" || constructorName === "Fraction" || constructorName === "Complex" || constructorName === "Unit") {
-      raw = formatMathResult(value, { precision: 14, lowerExp: -9, upperExp: 20 })
-    } else if (typeof value === "string" && value.trim().length > 0) {
-      raw = value
-    } else {
-      try {
-        const formatted = formatMathResult(value, { precision: 14, lowerExp: -9, upperExp: 20 })
-        raw = typeof formatted === "string" && formatted.trim().length > 0 ? formatted : null
-      } catch {
-        return null
-      }
-    }
+    return formatMathResult(value, { precision: 14, lowerExp: -9, upperExp: 20 })
   }
 
-  if (raw == null) return null
-  // Collapse any embedded newlines — mathjs can format matrices/complex values
-  // with line breaks, which would create phantom blank lines in the textarea.
-  const clean = String(raw).replace(/[\r\n]+/g, " ").trim()
-  return clean.length > 0 ? clean : null
+  if (typeof value === "bigint") return value.toString()
+
+  const constructorName = value?.constructor?.name
+  if (constructorName === "BigNumber" || constructorName === "Fraction" || constructorName === "Complex" || constructorName === "Unit") {
+    return formatMathResult(value, { precision: 14, lowerExp: -9, upperExp: 20 })
+  }
+
+  if (typeof value === "string" && value.trim().length > 0) return value
+
+  try {
+    const formatted = formatMathResult(value, { precision: 14, lowerExp: -9, upperExp: 20 })
+    return typeof formatted === "string" && formatted.trim().length > 0 ? formatted : null
+  } catch {
+    return null
+  }
 }
 
 const MATH_ASSIGN_RE = /^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)$/
@@ -1947,14 +1940,6 @@ export default class extends Controller {
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
-  handleNotesFocus() {
-    // Re-render the backdrop from the live textarea value whenever focus
-    // returns to the editor. This corrects any stale backdrop state that
-    // built up while the textarea was unfocused (e.g. after a resize event
-    // or an ActionCable echo updated the content without a focus re-render).
-    this._renderAll(this.notesInputTarget.value)
-  }
-
   updateNotes() {
     this._moveCaretOffTimerCountdownRow({ createRowIfMissing: true, dispatchInput: false })
     const textarea = this.notesInputTarget
@@ -1978,6 +1963,13 @@ export default class extends Controller {
     const bd = this.notesBackdropTarget
     bd.scrollTop = ta.scrollTop
     bd.scrollLeft = ta.scrollLeft
+  }
+
+  handleNotesFocus() {
+    // Re-render from normalized textarea content so caret/backdrop stay aligned
+    // after blur/focus and remote update cycles.
+    this._renderAll(this.notesInputTarget.value)
+    this.syncBackdropScroll()
   }
 
   handleNotesKeydown(event) {
@@ -2349,19 +2341,12 @@ export default class extends Controller {
     const body = displayTimerBody(extractQuartzBody(detail.content?.toString() ?? ""))
     if (body !== this.notesInputTarget.value) {
       this.notesInputTarget.value = body
-      // Always render from the browser-normalised textarea value rather than the
-      // raw server string — the browser strips \r and normalises \r\n → \n on
-      // textarea assignment. Using the raw body would embed \r characters in the
-      // backdrop HTML which, under white-space:pre, render as phantom blank lines
-      // (one spacer between every content line).
       this._renderAll(this.notesInputTarget.value)
     }
   }
 
   _onViewportChange() {
     if (!this.hasNotesInputTarget) return
-    // Always re-segment from the live textarea value so the backdrop can't
-    // become stale if content changed since the last full _renderAll call.
     this._segments = segmentDocument(this.notesInputTarget.value)
     this._renderBackdrop()
     renderTimeline(this._segments, this.hasTimelineBarTarget ? this.timelineBarTarget : null)
