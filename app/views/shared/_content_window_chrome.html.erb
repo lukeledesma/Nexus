@@ -3,10 +3,11 @@
 <% linked_app_save_flow = local_assigns.fetch(:linked_app_save_flow, false) %>
 <% open_file_badge = local_assigns.fetch(:open_file_badge, false) %>
 <% show_finder_new_folder = local_assigns.fetch(:show_finder_new_folder, false) %>
+<% show_finder_search_toggle = local_assigns.fetch(:show_finder_search_toggle, false) %>
 <% show_task_list_add = local_assigns.fetch(:show_task_list_add, false) %>
 <% show_calendar_new_event = local_assigns.fetch(:show_calendar_new_event, false) %>
 <% show_set_wallpaper = local_assigns.fetch(:show_set_wallpaper, false) %>
-<% show_command_shell = linked_app_save_flow || show_finder_new_folder || show_task_list_add || show_calendar_new_event || show_save || show_open || show_set_wallpaper %>
+<% show_command_shell = linked_app_save_flow || show_finder_new_folder || show_finder_search_toggle || show_task_list_add || show_calendar_new_event || show_save || show_open || show_set_wallpaper %>
 
 <header class="content-window-chrome <%= "content-window-chrome--with-open-file" if open_file_badge %>">
   <% if open_file_badge %>
@@ -69,6 +70,17 @@
       </div>
     <% else %>
       <div class="content-window-chrome-tool-group content-window-chrome-actions">
+        <% if show_finder_search_toggle %>
+          <button
+            type="button"
+            class="content-window-search-toggle settings-themes-item-action-btn theme-builder-save-btn"
+            data-finder-toolbar-target="searchToggle"
+            data-action="click->finder-toolbar#toggleSearchMode"
+            title="Search all files"
+            aria-label="Search all files"
+            aria-pressed="false"
+          ><%= material_symbol_icon(:search, size: :xs) %></button>
+        <% end %>
         <% if show_finder_new_folder %>
           <button
             type="button"

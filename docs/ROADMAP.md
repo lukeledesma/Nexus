@@ -1,52 +1,72 @@
 # Nexus Roadmap and Open Work
 
+Last updated: 2026-05-19
+
 ## Current Priority
 
-Primary objective is preserving and improving the "live and snappy" experience across the full app surface.
+Primary objective remains preserving and improving the "live and snappy" experience, with immediate focus now on Finder cleanup and layout workflows.
+
+## Newly Completed Baseline (May 2026)
+
+1. Window movement/snap refresh
+- Classic top chrome restored.
+- Edge drag affordance retained and polished.
+- Delayed title snap ghost and delayed resize snap preview shipped.
+- Escape-to-dismiss snap zone behavior shipped.
+- Multi-anchor title snap behavior shipped.
+
+2. Finder quality-of-life updates
+- Image row "set as desktop wallpaper" quick action shipped.
+- Finder last section persistence shipped (`finder.last_section`).
+
+3. Stability
+- Window drift on refresh fixed with transform-safe bounds persistence.
 
 ## In-Flight / High Priority
 
-1. Production end-to-end realtime validation pass
-- Verify calendar, quartz, tasks, finder, and other active surfaces update without refresh.
-- Record any lagging routes/controllers and fix at source.
+1. Finder context menu migration (row cleanup)
+- Replace row action buttons with right-click actions: rename, delete, set wallpaper (image only), favorite/unfavorite.
+- Keep keyboard-accessible equivalents for all actions.
 
-2. Image and wallpaper responsiveness hard validation
-- Confirm production latency improvements under normal and burst usage.
-- If needed, add objective timing checks and thresholds.
+2. Drag-and-drop favorite flow
+- Allow dragging files/folders into Favorites, mirroring trash drop affordance quality.
+- Add hover/target states and optimistic UI feedback.
 
-3. Wallpaper persistence regression backlog item
-- Investigate and eliminate any flow where wallpaper can clear after unrelated UI changes.
-- Add a regression test that simulates side-panel preview interactions before/after reload and verifies wallpaper persistence in both API response and workspace state file.
+3. Desktop file interactions
+- Add drop target support for desktop to accept files/folders.
+- Define collision and placement rules so icon layout stays deterministic.
 
 ## Near-Term Improvements
 
-1. Reduce remaining request noise
-- Audit prefetch/background fetch patterns that do not add user value.
+1. Workspace app (saved layouts)
+- New app to capture, name, and restore workspace window layouts.
+- On restore, show clear missing-file diagnostics when saved docs no longer exist.
 
-2. Query and indexing optimization
-- Identify highest-volume document/state read-write paths.
-- Add targeted optimizations where evidence supports it.
+2. Developer board app
+- Project board for ideas, implementation steps, and status tracking.
+- Link cards to files/windows/documents to keep context close to work.
 
-3. Operational hygiene
-- Remove nginx configuration duplication/warning noise.
-- Keep deploy scripts deterministic and low-maintenance.
+3. OS sound system
+- Add event-driven sound hooks (open, close, error, complete).
+- Gate sounds behind user preferences and provide low-latency preload strategy.
 
 ## Medium-Term Direction
 
-1. Better observability for UX-critical paths
-- lightweight performance instrumentation for key app routes.
+1. Nexus-trained AI companion
+- Assistant app that can reason over workspace state, create/manage files, and execute constrained workflow actions.
+- Start with safe, auditable actions and explicit user confirmation on write/destructive operations.
 
-2. Realtime coverage expansion
-- eliminate fallback polling where reliable cable updates are already available.
+2. Observability for UX-critical paths
+- Lightweight instrumentation around drag/snap/Finder operations to catch regressions quickly.
 
 3. Feature-level reliability checks
-- build smoke checks for core UX promises after deploy.
+- Add smoke checks covering window restore, Finder section restore, and core drag/drop flows.
 
 ## Unresolved Questions
 
-1. Should large image handling include thumbnail generation pipeline?
-2. Should all app save events converge to one standardized broadcast contract?
-3. What should be the accepted latency target for "snappy" across key interactions?
+1. Should desktop icons be persisted as absolute coordinates, grid slots, or a hybrid model?
+2. Should workspace restore reopen all missing docs as placeholders, or skip and summarize missing items?
+3. Should context-menu actions be implemented with one shared action bus for Finder and future desktop surfaces?
 
 ## Completion Signals
 
@@ -56,3 +76,5 @@ The current phase can be considered complete when:
 - image/wallpaper open latency is reliably low
 - deploy process is stable and quiet
 - docs remain synchronized with actual behavior
+- Finder row actions are consolidated into context menus without discoverability regressions
+- users can save/load workspace layouts with explicit missing-file feedback

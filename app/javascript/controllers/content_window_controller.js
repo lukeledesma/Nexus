@@ -39,6 +39,31 @@ const SHELL_CANVAS_MIN_W = 760
 const SHELL_CANVAS_MIN_H = 460
 const CONTENT_WINDOW_OPEN_ANIMATION_MS = 300
 const CONTENT_WINDOW_CLOSE_ANIMATION_MS = 300
+const TITLE_SNAP_DETECT_GAP_PX = 34
+const TITLE_SNAP_OVERLAP_PX = 52
+const TITLE_SNAP_HOLD_MS = 650
+const TITLE_SNAP_FINAL_GAP_PX = 10
+const TITLE_SNAP_TITLE_ALIGN_TOLERANCE_PX = 28
+const RESIZE_HEIGHT_SNAP_DELTA_PX = 34
+const RESIZE_WIDTH_SNAP_DELTA_PX = 34
+const RESIZE_NEIGHBOR_MAX_GAP_PX = 360
+
+function getTitleSnapGhostEl() {
+  if (!window.__nexusTitleSnapGhostEl?.isConnected) {
+    const ghost = document.createElement("div")
+    ghost.className = "content-window-title-snap-ghost"
+    ghost.setAttribute("aria-hidden", "true")
+    const container = document.getElementById("desktop-shell-canvas") || document.getElementById("desktop-shell") || document.body
+    container.appendChild(ghost)
+    window.__nexusTitleSnapGhostEl = ghost
+  }
+  return window.__nexusTitleSnapGhostEl
+}
+
+function hideTitleSnapGhostEl() {
+  const ghost = window.__nexusTitleSnapGhostEl
+  if (ghost) ghost.style.display = "none"
+}
 
 export default class extends Controller {
   static targets = [
@@ -107,6 +132,20 @@ export default class extends Controller {
     this.closeAnimationTimer = null
     this._boundsPinX = "none"
     this._boundsPinY = "none"
+    this.titleSnapHoverTarget = null
+    this.titleSnapHoverSide = null
+    this.titleSnapHoverStartedAt = 0
+    this.titleSnapPlacement = null
+    this.currentTitleSnapKey = null
+    this.dismissedTitleSnapKey = null
+    this.titleSnapArmTimer = null
+    this.resizeHeightSnapHoverTarget = null
+    this.resizeHeightSnapHoverKind = null
+    this.resizeHeightSnapStartedAt = 0
+    this.resizeHeightSnapPlacement = null
+    this.currentResizeSnapKey = null
+    this.dismissedResizeSnapKey = null
+    this.resizeSnapArmTimer = null
 
     this.boundDragMove = this.handleDragMove.bind(this)
     this.boundDragEnd = this.stopDrag.bind(this)
@@ -115,6 +154,7 @@ export default class extends Controller {
     this.boundResizeMove = this.handleResizeMove.bind(this)
     this.boundResizeEnd = this.stopResize.bind(this)
     this.boundLostPointerCaptureResize = this.handleLostPointerCaptureResize.bind(this)
+    this.boundSnapEscapeKeydown = this.handleSnapEscapeKeydown.bind(this)
     this.boundToggleRequest = this.handleToggleRequest.bind(this)
 
     window.addEventListener("app-window:toggle", this.boundToggleRequest)
@@ -146,6 +186,7 @@ export default class extends Controller {
       this.reconcileWindowOnViewportResize({ viewportResize: true })
     }
     window.addEventListener("resize", this.boundViewportResize)
+    document.addEventListener("keydown", this.boundSnapEscapeKeydown)
 
     if (this.hasLinkedAppSavePickerValue) {
       this.boundLinkedAppPickerClose = this.handleLinkedAppSavePickerClose.bind(this)
@@ -214,12 +255,14 @@ export default class extends Controller {
     window.removeEventListener("nexus:item-saved", this.boundItemSavedState)
     window.removeEventListener("nexus:user-state-loaded", this.boundUserStateLoaded)
     window.removeEventListener("resize", this.boundViewportResize)
+    document.removeEventListener("keydown", this.boundSnapEscapeKeydown)
     if (this.boundLinkedAppPickerClose) {
       window.removeEventListener("nexus:linked-app-save-picker-close", this.boundLinkedAppPickerClose)
     }
     if (this.boundEmbeddedLinkedAppOpen) {
       window.removeEventListener("nexus:linked-app-open-from-embedded-finder", this.boundEmbeddedLinkedAppOpen)
     }
+    this.resetTitleShellSnapState()
     this.element.removeEventListener("mousedown", this.boundTitleShellPointerDown)
     this.element.removeEventListener("touchstart", this.boundTitleShellPointerDown)
     this.removeEdgeDragRails()
@@ -232,7 +275,7 @@ export default class extends Controller {
     if (target.closest(".pane-resize-handle")) return
     if (target.closest(".content-window-close, button, a, input, textarea, select, [role='button']")) return
     if (!target.closest(".content-window-chrome, .content-window-bottom-shell")) return
-    this.startDrag(event)
+    this.startDrag(event, { source: "title" })
   }
 
   installEdgeDragRails() {
@@ -299,7 +342,7 @@ export default class extends Controller {
     if (event.button !== undefined && event.button !== 0) return
     if (event.buttons !== undefined && event.buttons !== 1) return
     if (!this.updateEdgeDragGhost(event)) return
-    this.startDrag(event)
+    this.startDrag(event, { source: "edge" })
   }
 
   handleEdgeDragPointerMove(event) {
@@ -361,7 +404,7 @@ export default class extends Controller {
       const t = n === 1 ? 0.5 : ((i + 0.5) / n)
       const signed = (2 * t) - 1
       const gaussian = Math.exp(-0.5 * Math.pow(signed / sigma, 2))
-      const alpha = intensity * gaussian * 0.98
+      const alpha = intensity * gaussian * 0.441
       const centerDistance = (offset - (visibleLength / 2)) + (t * visibleLength)
       applySlice(pathElement, centerDistance, sliceLength, alpha)
     }
@@ -1868,6 +1911,17 @@ export default class extends Controller {
   }
 
   currentLocalBounds() {
+    const styledLeft = Number.parseFloat(this.element.style.left)
+    const styledTop = Number.parseFloat(this.element.style.top)
+    if (Number.isFinite(styledLeft) && Number.isFinite(styledTop)) {
+      return {
+        left: styledLeft,
+        top: styledTop,
+        width: this.element.offsetWidth,
+        height: this.element.offsetHeight
+      }
+    }
+
     const rect = this.element.getBoundingClientRect()
     const shell = this.desktopShellElement()
     const scrollLeft = shell ? shell.scrollLeft : window.scrollX
@@ -1935,7 +1989,274 @@ export default class extends Controller {
     /* Feature disabled: windows no longer auto-reposition when side panel opens/closes */
   }
 
-  startDrag(event) {
+  resetTitleShellSnapState() {
+    if (this.titleSnapArmTimer) {
+      clearTimeout(this.titleSnapArmTimer)
+      this.titleSnapArmTimer = null
+    }
+    this.titleSnapHoverTarget = null
+    this.titleSnapHoverSide = null
+    this.titleSnapHoverStartedAt = 0
+    this.titleSnapPlacement = null
+    this.element.classList.remove("content-window--snap-ready")
+    if (!this.resizeHeightSnapPlacement) hideTitleSnapGhostEl()
+  }
+
+  resetResizeHeightSnapState() {
+    if (this.resizeSnapArmTimer) {
+      clearTimeout(this.resizeSnapArmTimer)
+      this.resizeSnapArmTimer = null
+    }
+    this.resizeHeightSnapHoverTarget = null
+    this.resizeHeightSnapHoverKind = null
+    this.resizeHeightSnapStartedAt = 0
+    this.resizeHeightSnapPlacement = null
+    this.element.classList.remove("content-window--snap-ready")
+    hideTitleSnapGhostEl()
+  }
+
+  titleSnapKey(candidate) {
+    const targetId = candidate?.target?.dataset?.contentWindowStorageKeyValue || candidate?.target?.id || "unknown"
+    return `title:${targetId}:${candidate?.side || "none"}`
+  }
+
+  resizeSnapKey(candidate) {
+    const targetId = candidate?.target?.dataset?.contentWindowStorageKeyValue || candidate?.target?.id || "unknown"
+    return `resize:${targetId}:${candidate?.kind || "none"}`
+  }
+
+  handleSnapEscapeKeydown(event) {
+    if (event.key !== "Escape") return
+    const hasTitleZone = Boolean(this.currentTitleSnapKey)
+    const hasResizeZone = Boolean(this.currentResizeSnapKey)
+    if (!hasTitleZone && !hasResizeZone) return
+
+    if (hasTitleZone) this.dismissedTitleSnapKey = this.currentTitleSnapKey
+    if (hasResizeZone) this.dismissedResizeSnapKey = this.currentResizeSnapKey
+
+    this.resetTitleShellSnapState()
+    this.resetResizeHeightSnapState()
+    event.preventDefault()
+    event.stopPropagation()
+  }
+
+  armTitleSnapPreview(candidate) {
+    this.titleSnapPlacement = {
+      left: candidate.snapLeft,
+      top: candidate.snapTop,
+      width: candidate.width,
+      height: candidate.height
+    }
+    this.element.classList.add("content-window--snap-ready")
+
+    const ghost = getTitleSnapGhostEl()
+    ghost.style.left = `${candidate.snapLeft}px`
+    ghost.style.top = `${candidate.snapTop}px`
+    ghost.style.width = `${candidate.width}px`
+    ghost.style.height = `${candidate.height}px`
+    ghost.style.display = "block"
+  }
+
+  armResizeSnapPreview(candidate) {
+    this.resizeHeightSnapPlacement = {
+      left: candidate.left,
+      top: candidate.top,
+      width: candidate.width,
+      height: candidate.height
+    }
+    this.element.classList.add("content-window--snap-ready")
+
+    const ghost = getTitleSnapGhostEl()
+    ghost.style.left = `${candidate.left}px`
+    ghost.style.top = `${candidate.top}px`
+    ghost.style.width = `${candidate.width}px`
+    ghost.style.height = `${candidate.height}px`
+    ghost.style.display = "block"
+  }
+
+  findTitleShellSnapCandidate() {
+    const selfRect = this.element.getBoundingClientRect()
+    const selfWidth = this.element.offsetWidth
+    const selfHeight = this.element.offsetHeight
+    const shell = this.desktopShellElement()
+    const shellRect = shell ? shell.getBoundingClientRect() : { left: 0, top: 0 }
+    const scrollLeft = shell ? shell.scrollLeft : window.scrollX
+    const scrollTop = shell ? shell.scrollTop : window.scrollY
+
+    let best = null
+    let bestScore = Number.POSITIVE_INFINITY
+    document.querySelectorAll("section.content-window.os-window:not(.is-hidden)").forEach((windowEl) => {
+      if (windowEl === this.element) return
+      if (windowEl.classList.contains("content-window--closing")) return
+
+      const rect = windowEl.getBoundingClientRect()
+      const overlapY = Math.max(0, Math.min(selfRect.bottom, rect.bottom) - Math.max(selfRect.top, rect.top))
+      const overlapX = Math.max(0, Math.min(selfRect.right, rect.right) - Math.max(selfRect.left, rect.left))
+
+      if (overlapY >= TITLE_SNAP_OVERLAP_PX) {
+        const verticalAnchors = [
+          {
+            name: "top",
+            alignDelta: Math.abs(selfRect.top - rect.top),
+            snapTop: rect.top - shellRect.top + scrollTop
+          },
+          {
+            name: "bottom",
+            alignDelta: Math.abs(selfRect.top - (rect.bottom - selfHeight)),
+            snapTop: rect.bottom - shellRect.top + scrollTop - selfHeight
+          }
+        ]
+
+        verticalAnchors.forEach((anchor) => {
+          if (anchor.alignDelta > TITLE_SNAP_TITLE_ALIGN_TOLERANCE_PX) return
+
+          const leftGap = selfRect.left - rect.right
+          if (leftGap <= TITLE_SNAP_DETECT_GAP_PX && leftGap >= -8) {
+            const absGap = Math.abs(leftGap)
+            const score = absGap + (anchor.alignDelta * 0.08)
+            if (score < bestScore) {
+              bestScore = score
+              best = {
+                target: windowEl,
+                side: `left-${anchor.name}`,
+                snapLeft: rect.right - shellRect.left + scrollLeft + TITLE_SNAP_FINAL_GAP_PX,
+                snapTop: anchor.snapTop,
+                width: selfWidth,
+                height: selfHeight
+              }
+            }
+          }
+
+          const rightGap = rect.left - selfRect.right
+          if (rightGap <= TITLE_SNAP_DETECT_GAP_PX && rightGap >= -8) {
+            const absGap = Math.abs(rightGap)
+            const score = absGap + (anchor.alignDelta * 0.08)
+            if (score < bestScore) {
+              bestScore = score
+              best = {
+                target: windowEl,
+                side: `right-${anchor.name}`,
+                snapLeft: rect.left - shellRect.left + scrollLeft - selfWidth - TITLE_SNAP_FINAL_GAP_PX,
+                snapTop: anchor.snapTop,
+                width: selfWidth,
+                height: selfHeight
+              }
+            }
+          }
+        })
+      }
+
+      if (overlapX >= TITLE_SNAP_OVERLAP_PX) {
+        const horizontalAnchors = [
+          {
+            name: "left",
+            alignDelta: Math.abs(selfRect.left - rect.left),
+            snapLeft: rect.left - shellRect.left + scrollLeft
+          },
+          {
+            name: "right",
+            alignDelta: Math.abs(selfRect.left - (rect.right - selfWidth)),
+            snapLeft: rect.right - shellRect.left + scrollLeft - selfWidth
+          }
+        ]
+
+        horizontalAnchors.forEach((anchor) => {
+          if (anchor.alignDelta > TITLE_SNAP_TITLE_ALIGN_TOLERANCE_PX) return
+
+          const topGap = selfRect.top - rect.bottom
+          if (topGap <= TITLE_SNAP_DETECT_GAP_PX && topGap >= -8) {
+            const absGap = Math.abs(topGap)
+            const score = absGap + (anchor.alignDelta * 0.08)
+            if (score < bestScore) {
+              bestScore = score
+              best = {
+                target: windowEl,
+                side: `top-${anchor.name}`,
+                snapLeft: anchor.snapLeft,
+                snapTop: rect.bottom - shellRect.top + scrollTop + TITLE_SNAP_FINAL_GAP_PX,
+                width: selfWidth,
+                height: selfHeight
+              }
+            }
+          }
+
+          const bottomGap = rect.top - selfRect.bottom
+          if (bottomGap <= TITLE_SNAP_DETECT_GAP_PX && bottomGap >= -8) {
+            const absGap = Math.abs(bottomGap)
+            const score = absGap + (anchor.alignDelta * 0.08)
+            if (score < bestScore) {
+              bestScore = score
+              best = {
+                target: windowEl,
+                side: `bottom-${anchor.name}`,
+                snapLeft: anchor.snapLeft,
+                snapTop: rect.top - shellRect.top + scrollTop - selfHeight - TITLE_SNAP_FINAL_GAP_PX,
+                width: selfWidth,
+                height: selfHeight
+              }
+            }
+          }
+        })
+      }
+    })
+
+    return best
+  }
+
+  updateTitleShellSnapState() {
+    if (!this.activeDrag || this.activeDrag.source !== "title" || !this.activeDrag.didMove) {
+      this.currentTitleSnapKey = null
+      this.resetTitleShellSnapState()
+      return
+    }
+
+    const candidate = this.findTitleShellSnapCandidate()
+    if (!candidate) {
+      if (this.dismissedTitleSnapKey && this.currentTitleSnapKey === this.dismissedTitleSnapKey) {
+        this.dismissedTitleSnapKey = null
+      }
+      this.currentTitleSnapKey = null
+      this.resetTitleShellSnapState()
+      return
+    }
+
+    const key = this.titleSnapKey(candidate)
+    this.currentTitleSnapKey = key
+    if (this.dismissedTitleSnapKey && this.dismissedTitleSnapKey === key) {
+      this.resetTitleShellSnapState()
+      return
+    }
+
+    const now = Date.now()
+    const sameCandidate =
+      this.titleSnapHoverTarget === candidate.target &&
+      this.titleSnapHoverSide === candidate.side
+
+    if (!sameCandidate) {
+      this.titleSnapHoverTarget = candidate.target
+      this.titleSnapHoverSide = candidate.side
+      this.titleSnapHoverStartedAt = now
+      this.titleSnapPlacement = null
+      if (this.titleSnapArmTimer) clearTimeout(this.titleSnapArmTimer)
+      const expectedKey = key
+      this.titleSnapArmTimer = window.setTimeout(() => {
+        this.titleSnapArmTimer = null
+        if (!this.activeDrag || this.activeDrag.source !== "title" || !this.activeDrag.didMove) return
+        if (this.currentTitleSnapKey !== expectedKey) return
+        if (this.dismissedTitleSnapKey && this.dismissedTitleSnapKey === expectedKey) return
+        const latest = this.findTitleShellSnapCandidate()
+        if (!latest || this.titleSnapKey(latest) !== expectedKey) return
+        this.armTitleSnapPreview(latest)
+      }, TITLE_SNAP_HOLD_MS)
+      hideTitleSnapGhostEl()
+      return
+    }
+
+    if ((now - this.titleSnapHoverStartedAt) < TITLE_SNAP_HOLD_MS) return
+    this.armTitleSnapPreview(candidate)
+  }
+
+  startDrag(event, options = {}) {
     if (this.activeResize) return
     if (event.button !== undefined && event.button !== 0) return
     if (event.target instanceof Element && event.target.closest("button, a, input, textarea, select, [role='button']")) return
@@ -1954,14 +2275,20 @@ export default class extends Controller {
     const shellRect = shell ? shell.getBoundingClientRect() : { left: 0, top: 0 }
     const rectLeft = rect.left - shellRect.left + scrollLeft
     const rectTop = rect.top - shellRect.top + scrollTop
+    const source = options.source || "title"
 
     this.activeDrag = {
+      source,
       offsetX: coords.x - rectLeft,
       offsetY: coords.y - rectTop,
       startX: coords.x,
       startY: coords.y,
       didMove: false
     }
+    this.currentTitleSnapKey = null
+    this.dismissedTitleSnapKey = null
+    this.resetTitleShellSnapState()
+    this.resetResizeHeightSnapState()
     this.element.classList.add("content-window--drag-lift")
     this.element.classList.add("content-window--suppress-position-transition")
 
@@ -1994,11 +2321,14 @@ export default class extends Controller {
 
     this.element.style.left = `${left}px`
     this.element.style.top = `${top}px`
+    this.updateTitleShellSnapState()
     this.ensureDesktopCanvasContainsBounds({ left, top, width: w, height: h })
   }
 
   stopDrag() {
     const dragState = this.activeDrag
+    const placement = this.titleSnapPlacement
+    const shouldSnapToPlacement = Boolean(dragState?.source === "title" && placement)
     const hadDrag = Boolean(dragState)
     const didMove = Boolean(dragState?.didMove)
     this.activeDrag = null
@@ -2011,8 +2341,15 @@ export default class extends Controller {
     document.removeEventListener("pointercancel", this.boundPointerDragEnd)
     document.removeEventListener("touchmove", this.boundDragMove)
     document.removeEventListener("touchend", this.boundDragEnd)
+    if (shouldSnapToPlacement) {
+      this.element.style.left = `${placement.left}px`
+      this.element.style.top = `${placement.top}px`
+      this.ensureDesktopCanvasContainsBounds(placement)
+    }
+    this.currentTitleSnapKey = null
+    this.resetTitleShellSnapState()
     this.clearAllEdgeGhosts()
-    /* reconcile bails out while activeDrag is set — clear first so snap + saveWindowBounds run. */
+    /* reconcile bails out while activeDrag is set — clear first so saveWindowBounds runs. */
     if (hadDrag && didMove) {
       this.reconcileWindowOnViewportResize()
       this.emitWindowState(!this.element.classList.contains("is-hidden"))
@@ -2056,6 +2393,9 @@ export default class extends Controller {
       anchorRight: rectLeft + rect.width,
       anchorBottom: rectTop + rect.height
     }
+    this.currentResizeSnapKey = null
+    this.dismissedResizeSnapKey = null
+    this.resetResizeHeightSnapState()
     this.element.classList.add("content-window--suppress-position-transition")
 
     this._resizeUsesPointer = false
@@ -2146,11 +2486,185 @@ export default class extends Controller {
     this.element.style.top = `${top}px`
     this.element.style.width = `${width}px`
     this.element.style.height = `${height}px`
+    this.updateResizeHeightSnapState({ left, top, width, height, edge })
     this.ensureDesktopCanvasContainsBounds({ left, top, width, height })
+  }
+
+  findResizeHeightSnapCandidate(current) {
+    if (!this.activeResize) return null
+    const edge = this.activeResize.edge || ""
+    const canSnapHeight = edge.includes("bottom") || edge.includes("top")
+    const canSnapWidth = edge.includes("left") || edge.includes("right")
+    if (!canSnapHeight && !canSnapWidth) return null
+
+    const shell = this.desktopShellElement()
+    const shellRect = shell ? shell.getBoundingClientRect() : { left: 0, top: 0 }
+    const scrollLeft = shell ? shell.scrollLeft : window.scrollX
+    const scrollTop = shell ? shell.scrollTop : window.scrollY
+    const dockBound = this.effectiveLeftBoundary()
+    const margin = this.viewportMargin
+    const minW = this.minWindowWidth
+    const minH = this.minWindowHeight
+    const rangeGap = (aStart, aEnd, bStart, bEnd) => Math.max(0, Math.max(bStart - aEnd, aStart - bEnd))
+
+    const selfLeft = current.left
+    const selfRight = current.left + current.width
+    const selfTop = current.top
+    const selfBottom = current.top + current.height
+
+    let best = null
+    let bestScore = Number.POSITIVE_INFINITY
+
+    document.querySelectorAll("section.content-window.os-window:not(.is-hidden)").forEach((windowEl) => {
+      if (windowEl === this.element) return
+      if (windowEl.classList.contains("content-window--closing")) return
+      const rect = windowEl.getBoundingClientRect()
+      const targetLeft = rect.left - shellRect.left + scrollLeft
+      const targetTop = rect.top - shellRect.top + scrollTop
+      const targetRight = targetLeft + rect.width
+      const targetBottom = targetTop + rect.height
+
+      if (canSnapWidth) {
+        const orthGap = rangeGap(selfTop, selfBottom, targetTop, targetBottom)
+        if (orthGap <= RESIZE_NEIGHBOR_MAX_GAP_PX) {
+          const targetXEdges = [
+            { name: "left", x: targetLeft },
+            { name: "right", x: targetRight }
+          ]
+          const movingX = edge.includes("right") ? selfRight : selfLeft
+
+          targetXEdges.forEach((targetEdge) => {
+            const delta = Math.abs(movingX - targetEdge.x)
+            if (delta > RESIZE_WIDTH_SNAP_DELTA_PX) return
+
+            let snappedLeft = current.left
+            let snappedWidth = current.width
+            if (edge.includes("right")) {
+              snappedWidth = targetEdge.x - current.left
+            } else {
+              snappedLeft = targetEdge.x
+              snappedWidth = selfRight - snappedLeft
+            }
+
+            if (snappedWidth < minW) return
+            if (snappedLeft < dockBound) return
+
+            const score = delta + (orthGap * 0.08)
+            if (score >= bestScore) return
+            bestScore = score
+            best = {
+              target: windowEl,
+              kind: `width-${edge.includes("right") ? "right" : "left"}-to-${targetEdge.name}`,
+              left: snappedLeft,
+              top: current.top,
+              width: snappedWidth,
+              height: current.height
+            }
+          })
+        }
+      }
+
+      if (canSnapHeight) {
+        const orthGap = rangeGap(selfLeft, selfRight, targetLeft, targetRight)
+        if (orthGap <= RESIZE_NEIGHBOR_MAX_GAP_PX) {
+          const targetYEdges = [
+            { name: "top", y: targetTop },
+            { name: "bottom", y: targetBottom }
+          ]
+          const movingY = edge.includes("bottom") ? selfBottom : selfTop
+
+          targetYEdges.forEach((targetEdge) => {
+            const delta = Math.abs(movingY - targetEdge.y)
+            if (delta > RESIZE_HEIGHT_SNAP_DELTA_PX) return
+
+            let snappedTop = current.top
+            let snappedHeight = current.height
+            if (edge.includes("bottom")) {
+              snappedHeight = targetEdge.y - current.top
+            } else {
+              snappedTop = targetEdge.y
+              snappedHeight = selfBottom - snappedTop
+            }
+
+            if (snappedHeight < minH) return
+            if (snappedTop < margin) return
+
+            const score = delta + (orthGap * 0.08)
+            if (score >= bestScore) return
+            bestScore = score
+            best = {
+              target: windowEl,
+              kind: `height-${edge.includes("bottom") ? "bottom" : "top"}-to-${targetEdge.name}`,
+              left: current.left,
+              top: snappedTop,
+              width: current.width,
+              height: snappedHeight
+            }
+          })
+        }
+      }
+    })
+
+    return best
+  }
+
+  updateResizeHeightSnapState(current) {
+    const candidate = this.findResizeHeightSnapCandidate(current)
+    if (!candidate) {
+      if (this.dismissedResizeSnapKey && this.currentResizeSnapKey === this.dismissedResizeSnapKey) {
+        this.dismissedResizeSnapKey = null
+      }
+      this.currentResizeSnapKey = null
+      this.resetResizeHeightSnapState()
+      return
+    }
+
+    const key = this.resizeSnapKey(candidate)
+    this.currentResizeSnapKey = key
+    if (this.dismissedResizeSnapKey && this.dismissedResizeSnapKey === key) {
+      this.resetResizeHeightSnapState()
+      return
+    }
+
+    const now = Date.now()
+    const sameCandidate =
+      this.resizeHeightSnapHoverTarget === candidate.target &&
+      this.resizeHeightSnapHoverKind === candidate.kind
+    if (!sameCandidate) {
+      this.resizeHeightSnapHoverTarget = candidate.target
+      this.resizeHeightSnapHoverKind = candidate.kind
+      this.resizeHeightSnapStartedAt = now
+      this.resizeHeightSnapPlacement = null
+      if (this.resizeSnapArmTimer) clearTimeout(this.resizeSnapArmTimer)
+      const expectedKey = key
+      this.resizeSnapArmTimer = window.setTimeout(() => {
+        this.resizeSnapArmTimer = null
+        if (!this.activeResize) return
+        if (this.currentResizeSnapKey !== expectedKey) return
+        if (this.dismissedResizeSnapKey && this.dismissedResizeSnapKey === expectedKey) return
+        const current = {
+          left: Number.parseFloat(this.element.style.left) || 0,
+          top: Number.parseFloat(this.element.style.top) || 0,
+          width: this.element.offsetWidth,
+          height: this.element.offsetHeight
+        }
+        const latest = this.findResizeHeightSnapCandidate(current)
+        if (!latest || this.resizeSnapKey(latest) !== expectedKey) return
+        this.armResizeSnapPreview(latest)
+      }, TITLE_SNAP_HOLD_MS)
+      this.element.classList.remove("content-window--snap-ready")
+      hideTitleSnapGhostEl()
+      return
+    }
+
+    if ((now - this.resizeHeightSnapStartedAt) < TITLE_SNAP_HOLD_MS) return
+    this.armResizeSnapPreview(candidate)
   }
 
   stopResize() {
     const hadResize = Boolean(this.activeResize)
+    const resizeSnapPlacement = this.resizeHeightSnapPlacement
+    const shouldApplyResizeSnap = Boolean(hadResize && resizeSnapPlacement)
 
     if (this._resizeCaptureEl) {
       this._resizeCaptureEl.removeEventListener("lostpointercapture", this.boundLostPointerCaptureResize)
@@ -2180,7 +2694,17 @@ export default class extends Controller {
     this._resizePointerId = null
     this._resizeCaptureEl = null
 
+    if (shouldApplyResizeSnap) {
+      this.element.style.left = `${resizeSnapPlacement.left}px`
+      this.element.style.top = `${resizeSnapPlacement.top}px`
+      this.element.style.width = `${resizeSnapPlacement.width}px`
+      this.element.style.height = `${resizeSnapPlacement.height}px`
+      this.ensureDesktopCanvasContainsBounds(resizeSnapPlacement)
+    }
+
     this.activeResize = null
+    this.currentResizeSnapKey = null
+    this.resetResizeHeightSnapState()
     this.element.classList.remove("content-window--suppress-position-transition")
     if (hadResize) {
       const r = this.element.getBoundingClientRect()
@@ -2304,16 +2828,13 @@ export default class extends Controller {
   }
 
   saveWindowBounds() {
-    const rect = this.element.getBoundingClientRect()
-    const shell = this.desktopShellElement()
-    const scrollLeft = shell ? shell.scrollLeft : window.scrollX
-    const scrollTop = shell ? shell.scrollTop : window.scrollY
-    const shellRect = shell ? shell.getBoundingClientRect() : { left: 0, top: 0 }
+    const styledLeft = Number.parseFloat(this.element.style.left)
+    const styledTop = Number.parseFloat(this.element.style.top)
     const bounds = this.clampBounds({
-      left: rect.left - shellRect.left + scrollLeft,
-      top: rect.top - shellRect.top + scrollTop,
-      width: rect.width,
-      height: rect.height
+      left: Number.isFinite(styledLeft) ? styledLeft : 0,
+      top: Number.isFinite(styledTop) ? styledTop : 0,
+      width: this.element.offsetWidth,
+      height: this.element.offsetHeight
     })
     const slack = MIN_SIZE_SLACK_PX
     const minW = this.minWindowWidth

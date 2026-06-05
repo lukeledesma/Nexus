@@ -27,6 +27,9 @@ Expected behavior:
 - Stable open/close/toggle interactions.
 - No unnecessary animation replay when switching content.
 - Responsive resize and pane interactions.
+- Edge drag affordance is available around window borders with a perimeter ghost that previews movement intent.
+- Title-drag snapping uses a delayed hold-to-arm ghost preview and snaps on release when a candidate zone is armed.
+- Resize snapping supports delayed edge preview and can be dismissed with Escape until pointer exits and re-enters the snap zone.
 
 ## Finder
 
@@ -45,6 +48,8 @@ Implementation anchors:
 Expected behavior:
 - Folder and file operations reflect quickly.
 - Changes should propagate to relevant views/devices.
+- Finder restores the last selected section for each user (`finder.last_section` via UserAppState).
+- Image rows include a quick action to set desktop wallpaper from the row action area.
 
 ## Tasks
 

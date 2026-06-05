@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
+import { syncNexusDesktopWallpaper } from "lib/nexus_workspace_chrome"
 import {
   finderApiHeaders,
   finderCollectExpandedFolderIdsFromDom,
@@ -35,6 +36,7 @@ const LINKED_APP_LABEL = {
   audio: "Audio",
   tasks: "Tasks"
 }
+const FINDER_SEARCH_DEBOUNCE_MS = 140
 
 function finderDisplayTitleFromStorageName(title) {
   const s = String(title || "").trim()
@@ -57,10 +59,13 @@ function quartzIconSvg() {
  * Finder tree: create/rename/delete, open linked docs, Turbo frame refresh; read-only save-as flow for linked apps.
  */
 export default class extends Controller {
+  static targets = [ "searchInput" ]
+
   static values = {
     frameId: String,
     rootFolderId: Number,
     sectionKey: { type: String, default: "documents" },
+    searchMode: { type: Boolean, default: false },
     readOnly: { type: Boolean, default: false },
     linkedAppSaveIcon: { type: String, default: "file_document" }
   }
@@ -80,7 +85,12 @@ export default class extends Controller {
 
       this.boundFinderStructureChanged = this.handleFinderStructureChanged.bind(this)
       window.addEventListener("nexus:finder-structure-changed", this.boundFinderStructureChanged)
+
+      this.boundToggleFinderSearchMode = this.handleToggleFinderSearchMode.bind(this)
+      window.addEventListener("nexus:finder-toggle-search-mode", this.boundToggleFinderSearchMode)
     }
+
+    this.announceSearchMode()
   }
 
   disconnect() {
@@ -93,10 +103,87 @@ export default class extends Controller {
     if (this.boundFinderStructureChanged) {
       window.removeEventListener("nexus:finder-structure-changed", this.boundFinderStructureChanged)
     }
+    if (this.boundToggleFinderSearchMode) {
+      window.removeEventListener("nexus:finder-toggle-search-mode", this.boundToggleFinderSearchMode)
+    }
     if (this.liveRefreshTimer) {
       clearTimeout(this.liveRefreshTimer)
       this.liveRefreshTimer = null
     }
+    if (this.finderSearchTimer) {
+      clearTimeout(this.finderSearchTimer)
+      this.finderSearchTimer = null
+    }
+  }
+
+  announceSearchMode() {
+    window.dispatchEvent(new CustomEvent("nexus:finder-search-mode-changed", {
+      detail: {
+        frameId: this.frameIdValue,
+        searchMode: this.searchModeValue === true
+      }
+    }))
+  }
+
+  handleToggleFinderSearchMode(event) {
+    const { frameId } = event.detail || {}
+    if (frameId && frameId !== this.frameIdValue) return
+    if (this.readOnlyValue) return
+
+    this.submitFinderSearchMode(!(this.searchModeValue === true))
+  }
+
+  submitFinderSearchMode(nextMode) {
+    this.searchModeValue = nextMode === true
+    this.announceSearchMode()
+
+    if (!this.searchModeValue && this.hasSearchInputTarget) {
+      this.searchInputTarget.value = ""
+    }
+
+    const nextBrowse = this.selectedBrowseId() || this.rootFolderIdValue
+    this.reloadFrameWithBrowseId(nextBrowse)
+  }
+
+  queueFinderSearch(event) {
+    const raw = event?.currentTarget?.value || ""
+    const query = String(raw).trim()
+    if (this.finderSearchTimer) clearTimeout(this.finderSearchTimer)
+    this.finderSearchTimer = setTimeout(() => {
+      this.finderSearchTimer = null
+      this.submitFinderSearch(query)
+    }, FINDER_SEARCH_DEBOUNCE_MS)
+  }
+
+  handleFinderSearchKeydown(event) {
+    if (event.key === "Escape") {
+      event.preventDefault()
+      event.currentTarget.value = ""
+      this.submitFinderSearchMode(false)
+      return
+    }
+
+    if (event.key === "Enter") {
+      event.preventDefault()
+      this.submitFinderSearch((event.currentTarget?.value || "").trim())
+    }
+  }
+
+  submitFinderSearch(rawQuery) {
+    if (!(this.searchModeValue === true)) return
+    const query = String(rawQuery || "").trim()
+    const activeQuery = this.currentFinderSearchQuery()
+    if (query === activeQuery) return
+
+    if (this.hasSearchInputTarget) this.searchInputTarget.value = query
+
+    const nextBrowse = this.selectedBrowseId() || this.rootFolderIdValue
+    this.reloadFrameWithBrowseId(nextBrowse)
+  }
+
+  currentFinderSearchQuery() {
+    if (this.hasSearchInputTarget) return (this.searchInputTarget.value || "").trim()
+    return ""
   }
 
   /** Save-as picker: start naming a new file under this folder (read-only mode only). */
@@ -800,6 +887,69 @@ export default class extends Controller {
     }))
   }
 
+  // ── Drag-to-Favorites ─────────────────────────────────────────────────────
+  // File rows can be dragged onto Favorites to add them without opening row actions.
+
+  favoritesSidebarDragOver(event) {
+    if (!event.dataTransfer.types.includes("application/nexus-document-id")) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = "copy"
+    event.currentTarget.classList.add("finder-folder-item--drag-over")
+  }
+
+  favoritesSidebarDragLeave(event) {
+    event.currentTarget.classList.remove("finder-folder-item--drag-over")
+  }
+
+  async favoritesSidebarDrop(event) {
+    event.currentTarget.classList.remove("finder-folder-item--drag-over")
+    const id = event.dataTransfer.getData("application/nexus-document-id")
+    if (!id) return
+    event.preventDefault()
+
+    const button = this.element.querySelector(`.item-action-favorite[data-document-id="${id}"]`)
+    const knownFavoriteState = button?.dataset?.isFavorited
+    if (knownFavoriteState === "true") return
+
+    try {
+      const response = await fetch(`/documents/${id}/toggle_favorite`, {
+        method: "PATCH",
+        headers: finderApiHeaders({ jsonBody: false })
+      })
+
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        window.alert(payload.error || "Could not add item to Favorites.")
+        return
+      }
+
+      let isFavorited = payload.is_favorited === true
+      if (!isFavorited) {
+        const secondResponse = await fetch(`/documents/${id}/toggle_favorite`, {
+          method: "PATCH",
+          headers: finderApiHeaders({ jsonBody: false })
+        })
+        const secondPayload = await secondResponse.json().catch(() => ({}))
+        if (!secondResponse.ok) {
+          window.alert(secondPayload.error || "Could not add item to Favorites.")
+          return
+        }
+        isFavorited = secondPayload.is_favorited === true
+      }
+
+      this.updateFavoriteButtonState(button, isFavorited)
+      window.dispatchEvent(new CustomEvent("nexus:finder-structure-changed", {
+        detail: {
+          type: "favorite_toggled",
+          documentId: String(id),
+          sectionKey: "favorites"
+        }
+      }))
+    } catch (_error) {
+      window.alert("Could not add item to Favorites.")
+    }
+  }
+
   async deleteItem(li, kind) {
     if (!li) return
     const deleteUrl = li.dataset.deleteUrl
@@ -879,12 +1029,24 @@ export default class extends Controller {
     if (rootId) finderWriteExpandedFolderIds(rootId, [...expanded])
 
     const url = new URL("/apps/finder", window.location.origin)
+    const activeSearchQuery = this.currentFinderSearchQuery()
+    const searchMode = this.searchModeValue === true
     url.searchParams.set("frame_id", frameId)
     if (this.sectionKeyValue) url.searchParams.set("section", this.sectionKeyValue)
     if (this.readOnlyValue) url.searchParams.set("mode", "save_as")
-    if (browseId) url.searchParams.set("browse_id", String(browseId))
-    if (expanded.size > 0) url.searchParams.set("expanded_ids", [...expanded].sort().join(","))
-    else url.searchParams.delete("expanded_ids")
+    if (searchMode) {
+      url.searchParams.set("search_mode", "1")
+      if (activeSearchQuery) url.searchParams.set("q", activeSearchQuery)
+      else url.searchParams.delete("q")
+      url.searchParams.delete("browse_id")
+      url.searchParams.delete("expanded_ids")
+    } else {
+      url.searchParams.delete("search_mode")
+      url.searchParams.delete("q")
+      if (browseId) url.searchParams.set("browse_id", String(browseId))
+      if (expanded.size > 0) url.searchParams.set("expanded_ids", [...expanded].sort().join(","))
+      else url.searchParams.delete("expanded_ids")
+    }
     const next = `${url.pathname}${url.search}`
     if (frame.tagName === "TURBO-FRAME") {
       frame.src = next
@@ -915,11 +1077,7 @@ export default class extends Controller {
       }
 
       const isFavorited = payload.is_favorited === true
-      button.dataset.isFavorited = String(isFavorited)
-
-      const actionLabel = isFavorited ? "Remove from Favorites" : "Add to Favorites"
-      button.title = actionLabel
-      button.setAttribute("aria-label", actionLabel)
+      this.updateFavoriteButtonState(button, isFavorited)
 
       // In Favorites view, remove the row immediately when unfavorited.
       if (this.sectionKeyValue === "favorites" && !isFavorited) {
@@ -937,6 +1095,43 @@ export default class extends Controller {
       }))
     } catch (_error) {
       window.alert("Could not update favorite status.")
+    }
+  }
+
+  updateFavoriteButtonState(button, isFavorited) {
+    if (!button) return
+    button.dataset.isFavorited = String(isFavorited)
+
+    const actionLabel = isFavorited ? "Remove from Favorites" : "Add to Favorites"
+    button.title = actionLabel
+    button.setAttribute("aria-label", actionLabel)
+  }
+
+  async setFileAsWallpaper(event) {
+    if (this.readOnlyValue) return
+    event.preventDefault()
+    event.stopPropagation()
+
+    const button = event.currentTarget
+    const documentId = button?.dataset?.documentId
+    if (!documentId) return
+
+    try {
+      const response = await fetch("/workspace_preferences", {
+        method: "PATCH",
+        headers: finderApiHeaders({ jsonBody: true }),
+        body: JSON.stringify({ apply_wallpaper_image: { document_id: Number(documentId) } })
+      })
+
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        window.alert(payload.error || "Could not set wallpaper.")
+        return
+      }
+
+      syncNexusDesktopWallpaper(payload || {})
+    } catch (_error) {
+      window.alert("Could not set wallpaper.")
     }
   }
 

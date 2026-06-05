@@ -201,6 +201,7 @@
 
       <% if writable && !read_only %>
         <% is_favorited = node.fetch(:is_favorited, false) %>
+        <% is_image_asset = node[:content_type].to_s == "asset" && node[:file_kind].to_s == "image" %>
         <div class="finder-tree__row-actions">
           <% if in_trash %>
             <button
@@ -229,6 +230,16 @@
               data-is-favorited="<%= is_favorited %>"
               data-action="click->finder-browser#toggleFavorite"
             ><span class="item-action-favorite__filled"><%= material_symbol_icon(:star_rounded, size: :xs) %></span><span class="item-action-favorite__outline"><%= material_symbol_icon(:star_outline_rounded, size: :xs) %></span></button>
+            <% if is_image_asset %>
+              <button
+                type="button"
+                class="item-action-btn item-action-set-wallpaper"
+                title="Set as desktop display"
+                aria-label="Set <%= node[:title] %> as desktop display"
+                data-document-id="<%= node[:id] %>"
+                data-action="click->finder-browser#setFileAsWallpaper"
+              ><%= material_symbol_icon(:desktop_windows, size: :xs) %></button>
+            <% end %>
             <button
               type="button"
               class="item-action-btn item-action-rename"

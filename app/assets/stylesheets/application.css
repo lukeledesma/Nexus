@@ -221,6 +221,11 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
+.content-window-search-toggle.is-active {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .calendar-app {
   position: relative;
   width: 100%;
@@ -3965,6 +3970,12 @@ input.connection-inline {
   display: none;
 }
 
+.item-action-set-wallpaper:hover,
+.item-action-set-wallpaper:focus-visible {
+  color: #c084fc;
+  background: rgba(192, 132, 252, 0.16);
+}
+
 /* Inline rename input (replaces label text in-place) */
 .finder-rename-input {
   background: rgba(255, 255, 255, 0.07);
@@ -5648,6 +5659,21 @@ html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden)
   transform-origin: center center;
   transform: scale(1.011);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.56);
+}
+
+.content-window.os-window.content-window--snap-ready {
+  opacity: 0.74;
+}
+
+.content-window-title-snap-ghost {
+  position: absolute;
+  z-index: 9999;
+  display: none;
+  pointer-events: none;
+  border-radius: 0.85rem;
+  border: 1px dashed rgba(166, 227, 255, 0.9);
+  background: linear-gradient(180deg, rgba(102, 199, 255, 0.16), rgba(58, 132, 196, 0.1));
+  box-shadow: inset 0 0 0 1px rgba(149, 212, 247, 0.28), 0 12px 26px rgba(0, 0, 0, 0.28);
 }
 
 /* VR-style move affordance: hover near outer edge to reveal a thin ghost drag line. */
@@ -7534,8 +7560,21 @@ a.finder-tree__row {
 }
 
 .finder-folder-item--drag-over > .finder-folder-link {
-  background: rgba(248, 113, 113, 0.18);
-  color: #f87171;
+  background: rgba(239, 68, 68, 0.24);
+  color: #ef4444;
+}
+
+.finder-folder-item[data-finder-section-key="favorites"].finder-folder-item--drag-over > .finder-folder-link {
+  background: rgba(250, 204, 21, 0.24);
+  color: #facc15;
+}
+
+.settings-sections-list .finder-folder-item--drag-over > .finder-folder-link .finder-folder-icon {
+  color: #ef4444;
+}
+
+.settings-sections-list .finder-folder-item[data-finder-section-key="favorites"].finder-folder-item--drag-over > .finder-folder-link .finder-folder-icon {
+  color: #facc15;
 }
 
 .finder-tree__row-line--dragging {
@@ -7748,6 +7787,40 @@ a.finder-tree__row--file:focus-visible {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.finder-browser-search-row {
+  margin: 0 0 8px;
+}
+
+.finder-browser-search-form {
+  margin: 0;
+}
+
+.finder-browser-search {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.finder-browser-search-input {
+  font-size: 0.8rem;
+}
+
+.finder-browser-search-mode {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.finder-search-seed-list,
+.finder-search-results-list {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.finder-search-empty-state {
+  flex: 1 1 auto;
 }
 
 .finder-browser-content-surface {
@@ -8447,17 +8520,19 @@ a.finder-tree__row--file:focus-visible {
   padding: 0.5rem 0.5rem 1.2rem;
   border: 1px solid var(--border-hairline);
   border-radius: 6px;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 0.76rem;
   font-weight: normal;
-  line-height: 1.35;
+  line-height: 18px;
   letter-spacing: normal;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
+  white-space: pre;
+  word-wrap: normal;
+  overflow-wrap: normal;
   overflow: auto;
   scrollbar-gutter: stable;
   tab-size: 2;
+  font-kerning: none;
+  font-variant-ligatures: none;
   box-sizing: border-box;
   width: 100%;
   min-height: 0;
@@ -8470,15 +8545,39 @@ a.finder-tree__row--file:focus-visible {
   pointer-events: none;
   user-select: none;
   z-index: 0;
-  overflow: clip;
+  overflow: auto;
   overscroll-behavior: none;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
+  display: block;
+}
+
+.quartz-notes-backdrop > div {
+  min-height: 100%;
+  min-width: 100%;
+  width: max-content;
 }
 
 .quartz-notes-backdrop::-webkit-scrollbar { width: 8px; height: 8px; }
 .quartz-notes-backdrop::-webkit-scrollbar-thumb { background: transparent; }
 .quartz-notes-backdrop::-webkit-scrollbar-track { background: transparent; }
+
+/* Ensure syntax spans cannot alter row metrics or wrap behavior. */
+.quartz-notes-backdrop > div,
+.quartz-notes-backdrop > div * {
+  line-height: 18px;
+  font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.76rem;
+  font-weight: normal;
+  letter-spacing: normal;
+  white-space: pre;
+  display: inline;
+  vertical-align: baseline;
+}
+
+.quartz-notes-backdrop > div {
+  display: block;
+}
 
 /* Textarea: transparent text so backdrop shows through; only caret is visible */
 .quartz-notes-textarea {
@@ -8636,27 +8735,101 @@ a.finder-tree__row--file:focus-visible {
 /* ── Tasklist mode ───────────────────────────────────────────────────────── */
 
 .quartz-task__checkbox {
-  color: inherit;
+  color: color-mix(in oklab, var(--text-muted) 78%, #d6b98c 22%);
 }
 
 .quartz-task__checkbox--done {
-  color: inherit;
+  color: #86efac;
   opacity: 1;
 }
 
-:root[data-nexus-shell-mode="light"] .quartz-task__checkbox--done { color: inherit; }
+:root[data-nexus-shell-mode="light"] .quartz-task__checkbox {
+  color: color-mix(in oklab, var(--text-muted) 85%, #b08968 15%);
+}
+
+:root[data-nexus-shell-mode="light"] .quartz-task__checkbox--done { color: #166534; }
 
 .quartz-task__body {
   display: inline;
 }
 
 .quartz-task__body--done {
-  color: inherit;
-  text-decoration: none;
+  color: #86efac;
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in oklab, #86efac 65%, transparent 35%);
   opacity: 1;
 }
 
-:root[data-nexus-shell-mode="light"] .quartz-task__body--done { color: inherit; }
+:root[data-nexus-shell-mode="light"] .quartz-task__body--done {
+  color: #166534;
+  text-decoration-color: color-mix(in oklab, #166534 62%, transparent 38%);
+}
+
+/* ── Math mode ───────────────────────────────────────────────────────────── */
+
+.quartz-math-var {
+  color: #60a5fa;
+  font-weight: inherit;
+}
+
+.quartz-math-var--ref {
+  color: #7dd3fc;
+  font-weight: inherit;
+}
+
+.quartz-math-op {
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
+.quartz-math-expr {
+  color: var(--text);
+}
+
+.quartz-math-result {
+  color: #34d399;
+  font-weight: inherit;
+}
+
+.quartz-math-error {
+  color: #f87171;
+  font-weight: inherit;
+}
+
+.quartz-math-error--duplicate {
+  color: #ef4444;
+}
+
+:root[data-nexus-shell-mode="light"] .quartz-math-var { color: #1d4ed8; }
+:root[data-nexus-shell-mode="light"] .quartz-math-var--ref { color: #2563eb; }
+:root[data-nexus-shell-mode="light"] .quartz-math-result { color: #15803d; }
+:root[data-nexus-shell-mode="light"] .quartz-math-error { color: #dc2626; }
+:root[data-nexus-shell-mode="light"] .quartz-math-error--duplicate { color: #b91c1c; }
+
+/* ── Toast notifications for math mode ────────────────────────────────────── */
+
+@keyframes fadeInOut {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+  }
+  20% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  80% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+  }
+}
+
+#quartz-math-toast {
+  animation: fadeInOut 2s ease-in-out !important;
+}
 
 /* ── Contextual timeline bar ─────────────────────────────────────────────── */
 

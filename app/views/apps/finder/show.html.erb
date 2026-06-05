@@ -7,6 +7,7 @@
     data-finder-browser-frame-id-value="<%= frame_id %>"
     data-finder-browser-root-folder-id-value="<%= @root_folder&.id %>"
     data-finder-browser-section-key-value="<%= @section_key %>"
+    data-finder-browser-search-mode-value="<%= @finder_search_mode %>"
     data-finder-browser-read-only-value="<%= @finder_read_only %>"
     data-finder-browser-read-only-can-save-value="<%= @finder_read_only_can_save %>"
     <% if @finder_read_only %>data-finder-browser-linked-app-save-icon-value="<%= @linked_app_save_icon %>"<% end %>
@@ -17,8 +18,9 @@
         <aside class="finder-shell-pane finder-shell-pane--folders" aria-label="Finder sections">
           <ul class="finder-folder-list settings-sections-list">
             <% @finder_sections.each do |section| %>
-              <% active = section[:key] == @section_key %>
+              <% active = !@finder_search_mode && section[:key] == @section_key %>
               <li class="finder-folder-item<%= " is-active" if active %><%= " finder-folder-item--separator" if ["favorites", "trash"].include?(section[:key]) %><%= " finder-folder-item--bottom" if section[:key] == "trash" %>" data-finder-section-key="<%= section[:key] %>"
+                <% if section[:key] == "favorites" && !@finder_read_only %>data-action="dragover->finder-browser#favoritesSidebarDragOver dragleave->finder-browser#favoritesSidebarDragLeave drop->finder-browser#favoritesSidebarDrop"<% end %>
                 <% if section[:key] == "trash" && !@finder_read_only %>data-action="dragover->finder-browser#trashSidebarDragOver dragleave->finder-browser#trashSidebarDragLeave drop->finder-browser#trashSidebarDrop"<% end %>>
                 <%= link_to apps_finder_path({ section: section[:key], frame_id: frame_id }.merge(@finder_read_only ? { mode: "save_as" } : {})), class: "finder-folder-link", data: { turbo_frame: frame_id, turbo_prefetch: false }, aria: { label: "Open #{section[:title]}" } do %>
                   <span class="finder-folder-icon" aria-hidden="true">
@@ -36,7 +38,53 @@
         </aside>
       <% end %>
 
-      <section class="finder-shell-pane finder-shell-pane--contents" aria-label="<%= @finder_section_label %> content">
+      <section class="finder-shell-pane finder-shell-pane--contents" aria-label="<%= @finder_search_mode ? "Search results" : @finder_section_label %> content">
+        <% if @finder_search_mode %>
+          <div
+            class="finder-browser-search-mode"
+            data-controller="side-panel-search"
+            data-side-panel-search-search-url-value="<%= panel_search_documents_path %>"
+          >
+            <div class="finder-browser-search-row">
+              <label class="desktop-side-panel-search finder-browser-search" aria-label="Search all Finder files">
+                <span class="desktop-side-panel-search-icon" aria-hidden="true"><%= material_symbol_icon(:search, size: :xs) %></span>
+                <input
+                  type="search"
+                  class="desktop-side-panel-search-input finder-browser-search-input"
+                  placeholder="Search all files"
+                  value=""
+                  autocomplete="off"
+                  spellcheck="false"
+                  data-side-panel-search-target="input"
+                  data-action="input->side-panel-search#handleInput keydown->side-panel-search#handleInputKeydown"
+                >
+              </label>
+            </div>
+
+            <div class="finder-browser-content-surface">
+              <nav class="desktop-side-panel-apps finder-search-seed-list" aria-label="All Finder files" data-side-panel-search-target="apps">
+                <ul class="finder-tree" role="tree">
+                  <% @finder_search_seed_rows.each_with_index do |row, index| %>
+                    <% next if row[:id].blank? %>
+                    <%= render "tree_node",
+                          node: row,
+                          is_last_child: index == @finder_search_seed_rows.size - 1,
+                          browse_folder_id: @browse_folder&.id,
+                          expanded_folder_ids: @expanded_folder_ids,
+                          frame_id: frame_id,
+                          section_key: @section_key,
+                          read_only: @finder_read_only,
+                          read_only_can_save: @finder_read_only_can_save,
+                          open_in_app_content_types: @open_in_app_content_types %>
+                  <% end %>
+                </ul>
+              </nav>
+
+              <nav class="desktop-side-panel-apps finder-search-results-list" aria-label="Search results" data-side-panel-search-target="results" hidden></nav>
+              <p class="desktop-side-panel-search-empty finder-search-empty-state" data-side-panel-search-target="emptyState" hidden>No Finder files matched.</p>
+            </div>
+          </div>
+        <% else %>
         <% if @root_folder %>
           <div class="finder-browser-content-surface finder-browser-root-drop-zone">
             <div class="finder-browser-content-tree">
@@ -48,7 +96,7 @@
                         browse_folder_id: @browse_folder&.id,
                         expanded_folder_ids: @expanded_folder_ids,
                         frame_id: frame_id,
-                  section_key: @section_key,
+                        section_key: @section_key,
                         read_only: @finder_read_only,
                         read_only_can_save: @finder_read_only_can_save,
                         open_in_app_content_types: @open_in_app_content_types %>
@@ -65,6 +113,7 @@
           <div class="finder-empty-wrap finder-empty-wrap--content">
             <p class="finder-empty-state"><%= @finder_empty_message.presence || "Nothing to show." %></p>
           </div>
+        <% end %>
         <% end %>
       </section>
     </div>

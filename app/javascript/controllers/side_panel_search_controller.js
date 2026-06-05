@@ -1,16 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
-import { materialSymbolSvg } from "lib/material_symbols"
-
 const SEARCH_DEBOUNCE_MS = 140
-
-function escapeHtml(value) {
-  return String(value || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;")
-}
 
 export default class extends Controller {
   static targets = ["input", "apps", "userSection", "results", "emptyState"]
@@ -50,18 +39,20 @@ export default class extends Controller {
     }
 
     if (!query) {
+      // Invalidate any in-flight response so stale callbacks cannot override reset state.
+      this.requestToken += 1
       this.clearTimersAndRequests()
       this.resetDefaultPanelView()
       return
     }
 
     this.debounceTimer = window.setTimeout(() => {
-      this.fetchAndRender(query)
+      this.fetchAndFilter(query)
     }, SEARCH_DEBOUNCE_MS)
   }
 
-  async fetchAndRender(query) {
-    if (!this.hasSearchUrlValue || !this.hasResultsTarget) return
+  async fetchAndFilter(query) {
+    if (!this.hasSearchUrlValue || !this.hasAppsTarget) return
 
     if (this.abortController) this.abortController.abort()
     this.abortController = new AbortController()
@@ -82,54 +73,42 @@ export default class extends Controller {
 
       if (requestToken !== this.requestToken) return
       if (!payload || payload.ok !== true) {
-        this.renderResults([], [])
+        this.applyMatchedDocumentIds(new Set())
         return
+      }
+
+      const matchedDocumentIds = new Set()
+      const addMatch = (item) => {
+        const id = String(item?.document_id || "").trim()
+        if (id) matchedDocumentIds.add(id)
       }
 
       const nameMatches = Array.isArray(payload.name_matches) ? payload.name_matches : []
       const contentMatches = Array.isArray(payload.content_matches) ? payload.content_matches : []
-      this.renderResults(nameMatches, contentMatches)
+      nameMatches.forEach(addMatch)
+      contentMatches.forEach(addMatch)
+
+      this.applyMatchedDocumentIds(matchedDocumentIds)
     } catch (_error) {
       if (requestToken !== this.requestToken) return
-      this.renderResults([], [])
+      this.applyMatchedDocumentIds(new Set())
     }
   }
 
-  renderResults(nameMatches, contentMatches) {
-    const rows = []
+  applyMatchedDocumentIds(matchedDocumentIds) {
+    const allRows = this.hasAppsTarget ? Array.from(this.appsTarget.querySelectorAll("li.finder-tree__node")) : []
 
-    nameMatches.forEach((item) => rows.push(this.renderRow(item)))
-    contentMatches.forEach((item) => rows.push(this.renderRow(item)))
+    let visibleCount = 0
+    allRows.forEach((row) => {
+      const rowId = String(row.dataset.finderTreeNodeId || "").trim()
+      const visible = rowId && matchedDocumentIds.has(rowId)
+      row.style.display = visible ? "" : "none"
+      if (visible) visibleCount++
+    })
 
-    this.showSearchMode(rows.length === 0)
-    this.resultsTarget.innerHTML = rows.join("")
-  }
-
-  renderRow(item) {
-    const appKey = escapeHtml(item?.app_key || "")
-    const documentId = escapeHtml(item?.document_id || "")
-    const title = escapeHtml(item?.document_title || "Untitled")
-    const icon = this.iconName(item?.icon)
-
-    return `
-      <button
-        type="button"
-        class="desktop-side-panel-app-row"
-        data-action="click->side-panel-search#openResult"
-        data-app-key="${appKey}"
-        data-document-id="${documentId}"
-        data-document-title="${title}"
-      >
-        <span class="desktop-side-panel-app-icon" aria-hidden="true">${materialSymbolSvg(icon, "sm")}</span>
-        <span class="desktop-side-panel-app-label">${title}</span>
-      </button>
-    `
-  }
-
-  iconName(value) {
-    const key = String(value || "").trim().toLowerCase()
-    const known = new Set(["edit_note", "task_checklist", "overview", "wallpaper", "graphic_eq", "file_document"])
-    return known.has(key) ? key : "file_document"
+    if (this.hasAppsTarget) this.appsTarget.hidden = visibleCount === 0
+    if (this.hasResultsTarget) this.resultsTarget.hidden = true
+    if (this.hasEmptyStateTarget) this.emptyStateTarget.hidden = visibleCount > 0
   }
 
   openResult(event) {
@@ -149,13 +128,14 @@ export default class extends Controller {
     }))
   }
 
-  showSearchMode(isEmpty) {
-    if (this.hasAppsTarget) this.appsTarget.hidden = true
-    if (this.hasResultsTarget) this.resultsTarget.hidden = false
-    if (this.hasEmptyStateTarget) this.emptyStateTarget.hidden = !isEmpty
-  }
-
   resetDefaultPanelView() {
+    if (this.hasAppsTarget) {
+      const allRows = this.appsTarget.querySelectorAll("li.finder-tree__node")
+      allRows.forEach((row) => {
+        row.style.display = ""
+      })
+    }
+
     if (this.hasAppsTarget) this.appsTarget.hidden = false
     if (this.hasResultsTarget) {
       this.resultsTarget.hidden = true

@@ -1,6 +1,6 @@
 # AI Handoff - Current Project State
 
-Last updated: 2026-05-18
+Last updated: 2026-05-19
 
 ## Project Purpose
 
@@ -22,7 +22,23 @@ Nexus is a browser-based OS-like workspace built on Rails. The core product prom
 
 ## What Was Recently Completed
 
-1. Security dependency audit and full remediation (2026-05-13):
+1. Window movement and snap UX refresh (2026-05-19):
+- Restored the classic top window chrome and removed the experimental bottom title shell pattern.
+- Kept and polished edge drag affordance around windows with perimeter ghost feedback.
+- Implemented delayed title-drag snap arming (hold-to-arm ghost, release-to-snap) for less accidental snapping.
+- Added resize-edge snap preview behavior with delayed arming to match drag ergonomics.
+- Added Escape-to-dismiss for active snap zones until pointer leaves and re-enters the zone.
+- Expanded title snap candidates to support multi-anchor alignment (left/right can align top or bottom; top/bottom can align left or right).
+- Removed the previous lock/group snap experiment and related dead code/CSS.
+
+2. Window persistence reliability fix (2026-05-19):
+- Fixed per-refresh window drift by persisting and restoring bounds with transform-safe left/top and offset width/height values.
+
+3. Finder UX improvements (2026-05-19):
+- Added image-row quick action to set desktop wallpaper directly from Finder rows.
+- Finder now persists and restores each user's last selected section via `finder.last_section` in UserAppState.
+
+4. Security dependency audit and full remediation (2026-05-13):
 - Upgraded Rails 8.1.2 → 8.1.3, resolving 9 CVEs across actionpack, actionview, activestorage, activesupport.
 - Upgraded rack 3.2.5 → 3.2.6, resolving 11 CVEs including High-severity static file exposure and multipart DoS.
 - Upgraded rack-session 2.1.1 → 2.1.2, resolving a Critical RCE via Marshal deserialization on session forgery (CVE-2026-39324).
@@ -33,7 +49,7 @@ Nexus is a browser-based OS-like workspace built on Rails. The core product prom
 - bundler-audit and brakeman both return clean after all upgrades.
 - See docs/SECURITY_AUDIT_2026_05_13.md for the full report.
 
-2. Test suite fixes (2026-05-13):
+5. Test suite fixes (2026-05-13):
 - Removed duplicate private `files_by_date` definition in TimeCardController (was causing 404 on the action).
 - Added `apply_theme_gradient` rejection to WorkspacePreferencesController (returns 422 as expected).
 - Removed `require "minitest/mock"` from test_helper (Minitest 6 merged mock into core — the separate file no longer exists).
@@ -41,11 +57,11 @@ Nexus is a browser-based OS-like workspace built on Rails. The core product prom
 - Implemented `migrate_legacy_favorites!` in FinderWorkspaceInitializer.
 - All 98 tests pass, 0 failures, 0 errors.
 
-3. Realtime synchronization infrastructure:
+6. Realtime synchronization infrastructure:
 - User-scoped Action Cable channel for app/document/state updates.
 - Frontend subscription wiring for receiving and applying remote updates.
 
-11. Image thumbnails (2026-05-14):
+7. Image thumbnails (2026-05-14):
 - Documents::GenerateThumbnail service uses ImageMagick (via image_processing/mini_magick) to generate 28×28 WebP thumbnails.
 - Thumbnails stored at storage/workspace/.thumbnails/{doc_id}.webp — keyed by ID so they survive renames.
 - Generated automatically on upload; deleted when document is destroyed.
@@ -54,7 +70,7 @@ Nexus is a browser-based OS-like workspace built on Rails. The core product prom
 - bin/rails nexus:backfill_thumbnails generates missing thumbnails for all existing image assets.
 - Requires ImageMagick installed: `brew install imagemagick` (macOS) / `sudo apt install imagemagick` (server).
 
-10. Unified broadcast system (2026-05-14):
+8. Unified broadcast system (2026-05-14):
 - UserSyncChannel consolidated from 6 methods to 3: broadcast_state_change, broadcast_document_change, broadcast_workspace_change.
 - broadcast_workspace_change(kind: "finder"|"wallpaper") replaces broadcast_finder_change and broadcast_wallpaper_change.
 - Calendar now routes through broadcast_document_change(content_type: "calendar_events") instead of its own method.
@@ -63,37 +79,37 @@ Nexus is a browser-based OS-like workspace built on Rails. The core product prom
 - calendar_app_controller.js: nexus:calendar-remote-changed listener removed; calendar updates handled in handleRemoteDocumentChanged filtering by content_type.
 - task_list_editor_controller.js: nexus:task-list-remote-changed listener replaced with nexus:document-remote-changed filtered by content_type === "task_list".
 
-4. Production websocket reliability:
+9. Production websocket reliability:
 - nginx /cable proxy configured with websocket upgrade headers.
 - Production websocket upgrades verified in logs.
 
-5. Calendar persistence redesign:
+10. Calendar persistence redesign:
 - Calendar events persisted to a single Embedded Calendar file.
 - Save flow normalized through service layer.
 
-6. Quartz and storage cleanup:
+11. Quartz and storage cleanup:
 - Quartz is the active note-style app surface; legacy Notes and Time Card app routes/controllers are retired.
 - Dead `time_card_controller.js` was deleted, and Calendar no longer probes Time Card files by date.
 - Legacy workspace clutter was purged from `storage/workspace` and `storage/workspace_test` (`apps_open_user_*`, `json_api_user_*`, `LayoutThemes*.rtf`, `WorkspaceState*.rtf`, and old Note/Time Card draft artifacts).
 
-7. Finder noise/performance mitigation:
+12. Finder noise/performance mitigation:
 - Request noise reduction changes (including prefetch behavior tuning).
 
-8. Image/wallpaper performance improvement:
+13. Image/wallpaper performance improvement:
 - Production asset delivery shifted to nginx-backed X-Accel-Redirect flow.
 - Rails now authorizes then delegates file bytes to nginx for faster serving.
 
-9. Deploy script hardening:
+14. Deploy script hardening:
 - Handles git clean failures caused by bootsnap cache race conditions.
 - Fixes heredoc command-substitution bug so remote status checks run remotely.
 - Deploy summaries now report Puma and nginx status correctly.
 
-10. Finder live UX updates (2026-05-14):
+15. Finder live UX updates (2026-05-14):
 - Unfavoriting a file inside the Favorites view removes the row immediately instead of requiring a section refresh.
 - Side-panel hover previews now refresh in place when a draft is opened with the `+` action, so new instances appear without leaving/re-entering hover.
 - Hover preview refresh is normalized across spawned app window keys (`task-spawn-*`, `note-spawn-*`, `time-card-spawn-*`, `image-spawn-*`).
 
-11. Quartz note shorthand and sync hardening (2026-05-14):
+16. Quartz note shorthand and sync hardening (2026-05-14):
 - Quartz note input now expands top-level shorthand like `10-` → `10:00-`, `1345-` → `13:45-`, and `now-` → current time rounded to the nearest 5 minutes.
 - Customer and entry lines are excluded from the shorthand expansion path.
 - `DocumentDiskLoader` now tolerates files disappearing between directory scan and read, which removes the flaky `ENOENT` race seen in linked-document tests.
@@ -109,9 +125,9 @@ Nexus is a browser-based OS-like workspace built on Rails. The core product prom
 
 ## Active Priorities
 
-1. Validate end-to-end live sync across all app surfaces on production with a single structured pass.
-2. Continue tightening system responsiveness while preserving current behavior contracts.
-3. Decide whether to remove the remaining intentionally ignored Brakeman findings or keep them documented.
+1. Replace Finder row action clutter with a right-click context menu (rename, delete, set wallpaper, favorite) and support drag-to-favorite.
+2. Add desktop file drop capabilities and clear desktop interaction contracts.
+3. Introduce a Workspace app for saving/loading window layouts with missing-file diagnostics.
 
 ## Open Questions / Follow-ups
 

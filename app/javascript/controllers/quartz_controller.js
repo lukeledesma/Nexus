@@ -16,6 +16,7 @@
  */
 
 import { Controller } from "@hotwired/stimulus"
+import { evaluate as evaluateMathExpression, format as formatMathResult } from "mathjs"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // § Utilities
@@ -56,6 +57,352 @@ function roundedNowMin(nearest = 5) {
   const now = new Date()
   const total = now.getHours() * 60 + now.getMinutes()
   return Math.round(total / nearest) * nearest % (24 * 60)
+}
+
+const MATH_UNIT_ALIASES = [
+  [/\bkilometers per hour\b/gi, "km / h"],
+  [/\bkilometres per hour\b/gi, "km / h"],
+  [/\bkilometer per hour\b/gi, "km / h"],
+  [/\bkilometre per hour\b/gi, "km / h"],
+  [/\bmiles per hour\b/gi, "mi / h"],
+  [/\bmile per hour\b/gi, "mi / h"],
+  [/\bmeters per second\b/gi, "m / s"],
+  [/\bmetres per second\b/gi, "m / s"],
+  [/\bmeter per second\b/gi, "m / s"],
+  [/\bmetre per second\b/gi, "m / s"],
+  [/\bfeet per second\b/gi, "ft / s"],
+  [/\bfoot per second\b/gi, "ft / s"],
+  [/\bknots\b/gi, "knot"],
+  [/\bkn\b/gi, "knot"],
+  [/\bkmh\b/gi, "km / h"],
+  [/\bkph\b/gi, "km / h"],
+  [/\bmph\b/gi, "mi / h"],
+  [/\bmps\b/gi, "m / s"],
+  [/\bfps\b/gi, "ft / s"],
+  [/\bnautical miles\b/gi, "nmi"],
+  [/\bnautical mile\b/gi, "nmi"],
+  [/\bkilometers\b/gi, "km"],
+  [/\bkilometres\b/gi, "km"],
+  [/\bkilometer\b/gi, "km"],
+  [/\bkilometre\b/gi, "km"],
+  [/\bmiles\b/gi, "mi"],
+  [/\bmile\b/gi, "mi"],
+  [/\bfeet\b/gi, "ft"],
+  [/\bfoot\b/gi, "ft"],
+  [/\byards\b/gi, "yd"],
+  [/\byard\b/gi, "yd"],
+  [/\bmeters\b/gi, "m"],
+  [/\bmetres\b/gi, "m"],
+  [/\bmeter\b/gi, "m"],
+  [/\bmetre\b/gi, "m"],
+  [/\bcentimeters\b/gi, "cm"],
+  [/\bcentimetres\b/gi, "cm"],
+  [/\bcentimeter\b/gi, "cm"],
+  [/\bcentimetre\b/gi, "cm"],
+  [/\bcentemeters\b/gi, "cm"],
+  [/\bcentemeter\b/gi, "cm"],
+  [/\bcentemetres\b/gi, "cm"],
+  [/\bcentemetre\b/gi, "cm"],
+  [/\bmillimeters\b/gi, "mm"],
+  [/\bmillimetres\b/gi, "mm"],
+  [/\bmillimeter\b/gi, "mm"],
+  [/\bmillimetre\b/gi, "mm"],
+  [/\binches\b/gi, "inch"],
+  [/\bmeters?\b/gi, "m"],
+  [/\bfahrenheit\b/gi, "degF"],
+  [/\bcelsius\b/gi, "degC"],
+  [/\bkelvin\b/gi, "K"],
+  [/\bgrams\b/gi, "g"],
+  [/\bgram\b/gi, "g"],
+  [/\bkilograms\b/gi, "kg"],
+  [/\bkilogram\b/gi, "kg"],
+  [/\bmilligrams\b/gi, "mg"],
+  [/\bmilligram\b/gi, "mg"],
+  [/\bpounds\b/gi, "lb"],
+  [/\bpound\b/gi, "lb"],
+  [/\boz\b/gi, "ounce"],
+  [/\bounces\b/gi, "ounce"],
+  [/\bounce\b/gi, "ounce"],
+  [/\bstones\b/gi, "stone"],
+  [/\btons\b/gi, "ton"],
+  [/\btonnes\b/gi, "tonne"],
+  [/\btonne\b/gi, "tonne"],
+  [/\bliters\b/gi, "l"],
+  [/\blitres\b/gi, "l"],
+  [/\bliter\b/gi, "l"],
+  [/\blitre\b/gi, "l"],
+  [/\bmilliliters\b/gi, "ml"],
+  [/\bmillilitres\b/gi, "ml"],
+  [/\bmilliliter\b/gi, "ml"],
+  [/\bmillilitre\b/gi, "ml"],
+  [/\bgallons\b/gi, "gal"],
+  [/\bgallon\b/gi, "gal"],
+  [/\bpints\b/gi, "pint"],
+  [/\bpint\b/gi, "pint"],
+  [/\bcups\b/gi, "cup"],
+  [/\bcup\b/gi, "cup"],
+  [/\btablespoons\b/gi, "tbsp"],
+  [/\btablespoon\b/gi, "tbsp"],
+  [/\btsp\b/gi, "teaspoon"],
+  [/\bteaspoons\b/gi, "teaspoon"],
+  [/\bteaspoon\b/gi, "teaspoon"],
+  [/\bfl oz\b/gi, "floz"],
+  [/\bfluid ounces\b/gi, "floz"],
+  [/\bfluid ounce\b/gi, "floz"],
+  [/\bquarts\b/gi, "qt"],
+  [/\bquart\b/gi, "qt"],
+  [/\bacres\b/gi, "acre"],
+  [/\bhectares\b/gi, "hectare"],
+  [/\bhectare\b/gi, "hectare"],
+  [/\bsq\.?\s*ft\b/gi, "sqft"],
+  [/\bsquare feet\b/gi, "sqft"],
+  [/\bsquare foot\b/gi, "sqft"],
+  [/\bsq\.?\s*m\b/gi, "m^2"],
+  [/\bsquare meters\b/gi, "m^2"],
+  [/\bsquare metres\b/gi, "m^2"],
+  [/\bsquare meter\b/gi, "m^2"],
+  [/\bsquare metre\b/gi, "m^2"],
+  [/\bcubic feet\b/gi, "ft^3"],
+  [/\bcubic foot\b/gi, "ft^3"],
+  [/\bcubic meters\b/gi, "m^3"],
+  [/\bcubic metres\b/gi, "m^3"],
+  [/\bcubic meter\b/gi, "m^3"],
+  [/\bcubic metre\b/gi, "m^3"],
+  [/\bbytes\b/gi, "byte"],
+  [/\bkb\b/gi, "kB"],
+  [/\bmb\b/gi, "MB"],
+  [/\bgb\b/gi, "GB"],
+  [/\btb\b/gi, "TB"]
+]
+
+function normalizeMathInput(expr) {
+  let normalized = String(expr ?? "").trim()
+  for (const [pattern, replacement] of MATH_UNIT_ALIASES) {
+    normalized = normalized.replace(pattern, replacement)
+  }
+  // Currency symbols/codes are treated as scalar prefixes in this math mode.
+  // Example: 4.35 USD / gal -> 4.35 / gal
+  normalized = normalized.replace(/\$/g, "")
+  normalized = normalized.replace(/\bUSD\b/gi, "")
+  normalized = normalized.replace(/\s{2,}/g, " ").trim()
+  return normalized
+}
+
+function renderMathResult(value) {
+  if (value == null) return null
+
+  let raw
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return null
+    raw = formatMathResult(value, { precision: 14, lowerExp: -9, upperExp: 20 })
+  } else if (typeof value === "bigint") {
+    raw = value.toString()
+  } else {
+    const constructorName = value?.constructor?.name
+    if (constructorName === "BigNumber" || constructorName === "Fraction" || constructorName === "Complex" || constructorName === "Unit") {
+      raw = formatMathResult(value, { precision: 14, lowerExp: -9, upperExp: 20 })
+    } else if (typeof value === "string" && value.trim().length > 0) {
+      raw = value
+    } else {
+      try {
+        const formatted = formatMathResult(value, { precision: 14, lowerExp: -9, upperExp: 20 })
+        raw = typeof formatted === "string" && formatted.trim().length > 0 ? formatted : null
+      } catch {
+        return null
+      }
+    }
+  }
+
+  if (raw == null) return null
+  // Collapse any embedded newlines — mathjs can format matrices/complex values
+  // with line breaks, which would create phantom blank lines in the textarea.
+  const clean = String(raw).replace(/[\r\n]+/g, " ").trim()
+  return clean.length > 0 ? clean : null
+}
+
+const MATH_ASSIGN_RE = /^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)$/
+const MATH_LOOKUP_RE = /^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*$/
+const MATH_LOGIC_RE = /\b(if|and|or|not|xor)\b|&&|\|\||\?/i
+
+const MATH_FN_TOKENS = new Set([
+  "abs", "acos", "acosh", "asin", "asinh", "atan", "atan2", "atanh", "cbrt", "ceil",
+  "combinations", "cos", "cosh", "cot", "csc", "det", "exp", "factorial", "flatten",
+  "floor", "gamma", "hypot", "im", "inv", "log", "log10", "log2", "lusolve", "max",
+  "mean", "median", "min", "norm", "permutations", "pow", "prod", "re", "round", "sec",
+  "sin", "sinh", "sqrt", "std", "sum", "tan", "tanh", "trace", "zeta"
+])
+
+const MATH_CONST_TOKENS = new Set(["pi", "e", "i", "Infinity", "NaN"])
+
+const MATH_UNIT_TOKENS = new Set([
+  "m", "km", "cm", "mm", "mi", "nmi", "ft", "yd", "inch",
+  "s", "second", "minute", "h", "hour",
+  "kg", "g", "mg", "lb", "ounce", "stone", "ton", "tonne",
+  "l", "ml", "gal", "pint", "cup", "tbsp", "teaspoon", "qt", "floz",
+  "K", "degC", "degF",
+  "V", "A", "W", "kW", "VA", "kVA", "J", "kJ", "MJ", "Wh", "kWh",
+  "Pa", "kPa", "psi", "bar", "ohm", "Hz", "byte", "kB", "MB", "GB", "TB",
+  "N", "mol", "rad", "sr", "acre", "hectare", "to"
+])
+
+function renderMathPunctuation(chunk) {
+  const escaped = escHtml(chunk)
+  return escaped.replace(/([+\-*/^%=(){}\[\],:])/g, '<span class="quartz-math-punc">$1</span>')
+}
+
+function renderMathExpression(expr, scope = null) {
+  const source = String(expr ?? "")
+  const tokenRe = /([A-Za-z_][A-Za-z0-9_]*|\d+(?:\.\d+)?(?:[eE][+\-]?\d+)?)/g
+  let out = ""
+  let lastIdx = 0
+  let match
+
+  while ((match = tokenRe.exec(source)) !== null) {
+    const idx = match.index
+    const token = match[0]
+    out += renderMathPunctuation(source.slice(lastIdx, idx))
+
+    if (/^\d/.test(token)) {
+      out += `<span class="quartz-math-number">${escHtml(token)}</span>`
+    } else if (scope && Object.prototype.hasOwnProperty.call(scope, token)) {
+      out += `<span class="quartz-math-var quartz-math-var--ref">${escHtml(token)}</span>`
+    } else if (MATH_FN_TOKENS.has(token)) {
+      out += `<span class="quartz-math-fn">${escHtml(token)}</span>`
+    } else if (MATH_CONST_TOKENS.has(token)) {
+      out += `<span class="quartz-math-const">${escHtml(token)}</span>`
+    } else if (MATH_UNIT_TOKENS.has(token)) {
+      out += `<span class="quartz-math-unit">${escHtml(token)}</span>`
+    } else {
+      out += escHtml(token)
+    }
+    lastIdx = tokenRe.lastIndex
+  }
+
+  out += renderMathPunctuation(source.slice(lastIdx))
+  return `<span class="quartz-math-expr">${out}</span>`
+}
+
+function renderMathEquation(inputExpr, resultDisplay, scope = null) {
+  return (
+    `${renderMathExpression(inputExpr, scope)} ` +
+    `<span class="quartz-math-op">=</span> ` +
+    `<span class="quartz-math-result">${escHtml(resultDisplay)}</span>`
+  )
+}
+
+function renderMathAssignment(name, rhs, resultDisplay, scope = null) {
+  return (
+    `<span class="quartz-math-var">${escHtml(name)}</span> ` +
+    `<span class="quartz-math-op">=</span> ` +
+    `${renderMathExpression(rhs, scope)} ` +
+    `<span class="quartz-math-op">=> </span>` +
+    `<span class="quartz-math-result">${escHtml(resultDisplay)}</span>`
+  )
+}
+
+function renderMathDuplicateDefinition(line, varName) {
+  return (
+    `<span class="quartz-math-expr">${escHtml(line)}</span> ` +
+    `<span class="quartz-math-error quartz-math-error--duplicate">(duplicate ${escHtml(varName)}; keeping first value)</span>`
+  )
+}
+
+function mathDelimiterDelta(str) {
+  let delta = 0
+  let quote = null
+  let escaped = false
+
+  for (const ch of String(str ?? "")) {
+    if (escaped) {
+      escaped = false
+      continue
+    }
+    if (ch === "\\") {
+      escaped = true
+      continue
+    }
+    if (quote) {
+      if (ch === quote) quote = null
+      continue
+    }
+    if (ch === '"' || ch === "'" || ch === "`") {
+      quote = ch
+      continue
+    }
+    if (ch === "(" || ch === "[" || ch === "{") delta += 1
+    else if (ch === ")" || ch === "]" || ch === "}") delta -= 1
+  }
+
+  return delta
+}
+
+function renderMathContinuation(line) {
+  return `<span class="quartz-math-expr">${escHtml(line)}</span> <span class="quartz-math-op">(continuing)</span>`
+}
+
+function renderMathIncomplete(line) {
+  return `<span class="quartz-math-expr">${escHtml(line)}</span> <span class="quartz-math-error">(incomplete expression)</span>`
+}
+
+function renderMathEvalError(line, error) {
+  const raw = String(error?.message || error || "error")
+  const msg = raw.trim().replace(/\s+/g, " ")
+  return `<span class="quartz-math-expr">${escHtml(line)}</span> <span class="quartz-math-error">(${escHtml(msg || "error")})</span>`
+}
+
+function clearMathScope(scope) {
+  for (const key of Object.keys(scope)) delete scope[key]
+}
+
+function isMathResetCommand(expr) {
+  const cmd = String(expr ?? "").trim().toLowerCase()
+  return cmd === "clear" || cmd === "reset" || cmd === ":clear" || cmd === ":reset"
+}
+
+function renderMathNotice(line, msg) {
+  return `<span class="quartz-math-expr">${escHtml(line)}</span> <span class="quartz-math-op">(${escHtml(msg)})</span>`
+}
+
+function hasRestrictedMathLogic(expr) {
+  return MATH_LOGIC_RE.test(String(expr ?? ""))
+}
+
+function evaluateMathLine(line, scope, firstDefined) {
+  const expr = String(line ?? "").trim()
+  if (!expr) return escHtml(line)
+
+  const lookup = MATH_LOOKUP_RE.exec(expr)
+  if (lookup) {
+    const varName = lookup[1]
+    if (Object.prototype.hasOwnProperty.call(scope, varName)) {
+      const display = renderMathResult(scope[varName])
+      if (display != null) return renderMathEquation(`${varName} =`, display, scope)
+    }
+    return `<span class="quartz-math-expr">${escHtml(line)}</span> <span class="quartz-math-error">(unknown variable)</span>`
+  }
+
+  const assignment = MATH_ASSIGN_RE.exec(expr)
+  if (assignment) {
+    const varName = assignment[1]
+    const rhsRaw = assignment[2]
+    if (firstDefined.has(varName)) return renderMathDuplicateDefinition(line, varName)
+    if (hasRestrictedMathLogic(rhsRaw)) return renderMathNotice(line, "logic operators disabled in #math")
+
+    try {
+      const value = evaluateMathExpression(normalizeMathInput(rhsRaw), scope)
+      const display = renderMathResult(value)
+      if (display == null) {
+        return `<span class="quartz-math-expr">${escHtml(line)}</span> <span class="quartz-math-error">(not a number)</span>`
+      }
+      scope[varName] = value
+      firstDefined.set(varName, value)
+      return renderMathAssignment(varName, rhsRaw, display, scope)
+    } catch (error) {
+      return renderMathEvalError(line, error)
+    }
+  }
+
+  return renderMathNotice(line, "assignment only (use: x = 5)")
 }
 
 /** Expand a start-time shorthand token → "HH:MM", or null if not recognised. */
@@ -198,6 +545,210 @@ const TASK_RE         = /^(\s*)([☐☑])\s*(.*?)$/
 const TIMER_LINE_RE   = /^(\d{1,2}:\d{2}(?::\d{2})?)\s*-\s*(\d{1,2}:\d{2}:\d{2}|\d{1,2}:\d{2}\s*(?:AM|PM))$/i
 const TIMER_VISIBLE_LINE_RE = /^(\d{1,2}:\d{2}(?::\d{2})?)$/
 const TRIGGER_RE      = /^(#[a-z][a-z0-9_-]*)(.*)$/i
+
+function splitMathLineForCalculatedSuffix(line) {
+  const src = String(line ?? "")
+  const marker = " = "
+  const last = src.lastIndexOf(marker)
+  if (last === -1) return { exprLine: src, hasCalculatedSuffix: false }
+
+  const left = src.slice(0, last)
+  if (!left.trim()) return { exprLine: src, hasCalculatedSuffix: false }
+  const right = src.slice(last + marker.length)
+  // Do not treat "name = " as a calculated suffix while user is still typing.
+  if (!right.trim()) return { exprLine: src, hasCalculatedSuffix: false }
+
+  // Distinguish editable assignment lines from calculated output suffixes.
+  // A suffix is valid when either:
+  // 1) left side already contains '=' (e.g. "x=4 = 4"), or
+  // 2) left side is an expression (e.g. "2+2 = 4", "70 km to mi = 43.5 mi")
+  // A single bare identifier on the left ("distance = 180 mi") is assignment,
+  // not a calculated suffix.
+  const leftTrim = left.trim()
+  const leftHasEquals = leftTrim.includes("=")
+  const leftIsBareIdentifier = /^[A-Za-z_][A-Za-z0-9_]*$/.test(leftTrim)
+  if (!leftHasEquals && leftIsBareIdentifier) {
+    return { exprLine: src, hasCalculatedSuffix: false }
+  }
+
+  return {
+    exprLine: left,
+    hasCalculatedSuffix: true,
+    protectedStartInLine: last + marker.length,
+    protectedEndInLine: src.length
+  }
+}
+
+function getMathProtectedRangeAtCursor(text, caretStart, caretEnd = caretStart) {
+  if (caretStart !== caretEnd) {
+    const lineStart = text.lastIndexOf("\n", Math.max(0, caretStart - 1)) + 1
+    const lineEndIdx = text.indexOf("\n", caretEnd)
+    const lineEnd = lineEndIdx === -1 ? text.length : lineEndIdx
+    const line = text.slice(lineStart, lineEnd)
+    const split = splitMathLineForCalculatedSuffix(line)
+    if (!split.hasCalculatedSuffix) return null
+
+    const absStart = lineStart + split.protectedStartInLine
+    const absEnd = lineStart + split.protectedEndInLine
+    const overlaps = caretStart < absEnd && caretEnd > absStart
+    return overlaps ? { start: absStart, end: absEnd } : null
+  }
+
+  const lineStart = text.lastIndexOf("\n", Math.max(0, caretStart - 1)) + 1
+  const lineEndIdx = text.indexOf("\n", caretStart)
+  const lineEnd = lineEndIdx === -1 ? text.length : lineEndIdx
+  const line = text.slice(lineStart, lineEnd)
+  const split = splitMathLineForCalculatedSuffix(line)
+  if (!split.hasCalculatedSuffix) return null
+
+  const absStart = lineStart + split.protectedStartInLine
+  const absEnd = lineStart + split.protectedEndInLine
+  if (caretStart >= absStart && caretStart <= absEnd) return { start: absStart, end: absEnd }
+  return null
+}
+
+function sanitizeMathExpressionFromLine(line) {
+  const split = splitMathLineForCalculatedSuffix(line)
+  const baseExpr = split.exprLine.trim()
+  const hasTrailingEquals = /=\s*$/.test(baseExpr)
+  const expr = hasTrailingEquals ? baseExpr.replace(/=\s*$/, "").trimEnd() : baseExpr
+  return { expr, split }
+}
+
+function buildMathScopeBeforeOffset(text, offset) {
+  const scope = {}
+  let mode = null
+  let chars = 0
+  const seenTriggers = new Set()
+  const mathTriggerKey = MathMode.trigger.toLowerCase()
+
+  for (const line of text.split("\n")) {
+    if (chars >= offset) break
+
+    const m = TRIGGER_RE.exec(line.trim())
+    if (m) {
+      const key = m[1].toLowerCase()
+      const matched = MODE_BY_TRIGGER.get(key)
+      if (matched) {
+        if (!seenTriggers.has(key)) {
+          mode = matched
+          seenTriggers.add(key)
+        } else if (key === mathTriggerKey) {
+          mode = null
+        }
+      }
+      chars += line.length + 1
+      continue
+    }
+
+    if (mode?.id === "math") {
+      const { expr } = sanitizeMathExpressionFromLine(line)
+      const assignment = MATH_ASSIGN_RE.exec(expr)
+      if (assignment && !hasRestrictedMathLogic(assignment[2])) {
+        try {
+          const value = evaluateMathExpression(normalizeMathInput(assignment[2]), scope)
+          if (renderMathResult(value) != null) scope[assignment[1]] = value
+        } catch {
+          // Ignore invalid historical lines while rebuilding scope.
+        }
+      }
+    }
+
+    chars += line.length + 1
+  }
+
+  return scope
+}
+
+function refreshMathCalculatedLines(body) {
+  const segments = segmentDocument(body)
+  const out = []
+  const scope = {}
+
+  for (const seg of segments) {
+    if (seg.triggerLine != null) out.push(seg.triggerLine)
+
+    if (seg.mode?.id !== "math") {
+      out.push(...seg.lines)
+      continue
+    }
+
+    for (const line of seg.lines) {
+      const { expr, split } = sanitizeMathExpressionFromLine(line)
+      if (!expr) {
+        out.push(line)
+        continue
+      }
+
+      const assignment = MATH_ASSIGN_RE.exec(expr)
+      if (assignment && !hasRestrictedMathLogic(assignment[2])) {
+        try {
+          const value = evaluateMathExpression(normalizeMathInput(assignment[2]), scope)
+          const display = renderMathResult(value)
+          if (display != null) {
+            scope[assignment[1]] = value
+            out.push(split.hasCalculatedSuffix ? `${split.exprLine.trimEnd()} = ${display}` : line)
+            continue
+          }
+        } catch {
+          // Keep original text when assignment cannot be evaluated.
+        }
+      }
+
+      if (split.hasCalculatedSuffix) {
+        try {
+          const value = evaluateMathExpression(normalizeMathInput(expr), scope)
+          const display = renderMathResult(value)
+          if (display != null) {
+            out.push(`${split.exprLine.trimEnd()} = ${display}`)
+            continue
+          }
+        } catch {
+          // Preserve existing line for invalid expressions.
+        }
+      }
+
+      out.push(line)
+    }
+  }
+
+  return out.join("\n")
+}
+
+function renderMathLineWithColor(line, runtime = null) {
+  const raw = String(line ?? "")
+  if (!raw.trim()) return escHtml(raw)
+
+  const state = runtime || { scope: {} }
+  const scope = state.scope || {}
+  const { expr, split } = sanitizeMathExpressionFromLine(raw)
+
+  const assignment = MATH_ASSIGN_RE.exec(expr)
+  if (assignment && !hasRestrictedMathLogic(assignment[2])) {
+    try {
+      const value = evaluateMathExpression(normalizeMathInput(assignment[2]), scope)
+      if (renderMathResult(value) != null) scope[assignment[1]] = value
+    } catch {
+      // Keep rendering even when assignment fails.
+    }
+  }
+
+  if (split.hasCalculatedSuffix) {
+    const prefix = raw.slice(0, split.protectedStartInLine)
+    const result = raw.slice(split.protectedStartInLine)
+    return `<span class="quartz-math-expr">${escHtml(prefix)}</span><span class="quartz-math-result">${escHtml(result)}</span>`
+  }
+
+  // Use low-fragment rendering for stable glyph spacing against textarea text.
+  const eqIdx = raw.indexOf("=")
+  if (eqIdx > 0) {
+    const lhs = raw.slice(0, eqIdx)
+    const rhs = raw.slice(eqIdx)
+    return `<span class="quartz-math-var">${escHtml(lhs)}</span><span class="quartz-math-expr">${escHtml(rhs)}</span>`
+  }
+
+  return `<span class="quartz-math-expr">${escHtml(raw)}</span>`
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // § Mode: TIMECARD
@@ -880,28 +1431,100 @@ const TasklistMode = {
 const MathMode = {
   id: "math",
   trigger: "#math",
-  placeholder: "2 + 2\n3 * (4 + 5)",
+  placeholder: "x = 5\nspeed = 2 mph to kph\nvolume = 3 liters to quarts\nx =",
 
-  renderLines(lines) {
-    return lines.map(line => {
-      const expr = line.trim()
-      if (!expr) return escHtml(line)
-      try {
-        // Only allow safe math expressions
-        // eslint-disable-next-line no-new-func
-        const result = Function(`"use strict"; return (${expr})`)()
-        if (typeof result === "number" && isFinite(result)) {
-          return `<span class=\"quartz-math-expr\">${escHtml(line)}</span> = <span class=\"quartz-math-result\">${escHtml(result)}</span>`
-        }
-        return `<span class=\"quartz-math-expr\">${escHtml(line)}</span> <span class=\"quartz-math-error\">(not a number)</span>`
-      } catch {
-        return `<span class=\"quartz-math-expr\">${escHtml(line)}</span> <span class=\"quartz-math-error\">(error)</span>`
-      }
-    })
+  renderLines(lines, runtime = null) {
+    return lines.map(line => renderMathLineWithColor(line, runtime))
   },
 
   handleDashKey() { return false },
-  handleKeydown() { return false }
+
+  handleKeydown(event, textarea) {
+    const isEqualKey = event.key === "="
+
+    if (isEqualKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      const ss = textarea.selectionStart
+      const se = textarea.selectionEnd
+      const text = textarea.value
+      const lineStart = text.lastIndexOf("\n", Math.max(0, ss - 1)) + 1
+      const lineEndIdx = text.indexOf("\n", se)
+      const lineEnd = lineEndIdx === -1 ? text.length : lineEndIdx
+      const currentLine = text.slice(lineStart, lineEnd)
+      const trimmed = currentLine.trim()
+
+      // Allow normal '=' typing except when cursor is at end of an expression line.
+      if (ss !== se || ss < lineEnd || !trimmed) return false
+
+      const { expr, split } = sanitizeMathExpressionFromLine(currentLine)
+      if (!expr) return false
+
+      const assignment = MATH_ASSIGN_RE.exec(expr)
+      const lookupFromExpr = MATH_LOOKUP_RE.exec(`${expr}=`)
+      const canEvaluateAsPlainExpression = /\d|[()+\-*/^]|\bto\b/i.test(expr)
+      const isBareIdentifier = /^[A-Za-z_][A-Za-z0-9_]*$/.test(expr)
+
+      // Let bare identifiers keep normal typing flow so users can write
+      // variable definitions naturally: e + '=' + ' 5'.
+      if (isBareIdentifier && !assignment) return false
+
+      // Let users type variable definitions normally: "x" + "=" should not calculate.
+      if (!assignment && !lookupFromExpr && !canEvaluateAsPlainExpression) return false
+
+      event.preventDefault()
+      const scope = buildMathScopeBeforeOffset(text, lineStart)
+      try {
+        if (assignment) {
+          if (hasRestrictedMathLogic(assignment[2])) {
+            const errorLine = `${split.exprLine} = error: logic operators disabled in #math`
+            textarea.setRangeText(errorLine, lineStart, lineEnd, "end")
+            textarea.dispatchEvent(new Event("input", { bubbles: true }))
+            return true
+          }
+          const rhsRaw = assignment[2]
+          const value = evaluateMathExpression(normalizeMathInput(rhsRaw), scope)
+          const display = renderMathResult(value)
+          if (display != null) {
+            const nextLine = `${split.exprLine} = ${display}`
+            textarea.setRangeText(nextLine, lineStart, lineEnd, "end")
+            textarea.dispatchEvent(new Event("input", { bubbles: true }))
+          }
+        } else if (lookupFromExpr) {
+          if (Object.prototype.hasOwnProperty.call(scope, expr)) {
+            const display = renderMathResult(scope[expr])
+            if (display != null) {
+              const nextLine = `${expr} = ${display}`
+              textarea.setRangeText(nextLine, lineStart, lineEnd, "end")
+              textarea.dispatchEvent(new Event("input", { bubbles: true }))
+            }
+          } else {
+            const errorMsg = `${expr} = unknown variable`
+            textarea.setRangeText(errorMsg, lineStart, lineEnd, "end")
+            textarea.dispatchEvent(new Event("input", { bubbles: true }))
+          }
+        } else {
+          const value = evaluateMathExpression(normalizeMathInput(expr), scope)
+          const display = renderMathResult(value)
+          if (display != null) {
+            const nextLine = `${expr} = ${display}`
+            textarea.setRangeText(nextLine, lineStart, lineEnd, "end")
+            textarea.dispatchEvent(new Event("input", { bubbles: true }))
+          } else {
+            const errorLine = `${expr} = error: not a number`
+            textarea.setRangeText(errorLine, lineStart, lineEnd, "end")
+            textarea.dispatchEvent(new Event("input", { bubbles: true }))
+          }
+        }
+      } catch (error) {
+        const message = String(error?.message || "error").trim().replace(/\s+/g, " ")
+        const errorLine = `${expr} = error: ${message}`
+        textarea.setRangeText(errorLine, lineStart, lineEnd, "end")
+        textarea.dispatchEvent(new Event("input", { bubbles: true }))
+      }
+      return true
+    }
+
+    return false
+  }
 }
 
 const QUARTZ_MODES     = [TimecardMode, TimerMode, TasklistMode, MathMode]
@@ -957,6 +1580,7 @@ function segmentDocument(text) {
   const segments = []
   let currentMode = null, triggerLine = null, currentLines = [], startLine = 0
   const seenTriggers = new Set()
+  const mathTriggerKey = MathMode.trigger.toLowerCase()
 
   function flush(nextStart) {
     if (currentLines.length > 0 || triggerLine != null) {
@@ -979,7 +1603,7 @@ function segmentDocument(text) {
       } else {
         flush(i)
         segments.push({ mode: null, triggerLine: line, lines: [], globalStartLine: i, invalidTrigger: true })
-        currentMode = null
+        if (triggerKey === mathTriggerKey) currentMode = null
         startLine = i + 1
       }
     } else {
@@ -1024,6 +1648,7 @@ function isFirstRecognizedTriggerOccurrenceAtLine(text, lineStart) {
 function modeAtOffset(text, offset) {
   let mode = null, chars = 0
   const seenTriggers = new Set()
+  const mathTriggerKey = MathMode.trigger.toLowerCase()
   for (const line of text.split("\n")) {
     const lineEnd = chars + line.length
     if (chars <= offset && offset <= lineEnd + 1) break
@@ -1035,7 +1660,7 @@ function modeAtOffset(text, offset) {
         if (!seenTriggers.has(key)) {
           mode = matched
           seenTriggers.add(key)
-        } else {
+        } else if (key === mathTriggerKey) {
           mode = null
         }
       }
@@ -1051,6 +1676,7 @@ function modeAtOffset(text, offset) {
 
 function buildBackdropHtml(segments) {
   const allLines = []
+  const mathRuntime = { scope: {}, firstDefined: new Map() }
 
   for (const seg of segments) {
     if (seg.triggerLine != null) {
@@ -1064,7 +1690,11 @@ function buildBackdropHtml(segments) {
     }
 
     if (seg.mode) {
-      allLines.push(...seg.mode.renderLines(seg.lines))
+      if (seg.mode.id === "math") {
+        allLines.push(...seg.mode.renderLines(seg.lines, mathRuntime))
+      } else {
+        allLines.push(...seg.mode.renderLines(seg.lines))
+      }
     } else {
       allLines.push(...seg.lines.map(escHtml))
     }
@@ -1295,7 +1925,7 @@ export default class extends Controller {
 
     const body = displayTimerBody(this.initialBodyValue || "")
     this.notesInputTarget.value = body
-    this._renderAll(body)
+    this._renderAll(this.notesInputTarget.value)
     this._startTicker()
   }
 
@@ -1317,21 +1947,37 @@ export default class extends Controller {
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
+  handleNotesFocus() {
+    // Re-render the backdrop from the live textarea value whenever focus
+    // returns to the editor. This corrects any stale backdrop state that
+    // built up while the textarea was unfocused (e.g. after a resize event
+    // or an ActionCable echo updated the content without a focus re-render).
+    this._renderAll(this.notesInputTarget.value)
+  }
+
   updateNotes() {
     this._moveCaretOffTimerCountdownRow({ createRowIfMissing: true, dispatchInput: false })
-    const text = this.notesInputTarget.value
+    const textarea = this.notesInputTarget
+    const before = textarea.value
+    const refreshed = refreshMathCalculatedLines(before)
+    if (refreshed !== before) {
+      const ss = textarea.selectionStart
+      const se = textarea.selectionEnd
+      textarea.value = refreshed
+      textarea.setSelectionRange(Math.min(ss, refreshed.length), Math.min(se, refreshed.length))
+    }
+
+    const text = textarea.value
     this._renderAll(text)
     this._scheduleAutosave()
   }
 
   syncBackdropScroll() {
-    // Transform-based scroll sync — no scrollHeight reads, no drift
+    // Native scroll sync keeps caret and backdrop alignment exact over long documents.
     const ta = this.notesInputTarget
     const bd = this.notesBackdropTarget
-    const inner = bd.firstElementChild
-    if (!inner) return
-    bd.scrollTop = 0; bd.scrollLeft = 0
-    inner.style.transform = `translateY(${-ta.scrollTop}px) translateX(${-ta.scrollLeft}px)`
+    bd.scrollTop = ta.scrollTop
+    bd.scrollLeft = ta.scrollLeft
   }
 
   handleNotesKeydown(event) {
@@ -1366,8 +2012,46 @@ export default class extends Controller {
       }
     }
 
-    const mode = modeAtOffset(textarea.value, textarea.selectionStart)
+    const text = textarea.value
+    const ss = textarea.selectionStart
+    const se = textarea.selectionEnd
+    const mode = modeAtOffset(text, ss)
     if (!mode) return
+
+    if (mode.id === "math") {
+      const protectedRange = getMathProtectedRangeAtCursor(text, ss, se)
+      if (protectedRange) {
+        const printableKey = event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey
+        const backspaceInProtected = event.key === "Backspace" && ss === se && ss > protectedRange.start
+        const deleteInProtected = event.key === "Delete" && ss === se && ss >= protectedRange.start && ss < protectedRange.end
+        const deleteSelectionTouchingProtected = (event.key === "Backspace" || event.key === "Delete") && ss !== se
+        const typeInProtected = printableKey && ss === se && ss >= protectedRange.start && ss <= protectedRange.end
+
+        if (backspaceInProtected || deleteInProtected || deleteSelectionTouchingProtected) {
+          // Delete/Backspace in calculated suffix removes the entire " = result" chunk.
+          event.preventDefault()
+          const lineStart = text.lastIndexOf("\n", Math.max(0, ss - 1)) + 1
+          const lineEndIdx = text.indexOf("\n", Math.max(ss, se))
+          const lineEnd = lineEndIdx === -1 ? text.length : lineEndIdx
+          const line = text.slice(lineStart, lineEnd)
+          const split = splitMathLineForCalculatedSuffix(line)
+          if (split.hasCalculatedSuffix) {
+            const nextLine = split.exprLine.replace(/\s+$/, "")
+            textarea.setRangeText(nextLine, lineStart, lineEnd, "end")
+            const caret = lineStart + nextLine.length
+            textarea.setSelectionRange(caret, caret)
+            textarea.dispatchEvent(new Event("input", { bubbles: true }))
+          }
+          return
+        }
+
+        if (typeInProtected) {
+          event.preventDefault()
+          this._showMathProtectionToast()
+          return
+        }
+      }
+    }
 
     const handled = mode.handleKeydown(event, textarea)
     // If mode used setRangeText it already fired "input" — nothing more needed.
@@ -1583,6 +2267,38 @@ export default class extends Controller {
     if (this._hoverTipEl) this._hoverTipEl.hidden = true
   }
 
+  // ── Math protection toast ────────────────────────────────────────────────
+
+  _showMathProtectionToast() {
+    const msg = "Can't edit calculated text"
+    // Show a temporary notification at bottom of window
+    const existing = document.getElementById("quartz-math-toast")
+    if (existing) existing.remove()
+    
+    const toast = document.createElement("div")
+    toast.id = "quartz-math-toast"
+    toast.textContent = msg
+    toast.style.cssText = `
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #ef4444;
+      color: #111111;
+      border: 1px solid #b91c1c;
+      padding: 8px 16px;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 700;
+      z-index: 9999;
+      animation: fadeInOut 2s ease-in-out;
+      pointer-events: none;
+    `
+    document.body.appendChild(toast)
+    
+    setTimeout(() => toast.remove(), 2000)
+  }
+
   // ── Range hover cross-highlight ────────────────────────────────────────────
 
   _setupRangeHover() {
@@ -1633,12 +2349,20 @@ export default class extends Controller {
     const body = displayTimerBody(extractQuartzBody(detail.content?.toString() ?? ""))
     if (body !== this.notesInputTarget.value) {
       this.notesInputTarget.value = body
-      this._renderAll(body)
+      // Always render from the browser-normalised textarea value rather than the
+      // raw server string — the browser strips \r and normalises \r\n → \n on
+      // textarea assignment. Using the raw body would embed \r characters in the
+      // backdrop HTML which, under white-space:pre, render as phantom blank lines
+      // (one spacer between every content line).
+      this._renderAll(this.notesInputTarget.value)
     }
   }
 
   _onViewportChange() {
     if (!this.hasNotesInputTarget) return
+    // Always re-segment from the live textarea value so the backdrop can't
+    // become stale if content changed since the last full _renderAll call.
+    this._segments = segmentDocument(this.notesInputTarget.value)
     this._renderBackdrop()
     renderTimeline(this._segments, this.hasTimelineBarTarget ? this.timelineBarTarget : null)
   }

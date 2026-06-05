@@ -572,7 +572,7 @@ class DocumentsController < ApplicationController
 
   def panel_search_icon_for(app_key)
     {
-      "quartz" => "sticky_note",
+      "quartz" => "edit_note",
       "tasks" => "task_checklist",
       "images" => "wallpaper",
       "audio" => "graphic_eq"

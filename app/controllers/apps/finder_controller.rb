@@ -5,6 +5,7 @@ require "set"
 module Apps
   class FinderController < BaseController
     skip_before_action :sync_from_disk
+    FINDER_LAST_SECTION_STATE_KEY = "finder.last_section"
 
     DEFAULT_SECTION_KEY = "documents"
     TASKS_SECTION_TITLE = "Tasks"
@@ -182,8 +183,11 @@ module Apps
           self.class.normalized_section_key(read_only_config[:section_key])
         else
           self.class.finder_section_key_for_document(current_user, browse_doc) ||
-            self.class.normalized_section_key(params[:section])
+            self.class.normalized_section_key(params[:section].presence || last_finder_section_key)
         end
+
+      persist_last_finder_section_key(@section_key) unless @finder_single_section_mode
+
       @finder_sections = self.class.workspace_section_definitions.map do |definition|
         definition.merge(folder: section_roots[definition[:key]])
       end
@@ -201,6 +205,10 @@ module Apps
       @finder_empty_message = nil
       @tree_nodes = []
       @browse_folder = nil
+      @finder_search_mode = !@finder_read_only && params[:search_mode].to_s == "1"
+      @finder_search_query = @finder_search_mode ? params[:q].to_s.strip : ""
+      @finder_search_active = @finder_search_mode
+      @finder_search_seed_rows = []
 
       unless @root_folder
         @finder_empty_message =
@@ -209,7 +217,12 @@ module Apps
         return
       end
 
-      if @section_key == "favorites"
+      if @finder_search_mode
+        @browse_folder = @root_folder
+        @expanded_folder_ids = Set.new
+        @finder_search_seed_rows = build_global_search_rows(section_roots)
+        @tree_nodes = []
+      elsif @section_key == "favorites"
         @browse_folder = @root_folder
         @expanded_folder_ids = Set.new
         @tree_nodes = build_favorites_tree_nodes(@root_folder)
@@ -250,6 +263,28 @@ module Apps
 
     def finder_embed_layout?
       params[:embed].to_s == "iframe" ? "finder_embed" : false
+    end
+
+    def last_finder_section_key
+      state = current_user.user_app_states.find_by(key: FINDER_LAST_SECTION_STATE_KEY)
+      value = state&.data
+      if value.is_a?(Hash)
+        self.class.normalized_section_key(value["section_key"] || value[:section_key])
+      else
+        self.class.normalized_section_key(value)
+      end
+    rescue StandardError
+      DEFAULT_SECTION_KEY
+    end
+
+    def persist_last_finder_section_key(section_key)
+      UserAppState.put(
+        user: current_user,
+        key: FINDER_LAST_SECTION_STATE_KEY,
+        value: { section_key: self.class.normalized_section_key(section_key) }
+      )
+    rescue StandardError
+      nil
     end
 
     def expanded_folder_ids_on_path(root_folder, browse_folder)
@@ -323,6 +358,25 @@ module Apps
         nodes = docs.map { |doc| tree_node_for_favorite(doc) }
       end
       nodes
+    end
+
+    def build_global_search_rows(section_roots)
+      nodes = []
+      section_roots.each do |key, root|
+        next if root.blank?
+        next if [ "favorites", "trash" ].include?(key.to_s)
+
+        descendant_documents_for_finder_tree(root).each do |doc|
+          next unless doc.file?
+
+          nodes << tree_node_for_file(doc)
+        end
+      end
+      nodes.sort_by { |row| row[:title].to_s.downcase }
+    end
+
+    def finder_search_row_payload(doc, origin_section_key:)
+      tree_node_for_file(doc)
     end
 
     def build_trash_tree_nodes(trash_root)

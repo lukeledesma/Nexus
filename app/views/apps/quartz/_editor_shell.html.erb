@@ -12,11 +12,13 @@
         <textarea class="quartz-notes-textarea"
                   data-quartz-target="notesInput"
                   data-action="input->quartz#updateNotes
+                               focus->quartz#handleNotesFocus
                                scroll->quartz#syncBackdropScroll
                                keydown->quartz#handleNotesKeydown
                                click->quartz#handleNotesClick
                                mousemove->quartz#handleNotesMousemove"
                   placeholder="#math #tasklist #timecard #timer"
+                  wrap="off"
                   autocomplete="off"
                   spellcheck="true"></textarea>
   </div>
