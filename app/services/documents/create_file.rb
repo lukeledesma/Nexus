@@ -43,7 +43,12 @@ module Documents
     end
 
     def next_item_title
-      base = @content_type == "task_list" ? "Untitled Task List" : "Untitled Note"
+      base =
+        case @content_type
+        when "task_list" then "Untitled Task List"
+        when "alchemy_tag_list" then "Untitled PLC Tag List"
+        else "Untitled Note"
+        end
       names = @parent.children.files.where(content_type: @content_type).pluck(:title).map(&:to_s)
       return base unless names.include?(base)
 

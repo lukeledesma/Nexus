@@ -14,9 +14,10 @@ module Apps
     TRASH_SECTION_TITLE = "Trash"
     FINDER_SECTION_DEFINITIONS = [
       { key: "documents", title: TASKS_SECTION_TITLE, icon: "task_checklist" },
-      { key: "quartz", title: QUARTZ_SECTION_TITLE, icon: "sticky_note", icon_svg: true },
+      { key: "quartz", title: QUARTZ_SECTION_TITLE, icon: "sticky_note", icon_svg: true, icon_partial: "quartz_icon" },
       { key: "images", title: "Images", icon: "wallpaper" },
       { key: "audio", title: "Audio", icon: "graphic_eq" },
+      { key: "alchemy", title: "Alchemy", icon: "apps", icon_svg: true, icon_partial: "alchemy_icon" },
       { key: "favorites", title: FAVORITES_SECTION_TITLE, icon: "star_rounded" },
       { key: "trash", title: TRASH_SECTION_TITLE, icon: "delete" }
     ].freeze
@@ -28,10 +29,11 @@ module Apps
         allow_save: true
       },
       "audio-pane" => { section_key: "audio", content_type: "asset", allow_save: false },
-      "images-pane" => { section_key: "images", content_type: "asset", allow_save: false }
+      "images-pane" => { section_key: "images", content_type: "asset", allow_save: false },
+      "alchemy-pane" => { section_key: "alchemy", content_type: "alchemy_tag_list", allow_save: true }
     }.freeze
     # Matches file kinds with an opener app (see finder_browser_controller.js).
-    LINKED_FILE_CONTENT_TYPES = %w[note task_list asset].freeze
+    LINKED_FILE_CONTENT_TYPES = %w[note task_list asset alchemy_tag_list].freeze
 
     class << self
       def workspace_section_definitions
@@ -242,6 +244,8 @@ module Apps
         if @finder_read_only
           if frame_id == "quartz-pane"
             "quartz_svg"
+          elsif frame_id == "alchemy-pane"
+            "alchemy_svg"
           elsif read_only_content_type
             helpers.finder_file_icon_for_content_type(read_only_content_type, section_key: @section_key).to_s
           else
@@ -253,7 +257,7 @@ module Apps
         if @finder_read_only
           read_only_content_type.present? ? [ read_only_content_type.to_s ] : []
         else
-          %w[note task_list asset]
+          %w[note task_list asset alchemy_tag_list]
         end
 
       render layout: finder_embed_layout?
@@ -461,6 +465,8 @@ module Apps
         when "note"
           true
         when "task_list"
+          true
+        when "alchemy_tag_list"
           true
         when "asset"
           file_kind.in?(%w[image audio])

@@ -4,7 +4,7 @@ class Document < ApplicationRecord
   DEFAULT_FOLDER_TITLE = "New Folder"
   DEFAULT_NOTE_TITLE = "Untitled Note"
   DEFAULT_TASK_LIST_TITLE = "Untitled Task List"
-  CONTENT_TYPES = %w[note task_list asset calendar_events].freeze
+  CONTENT_TYPES = %w[note task_list asset calendar_events alchemy_tag_list].freeze
 
   # Binary/media files on disk (bytes are not stored in `content`; sync reads/writes the file at storage_path).
   ASSET_FILE_EXTENSIONS = %w[.wav .aif .aiff .mp3 .m4a .flac .ogg .jpg .jpeg .png .gif .webp .bmp .tif .tiff .heic .heif .avif].freeze
@@ -83,7 +83,7 @@ class Document < ApplicationRecord
     return false unless folder?
     return false if user_workspace_root?
 
-    protected_titles = ["Embedded", "Documents", "Tasks", "Images", "Audio", "Trash"]
+    protected_titles = ["Embedded", "Documents", "Tasks", "Quartz", "Images", "Audio", "Alchemy", "Trash"]
     return false unless protected_titles.any? { |name| title.to_s.casecmp?(name) }
 
     p = parent
@@ -130,6 +130,7 @@ class Document < ApplicationRecord
       default_title = case content_type.to_s
       when "task_list" then DEFAULT_TASK_LIST_TITLE
       when "asset" then "Untitled"
+      when "alchemy_tag_list" then "Untitled PLC Tag List"
       else DEFAULT_NOTE_TITLE
       end
       self.title = (title.presence || default_title).to_s.strip
@@ -154,6 +155,12 @@ class Document < ApplicationRecord
         self.reset_days = []
         self.last_reset_at = nil
       elsif content_type == "calendar_events"
+        self.content = content.to_s
+        self.tasks = []
+        self.reset_mode = "none"
+        self.reset_days = []
+        self.last_reset_at = nil
+      elsif content_type == "alchemy_tag_list"
         self.content = content.to_s
         self.tasks = []
         self.reset_mode = "none"
@@ -222,6 +229,6 @@ class Document < ApplicationRecord
     return if folder?
     return if CONTENT_TYPES.include?(content_type.to_s)
 
-    errors.add(:content_type, "must be note, task_list, asset, or calendar_events")
+    errors.add(:content_type, "must be note, task_list, asset, calendar_events, or alchemy_tag_list")
   end
 end

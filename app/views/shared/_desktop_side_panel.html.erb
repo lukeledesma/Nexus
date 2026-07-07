@@ -52,7 +52,7 @@
           >
             <span class="desktop-side-panel-app-icon" aria-hidden="true">
               <% if entry[:icon_svg] %>
-                <%= render "shared/quartz_icon" %>
+                <%= render "shared/#{entry[:icon_partial] || "quartz_icon"}" %>
               <% else %>
                 <%= material_symbol_icon(entry[:icon], size: :sm) %>
               <% end %>

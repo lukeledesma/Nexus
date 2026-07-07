@@ -7,6 +7,7 @@ class DocumentsController < ApplicationController
   before_action :set_document, only: %i[show edit update destroy restore_from_trash permanent_delete create_file create_subfolder move_folder move_file upload_images rename toggle_favorite file_list asset_file thumbnail]
 
   def index
+    FinderWorkspaceInitializer.ensure_for_user!(current_user) if current_user
     set_no_cache_headers
     load_organizer_data
   end
@@ -16,6 +17,7 @@ class DocumentsController < ApplicationController
   end
 
   def organizer_fragment
+    FinderWorkspaceInitializer.ensure_for_user!(current_user) if current_user
     load_organizer_data
     render partial: "organizer"
   end
@@ -560,6 +562,8 @@ class DocumentsController < ApplicationController
       "quartz"
     when "task_list"
       "tasks"
+    when "alchemy_tag_list"
+      "alchemy"
     when "asset"
       extension = File.extname(document.storage_path.to_s)
       extension = File.extname(document.title.to_s) if extension.blank?
@@ -574,6 +578,7 @@ class DocumentsController < ApplicationController
     {
       "quartz" => "edit_note",
       "tasks" => "task_checklist",
+      "alchemy" => "apps",
       "images" => "wallpaper",
       "audio" => "graphic_eq"
     }[app_key.to_s] || "file_document"

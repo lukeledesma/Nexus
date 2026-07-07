@@ -272,7 +272,7 @@ class DocumentDiskLoader
 
     def supported_file_extension?(path)
       ext = File.extname(path.to_s).downcase
-      path.end_with?(".nexus") || path.end_with?(".txt") || path.end_with?(".md") || path.end_with?(".rtf") ||
+      path.end_with?(".nexus") || path.end_with?(".txt") || path.end_with?(".md") || path.end_with?(".rtf") || path.end_with?(".xml") ||
         Document::ASSET_FILE_EXTENSIONS.include?(ext)
     end
 
@@ -281,6 +281,7 @@ class DocumentDiskLoader
       ext = File.extname(base)
       ext_down = ext.downcase
       return File.basename(base, ext) if Document::ASSET_FILE_EXTENSIONS.include?(ext_down)
+      return File.basename(base, ".xml") if base.end_with?(".xml")
       return File.basename(base, ".nexus") if base.end_with?(".nexus")
       return File.basename(base, ".txt") if base.end_with?(".txt")
       return File.basename(base, ".md") if base.end_with?(".md")
@@ -331,6 +332,8 @@ class DocumentDiskLoader
         parse_note_from_unified(metadata, body)
       when NexusFileFormat::KIND_TASK_LIST
         build_task_list_attributes(metadata, body)
+      when NexusFileFormat::KIND_ALCHEMY
+        parse_alchemy_from_unified(metadata, body)
       when "quartz"
         parse_quartz_from_unified(metadata, lines)
       when "stickynotes"
@@ -396,6 +399,19 @@ class DocumentDiskLoader
       {
         content_type: "note",
         content: lines.join("\n"),
+        tasks: [],
+        reset_mode: "none",
+        reset_days: [],
+        last_reset_at: nil,
+        created_at: parse_time(metadata["created_at"]),
+        updated_at: parse_time(metadata["updated_at"])
+      }
+    end
+
+    def parse_alchemy_from_unified(metadata, body)
+      {
+        content_type: "alchemy_tag_list",
+        content: body,
         tasks: [],
         reset_mode: "none",
         reset_days: [],

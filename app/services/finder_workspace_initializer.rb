@@ -76,14 +76,18 @@ class FinderWorkspaceInitializer
 
       title = definition[:title]
       existing = finder_root.children.folders.find { |d| d.title.to_s.strip.casecmp?(title) }
-      out[definition[:key]] = existing || finder_root.children.create!(is_folder: true, title: title)
+      folder = existing || finder_root.children.create!(is_folder: true, title: title)
+      Apps::FinderController.ensure_folder_storage_path!(finder_root, folder)
+      out[definition[:key]] = folder
     end
   end
 
   def ensure_trash_root!(finder_root)
     title = Apps::FinderController::TRASH_SECTION_TITLE
-    finder_root.children.folders.find { |d| d.title.to_s.strip.casecmp?(title) } ||
+    folder = finder_root.children.folders.find { |d| d.title.to_s.strip.casecmp?(title) } ||
       finder_root.children.create!(is_folder: true, title: title)
+    Apps::FinderController.ensure_folder_storage_path!(finder_root, folder)
+    folder
   end
 
   def migrate_recently_deleted_to_trash!(finder_root)

@@ -338,6 +338,132 @@
   cursor: pointer;
 }
 
+.alchemy-app {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: var(--os-shell-content-padding);
+  background: var(--surface);
+}
+
+.alchemy-app__results {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid var(--border-hairline);
+  border-top: 0;
+  border-radius: 0;
+  overflow: hidden;
+}
+
+.alchemy-app__table-wrap {
+  overflow: auto;
+}
+
+.alchemy-app__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.alchemy-app__table th,
+.alchemy-app__table td {
+  text-align: left;
+  border-bottom: 1px solid color-mix(in oklab, var(--border-hairline) 72%, transparent);
+  padding: 0.36rem 0.48rem;
+  white-space: nowrap;
+}
+
+.alchemy-app__table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: color-mix(in oklab, var(--surface) 88%, #fff 12%);
+  color: var(--text);
+}
+
+html[data-nexus-shell-mode="dark"] .alchemy-app__table th {
+  background: color-mix(in oklab, var(--surface) 82%, #fff 18%);
+  color: var(--text);
+}
+
+html[data-nexus-shell-mode="light"] .alchemy-app__table th {
+  background: #d4d8de;
+  color: #2f3338;
+}
+
+.alchemy-app__table-wrap.is-scrolled .alchemy-app__table th {
+  box-shadow: 0 1px 0 color-mix(in oklab, var(--bg) 40%, transparent);
+}
+
+.alchemy-app__table tbody tr {
+  cursor: pointer;
+}
+
+.alchemy-app__table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.alchemy-app__table tbody tr.row-selected {
+  background: rgba(59, 130, 246, 0.15) !important;
+}
+
+.alchemy-app__table tbody tr.row-selected:hover {
+  background: rgba(59, 130, 246, 0.22) !important;
+}
+
+.alchemy-app__table tbody tr.row-address-conflict {
+  background: rgba(239, 68, 68, 0.126);
+}
+
+.alchemy-app__table tbody tr.row-address-conflict:hover {
+  background: rgba(239, 68, 68, 0.18);
+}
+
+.alchemy-app__table td.alchemy-app__cell-conflict {
+  color: #f87171;
+  font-weight: 600;
+}
+
+.alchemy-app__hover-tip {
+  position: fixed;
+  left: 0;
+  top: 0;
+  max-width: 34rem;
+  padding: 0.38rem 0.5rem;
+  border: 1px solid var(--border-hairline);
+  border-radius: 0.4rem;
+  background: color-mix(in oklab, var(--surface-raised) 90%, #000 10%);
+  color: var(--text);
+  font-size: 0.72rem;
+  line-height: 1.25;
+  white-space: pre-line;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(3px);
+  transition: opacity 80ms ease, transform 80ms ease;
+  z-index: 12000;
+}
+
+.alchemy-app__hover-tip.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.alchemy-app__empty {
+  margin: 0;
+  padding: 0.75rem;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+section.content-window[data-content-window-app-key-value="alchemy"] .content-window-chrome {
+  justify-content: space-between;
+}
+
 .calendar-app__mini-day.is-selected {
   background: rgba(59, 130, 246, 0.24);
 }
@@ -6113,6 +6239,29 @@ html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden)
   margin-left: 0.3rem;
   opacity: 0.6;
   flex-shrink: 0;
+}
+
+.content-window-alchemy-tag-count {
+  color: var(--text-muted);
+  font-size: 0.64rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  opacity: 0.8;
+  flex-shrink: 0;
+}
+
+.content-window-alchemy-conflict-toggle {
+  color: var(--text-muted);
+}
+
+.content-window-alchemy-conflict-toggle svg {
+  display: block;
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.content-window-alchemy-conflict-toggle[aria-pressed="true"] {
+  color: #f87171;
 }
 
 .content-window-time-card-hours {

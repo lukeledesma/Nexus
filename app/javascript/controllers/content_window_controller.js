@@ -104,6 +104,7 @@ export default class extends Controller {
       tasks: taskListMin,
       finder: finderLikeMin,
       calendar: finderLikeMin,
+      alchemy: finderLikeMin,
       audio: audioMin,
       images: imagesMin,
       quartz: taskListMin,
@@ -1407,7 +1408,66 @@ export default class extends Controller {
 
   handleFrameLoad(event) {
     if (!this.hasFrameTarget || event?.target !== this.frameTarget) return
+    this.syncAlchemyChromeMeta()
     this.repairTaskDraftLinkIfStale()
+  }
+
+  toggleAlchemyConflictFilter(event) {
+    if (event) event.preventDefault()
+    if (this.appKeyValue !== "alchemy") return
+
+    const enabled = this.element.dataset.alchemyConflictsOnly !== "true"
+    this.applyAlchemyConflictFilter(enabled)
+    this.syncAlchemyConflictToggleButton(enabled)
+    this.syncAlchemyChromeMeta()
+  }
+
+  syncAlchemyChromeMeta() {
+    if (this.appKeyValue !== "alchemy" || !this.hasFrameTarget) return
+
+    const countEl = this.element.querySelector("[data-nexus-alchemy-tag-count]")
+    const rows = Array.from(this.frameTarget.querySelectorAll("tbody[data-alchemy-table-target='tbody'] tr"))
+    const conflictCount = rows.filter((row) => row.classList.contains("row-address-conflict")).length
+    const enabled = this.element.dataset.alchemyConflictsOnly === "true"
+
+    if (countEl) {
+      countEl.hidden = false
+      const count = rows.length
+      const totalText = `${count} tag${count === 1 ? "" : "s"}`
+      countEl.textContent = enabled
+        ? `${totalText} | ${conflictCount} conflict${conflictCount === 1 ? "" : "s"}`
+        : totalText
+    }
+
+    this.applyAlchemyConflictFilter(enabled)
+    this.syncAlchemyConflictToggleButton(enabled)
+  }
+
+  applyAlchemyConflictFilter(enabled) {
+    if (this.appKeyValue !== "alchemy" || !this.hasFrameTarget) return
+
+    const rows = Array.from(this.frameTarget.querySelectorAll("tbody[data-alchemy-table-target='tbody'] tr"))
+    rows.forEach((row) => {
+      const conflict = row.classList.contains("row-address-conflict")
+      row.hidden = enabled && !conflict
+    })
+
+    this.element.dataset.alchemyConflictsOnly = enabled ? "true" : "false"
+  }
+
+  syncAlchemyConflictToggleButton(enabled) {
+    const button = this.element.querySelector("[data-alchemy-conflict-toggle]")
+    if (!button) return
+
+    const onIcon = button.querySelector("[data-alchemy-conflict-icon='on']")
+    const offIcon = button.querySelector("[data-alchemy-conflict-icon='off']")
+
+    button.setAttribute("aria-pressed", enabled ? "true" : "false")
+    const label = enabled ? "Show all rows" : "Show conflicts only"
+    button.setAttribute("title", label)
+    button.setAttribute("aria-label", label)
+    if (onIcon) onIcon.hidden = !enabled
+    if (offIcon) offIcon.hidden = enabled
   }
 
   async repairTaskDraftLinkIfStale() {
@@ -1875,6 +1935,7 @@ export default class extends Controller {
   isLinkedDocumentApp() {
     return this.appKeyValue === "tasks" ||
       this.appKeyValue.startsWith("task-spawn-") ||
+      this.appKeyValue === "alchemy" ||
       this.appKeyValue === "audio" ||
       this.appKeyValue === "images" ||
       this.appKeyValue.startsWith("image-spawn-") ||

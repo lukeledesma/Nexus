@@ -9,6 +9,7 @@ module NexusFileFormat
   KIND_NOTE = "note"
   KIND_TASK_LIST = "task_list"
   KIND_QUARTZ = "quartz"
+  KIND_ALCHEMY = "alchemy"
 
   module_function
 

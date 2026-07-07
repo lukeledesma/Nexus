@@ -24,8 +24,8 @@
                 <% if section[:key] == "trash" && !@finder_read_only %>data-action="dragover->finder-browser#trashSidebarDragOver dragleave->finder-browser#trashSidebarDragLeave drop->finder-browser#trashSidebarDrop"<% end %>>
                 <%= link_to apps_finder_path({ section: section[:key], frame_id: frame_id }.merge(@finder_read_only ? { mode: "save_as" } : {})), class: "finder-folder-link", data: { turbo_frame: frame_id, turbo_prefetch: false }, aria: { label: "Open #{section[:title]}" } do %>
                   <span class="finder-folder-icon" aria-hidden="true">
-                    <% if section[:icon_svg] && section[:key] == "quartz" %>
-                      <%= render "shared/quartz_icon" %>
+                    <% if section[:icon_svg] %>
+                      <%= render "shared/#{section[:icon_partial] || "quartz_icon"}" %>
                     <% else %>
                       <%= material_symbol_icon(section[:icon], size: :md) %>
                     <% end %>

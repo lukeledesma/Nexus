@@ -1,0 +1,54 @@
+<% frame_id = params[:frame_id].presence || turbo_frame_request_id.presence || "alchemy-pane" %>
+<turbo-frame id="<%= frame_id %>">
+  <section class="app-surface app-surface--tool alchemy-app os-window-body-start" data-controller="alchemy-table">
+    <textarea hidden aria-hidden="true" data-alchemy-source-xml><%= @source_xml_content.to_s %></textarea>
+    <section class="alchemy-app__results">
+      <% if @rows.present? %>
+        <div class="alchemy-app__table-wrap" data-alchemy-table-target="tableWrap" data-action="scroll->alchemy-table#handleTableScroll">
+          <table class="alchemy-app__table" data-alchemy-table-target="table">
+            <thead>
+              <tr>
+                <th>Tag Group</th>
+                <th>Tag Name</th>
+                <th>Data Type</th>
+                <th>Address Start</th>
+                <th>Scaling</th>
+                <th>Read/Write</th>
+              </tr>
+            </thead>
+            <tbody
+              data-alchemy-table-target="tbody"
+              data-action="click->alchemy-table#handleTbodyClick mouseover->alchemy-table#handleTooltipOver mousemove->alchemy-table#handleTooltipMove mouseout->alchemy-table#handleTooltipOut">
+              <% @rows.each do |row| %>
+                <% raw_dt = row["_raw_datatype"].to_s.strip %>
+                <% raw_enc = row["_raw_encode"].to_s.strip %>
+                <% dt_code_tip = Alchemy::TagXml::DataTypeMapper.normalize_code(raw_dt.presence || "0") %>
+                <% enc_code_tip = Alchemy::TagXml::DataTypeMapper.normalize_code(raw_enc.presence || "255") %>
+                <% dt_tip = Alchemy::TagXml::DataTypeMapper.uticor_label(dt_code_tip).presence || "Unknown" %>
+                <% enc_tip = Alchemy::TagXml::DataTypeMapper.uticor_label(enc_code_tip).presence || "Unknown" %>
+                <% uticor_tip = "Datatype - #{dt_code_tip}: #{dt_tip}\nEncode - #{enc_code_tip}: #{enc_tip}" %>
+                <tr
+                  class="<%= "row-address-conflict" if row["_address_conflict"] %>"
+                  data-tag-group="<%= row["Tag Group"].to_s %>"
+                  data-tag-name="<%= row["Tag Name"].to_s %>"
+                  data-data-type="<%= row["Data Type"].to_s %>"
+                  data-modbus-register="<%= row["Address Start"].to_s %>"
+                  data-scaling="<%= row["Scaling"].to_s %>"
+                  data-read-write="<%= row["Read/Write"].to_s %>">
+                  <td><%= row["Tag Group"] %></td>
+                  <td><%= row["Tag Name"] %></td>
+                  <td data-hover-tip="<%= uticor_tip %>"><%= row["Data Type"] %></td>
+                  <td class="<%= "alchemy-app__cell-conflict" if row["_address_conflict"] %>"><%= row["Address Start"] %></td>
+                  <td><%= row["Scaling"] %></td>
+                  <td><%= row["Read/Write"] %></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% else %>
+        <p class="alchemy-app__empty"><%= @status_message.presence || "No parsed rows yet." %></p>
+      <% end %>
+    </section>
+  </section>
+</turbo-frame>

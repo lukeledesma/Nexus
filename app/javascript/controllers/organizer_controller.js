@@ -103,7 +103,8 @@ export default class extends Controller {
       "tasks": 'section.content-window[data-content-window-app-key-value="tasks"], section.content-window[data-content-window-app-key-value^="task-spawn-"]',
       "quartz": 'section.content-window[data-content-window-app-key-value="quartz"], section.content-window[data-content-window-app-key-value^="quartz-spawn-"]',
       "images": 'section.content-window[data-content-window-app-key-value="images"], section.content-window[data-content-window-app-key-value^="image-spawn-"]',
-      "audio": 'section.content-window[data-content-window-app-key-value="audio"]'
+      "audio": 'section.content-window[data-content-window-app-key-value="audio"]',
+      "alchemy": 'section.content-window[data-content-window-app-key-value="alchemy"]'
     }
 
     const selector = selectorByApp[appKey]

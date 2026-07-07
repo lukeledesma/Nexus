@@ -236,6 +236,7 @@ class DocumentStorageSyncLite
     base = File.basename(value)
     ext = File.extname(base)
     return File.basename(base, ext) if Document::ASSET_FILE_EXTENSIONS.include?(ext.downcase)
+    return File.basename(value, ".xml") if value.end_with?(".xml")
     return File.basename(value, ".txt") if value.end_with?(".txt")
     return File.basename(value, ".rtf") if value.end_with?(".rtf")
     return File.basename(value, ".nexus") if value.end_with?(".nexus")
@@ -247,6 +248,8 @@ class DocumentStorageSyncLite
     case @document.content_type.to_s
     when "note"
       nexus_file_note? ? ".txt" : ".rtf"
+    when "alchemy_tag_list"
+      ".xml"
     when "asset"
       ext = File.extname(@document.storage_path.to_s).downcase
       return ext if Document::ASSET_FILE_EXTENSIONS.include?(ext)
@@ -264,6 +267,8 @@ class DocumentStorageSyncLite
     case @document.content_type.to_s
     when "task_list"
       unified_task_list_contents
+    when "alchemy_tag_list"
+      unified_alchemy_contents
     when "note"
       nexus_file_note? ? @document.content.to_s : note_rtf_file_body
     when "calendar_events"
@@ -345,6 +350,17 @@ class DocumentStorageSyncLite
     end
 
     (header + task_lines).join("\n")
+  end
+
+  def unified_alchemy_contents
+    header = NexusFileFormat.unified_header_lines(
+      kind: NexusFileFormat::KIND_ALCHEMY,
+      title: @document.title,
+      document_id: @document.id,
+      created_at: @document.created_at,
+      updated_at: @document.updated_at
+    )
+    (header + [ @document.content.to_s ]).join("\n")
   end
 
   def iso8601_or_nil(value)

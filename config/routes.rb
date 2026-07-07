@@ -7,6 +7,8 @@ Rails.application.routes.draw do
 
   namespace :apps do
     get "finder", to: "finder#show"
+    get "alchemy", to: "alchemy#show"
+    post "alchemy/save_file", to: "alchemy#save_file"
     get "calendar", to: "calendar#show"
     get "images", to: "images#show"
     get "audio", to: "audio#show"

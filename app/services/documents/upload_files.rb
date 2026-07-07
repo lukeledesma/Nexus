@@ -28,6 +28,7 @@ module Documents
       return Support::OperationResult.new(status: :unprocessable_entity, error: "No files received.") if list.empty?
 
       in_iimage = iimage_folder && @folder.id == iimage_folder.id
+      in_alchemy = folder_section_key == "alchemy"
       created_ids = []
       errors = []
 
@@ -39,6 +40,8 @@ module Documents
           else
             [ nil, "#{uploaded.original_filename}: Only JPEG and PNG images are allowed here." ]
           end
+        elsif in_alchemy
+          build_uploaded_alchemy_document(uploaded)
         elsif text_like_finder_upload_extension?(ext)
           build_uploaded_text_document(uploaded)
         else
@@ -105,9 +108,14 @@ module Documents
       %w[.txt .nexus .rtf].include?(ext)
     end
 
-    def upload_filename_stem(uploaded, fallback: "Untitled")
-      ext = File.extname(uploaded.original_filename.to_s)
-      stem = File.basename(uploaded.original_filename.to_s, ext)
+    def folder_section_key
+      Apps::FinderController.origin_section_key_from_storage_path(@folder.storage_path)
+    end
+
+    def upload_filename_stem(uploaded, fallback: "Untitled", filename: nil)
+      original = filename.presence || uploaded.original_filename.to_s
+      ext = File.extname(original)
+      stem = File.basename(original, ext)
       stem = stem.gsub(/[^\p{L}\p{N}\s._-]/u, "_").strip
       stem.presence || fallback
     end
@@ -145,6 +153,22 @@ module Documents
       [ doc, nil ]
     rescue StandardError
       [ nil, "Could not import text file." ]
+    end
+
+    def build_uploaded_alchemy_document(uploaded)
+      resolved = Alchemy::UploadSourceResolver.call(uploaded)
+      return [ nil, "#{uploaded.original_filename}: #{resolved.error || 'Could not extract XML.'}" ] unless resolved.success?
+
+      doc = Document.new(
+        is_folder: false,
+        parent: @folder,
+        title: upload_filename_stem(uploaded, fallback: "PLC Tag List", filename: resolved.source_filename),
+        content_type: "alchemy_tag_list",
+        content: resolved.xml_content.to_s
+      )
+      [ doc, nil ]
+    rescue StandardError
+      [ nil, "#{uploaded.original_filename}: Could not import XML." ]
     end
   end
 end

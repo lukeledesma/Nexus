@@ -7,12 +7,18 @@
 <% show_task_list_add = local_assigns.fetch(:show_task_list_add, false) %>
 <% show_calendar_new_event = local_assigns.fetch(:show_calendar_new_event, false) %>
 <% show_set_wallpaper = local_assigns.fetch(:show_set_wallpaper, false) %>
-<% show_command_shell = linked_app_save_flow || show_finder_new_folder || show_finder_search_toggle || show_task_list_add || show_calendar_new_event || show_save || show_open || show_set_wallpaper %>
+<% show_alchemy_conflict_toggle = local_assigns.fetch(:show_alchemy_conflict_toggle, false) %>
+<% show_alchemy_tag_count = local_assigns.fetch(:show_alchemy_tag_count, false) %>
+<% show_command_shell = linked_app_save_flow || show_finder_new_folder || show_finder_search_toggle || show_task_list_add || show_calendar_new_event || show_save || show_open || show_set_wallpaper || show_alchemy_conflict_toggle %>
 
 <header class="content-window-chrome <%= "content-window-chrome--with-open-file" if open_file_badge %>">
   <% if open_file_badge %>
     <h2 class="content-window-chrome-title">
       <span class="content-window-open-file-name" data-nexus-open-file-name><%= title %></span>
+      <% if show_alchemy_tag_count %>
+        <span class="content-window-open-file-separator" aria-hidden="true">-</span>
+        <span class="content-window-alchemy-tag-count" data-nexus-alchemy-tag-count hidden></span>
+      <% end %>
       <span class="content-window-open-file-edited" data-nexus-open-file-edited hidden aria-hidden="true">saving</span>
     </h2>
   <% else %>
@@ -39,6 +45,23 @@
             aria-label="Set as wallpaper"
             title="Set as wallpaper"
           ><%= material_symbol_icon(:desktop_windows, size: :sm) %></button>
+        <% end %>
+        <% if show_alchemy_conflict_toggle %>
+          <button
+            type="button"
+            class="content-window-new-folder-btn settings-themes-item-action-btn theme-builder-save-btn content-window-alchemy-conflict-toggle"
+            data-alchemy-conflict-toggle
+            data-action="click->content-window#toggleAlchemyConflictFilter"
+            title="Show conflicts only"
+            aria-label="Show conflicts only"
+            aria-pressed="false">
+            <span data-alchemy-conflict-icon="off" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="16" height="16" fill="currentColor"><path d="m40-120 440-760 440 760H40Zm138-80h604L480-720 178-200Zm330.5-51.5Q520-263 520-280t-11.5-28.5Q497-320 480-320t-28.5 11.5Q440-297 440-280t11.5 28.5Q463-240 480-240t28.5-11.5ZM440-360h80v-200h-80v200Zm40-100Z"/></svg>
+            </span>
+            <span data-alchemy-conflict-icon="on" aria-hidden="true" hidden>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="16" height="16" fill="currentColor"><path d="M451.5-251.5Q440-263 440-280t11.5-28.5Q463-320 480-320t28.5 11.5Q520-297 520-280t-11.5 28.5Q497-240 480-240t-28.5-11.5ZM440-360v-161l80 80v81h-80Zm433 158L655-419 480-720l-47 80-58-58 105-182 393 678Zm-695 2h469L350-497 178-200ZM819-28l-92-92H40l252-435L27-820l57-57L876-85l-57 57ZM499-348Zm45-181Z"/></svg>
+            </span>
+          </button>
         <% end %>
         <% if show_open %>
           <button

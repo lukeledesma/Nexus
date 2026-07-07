@@ -17,6 +17,7 @@ function appKeyForLinkedFile(contentType, fileKind, sectionKey = "") {
   const ct = String(contentType || "").toLowerCase()
   const kind = String(fileKind || "").toLowerCase()
   const section = String(sectionKey || "").toLowerCase()
+  if (ct === "alchemy_tag_list") return "alchemy"
   if (ct === "note") {
     if (section === "quartz") return "quartz"
     return "quartz"
@@ -51,6 +52,14 @@ function quartzIconSvg() {
         '<path d="m18.612 10.82l-5.737-7.879a1.06 1.06 0 0 0-.382-.322a1.1 1.1 0 0 0-.986 0a1.06 1.06 0 0 0-.381.322l-5.738 7.88A2 2 0 0 0 5 12c0 .422.135.834.388 1.18l5.738 7.879c.098.135.229.246.38.322a1.1 1.1 0 0 0 .987 0c.152-.076.283-.187.381-.322l5.738-7.88a1.99 1.99 0 0 0 0-2.359" />' +
         '<path d="M5.015 12.195L12 15.078l6.985-2.883M12 2.5v19" />' +
       '</g>' +
+    '</svg>'
+  )
+}
+
+function alchemyIconSvg() {
+  return (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="16" height="16" aria-hidden="true" class="alchemy-card-icon" fill="currentColor">' +
+      '<path d="m608-368 46-166-142-98-46 166 142 98ZM160-207l-33-16q-31-13-42-44.5t3-62.5l72-156v279Zm160 87q-33 0-56.5-24T240-201v-239l107 294q3 7 5 13.5t7 12.5h-39Zm206-5q-31 11-62-3t-42-45L245-662q-11-31 3-61.5t45-41.5l301-110q31-11 61.5 3t41.5 45l178 489q11 31-3 61.5T827-235L526-125Zm-28-75 302-110-179-490-301 110 178 490Zm62-300Z" />' +
     '</svg>'
   )
 }
@@ -238,6 +247,8 @@ export default class extends Controller {
     const iconKey = this.linkedAppSaveIconValue || "file_document"
     if (iconKey === "quartz_svg") {
       icon.innerHTML = quartzIconSvg()
+    } else if (iconKey === "alchemy_svg") {
+      icon.innerHTML = alchemyIconSvg()
     } else {
       icon.innerHTML = materialSymbolSvg(iconKey, "sm") || materialSymbolSvg("file_document", "sm")
     }
@@ -294,6 +305,7 @@ export default class extends Controller {
       const isQuartzFrame = this.frameIdValue === "quartz-pane"
       const isTaskFrame =
         this.frameIdValue === "tasks-pane" || String(this.frameIdValue || "").startsWith("task-spawn-")
+      const isAlchemyFrame = this.frameIdValue === "alchemy-pane"
 
       if (isTaskFrame) {
         let taskPayload = ""
@@ -327,10 +339,22 @@ export default class extends Controller {
           }
         }
         body.set("note_text", noteText)
+      } else if (isAlchemyFrame) {
+        let xmlText = ""
+        try {
+          const host = linkedAppHostWindow()
+          const frame = host?.document?.getElementById(this.frameIdValue)
+          const sourceEl = frame?.querySelector("[data-alchemy-source-xml]")
+          xmlText = (sourceEl?.value || sourceEl?.textContent || "").toString()
+        } catch (_e) {
+          // non-blocking
+        }
+        body.set("xml_text", xmlText)
       }
 
       try {
-        const response = await fetch("/apps/tasks/save_file", {
+        const saveUrl = isAlchemyFrame ? "/apps/alchemy/save_file" : "/apps/tasks/save_file"
+        const response = await fetch(saveUrl, {
           method: "POST",
           headers: { "X-CSRF-Token": finderCsrfToken() },
           body
