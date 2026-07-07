@@ -27,6 +27,8 @@
                 <% dt_tip = Alchemy::TagXml::DataTypeMapper.uticor_label(dt_code_tip).presence || "Unknown" %>
                 <% enc_tip = Alchemy::TagXml::DataTypeMapper.uticor_label(enc_code_tip).presence || "Unknown" %>
                 <% uticor_tip = "Datatype - #{dt_code_tip}: #{dt_tip}\nEncode - #{enc_code_tip}: #{enc_tip}" %>
+                <% data_type_value = row["Data Type"].to_s %>
+                <% unique_data_type = data_type_value.casecmp?("unique") %>
                 <tr
                   class="<%= "row-address-conflict" if row["_address_conflict"] %>"
                   data-tag-group="<%= row["Tag Group"].to_s %>"
@@ -37,7 +39,7 @@
                   data-read-write="<%= row["Read/Write"].to_s %>">
                   <td><%= row["Tag Group"] %></td>
                   <td><%= row["Tag Name"] %></td>
-                  <td data-hover-tip="<%= uticor_tip %>"><%= row["Data Type"] %></td>
+                  <td class="<%= "alchemy-app__cell-unique" if unique_data_type %>" data-hover-tip="<%= uticor_tip %>"><%= data_type_value %></td>
                   <td class="<%= "alchemy-app__cell-conflict" if row["_address_conflict"] %>"><%= row["Address Start"] %></td>
                   <td><%= row["Scaling"] %></td>
                   <td><%= row["Read/Write"] %></td>

@@ -428,6 +428,10 @@ html[data-nexus-shell-mode="light"] .alchemy-app__table th {
   font-weight: 600;
 }
 
+.alchemy-app__table td.alchemy-app__cell-unique {
+  color: #eab308;
+}
+
 .alchemy-app__hover-tip {
   position: fixed;
   left: 0;
