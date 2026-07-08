@@ -185,6 +185,7 @@ export default class extends Controller {
       this.syncViewportShellMargins()
       this.syncDesktopCanvasDimensions()
       this.reconcileWindowOnViewportResize({ viewportResize: true })
+      this.syncAlchemySplitOnResize()
     }
     window.addEventListener("resize", this.boundViewportResize)
     document.addEventListener("keydown", this.boundSnapEscapeKeydown)
@@ -221,6 +222,7 @@ export default class extends Controller {
     this.restoreWindowBounds()
     this.restorePersistedSpawnedTaskWindows()
     this.restoreOpenState()
+    this.restoreAlchemyViewPrefs()
 
     // Frames restored by boot scripts may already be loaded before connect(),
     // so run one immediate stale-link repair pass in addition to turbo:frame-load.
@@ -268,8 +270,8 @@ export default class extends Controller {
     this.element.removeEventListener("touchstart", this.boundTitleShellPointerDown)
     this.removeEdgeDragRails()
 
-    if (this._alchemySelectionBound && this._alchemySelectionHandler && this.hasFrameTarget) {
-      this.frameTarget.removeEventListener("alchemy:selection-changed", this._alchemySelectionHandler)
+    if (this._alchemySelectionBound && this._alchemySelectionHandler) {
+      this.element.removeEventListener("alchemy:selection-changed", this._alchemySelectionHandler)
     }
     if (this._alchemyRawTextListenerEl && this._alchemyRawTextListenerHandler) {
       this._alchemyRawTextListenerEl.removeEventListener("click", this._alchemyRawTextListenerHandler)
@@ -279,6 +281,10 @@ export default class extends Controller {
       if (this._alchemyRawTextScrollHandler) {
         this._alchemyRawTextListenerEl.removeEventListener("scroll", this._alchemyRawTextScrollHandler)
       }
+    }
+    if (this._alchemySplitResizeObserver) {
+      this._alchemySplitResizeObserver.disconnect()
+      this._alchemySplitResizeObserver = null
     }
   }
 
@@ -1448,7 +1454,7 @@ export default class extends Controller {
     if (event) event.preventDefault()
     const onMove = (moveEvent) => {
       const rect = results.getBoundingClientRect()
-      const minPane = 108
+      const minPane = this.alchemySplitMinPanePx(rect.height)
       const y = Number(moveEvent.clientY || 0)
       const topPx = Math.max(minPane, Math.min(rect.height - minPane, y - rect.top))
       this.applyAlchemySplitSize(topPx)
@@ -1473,6 +1479,34 @@ export default class extends Controller {
     this.applyAlchemyConflictFilter(enabled)
     this.syncAlchemyConflictToggleButton(enabled)
     this.syncAlchemyChromeMeta()
+  }
+
+  restoreAlchemyViewPrefs() {
+    if (this.appKeyValue !== "alchemy") return
+    const raw = this.readAlchemyViewPref("rawView")
+    const conflicts = this.readAlchemyViewPref("conflictsOnly")
+    if (raw === "true" || raw === "false") this.element.dataset.alchemyRawView = raw
+    if (conflicts === "true" || conflicts === "false") this.element.dataset.alchemyConflictsOnly = conflicts
+  }
+
+  readAlchemyViewPref(name) {
+    try {
+      return window.localStorage.getItem(this.alchemyViewPrefKey(name))
+    } catch (_e) {
+      return null
+    }
+  }
+
+  writeAlchemyViewPref(name, value) {
+    try {
+      window.localStorage.setItem(this.alchemyViewPrefKey(name), String(value))
+    } catch (_e) {
+      // ignore storage failures
+    }
+  }
+
+  alchemyViewPrefKey(name) {
+    return `nexus.alchemy.${name}`
   }
 
   syncAlchemyChromeMeta() {
@@ -1510,6 +1544,7 @@ export default class extends Controller {
     })
 
     this.element.dataset.alchemyConflictsOnly = enabled ? "true" : "false"
+    this.writeAlchemyViewPref("conflictsOnly", this.element.dataset.alchemyConflictsOnly)
   }
 
   applyAlchemyRawView(enabled) {
@@ -1528,12 +1563,21 @@ export default class extends Controller {
 
     if (enabled) {
       this.bindAlchemySelectionSync()
+      this.ensureAlchemySplitObserver(results)
+      const rect = results.getBoundingClientRect()
+      const savedBottomPx = Number(this.element.dataset.alchemySplitBottomPx || 0)
       let topPx = Number(this.element.dataset.alchemySplitTopPx || 0)
-      if (!Number.isFinite(topPx) || topPx <= 0) {
-        topPx = Math.round(results.getBoundingClientRect().height * 0.58)
+      if (Number.isFinite(savedBottomPx) && savedBottomPx > 0) {
+        topPx = rect.height - savedBottomPx
+      } else if (!Number.isFinite(topPx) || topPx <= 0) {
+        topPx = Math.round(rect.height * 0.58)
       }
       this.applyAlchemySplitSize(topPx)
     } else {
+      if (this._alchemySplitResizeObserver) {
+        this._alchemySplitResizeObserver.disconnect()
+        this._alchemySplitResizeObserver = null
+      }
       tableView.style.flex = "1 1 auto"
       rawView.style.flex = "1 1 auto"
     }
@@ -1544,6 +1588,7 @@ export default class extends Controller {
     }
 
     this.element.dataset.alchemyRawView = enabled ? "true" : "false"
+    this.writeAlchemyViewPref("rawView", this.element.dataset.alchemyRawView)
   }
 
   applyAlchemySplitSize(topPx) {
@@ -1554,11 +1599,46 @@ export default class extends Controller {
     if (!results || !tableView || !rawView) return
 
     const rect = results.getBoundingClientRect()
-    const minPane = 108
+    const minPane = this.alchemySplitMinPanePx(rect.height)
     const clamped = Math.max(minPane, Math.min(rect.height - minPane, Number(topPx || 0)))
     tableView.style.flex = `0 0 ${Math.round(clamped)}px`
     rawView.style.flex = "1 1 auto"
-    this.element.dataset.alchemySplitTopPx = String(Math.round(clamped))
+    const roundedTop = Math.round(clamped)
+    this.element.dataset.alchemySplitTopPx = String(roundedTop)
+    this.element.dataset.alchemySplitBottomPx = String(Math.max(0, Math.round(rect.height - roundedTop)))
+  }
+
+  alchemySplitMinPanePx(totalHeight) {
+    const total = Number(totalHeight || 0)
+    if (!Number.isFinite(total) || total <= 0) return 108
+    return Math.max(52, Math.min(108, Math.floor(total * 0.45)))
+  }
+
+  ensureAlchemySplitObserver(resultsEl) {
+    if (!(resultsEl instanceof Element)) return
+    if (this._alchemySplitResizeObserver) {
+      this._alchemySplitResizeObserver.disconnect()
+      this._alchemySplitResizeObserver = null
+    }
+    if (typeof ResizeObserver !== "function") return
+
+    this._alchemySplitResizeObserver = new ResizeObserver(() => {
+      this.syncAlchemySplitOnResize()
+    })
+    this._alchemySplitResizeObserver.observe(resultsEl)
+  }
+
+  syncAlchemySplitOnResize() {
+    if (this.appKeyValue !== "alchemy" || !this.hasFrameTarget) return
+    if (this.element.dataset.alchemyRawView !== "true") return
+
+    const results = this.frameTarget.querySelector(".alchemy-app__results")
+    if (!results) return
+    const rect = results.getBoundingClientRect()
+    const savedBottomPx = Number(this.element.dataset.alchemySplitBottomPx || 0)
+    if (!Number.isFinite(savedBottomPx) || savedBottomPx <= 0) return
+
+    this.applyAlchemySplitSize(rect.height - savedBottomPx)
   }
 
   bindAlchemySelectionSync() {
@@ -1570,7 +1650,7 @@ export default class extends Controller {
         this._alchemyActiveRawTagName = String(event?.detail?.activeRawTagName || event?.detail?.activeTagName || "")
         this.syncRawTextToActiveSelection({ scroll: true, focus: false, details: event?.detail })
       }
-      this.frameTarget.addEventListener("alchemy:selection-changed", this._alchemySelectionHandler)
+      this.element.addEventListener("alchemy:selection-changed", this._alchemySelectionHandler)
     }
 
     if (this._alchemyRawTextListenerEl && this._alchemyRawTextListenerHandler) {
@@ -1617,16 +1697,24 @@ export default class extends Controller {
     const rawText = this.frameTarget.querySelector(".alchemy-app__raw-text")
     if (!rawText) return
 
-    const tagName = String(this._alchemyActiveRawTagName || this._alchemyActiveTagName || "").trim()
+    const detailActive = String(details?.activeRawTagName || details?.activeTagName || "").trim()
+    const domSelectedRows = Array.from(this.frameTarget.querySelectorAll("tbody[data-alchemy-table-target='tbody'] tr.row-selected"))
+    const domActive = domSelectedRows.length > 0
+      ? String(domSelectedRows[domSelectedRows.length - 1].dataset.rawTagName || domSelectedRows[domSelectedRows.length - 1].dataset.tagName || "").trim()
+      : ""
+    const tagName = String(detailActive || this._alchemyActiveRawTagName || this._alchemyActiveTagName || domActive || "").trim()
     if (!tagName) {
       this.refreshRawHighlights(details)
       return
     }
 
+    this._alchemyActiveRawTagName = tagName
+
     const sourceKind = this.frameTarget.querySelector("[data-alchemy-source-kind]")?.dataset?.alchemySourceKind
     const text = rawText.value || ""
     const span = this.findTagSpanInRaw(text, tagName, sourceKind)
     if (!span) {
+      this._alchemyActiveRawSpan = null
       this.refreshRawHighlights(details)
       return
     }
@@ -1637,14 +1725,18 @@ export default class extends Controller {
 
     this._alchemyProgrammaticRawSelection = true
     this._alchemyIgnoreRawSelectionUntil = Date.now() + 180
+    this._alchemyActiveRawSpan = { start: span.start, end: span.end }
     rawText.setSelectionRange(span.start, span.end)
     if (focus && this.element.dataset.alchemyRawView === "true") rawText.focus({ preventScroll: true })
-    if (scroll) this.scrollRawToIndex(rawText, span.start)
+    this.refreshRawHighlights({ ...(details || {}), activeRawTagName: tagName })
+    if (scroll) this.scrollRawToSelectedHighlight(rawText, span.start)
+    window.requestAnimationFrame(() => {
+      this.refreshRawHighlights({ ...(details || {}), activeRawTagName: tagName })
+      this.syncAlchemyRawOverlayScrollPosition(rawText)
+    })
     window.setTimeout(() => {
       this._alchemyProgrammaticRawSelection = false
     }, 0)
-
-    this.refreshRawHighlights(details)
   }
 
   syncRowsToRawCursor(rawText) {
@@ -1652,12 +1744,14 @@ export default class extends Controller {
     const cursor = Number(rawText.selectionStart || 0)
     const sourceKind = this.frameTarget.querySelector("[data-alchemy-source-kind]")?.dataset?.alchemySourceKind
     const rows = Array.from(this.frameTarget.querySelectorAll("tbody[data-alchemy-table-target='tbody'] tr"))
-    const tagName = this.findNearestTagNameAtCursor(text, cursor, sourceKind, rows)
+    const matchAtCursor = this.findNearestTagNameAtCursor(text, cursor, sourceKind, rows)
+    const tagName = String(matchAtCursor?.rawTagName || "")
     if (!tagName) {
       this._alchemySuppressRawToRows = true
       rows.forEach((row) => row.classList.remove("row-selected"))
       this._alchemyActiveTagName = ""
       this._alchemyActiveRawTagName = ""
+      this._alchemyActiveRawSpan = null
       this._alchemySuppressRawToRows = false
       this.refreshRawHighlights({ selectedRows: [] })
       return
@@ -1670,6 +1764,9 @@ export default class extends Controller {
     rows.forEach((row) => row.classList.toggle("row-selected", row === match))
     this._alchemyActiveTagName = String(match.dataset.tagName || tagName)
     this._alchemyActiveRawTagName = tagName
+    this._alchemyActiveRawSpan = matchAtCursor?.span
+      ? { start: matchAtCursor.span.start, end: matchAtCursor.span.end }
+      : null
     this.ensureAlchemyRowVisible(match)
     this._alchemySuppressRawToRows = false
     this.refreshRawHighlights({
@@ -1689,6 +1786,8 @@ export default class extends Controller {
     const text = rawText.value || ""
     const states = this.collectAlchemyRowStates(details)
     const spans = []
+    const activeRawTag = String(this._alchemyActiveRawTagName || this._alchemyActiveTagName || "")
+    const activeSpan = this._alchemyActiveRawSpan
 
     states.forEach((state) => {
       if (!state.tagName) return
@@ -1698,6 +1797,19 @@ export default class extends Controller {
         classes.push("alchemy-app__raw-highlight--selected")
       }
       if (classes.length === 0) return
+
+      if (
+        activeSpan &&
+        state.rawTagName === activeRawTag &&
+        Number.isFinite(activeSpan.start) &&
+        Number.isFinite(activeSpan.end) &&
+        activeSpan.end > activeSpan.start &&
+        activeSpan.start >= 0 &&
+        activeSpan.end <= text.length
+      ) {
+        spans.push({ start: activeSpan.start, end: activeSpan.end, classes })
+        return
+      }
 
       this.findAllTagSpansInRaw(text, state.rawTagName || state.tagName, sourceKind).forEach((span) => {
         spans.push({ ...span, classes })
@@ -1716,9 +1828,6 @@ export default class extends Controller {
     return rows.map((row) => ({
       tagName: String(row.dataset.tagName || ""),
       rawTagName: String(row.dataset.rawTagName || row.dataset.tagName || ""),
-      conflict: row.classList.contains("row-address-conflict"),
-      pair: row.classList.contains("row-address-paired"),
-      unique: !!row.querySelector("td.alchemy-app__cell-unique"),
       selected: row.classList.contains("row-selected") || selectedRawFromDetails.has(String(row.dataset.rawTagName || row.dataset.tagName || ""))
     }))
   }
@@ -1730,7 +1839,10 @@ export default class extends Controller {
       const spans = []
       const directRe = new RegExp(`"name"\\s*:\\s*"${safe}"`, "g")
       for (let m = directRe.exec(text); m; m = directRe.exec(text)) {
-        const block = this.findEnclosingJsonObjectBounds(text, m.index)
+        let block = this.findEnclosingJsonObjectBounds(text, m.index)
+        if (!this.isValidMoxaSpan(block, m.index)) {
+          block = this.findMoxaObjectBoundsFallback(text, m.index)
+        }
         spans.push(block || { start: m.index, end: m.index + m[0].length })
       }
 
@@ -1742,7 +1854,10 @@ export default class extends Controller {
         const rawName = String(m[1] || "")
         if (!rawName) continue
         if (this.normalizeAlchemyTagName(rawName) !== normalizedNeedle) continue
-        const block = this.findEnclosingJsonObjectBounds(text, m.index)
+        let block = this.findEnclosingJsonObjectBounds(text, m.index)
+        if (!this.isValidMoxaSpan(block, m.index)) {
+          block = this.findMoxaObjectBoundsFallback(text, m.index)
+        }
         spans.push(block || { start: m.index, end: m.index + m[0].length })
       }
 
@@ -1813,6 +1928,47 @@ export default class extends Controller {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "_")
       .replace(/^_+|_+$/g, "")
+  }
+
+  isValidMoxaSpan(span, anchorIndex) {
+    if (!span) return false
+    if (!Number.isFinite(span.start) || !Number.isFinite(span.end)) return false
+    if (span.end <= span.start) return false
+    if (anchorIndex < span.start || anchorIndex >= span.end) return false
+    // Full tag objects are much larger than the name token; guard against tiny fallbacks.
+    return (span.end - span.start) >= 56
+  }
+
+  findMoxaObjectBoundsFallback(text, anchorIndex) {
+    const startFromFunction = text.lastIndexOf('{"function"', anchorIndex)
+    const start = startFromFunction >= 0 ? startFromFunction : text.lastIndexOf('{', anchorIndex)
+    if (start < 0) return null
+
+    const nextObjectMarker = text.indexOf('},{"function"', anchorIndex)
+    if (nextObjectMarker >= 0) {
+      const end = nextObjectMarker + 1
+      if (end > start && anchorIndex >= start && anchorIndex < end) {
+        return { start, end }
+      }
+    }
+
+    const nextArrayEnd = text.indexOf('}]', anchorIndex)
+    if (nextArrayEnd >= 0) {
+      const end = nextArrayEnd + 1
+      if (end > start && anchorIndex >= start && anchorIndex < end) {
+        return { start, end }
+      }
+    }
+
+    const nextObjectEnd = text.indexOf('}', anchorIndex)
+    if (nextObjectEnd >= 0) {
+      const end = nextObjectEnd + 1
+      if (end > start && anchorIndex >= start && anchorIndex < end) {
+        return { start, end }
+      }
+    }
+
+    return null
   }
 
   findEnclosingJsonObjectBounds(text, index) {
@@ -1990,24 +2146,58 @@ export default class extends Controller {
 
         // Strict mode: only match when cursor is inside this tag block.
         if (cursor >= span.start && cursor < span.end) {
-          matches.push({ rawTagName, length: span.end - span.start, start: span.start })
+          matches.push({ rawTagName, span, length: span.end - span.start, start: span.start })
         }
       })
     })
 
-    if (matches.length === 0) return ""
+    if (matches.length === 0) return null
 
     // Prefer tightest block (in case of nesting), then earliest occurrence.
     matches.sort((a, b) => a.length - b.length || a.start - b.start)
-    return String(matches[0].rawTagName || "")
+    return {
+      rawTagName: String(matches[0].rawTagName || ""),
+      span: matches[0].span || null
+    }
   }
 
   scrollRawToIndex(rawText, index) {
-    const prefix = (rawText.value || "").slice(0, Math.max(0, index))
-    const lines = prefix.split("\n").length - 1
-    const total = Math.max(1, (rawText.value || "").split("\n").length - 1)
-    const ratio = lines / total
-    rawText.scrollTop = Math.max(0, ratio * rawText.scrollHeight - rawText.clientHeight * 0.32)
+    const text = String(rawText.value || "")
+    const target = Math.max(0, Math.min(Number(index || 0), text.length))
+    const ratio = text.length > 0 ? target / text.length : 0
+    rawText.scrollTop = Math.max(0, ratio * rawText.scrollHeight - rawText.clientHeight * 0.28)
+    this.syncAlchemyRawOverlayScrollPosition(rawText)
+  }
+
+  scrollRawToSelectedHighlight(rawText, fallbackIndex = 0) {
+    if (!this.hasFrameTarget) {
+      this.scrollRawToIndex(rawText, fallbackIndex)
+      return
+    }
+
+    const overlay = this.frameTarget.querySelector("[data-alchemy-raw-overlay]")
+    if (!(overlay instanceof HTMLElement)) {
+      this.scrollRawToIndex(rawText, fallbackIndex)
+      return
+    }
+
+    const highlight = overlay.querySelector(".alchemy-app__raw-highlight--selected")
+    if (!(highlight instanceof HTMLElement)) {
+      this.scrollRawToIndex(rawText, fallbackIndex)
+      return
+    }
+
+    const targetTop = Math.max(0, highlight.offsetTop - rawText.clientHeight * 0.28)
+    rawText.scrollTop = targetTop
+    this.syncAlchemyRawOverlayScrollPosition(rawText)
+  }
+
+  syncAlchemyRawOverlayScrollPosition(rawText) {
+    if (!this.hasFrameTarget) return
+    const overlay = this.frameTarget.querySelector("[data-alchemy-raw-overlay]")
+    if (!(overlay instanceof HTMLElement)) return
+    overlay.scrollTop = rawText.scrollTop
+    overlay.scrollLeft = rawText.scrollLeft
   }
 
   syncAlchemyConflictToggleButton(enabled) {

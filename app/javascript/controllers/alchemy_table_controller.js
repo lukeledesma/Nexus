@@ -225,10 +225,7 @@ export default class extends Controller {
       detail: {
         selectedRows: selectedRows.map((row) => ({
           tagName: String(row.dataset.tagName || ""),
-          rawTagName: String(row.dataset.rawTagName || row.dataset.tagName || ""),
-          conflict: row.classList.contains("row-address-conflict"),
-          pair: row.classList.contains("row-address-paired"),
-          unique: !!row.querySelector("td.alchemy-app__cell-unique")
+          rawTagName: String(row.dataset.rawTagName || row.dataset.tagName || "")
         })),
         activeTagName: String(active?.dataset?.tagName || ""),
         activeRawTagName: String(active?.dataset?.rawTagName || active?.dataset?.tagName || "")

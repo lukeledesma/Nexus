@@ -374,6 +374,10 @@
   background: color-mix(in oklab, var(--border-hairline) 80%, var(--text-muted) 20%);
 }
 
+html[data-nexus-shell-mode="light"] .alchemy-app__splitter {
+  background: color-mix(in oklab, var(--border-hairline) 88%, #0f172a 12%);
+}
+
 .alchemy-app__results.is-split .alchemy-app__splitter {
   display: block;
 }
@@ -420,6 +424,16 @@
   box-shadow: none;
 }
 
+.alchemy-app__raw-text::selection {
+  background: transparent;
+  color: transparent;
+}
+
+.alchemy-app__raw-text::-moz-selection {
+  background: transparent;
+  color: transparent;
+}
+
 .alchemy-app__raw-overlay {
   position: absolute;
   inset: 0;
@@ -436,6 +450,22 @@
   scrollbar-width: none;
 }
 
+:root[data-nexus-shell-mode="light"] section.content-window[data-content-window-app-key-value="alchemy"] .alchemy-app__raw-view,
+html[data-nexus-shell-mode="light"] section.content-window[data-content-window-app-key-value="alchemy"] .alchemy-app__raw-view {
+  background: #d4d8de !important;
+}
+
+:root[data-nexus-shell-mode="light"] section.content-window[data-content-window-app-key-value="alchemy"] .alchemy-app__raw-overlay,
+html[data-nexus-shell-mode="light"] section.content-window[data-content-window-app-key-value="alchemy"] .alchemy-app__raw-overlay {
+  background: #d4d8de !important;
+  color: #1f2937 !important;
+}
+
+:root[data-nexus-shell-mode="light"] section.content-window[data-content-window-app-key-value="alchemy"] .alchemy-app__splitter,
+html[data-nexus-shell-mode="light"] section.content-window[data-content-window-app-key-value="alchemy"] .alchemy-app__splitter {
+  background: #8f98a3;
+}
+
 .alchemy-app__raw-overlay::-webkit-scrollbar {
   display: none;
 }
@@ -447,7 +477,8 @@
 }
 
 .alchemy-app__raw-highlight--selected {
-  outline: 1px solid color-mix(in oklab, #93c5fd 75%, transparent);
+  outline: 1px solid color-mix(in oklab, #93c5fd 70%, transparent);
+  background: color-mix(in oklab, #93c5fd 18%, transparent);
 }
 
 section.content-window[data-content-window-app-key-value="alchemy"] .alchemy-app[data-alchemy-source-kind="moxa"] .alchemy-app__raw-text {
@@ -555,12 +586,12 @@ html[data-nexus-shell-mode="light"] .alchemy-app__table th {
 }
 
 .alchemy-app__table td.alchemy-app__cell-paired {
-  color: #4ade80;
-  font-weight: 600;
+  color: var(--text);
+  font-weight: inherit;
 }
 
 .alchemy-app__table td.alchemy-app__cell-paired-readonly {
-  color: #86efac;
+  color: var(--text);
 }
 
 .alchemy-app__table td.alchemy-app__cell-unique {
