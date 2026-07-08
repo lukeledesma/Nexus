@@ -8,8 +8,10 @@ module Apps
       @rows = []
       @source_filename = nil
       @source_xml_content = ""
+      @raw_source_content = ""
       @linked_document_id = nil
-      @status_message = "Drop XML files into Finder > Alchemy, then open one here."
+      @source_kind = nil
+      @status_message = "Drop XML or Moxa JSON files into Finder > Alchemy, then open one here."
 
       if params[:document_id].present?
         result = Apps::OpenLinkedDocument.call(
@@ -28,8 +30,11 @@ module Apps
         doc = result.payload.fetch(:document)
         @linked_document_id = doc.id
         @source_filename = doc.title.to_s
-        @source_xml_content = doc.content.to_s
+        stored_content = doc.content.to_s
+        @source_xml_content = Alchemy::TagXml::Parser.extract_xml_content(stored_content)
+        @raw_source_content = Alchemy::TagXml::Parser.extract_raw_content(stored_content)
         @rows = Alchemy::TagXml::Parser.parse_records_from_content(@source_xml_content)
+        @source_kind = infer_source_kind(@rows)
         @status_message = @rows.present? ? nil : "No tags found in this XML file."
       end
 
@@ -66,6 +71,16 @@ module Apps
       else
         head :internal_server_error
       end
+    end
+
+    private
+
+    def infer_source_kind(rows)
+      kinds = rows.filter_map { |row| row["_source_format"].to_s.downcase.presence }.uniq
+      return "unknown" if kinds.empty?
+      return kinds.first if kinds.size == 1
+
+      "mixed"
     end
   end
 end

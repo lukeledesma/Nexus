@@ -267,6 +267,19 @@ export default class extends Controller {
     this.element.removeEventListener("mousedown", this.boundTitleShellPointerDown)
     this.element.removeEventListener("touchstart", this.boundTitleShellPointerDown)
     this.removeEdgeDragRails()
+
+    if (this._alchemySelectionBound && this._alchemySelectionHandler && this.hasFrameTarget) {
+      this.frameTarget.removeEventListener("alchemy:selection-changed", this._alchemySelectionHandler)
+    }
+    if (this._alchemyRawTextListenerEl && this._alchemyRawTextListenerHandler) {
+      this._alchemyRawTextListenerEl.removeEventListener("click", this._alchemyRawTextListenerHandler)
+      this._alchemyRawTextListenerEl.removeEventListener("keyup", this._alchemyRawTextListenerHandler)
+      this._alchemyRawTextListenerEl.removeEventListener("select", this._alchemyRawTextListenerHandler)
+      this._alchemyRawTextListenerEl.removeEventListener("mouseup", this._alchemyRawTextListenerHandler)
+      if (this._alchemyRawTextScrollHandler) {
+        this._alchemyRawTextListenerEl.removeEventListener("scroll", this._alchemyRawTextScrollHandler)
+      }
+    }
   }
 
   onTitleShellPointerDown(event) {
@@ -1409,7 +1422,47 @@ export default class extends Controller {
   handleFrameLoad(event) {
     if (!this.hasFrameTarget || event?.target !== this.frameTarget) return
     this.syncAlchemyChromeMeta()
+    const rawEnabled = this.element.dataset.alchemyRawView === "true"
+    this.applyAlchemyRawView(rawEnabled)
+    this.syncAlchemyRawToggleButton(rawEnabled)
+    this.bindAlchemySelectionSync()
     this.repairTaskDraftLinkIfStale()
+  }
+
+  toggleAlchemyRawView(event) {
+    if (event) event.preventDefault()
+    if (this.appKeyValue !== "alchemy") return
+
+    const enabled = this.element.dataset.alchemyRawView !== "true"
+    this.applyAlchemyRawView(enabled)
+    this.syncAlchemyRawToggleButton(enabled)
+  }
+
+  startAlchemySplitResize(event) {
+    if (this.appKeyValue !== "alchemy" || !this.hasFrameTarget) return
+    const results = this.frameTarget.querySelector(".alchemy-app__results")
+    const tableView = this.frameTarget.querySelector("[data-alchemy-table-view]")
+    const rawView = this.frameTarget.querySelector("[data-alchemy-raw-view]")
+    if (!results || !tableView || !rawView) return
+
+    if (event) event.preventDefault()
+    const onMove = (moveEvent) => {
+      const rect = results.getBoundingClientRect()
+      const minPane = 108
+      const y = Number(moveEvent.clientY || 0)
+      const topPx = Math.max(minPane, Math.min(rect.height - minPane, y - rect.top))
+      this.applyAlchemySplitSize(topPx)
+    }
+
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove)
+      window.removeEventListener("pointerup", onUp)
+      window.removeEventListener("pointercancel", onUp)
+    }
+
+    window.addEventListener("pointermove", onMove)
+    window.addEventListener("pointerup", onUp)
+    window.addEventListener("pointercancel", onUp)
   }
 
   toggleAlchemyConflictFilter(event) {
@@ -1428,15 +1481,19 @@ export default class extends Controller {
     const countEl = this.element.querySelector("[data-nexus-alchemy-tag-count]")
     const rows = Array.from(this.frameTarget.querySelectorAll("tbody[data-alchemy-table-target='tbody'] tr"))
     const conflictCount = rows.filter((row) => row.classList.contains("row-address-conflict")).length
+    const sourceKind = this.frameTarget
+      .querySelector("[data-alchemy-source-kind]")
+      ?.dataset
+      ?.alchemySourceKind
     const enabled = this.element.dataset.alchemyConflictsOnly === "true"
 
     if (countEl) {
       countEl.hidden = false
       const count = rows.length
-      const totalText = `${count} tag${count === 1 ? "" : "s"}`
-      countEl.textContent = enabled
-        ? `${totalText} | ${conflictCount} conflict${conflictCount === 1 ? "" : "s"}`
-        : totalText
+      const sourceLabel = this.alchemySourceLabel(sourceKind) || "Uticor"
+      const tagText = `${count} tag${count === 1 ? "" : "s"}`
+      const conflictText = `${conflictCount} conflict${conflictCount === 1 ? "" : "s"}`
+      countEl.textContent = `(${sourceLabel}) | ${tagText} | ${conflictText}`
     }
 
     this.applyAlchemyConflictFilter(enabled)
@@ -1455,6 +1512,504 @@ export default class extends Controller {
     this.element.dataset.alchemyConflictsOnly = enabled ? "true" : "false"
   }
 
+  applyAlchemyRawView(enabled) {
+    if (this.appKeyValue !== "alchemy" || !this.hasFrameTarget) return
+
+    const results = this.frameTarget.querySelector(".alchemy-app__results")
+    const tableView = this.frameTarget.querySelector("[data-alchemy-table-view]")
+    const rawView = this.frameTarget.querySelector("[data-alchemy-raw-view]")
+    const splitter = this.frameTarget.querySelector("[data-alchemy-splitter]")
+    if (!results || !tableView || !rawView || !splitter) return
+
+    tableView.hidden = false
+    rawView.hidden = !enabled
+    splitter.hidden = !enabled
+    results.classList.toggle("is-split", enabled)
+
+    if (enabled) {
+      this.bindAlchemySelectionSync()
+      let topPx = Number(this.element.dataset.alchemySplitTopPx || 0)
+      if (!Number.isFinite(topPx) || topPx <= 0) {
+        topPx = Math.round(results.getBoundingClientRect().height * 0.58)
+      }
+      this.applyAlchemySplitSize(topPx)
+    } else {
+      tableView.style.flex = "1 1 auto"
+      rawView.style.flex = "1 1 auto"
+    }
+
+    if (enabled) {
+      const rawText = rawView.querySelector(".alchemy-app__raw-text")
+      if (rawText) this.syncRawTextToActiveSelection({ scroll: false, focus: false })
+    }
+
+    this.element.dataset.alchemyRawView = enabled ? "true" : "false"
+  }
+
+  applyAlchemySplitSize(topPx) {
+    if (this.appKeyValue !== "alchemy" || !this.hasFrameTarget) return
+    const results = this.frameTarget.querySelector(".alchemy-app__results")
+    const tableView = this.frameTarget.querySelector("[data-alchemy-table-view]")
+    const rawView = this.frameTarget.querySelector("[data-alchemy-raw-view]")
+    if (!results || !tableView || !rawView) return
+
+    const rect = results.getBoundingClientRect()
+    const minPane = 108
+    const clamped = Math.max(minPane, Math.min(rect.height - minPane, Number(topPx || 0)))
+    tableView.style.flex = `0 0 ${Math.round(clamped)}px`
+    rawView.style.flex = "1 1 auto"
+    this.element.dataset.alchemySplitTopPx = String(Math.round(clamped))
+  }
+
+  bindAlchemySelectionSync() {
+    if (this.appKeyValue !== "alchemy" || !this.hasFrameTarget) return
+    if (!this._alchemySelectionBound) {
+      this._alchemySelectionBound = true
+      this._alchemySelectionHandler = (event) => {
+        this._alchemyActiveTagName = String(event?.detail?.activeTagName || "")
+        this._alchemyActiveRawTagName = String(event?.detail?.activeRawTagName || event?.detail?.activeTagName || "")
+        this.syncRawTextToActiveSelection({ scroll: true, focus: false, details: event?.detail })
+      }
+      this.frameTarget.addEventListener("alchemy:selection-changed", this._alchemySelectionHandler)
+    }
+
+    if (this._alchemyRawTextListenerEl && this._alchemyRawTextListenerHandler) {
+      this._alchemyRawTextListenerEl.removeEventListener("click", this._alchemyRawTextListenerHandler)
+      this._alchemyRawTextListenerEl.removeEventListener("keyup", this._alchemyRawTextListenerHandler)
+      this._alchemyRawTextListenerEl.removeEventListener("select", this._alchemyRawTextListenerHandler)
+      this._alchemyRawTextListenerEl.removeEventListener("mouseup", this._alchemyRawTextListenerHandler)
+      if (this._alchemyRawTextScrollHandler) {
+        this._alchemyRawTextListenerEl.removeEventListener("scroll", this._alchemyRawTextScrollHandler)
+      }
+    }
+
+    const rawText = this.frameTarget.querySelector(".alchemy-app__raw-text")
+    if (!rawText) return
+
+    const rawHandler = (event) => {
+      // Only user-driven interactions in the raw pane should update row selection.
+      if (event && event.isTrusted === false) return
+      if (this._alchemySuppressRawToRows || this._alchemyProgrammaticRawSelection) return
+      if (Date.now() < Number(this._alchemyIgnoreRawSelectionUntil || 0)) return
+      this.syncRowsToRawCursor(rawText)
+    }
+
+    const syncOverlayScroll = () => {
+      const overlay = this.frameTarget.querySelector("[data-alchemy-raw-overlay]")
+      if (!overlay) return
+      overlay.scrollTop = rawText.scrollTop
+      overlay.scrollLeft = rawText.scrollLeft
+    }
+
+    rawText.addEventListener("click", rawHandler)
+    rawText.addEventListener("keyup", rawHandler)
+    rawText.addEventListener("select", rawHandler)
+    rawText.addEventListener("mouseup", rawHandler)
+    rawText.addEventListener("scroll", syncOverlayScroll)
+    this._alchemyRawTextListenerEl = rawText
+    this._alchemyRawTextListenerHandler = rawHandler
+    this._alchemyRawTextScrollHandler = syncOverlayScroll
+    this.refreshRawHighlights()
+  }
+
+  syncRawTextToActiveSelection({ scroll = true, focus = false, details = null } = {}) {
+    if (this.appKeyValue !== "alchemy" || !this.hasFrameTarget) return
+    const rawText = this.frameTarget.querySelector(".alchemy-app__raw-text")
+    if (!rawText) return
+
+    const tagName = String(this._alchemyActiveRawTagName || this._alchemyActiveTagName || "").trim()
+    if (!tagName) {
+      this.refreshRawHighlights(details)
+      return
+    }
+
+    const sourceKind = this.frameTarget.querySelector("[data-alchemy-source-kind]")?.dataset?.alchemySourceKind
+    const text = rawText.value || ""
+    const span = this.findTagSpanInRaw(text, tagName, sourceKind)
+    if (!span) {
+      this.refreshRawHighlights(details)
+      return
+    }
+
+    const rows = Array.from(this.frameTarget.querySelectorAll("tbody[data-alchemy-table-target='tbody'] tr"))
+    const rowMatch = rows.find((row) => String(row.dataset.rawTagName || row.dataset.tagName || "") === tagName)
+    if (rowMatch) this.ensureAlchemyRowVisible(rowMatch)
+
+    this._alchemyProgrammaticRawSelection = true
+    this._alchemyIgnoreRawSelectionUntil = Date.now() + 180
+    rawText.setSelectionRange(span.start, span.end)
+    if (focus && this.element.dataset.alchemyRawView === "true") rawText.focus({ preventScroll: true })
+    if (scroll) this.scrollRawToIndex(rawText, span.start)
+    window.setTimeout(() => {
+      this._alchemyProgrammaticRawSelection = false
+    }, 0)
+
+    this.refreshRawHighlights(details)
+  }
+
+  syncRowsToRawCursor(rawText) {
+    const text = rawText.value || ""
+    const cursor = Number(rawText.selectionStart || 0)
+    const sourceKind = this.frameTarget.querySelector("[data-alchemy-source-kind]")?.dataset?.alchemySourceKind
+    const rows = Array.from(this.frameTarget.querySelectorAll("tbody[data-alchemy-table-target='tbody'] tr"))
+    const tagName = this.findNearestTagNameAtCursor(text, cursor, sourceKind, rows)
+    if (!tagName) {
+      this._alchemySuppressRawToRows = true
+      rows.forEach((row) => row.classList.remove("row-selected"))
+      this._alchemyActiveTagName = ""
+      this._alchemyActiveRawTagName = ""
+      this._alchemySuppressRawToRows = false
+      this.refreshRawHighlights({ selectedRows: [] })
+      return
+    }
+
+    const match = rows.find((row) => String(row.dataset.rawTagName || row.dataset.tagName || "") === tagName)
+    if (!match) return
+
+    this._alchemySuppressRawToRows = true
+    rows.forEach((row) => row.classList.toggle("row-selected", row === match))
+    this._alchemyActiveTagName = String(match.dataset.tagName || tagName)
+    this._alchemyActiveRawTagName = tagName
+    this.ensureAlchemyRowVisible(match)
+    this._alchemySuppressRawToRows = false
+    this.refreshRawHighlights({
+      activeTagName: String(match.dataset.tagName || tagName),
+      activeRawTagName: tagName,
+      selectedRows: [{ tagName: String(match.dataset.tagName || tagName), rawTagName: tagName }]
+    })
+  }
+
+  refreshRawHighlights(details = null) {
+    if (this.appKeyValue !== "alchemy" || !this.hasFrameTarget) return
+    const rawText = this.frameTarget.querySelector(".alchemy-app__raw-text")
+    const overlay = this.frameTarget.querySelector("[data-alchemy-raw-overlay]")
+    if (!rawText || !overlay) return
+
+    const sourceKind = this.frameTarget.querySelector("[data-alchemy-source-kind]")?.dataset?.alchemySourceKind
+    const text = rawText.value || ""
+    const states = this.collectAlchemyRowStates(details)
+    const spans = []
+
+    states.forEach((state) => {
+      if (!state.tagName) return
+      const classes = []
+      // Keep raw text highlighting focused on active/selected tags only.
+      if (state.selected || state.rawTagName === String(this._alchemyActiveRawTagName || this._alchemyActiveTagName || "")) {
+        classes.push("alchemy-app__raw-highlight--selected")
+      }
+      if (classes.length === 0) return
+
+      this.findAllTagSpansInRaw(text, state.rawTagName || state.tagName, sourceKind).forEach((span) => {
+        spans.push({ ...span, classes })
+      })
+    })
+
+    overlay.innerHTML = this.buildRawOverlayHtml(text, spans)
+    overlay.scrollTop = rawText.scrollTop
+    overlay.scrollLeft = rawText.scrollLeft
+  }
+
+  collectAlchemyRowStates(details = null) {
+    const selectedRows = Array.isArray(details?.selectedRows) ? details.selectedRows : []
+    const selectedRawFromDetails = new Set(selectedRows.map((row) => String(row.rawTagName || row.tagName || "")))
+    const rows = Array.from(this.frameTarget.querySelectorAll("tbody[data-alchemy-table-target='tbody'] tr"))
+    return rows.map((row) => ({
+      tagName: String(row.dataset.tagName || ""),
+      rawTagName: String(row.dataset.rawTagName || row.dataset.tagName || ""),
+      conflict: row.classList.contains("row-address-conflict"),
+      pair: row.classList.contains("row-address-paired"),
+      unique: !!row.querySelector("td.alchemy-app__cell-unique"),
+      selected: row.classList.contains("row-selected") || selectedRawFromDetails.has(String(row.dataset.rawTagName || row.dataset.tagName || ""))
+    }))
+  }
+
+  findAllTagSpansInRaw(text, tagName, sourceKind) {
+    const safe = tagName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    const isMoxa = String(sourceKind || "").toLowerCase() === "moxa"
+    if (isMoxa) {
+      const spans = []
+      const directRe = new RegExp(`"name"\\s*:\\s*"${safe}"`, "g")
+      for (let m = directRe.exec(text); m; m = directRe.exec(text)) {
+        const block = this.findEnclosingJsonObjectBounds(text, m.index)
+        spans.push(block || { start: m.index, end: m.index + m[0].length })
+      }
+
+      if (spans.length > 0) return spans
+
+      const normalizedNeedle = this.normalizeAlchemyTagName(tagName)
+      const nameRe = /"name"\s*:\s*"([^"]+)"/g
+      for (let m = nameRe.exec(text); m; m = nameRe.exec(text)) {
+        const rawName = String(m[1] || "")
+        if (!rawName) continue
+        if (this.normalizeAlchemyTagName(rawName) !== normalizedNeedle) continue
+        const block = this.findEnclosingJsonObjectBounds(text, m.index)
+        spans.push(block || { start: m.index, end: m.index + m[0].length })
+      }
+
+      return spans
+    }
+
+    const xmlSpans = []
+    const candidates = this.xmlTagCandidates(tagName)
+    candidates.forEach((candidate) => {
+      const xmlRe = this.buildXmlOpenTagRegex(candidate)
+      for (let m = xmlRe.exec(text); m; m = xmlRe.exec(text)) {
+        const block = this.findXmlElementBounds(text, candidate, m.index)
+        xmlSpans.push(block || { start: m.index, end: m.index + m[0].length })
+      }
+    })
+
+    if (xmlSpans.length > 1) {
+      xmlSpans.sort((a, b) => a.start - b.start || a.end - b.end)
+      const deduped = []
+      xmlSpans.forEach((span) => {
+        const last = deduped[deduped.length - 1]
+        if (last && last.start === span.start && last.end === span.end) return
+        deduped.push(span)
+      })
+      return deduped
+    }
+    return xmlSpans
+  }
+
+  buildRawOverlayHtml(text, spans) {
+    if (!text) return ""
+    if (!Array.isArray(spans) || spans.length === 0) return this.escapeRawHtml(text)
+
+    const sorted = spans
+      .filter((s) => Number.isFinite(s.start) && Number.isFinite(s.end) && s.end > s.start)
+      .sort((a, b) => a.start - b.start || b.end - a.end)
+
+    let out = ""
+    let cursor = 0
+    sorted.forEach((span) => {
+      if (span.start < cursor) return
+      out += this.escapeRawHtml(text.slice(cursor, span.start))
+      const klass = ["alchemy-app__raw-highlight", ...(span.classes || [])].join(" ")
+      out += `<span class="${klass}">${this.escapeRawHtml(text.slice(span.start, span.end))}</span>`
+      cursor = span.end
+    })
+    out += this.escapeRawHtml(text.slice(cursor))
+    return out
+  }
+
+  escapeRawHtml(text) {
+    return String(text || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\"/g, "&quot;")
+      .replace(/'/g, "&#39;")
+  }
+
+  findTagSpanInRaw(text, tagName, sourceKind) {
+    const spans = this.findAllTagSpansInRaw(text, tagName, sourceKind)
+    return spans[0] || null
+  }
+
+  normalizeAlchemyTagName(value) {
+    return String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+  }
+
+  findEnclosingJsonObjectBounds(text, index) {
+    const open = this.findJsonBraceOpen(text, index)
+    if (open < 0) return null
+    const close = this.findJsonBraceClose(text, open)
+    if (close < 0 || close <= open) return null
+    return { start: open, end: close + 1 }
+  }
+
+  findJsonBraceOpen(text, index) {
+    const limit = Math.min(Math.max(0, Number(index || 0)), Math.max(0, text.length - 1))
+    if (!text || text.length === 0) return -1
+
+    let inString = false
+    let escaped = false
+    const objectStack = []
+
+    for (let i = 0; i <= limit; i += 1) {
+      const ch = text[i]
+
+      if (inString) {
+        if (escaped) {
+          escaped = false
+        } else if (ch === "\\") {
+          escaped = true
+        } else if (ch === '"') {
+          inString = false
+        }
+        continue
+      }
+
+      if (ch === '"') {
+        inString = true
+        escaped = false
+        continue
+      }
+
+      if (ch === "{") {
+        objectStack.push(i)
+        continue
+      }
+
+      if (ch === "}" && objectStack.length > 0) {
+        objectStack.pop()
+      }
+    }
+
+    return objectStack.length > 0 ? objectStack[objectStack.length - 1] : -1
+  }
+
+  findJsonBraceClose(text, openIndex) {
+    if (!text || openIndex < 0 || openIndex >= text.length) return -1
+    if (text[openIndex] !== "{") return -1
+
+    let inString = false
+    let escaped = false
+    let depth = 0
+
+    for (let i = openIndex; i < text.length; i += 1) {
+      const ch = text[i]
+
+      if (inString) {
+        if (escaped) {
+          escaped = false
+        } else if (ch === "\\") {
+          escaped = true
+        } else if (ch === '"') {
+          inString = false
+        }
+        continue
+      }
+
+      if (ch === '"') {
+        inString = true
+        escaped = false
+        continue
+      }
+
+      if (ch === "{") {
+        depth += 1
+        continue
+      }
+
+      if (ch === "}") {
+        depth -= 1
+        if (depth === 0) return i
+      }
+    }
+
+    return -1
+  }
+
+  findXmlElementBounds(text, tagName, openTagIndex) {
+    const openRe = this.buildXmlOpenTagRegex(tagName)
+    const closeRe = this.buildXmlCloseTagRegex(tagName)
+
+    closeRe.lastIndex = Math.max(0, openTagIndex)
+    const closeMatch = closeRe.exec(text)
+    if (!closeMatch) return null
+
+    openRe.lastIndex = Math.max(0, openTagIndex)
+    const openMatch = openRe.exec(text)
+    const start = openMatch ? openMatch.index : openTagIndex
+    return { start, end: closeMatch.index + closeMatch[0].length }
+  }
+
+  buildXmlOpenTagRegex(tagName) {
+    const token = String(tagName || "")
+    const safe = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    const isQuoted = token.startsWith('"') && token.endsWith('"')
+    const hasPrefix = safe.includes(":")
+    const prefix = hasPrefix ? "" : "(?:[A-Za-z_][\\w.-]*:)?"
+    return new RegExp(`<${isQuoted ? "" : prefix}${safe}(?:\\s[^>]*)?>`, "gi")
+  }
+
+  buildXmlCloseTagRegex(tagName) {
+    const token = String(tagName || "")
+    const safe = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    const isQuoted = token.startsWith('"') && token.endsWith('"')
+    const hasPrefix = safe.includes(":")
+    const prefix = hasPrefix ? "" : "(?:[A-Za-z_][\\w.-]*:)?"
+    return new RegExp(`</${isQuoted ? "" : prefix}${safe}\\s*>`, "gi")
+  }
+
+  xmlTagCandidates(tagName) {
+    const raw = String(tagName || "").trim()
+    if (!raw) return []
+
+    const unquoted = raw.replace(/^\"(.+)\"$/, "$1")
+    const candidates = [raw, unquoted, `"${unquoted}"`]
+      .map((value) => String(value || "").trim())
+      .filter((value) => value.length > 0)
+
+    return Array.from(new Set(candidates))
+  }
+
+  ensureAlchemyRowVisible(row) {
+    if (!(row instanceof Element) || !this.hasFrameTarget) return
+    const tableWrap = this.frameTarget.querySelector("[data-alchemy-table-target='tableWrap']")
+    if (!(tableWrap instanceof HTMLElement)) {
+      row.scrollIntoView({ block: "nearest" })
+      return
+    }
+
+    const rowTop = row.offsetTop
+    const rowBottom = rowTop + row.offsetHeight
+    const pad = Math.max(1, row.offsetHeight)
+    const viewportTop = tableWrap.scrollTop
+    const viewportBottom = viewportTop + tableWrap.clientHeight
+
+    if (rowTop - pad < viewportTop) {
+      tableWrap.scrollTop = Math.max(0, rowTop - pad)
+      return
+    }
+
+    if (rowBottom + pad > viewportBottom) {
+      tableWrap.scrollTop = Math.max(0, rowBottom + pad - tableWrap.clientHeight)
+    }
+  }
+
+  findNearestTagNameAtCursor(text, cursor, sourceKind, rowsArg = null) {
+    const rows = Array.from(rowsArg || this.frameTarget.querySelectorAll("tbody[data-alchemy-table-target='tbody'] tr"))
+    const matches = []
+
+    rows.forEach((row) => {
+      const rawTagName = String(row.dataset.rawTagName || row.dataset.tagName || "")
+      if (!rawTagName) return
+
+      const spans = this.findAllTagSpansInRaw(text, rawTagName, sourceKind)
+      spans.forEach((span) => {
+        if (!span) return
+        if (!Number.isFinite(span.start) || !Number.isFinite(span.end)) return
+        if (span.end <= span.start) return
+
+        // Strict mode: only match when cursor is inside this tag block.
+        if (cursor >= span.start && cursor < span.end) {
+          matches.push({ rawTagName, length: span.end - span.start, start: span.start })
+        }
+      })
+    })
+
+    if (matches.length === 0) return ""
+
+    // Prefer tightest block (in case of nesting), then earliest occurrence.
+    matches.sort((a, b) => a.length - b.length || a.start - b.start)
+    return String(matches[0].rawTagName || "")
+  }
+
+  scrollRawToIndex(rawText, index) {
+    const prefix = (rawText.value || "").slice(0, Math.max(0, index))
+    const lines = prefix.split("\n").length - 1
+    const total = Math.max(1, (rawText.value || "").split("\n").length - 1)
+    const ratio = lines / total
+    rawText.scrollTop = Math.max(0, ratio * rawText.scrollHeight - rawText.clientHeight * 0.32)
+  }
+
   syncAlchemyConflictToggleButton(enabled) {
     const button = this.element.querySelector("[data-alchemy-conflict-toggle]")
     if (!button) return
@@ -1468,6 +2023,29 @@ export default class extends Controller {
     button.setAttribute("aria-label", label)
     if (onIcon) onIcon.hidden = !enabled
     if (offIcon) offIcon.hidden = enabled
+  }
+
+  syncAlchemyRawToggleButton(enabled) {
+    const button = this.element.querySelector("[data-alchemy-raw-toggle]")
+    if (!button) return
+
+    const onIcon = button.querySelector("[data-alchemy-raw-icon='on']")
+    const offIcon = button.querySelector("[data-alchemy-raw-icon='off']")
+
+    button.setAttribute("aria-pressed", enabled ? "true" : "false")
+    const label = enabled ? "Hide raw file" : "Show raw file"
+    button.setAttribute("title", label)
+    button.setAttribute("aria-label", label)
+    if (onIcon) onIcon.hidden = !enabled
+    if (offIcon) offIcon.hidden = enabled
+  }
+
+  alchemySourceLabel(kind) {
+    const normalized = String(kind || "").toLowerCase()
+    if (normalized === "moxa") return "Moxa"
+    if (normalized === "uticor") return "Uticor"
+    if (normalized === "mixed") return "Mixed"
+    return ""
   }
 
   async repairTaskDraftLinkIfStale() {

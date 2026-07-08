@@ -1,56 +1,77 @@
 <% frame_id = params[:frame_id].presence || turbo_frame_request_id.presence || "alchemy-pane" %>
 <turbo-frame id="<%= frame_id %>">
-  <section class="app-surface app-surface--tool alchemy-app os-window-body-start" data-controller="alchemy-table">
+  <section class="app-surface app-surface--tool alchemy-app os-window-body-start" data-controller="alchemy-table" data-alchemy-source-kind="<%= @source_kind.to_s %>">
     <textarea hidden aria-hidden="true" data-alchemy-source-xml><%= @source_xml_content.to_s %></textarea>
     <section class="alchemy-app__results">
-      <% if @rows.present? %>
-        <div class="alchemy-app__table-wrap" data-alchemy-table-target="tableWrap" data-action="scroll->alchemy-table#handleTableScroll">
-          <table class="alchemy-app__table" data-alchemy-table-target="table">
-            <thead>
-              <tr>
-                <th>Tag Group</th>
-                <th>Tag Name</th>
-                <th>Data Type</th>
-                <th>Address Start</th>
-                <th>Scaling</th>
-                <th>Read/Write</th>
-              </tr>
-            </thead>
-            <tbody
-              data-alchemy-table-target="tbody"
-              data-action="click->alchemy-table#handleTbodyClick mouseover->alchemy-table#handleTooltipOver mousemove->alchemy-table#handleTooltipMove mouseout->alchemy-table#handleTooltipOut">
-              <% @rows.each do |row| %>
+      <div data-alchemy-table-view>
+        <% if @rows.present? %>
+          <div class="alchemy-app__table-wrap" data-alchemy-table-target="tableWrap" data-action="scroll->alchemy-table#handleTableScroll">
+            <table class="alchemy-app__table" data-alchemy-table-target="table">
+              <thead>
+                <tr>
+                  <th>Tag Group</th>
+                  <th>Tag Name</th>
+                  <th>Data Type</th>
+                  <th>Address Start</th>
+                  <th>Scaling</th>
+                  <th>Read/Write</th>
+                </tr>
+              </thead>
+              <tbody
+                data-alchemy-table-target="tbody"
+                data-action="click->alchemy-table#handleTbodyClick mouseover->alchemy-table#handleTooltipOver mousemove->alchemy-table#handleTooltipMove mouseout->alchemy-table#handleTooltipOut">
+                <% @rows.each do |row| %>
                 <% raw_dt = row["_raw_datatype"].to_s.strip %>
                 <% raw_enc = row["_raw_encode"].to_s.strip %>
+                <% source_format = row["_source_format"].to_s.downcase.presence || "uticor" %>
+                <% data_length_tip = row["Data Length"].to_s.presence || "1" %>
                 <% dt_code_tip = Alchemy::TagXml::DataTypeMapper.normalize_code(raw_dt.presence || "0") %>
                 <% enc_code_tip = Alchemy::TagXml::DataTypeMapper.normalize_code(raw_enc.presence || "255") %>
                 <% dt_tip = Alchemy::TagXml::DataTypeMapper.uticor_label(dt_code_tip).presence || "Unknown" %>
                 <% enc_tip = Alchemy::TagXml::DataTypeMapper.uticor_label(enc_code_tip).presence || "Unknown" %>
-                <% uticor_tip = "Datatype - #{dt_code_tip}: #{dt_tip}\nEncode - #{enc_code_tip}: #{enc_tip}" %>
+                <% moxa_json_type = row["_moxa_data_type"].to_s.presence || "Unknown" %>
+                <% moxa_data_length = row["_moxa_quantity"].to_s.presence || data_length_tip %>
+                <% moxa_dtype_label = moxa_json_type.to_s.strip %>
+                <% moxa_dtype_label = moxa_dtype_label.present? ? moxa_dtype_label[0].upcase + moxa_dtype_label[1..].to_s.downcase : "Unknown" %>
+                <% uticor_tip = "Datatype - #{dt_code_tip}: #{dt_tip}\nEncode - #{enc_code_tip}: #{enc_tip}\nData Length - #{data_length_tip}" %>
+                <% moxa_tip = "Datatype - #{moxa_dtype_label}\nData Length - #{moxa_data_length}" %>
+                <% data_type_tip = source_format == "moxa" ? moxa_tip : uticor_tip %>
                 <% data_type_value = row["Data Type"].to_s %>
                 <% unique_data_type = data_type_value.casecmp?("unique") %>
+                <% pair_readonly = source_format == "moxa" && row["_address_pair"] && row["Read/Write"].to_s == "Read Only" %>
+                <% raw_tag_name = source_format == "moxa" ? (row["_moxa_tag_name"].to_s.presence || row["Tag Name"].to_s) : row["Tag Name"].to_s %>
                 <tr
-                  class="<%= "row-address-conflict" if row["_address_conflict"] %>"
+                  class="<%= "row-address-conflict" if row["_address_conflict"] %> <%= "row-address-paired" if row["_address_pair"] %> <%= "row-address-paired-readonly" if pair_readonly %>"
                   data-tag-group="<%= row["Tag Group"].to_s %>"
                   data-tag-name="<%= row["Tag Name"].to_s %>"
+                  data-raw-tag-name="<%= raw_tag_name %>"
                   data-data-type="<%= row["Data Type"].to_s %>"
                   data-modbus-register="<%= row["Address Start"].to_s %>"
                   data-scaling="<%= row["Scaling"].to_s %>"
-                  data-read-write="<%= row["Read/Write"].to_s %>">
+                  data-read-write="<%= row["Read/Write"].to_s %>"
+                  data-source-format="<%= source_format %>">
                   <td><%= row["Tag Group"] %></td>
                   <td><%= row["Tag Name"] %></td>
-                  <td class="<%= "alchemy-app__cell-unique" if unique_data_type %>" data-hover-tip="<%= uticor_tip %>"><%= data_type_value %></td>
-                  <td class="<%= "alchemy-app__cell-conflict" if row["_address_conflict"] %>"><%= row["Address Start"] %></td>
+                  <td class="<%= "alchemy-app__cell-unique" if unique_data_type %>" data-hover-tip="<%= data_type_tip %>"><%= data_type_value %></td>
+                  <td class="<%= "alchemy-app__cell-conflict" if row["_address_conflict"] %> <%= "alchemy-app__cell-paired" if row["_address_pair"] %> <%= "alchemy-app__cell-paired-readonly" if pair_readonly %>"><%= row["Address Start"] %></td>
                   <td><%= row["Scaling"] %></td>
                   <td><%= row["Read/Write"] %></td>
                 </tr>
-              <% end %>
-            </tbody>
-          </table>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+        <% else %>
+          <p class="alchemy-app__empty"><%= @status_message.presence || "No parsed rows yet." %></p>
+        <% end %>
+      </div>
+      <div class="alchemy-app__splitter" data-alchemy-splitter hidden data-action="pointerdown->content-window#startAlchemySplitResize"></div>
+      <div class="alchemy-app__raw-view" data-alchemy-raw-view hidden>
+        <div class="alchemy-app__raw-layer" data-alchemy-raw-layer>
+          <pre class="alchemy-app__raw-overlay" data-alchemy-raw-overlay aria-hidden="true"></pre>
+          <textarea class="alchemy-app__raw-text" readonly aria-label="Raw file content"><%= @raw_source_content.to_s %></textarea>
         </div>
-      <% else %>
-        <p class="alchemy-app__empty"><%= @status_message.presence || "No parsed rows yet." %></p>
-      <% end %>
+      </div>
     </section>
   </section>
 </turbo-frame>

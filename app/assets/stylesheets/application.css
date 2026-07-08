@@ -352,6 +352,7 @@
 .alchemy-app__results {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   min-height: 0;
   border: 1px solid var(--border-hairline);
   border-top: 0;
@@ -359,7 +360,116 @@
   overflow: hidden;
 }
 
+.alchemy-app__results > [data-alchemy-table-view] {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.alchemy-app__splitter {
+  display: none;
+  flex: 0 0 3px;
+  cursor: row-resize;
+  background: color-mix(in oklab, var(--border-hairline) 80%, var(--text-muted) 20%);
+}
+
+.alchemy-app__results.is-split .alchemy-app__splitter {
+  display: block;
+}
+
+.alchemy-app__raw-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.alchemy-app__raw-view[hidden] {
+  display: none !important;
+}
+
+.alchemy-app__raw-layer {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.alchemy-app__raw-text {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  resize: none;
+  margin: 0;
+  border: 0;
+  padding: 0.7rem 0.8rem;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--text);
+  font: 500 0.76rem/1.38 "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  white-space: pre;
+  overflow: auto;
+}
+
+.alchemy-app__raw-text:focus,
+.alchemy-app__raw-text:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.alchemy-app__raw-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  margin: 0;
+  border: 0;
+  padding: 0.7rem 0.8rem;
+  overflow: auto;
+  background: color-mix(in oklab, var(--surface) 92%, #000 8%);
+  color: var(--text);
+  font: 500 0.76rem/1.38 "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  white-space: pre;
+  pointer-events: none;
+  scrollbar-width: none;
+}
+
+.alchemy-app__raw-overlay::-webkit-scrollbar {
+  display: none;
+}
+
+.alchemy-app__raw-highlight {
+  border-radius: 2px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.alchemy-app__raw-highlight--selected {
+  outline: 1px solid color-mix(in oklab, #93c5fd 75%, transparent);
+}
+
+section.content-window[data-content-window-app-key-value="alchemy"] .alchemy-app[data-alchemy-source-kind="moxa"] .alchemy-app__raw-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+section.content-window[data-content-window-app-key-value="alchemy"] .alchemy-app[data-alchemy-source-kind="moxa"] .alchemy-app__raw-overlay {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.alchemy-app__results [data-alchemy-splitter][hidden],
+.alchemy-app__results [data-alchemy-raw-overlay][hidden] {
+  display: none !important;
+}
+
 .alchemy-app__table-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
 }
 
@@ -423,9 +533,34 @@ html[data-nexus-shell-mode="light"] .alchemy-app__table th {
   background: rgba(239, 68, 68, 0.18);
 }
 
+.alchemy-app__table tbody tr.row-address-paired {
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.alchemy-app__table tbody tr.row-address-paired:hover {
+  background: rgba(34, 197, 94, 0.18);
+}
+
+.alchemy-app__table tbody tr.row-address-paired-readonly {
+  background: rgba(34, 197, 94, 0.07);
+}
+
+.alchemy-app__table tbody tr.row-address-paired-readonly:hover {
+  background: rgba(34, 197, 94, 0.12);
+}
+
 .alchemy-app__table td.alchemy-app__cell-conflict {
   color: #f87171;
   font-weight: 600;
+}
+
+.alchemy-app__table td.alchemy-app__cell-paired {
+  color: #4ade80;
+  font-weight: 600;
+}
+
+.alchemy-app__table td.alchemy-app__cell-paired-readonly {
+  color: #86efac;
 }
 
 .alchemy-app__table td.alchemy-app__cell-unique {
@@ -6256,6 +6391,20 @@ html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden)
 
 .content-window-alchemy-conflict-toggle {
   color: var(--text-muted);
+}
+
+.content-window-alchemy-raw-toggle {
+  color: var(--text-muted);
+}
+
+.content-window-alchemy-raw-toggle svg {
+  display: block;
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.content-window-alchemy-raw-toggle[aria-pressed="true"] {
+  color: #93c5fd;
 }
 
 .content-window-alchemy-conflict-toggle svg {

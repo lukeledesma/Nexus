@@ -15,6 +15,7 @@ export default class extends Controller {
     this.boundHandleGlobalKeydown = this.handleGlobalKeydown.bind(this)
     document.addEventListener("keydown", this.boundHandleGlobalKeydown)
     this.syncHeaderScrollState()
+    this.emitSelectionChanged()
   }
 
   disconnect() {
@@ -81,6 +82,7 @@ export default class extends Controller {
     if (e.metaKey || e.ctrlKey) {
       row.classList.toggle("row-selected")
       this.anchorRow = row
+      this.emitSelectionChanged(this.anchorRow)
       return
     }
 
@@ -89,6 +91,7 @@ export default class extends Controller {
         this.clearSelection()
         row.classList.add("row-selected")
         this.anchorRow = row
+        this.emitSelectionChanged(this.anchorRow)
         return
       }
 
@@ -96,6 +99,7 @@ export default class extends Controller {
       const lo = Math.min(anchorIndex, rowIndex)
       const hi = Math.max(anchorIndex, rowIndex)
       dataRows.forEach((r, i) => r.classList.toggle("row-selected", i >= lo && i <= hi))
+      this.emitSelectionChanged(row)
       return
     }
 
@@ -103,12 +107,14 @@ export default class extends Controller {
     if (selected.length === 1 && selected[0] === row) {
       row.classList.remove("row-selected")
       this.anchorRow = null
+      this.emitSelectionChanged(null)
       return
     }
 
     this.clearSelection()
     row.classList.add("row-selected")
     this.anchorRow = row
+    this.emitSelectionChanged(this.anchorRow)
   }
 
   handleTableScroll() {
@@ -116,9 +122,14 @@ export default class extends Controller {
   }
 
   handleGlobalKeydown(e) {
+    const activeEl = document.activeElement
+    const inRawPane = activeEl instanceof Element && !!activeEl.closest(".alchemy-app__raw-view")
+    if (inRawPane) return
+
     const inTable = this.element.contains(document.activeElement)
     const recentlyUsed = Date.now() - this.lastInteractionAt < 20000
-    if (!inTable && !recentlyUsed) return
+    const hasSelection = this.getSelectedRows().length > 0
+    if (!inTable && !recentlyUsed && !hasSelection) return
 
     const isMod = e.metaKey || e.ctrlKey
     const key = String(e.key || "").toLowerCase()
@@ -127,7 +138,8 @@ export default class extends Controller {
       e.preventDefault()
       e.stopPropagation()
       this.dataRows.forEach((row) => row.classList.add("row-selected"))
-      this.anchorRow = this.dataRows[0] || null
+      this.anchorRow = this.dataRows[this.dataRows.length - 1] || null
+      this.emitSelectionChanged(this.anchorRow)
       return
     }
 
@@ -143,6 +155,7 @@ export default class extends Controller {
     if (key === "escape") {
       this.clearSelection()
       this.anchorRow = null
+      this.emitSelectionChanged(null)
     }
   }
 
@@ -199,6 +212,28 @@ export default class extends Controller {
 
   clearSelection() {
     this.dataRows.forEach((row) => row.classList.remove("row-selected"))
+  }
+
+  emitSelectionChanged(activeRow = null) {
+    const selectedRows = this.getSelectedRows()
+    const active = activeRow && selectedRows.includes(activeRow)
+      ? activeRow
+      : selectedRows[selectedRows.length - 1] || null
+
+    this.element.dispatchEvent(new CustomEvent("alchemy:selection-changed", {
+      bubbles: true,
+      detail: {
+        selectedRows: selectedRows.map((row) => ({
+          tagName: String(row.dataset.tagName || ""),
+          rawTagName: String(row.dataset.rawTagName || row.dataset.tagName || ""),
+          conflict: row.classList.contains("row-address-conflict"),
+          pair: row.classList.contains("row-address-paired"),
+          unique: !!row.querySelector("td.alchemy-app__cell-unique")
+        })),
+        activeTagName: String(active?.dataset?.tagName || ""),
+        activeRawTagName: String(active?.dataset?.rawTagName || active?.dataset?.tagName || "")
+      }
+    }))
   }
 
   buildTooltipElement() {
