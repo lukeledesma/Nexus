@@ -526,6 +526,30 @@ section.content-window[data-content-window-app-key-value="alchemy"] .alchemy-app
   color: var(--text);
 }
 
+.alchemy-app__table th[data-sort-key] {
+  cursor: pointer;
+  transition: color 110ms ease, background-color 110ms ease, box-shadow 150ms ease, opacity 110ms ease;
+}
+
+.alchemy-app__table th[data-sort-key]:hover,
+.alchemy-app__table th[data-sort-key]:focus-visible {
+  background: color-mix(in oklab, var(--surface-raised) 88%, #fff 12%);
+}
+
+.alchemy-app__table th[data-sort-key].is-sorted {
+  color: color-mix(in oklab, var(--accent) 74%, var(--text) 26%);
+}
+
+.alchemy-app__table th[data-sort-key].is-sorted::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: color-mix(in oklab, var(--accent) 70%, transparent);
+}
+
 html[data-nexus-shell-mode="dark"] .alchemy-app__table th {
   background: color-mix(in oklab, var(--surface) 82%, #fff 18%);
   color: var(--text);
@@ -534,6 +558,10 @@ html[data-nexus-shell-mode="dark"] .alchemy-app__table th {
 html[data-nexus-shell-mode="light"] .alchemy-app__table th {
   background: #d4d8de;
   color: #2f3338;
+}
+
+html[data-nexus-shell-mode="light"] .alchemy-app__table th[data-sort-key].is-sorted {
+  color: color-mix(in oklab, var(--accent) 60%, #1f2937 40%);
 }
 
 .alchemy-app__table-wrap.is-scrolled .alchemy-app__table th {

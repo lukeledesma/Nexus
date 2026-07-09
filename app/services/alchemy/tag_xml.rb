@@ -259,35 +259,45 @@ module Alchemy
           grouped.each_value do |rows|
             next if rows.size <= 1
 
-            moxa_rows = rows.select { |r| r["_source_format"].to_s.downcase == "moxa" }
-            if moxa_rows.size == rows.size
+            moxa_like_rows = rows.select do |r|
+              format = r["_source_format"].to_s.downcase
+              format == "moxa" || format == "ignition"
+            end
+
+            if moxa_like_rows.size == rows.size
               matched_pair_ids = Set.new
-              by_name = moxa_rows.index_by { |r| r[COLUMNS[:tag_name]].to_s }
+              by_pair_key = Hash.new { |h, k| h[k] = [] }
+              moxa_like_rows.each do |row|
+                key = pair_key_for_row(row)
+                next if key.blank?
 
-              moxa_rows.each do |row|
-                name = row[COLUMNS[:tag_name]].to_s
-                next if name.empty?
+                by_pair_key[key] << row
+              end
 
-                if name.end_with?("_FB")
-                  base = name.delete_suffix("_FB")
-                  partner = by_name[base]
-                  if partner
+              moxa_like_rows.each do |row|
+                key = pair_key_for_row(row)
+                next if key.blank?
+
+                if key.end_with?("_fb")
+                  base = key.delete_suffix("_fb")
+                  partners = by_pair_key[base]
+                  if partners.present?
                     matched_pair_ids << row.object_id
-                    matched_pair_ids << partner.object_id
+                    partners.each { |partner| matched_pair_ids << partner.object_id }
                   end
                 else
-                  partner = by_name["#{name}_FB"]
-                  if partner
+                  partners = by_pair_key["#{key}_fb"]
+                  if partners.present?
                     matched_pair_ids << row.object_id
-                    matched_pair_ids << partner.object_id
+                    partners.each { |partner| matched_pair_ids << partner.object_id }
                   end
                 end
               end
 
-              moxa_rows.each do |row|
+              moxa_like_rows.each do |row|
                 row["_address_pair"] = matched_pair_ids.include?(row.object_id)
               end
-              remaining = moxa_rows.reject { |row| matched_pair_ids.include?(row.object_id) }
+              remaining = moxa_like_rows.reject { |row| matched_pair_ids.include?(row.object_id) }
               if remaining.size > 1
                 remaining.each { |row| row["_address_conflict"] = true }
               end
@@ -409,6 +419,11 @@ module Alchemy
           }
 
           mapping.fetch(key, "unknown")
+        end
+
+        def pair_key_for_row(row)
+          source_name = row["_moxa_tag_name"].to_s.presence || row[COLUMNS[:tag_name]].to_s
+          source_name.strip.downcase
         end
       end
     end

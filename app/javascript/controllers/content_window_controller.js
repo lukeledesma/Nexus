@@ -1834,9 +1834,22 @@ export default class extends Controller {
 
   findAllTagSpansInRaw(text, tagName, sourceKind) {
     const safe = tagName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-    const isMoxa = String(sourceKind || "").toLowerCase() === "moxa"
-    if (isMoxa) {
+    const normalizedKind = String(sourceKind || "").toLowerCase()
+    const isMoxaLike = normalizedKind === "moxa" || normalizedKind === "ignition"
+    if (isMoxaLike) {
       const spans = []
+
+      const sourcePathRe = new RegExp(`"sourceTagPath"\\s*:\\s*"[^"]*/${safe}/value"`, "g")
+      for (let m = sourcePathRe.exec(text); m; m = sourcePathRe.exec(text)) {
+        let block = this.findEnclosingJsonObjectBounds(text, m.index)
+        if (!this.isValidMoxaSpan(block, m.index)) {
+          block = this.findMoxaObjectBoundsFallback(text, m.index)
+        }
+        spans.push(block || { start: m.index, end: m.index + m[0].length })
+      }
+
+      if (spans.length > 0) return spans
+
       const directRe = new RegExp(`"name"\\s*:\\s*"${safe}"`, "g")
       for (let m = directRe.exec(text); m; m = directRe.exec(text)) {
         let block = this.findEnclosingJsonObjectBounds(text, m.index)
@@ -1849,6 +1862,22 @@ export default class extends Controller {
       if (spans.length > 0) return spans
 
       const normalizedNeedle = this.normalizeAlchemyTagName(tagName)
+      const sourceTagPathValueRe = /"sourceTagPath"\s*:\s*"([^"]+)"/g
+      for (let m = sourceTagPathValueRe.exec(text); m; m = sourceTagPathValueRe.exec(text)) {
+        const sourcePath = String(m[1] || "")
+        const moxaName = this.extractMoxaNameFromSourceTagPath(sourcePath)
+        if (!moxaName) continue
+        if (this.normalizeAlchemyTagName(moxaName) !== normalizedNeedle) continue
+
+        let block = this.findEnclosingJsonObjectBounds(text, m.index)
+        if (!this.isValidMoxaSpan(block, m.index)) {
+          block = this.findMoxaObjectBoundsFallback(text, m.index)
+        }
+        spans.push(block || { start: m.index, end: m.index + m[0].length })
+      }
+
+      if (spans.length > 0) return spans
+
       const nameRe = /"name"\s*:\s*"([^"]+)"/g
       for (let m = nameRe.exec(text); m; m = nameRe.exec(text)) {
         const rawName = String(m[1] || "")
@@ -1861,7 +1890,8 @@ export default class extends Controller {
         spans.push(block || { start: m.index, end: m.index + m[0].length })
       }
 
-      return spans
+      // Legacy files may only include XML (no raw JSON bundle), so fall through
+      // to XML tag matching when Moxa-like JSON signatures are absent.
     }
 
     const xmlSpans = []
@@ -1885,6 +1915,17 @@ export default class extends Controller {
       return deduped
     }
     return xmlSpans
+  }
+
+  extractMoxaNameFromSourceTagPath(sourcePath) {
+    const text = String(sourcePath || "").trim()
+    if (!text) return ""
+
+    const valueMatch = text.match(/\/([^/]+)\/value$/)
+    if (valueMatch && valueMatch[1]) return String(valueMatch[1])
+
+    const parts = text.split("/")
+    return String(parts[parts.length - 1] || "")
   }
 
   buildRawOverlayHtml(text, spans) {
@@ -2233,6 +2274,7 @@ export default class extends Controller {
   alchemySourceLabel(kind) {
     const normalized = String(kind || "").toLowerCase()
     if (normalized === "moxa") return "Moxa"
+    if (normalized === "ignition") return "Ignition"
     if (normalized === "uticor") return "Uticor"
     if (normalized === "mixed") return "Mixed"
     return ""

@@ -5,6 +5,8 @@ export default class extends Controller {
 
   connect() {
     this.anchorRow = null
+    this.sortKey = null
+    this.sortDirection = null
     this.lastInteractionAt = 0
     this.activeTooltipCell = null
     this.pendingTooltipCell = null
@@ -14,6 +16,8 @@ export default class extends Controller {
     this.tooltipEl = this.buildTooltipElement()
     this.boundHandleGlobalKeydown = this.handleGlobalKeydown.bind(this)
     document.addEventListener("keydown", this.boundHandleGlobalKeydown)
+    this.captureOriginalRowOrder()
+    this.resetHeaderSortState()
     this.syncHeaderScrollState()
     this.emitSelectionChanged()
   }
@@ -119,6 +123,41 @@ export default class extends Controller {
 
   handleTableScroll() {
     this.syncHeaderScrollState()
+  }
+
+  handleHeaderClick(e) {
+    const header = e.target.closest("th[data-sort-key]")
+    if (!header) return
+    if (!this.hasTbodyTarget || !this.hasTableTarget) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const key = String(header.dataset.sortKey || "").trim()
+    if (!key) return
+
+    if (this.sortKey === key && this.sortDirection === "asc") {
+      this.sortDirection = null
+      this.restoreOriginalRowOrder()
+      this.resetHeaderSortState()
+      this.emitSelectionChanged(this.anchorRow)
+      return
+    }
+
+    this.sortKey = key
+    this.sortDirection = "asc"
+    this.sortRowsByKey(key, this.sortDirection)
+    this.applyHeaderSortState(key, this.sortDirection)
+    this.emitSelectionChanged(this.anchorRow)
+  }
+
+  handleHeaderKeydown(e) {
+    const key = String(e.key || "")
+    if (key !== "Enter" && key !== " ") return
+    const header = e.target.closest("th[data-sort-key]")
+    if (!header) return
+
+    this.handleHeaderClick(e)
   }
 
   handleGlobalKeydown(e) {
@@ -282,5 +321,98 @@ export default class extends Controller {
     if (!this.hasTableWrapTarget) return
     const isScrolled = this.tableWrapTarget.scrollTop > 0
     this.tableWrapTarget.classList.toggle("is-scrolled", isScrolled)
+  }
+
+  captureOriginalRowOrder() {
+    this.dataRows.forEach((row, index) => {
+      row.dataset.originalIndex = String(index)
+    })
+  }
+
+  restoreOriginalRowOrder() {
+    const rows = this.dataRows
+    rows.sort((a, b) => Number(a.dataset.originalIndex || 0) - Number(b.dataset.originalIndex || 0))
+    rows.forEach((row) => this.tbodyTarget.appendChild(row))
+    this.sortKey = null
+  }
+
+  sortRowsByKey(key, direction) {
+    const rows = this.dataRows
+    rows.sort((a, b) => this.compareRows(a, b, key, direction))
+    rows.forEach((row) => this.tbodyTarget.appendChild(row))
+  }
+
+  compareRows(a, b, key, direction) {
+    const aVal = this.sortValueForKey(a, key)
+    const bVal = this.sortValueForKey(b, key)
+
+    let result = 0
+    const aNum = Number(aVal)
+    const bNum = Number(bVal)
+    const bothNumeric = Number.isFinite(aNum) && Number.isFinite(bNum)
+
+    if (bothNumeric) {
+      result = aNum - bNum
+    } else {
+      result = String(aVal).localeCompare(String(bVal), undefined, { sensitivity: "base" })
+    }
+
+    // For grouped columns, keep equal-value blocks internally ordered by address.
+    const blockSortedKeys = new Set(["tag-group", "data-type", "scaling", "read-write"])
+    if (blockSortedKeys.has(key) && result === 0) {
+      const aAddr = Number(a?.dataset?.modbusRegister || 0)
+      const bAddr = Number(b?.dataset?.modbusRegister || 0)
+      result = aAddr - bAddr
+    }
+
+    if (result === 0) {
+      const aIdx = Number(a.dataset.originalIndex || 0)
+      const bIdx = Number(b.dataset.originalIndex || 0)
+      result = aIdx - bIdx
+    }
+
+    return direction === "asc" ? result : -result
+  }
+
+  sortValueForKey(row, key) {
+    const data = row?.dataset || {}
+    switch (key) {
+      case "tag-group":
+        return String(data.tagGroup || "")
+      case "tag-name":
+        return String(data.tagName || "")
+      case "data-type":
+        return String(data.dataType || "")
+      case "address-start":
+        return Number(data.modbusRegister || 0)
+      case "scaling":
+        return Number(data.scaling || 0)
+      case "read-write":
+        return String(data.readWrite || "")
+      default:
+        return ""
+    }
+  }
+
+  resetHeaderSortState() {
+    if (!this.hasTableTarget) return
+    this.tableTarget.classList.remove("has-active-sort")
+    const headers = this.tableTarget.querySelectorAll("th[data-sort-key]")
+    headers.forEach((header) => {
+      header.removeAttribute("aria-sort")
+      header.classList.remove("is-sorted")
+    })
+  }
+
+  applyHeaderSortState(key, direction) {
+    this.resetHeaderSortState()
+    if (!this.hasTableTarget) return
+
+    const active = this.tableTarget.querySelector(`th[data-sort-key="${key}"]`)
+    if (!active) return
+
+    this.tableTarget.classList.add("has-active-sort")
+    active.setAttribute("aria-sort", direction === "asc" ? "ascending" : "descending")
+    active.classList.add("is-sorted")
   }
 }

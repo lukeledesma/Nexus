@@ -7,14 +7,14 @@
         <% if @rows.present? %>
           <div class="alchemy-app__table-wrap" data-alchemy-table-target="tableWrap" data-action="scroll->alchemy-table#handleTableScroll">
             <table class="alchemy-app__table" data-alchemy-table-target="table">
-              <thead>
+              <thead data-action="click->alchemy-table#handleHeaderClick keydown->alchemy-table#handleHeaderKeydown">
                 <tr>
-                  <th>Tag Group</th>
-                  <th>Tag Name</th>
-                  <th>Data Type</th>
-                  <th>Address Start</th>
-                  <th>Scaling</th>
-                  <th>Read/Write</th>
+                  <th data-sort-key="tag-group" role="button" tabindex="0">Tag Group</th>
+                  <th data-sort-key="tag-name" role="button" tabindex="0">Tag Name</th>
+                  <th data-sort-key="data-type" role="button" tabindex="0">Data Type</th>
+                  <th data-sort-key="address-start" role="button" tabindex="0">Address Start</th>
+                  <th data-sort-key="scaling" role="button" tabindex="0">Scaling</th>
+                  <th data-sort-key="read-write" role="button" tabindex="0">Read/Write</th>
                 </tr>
               </thead>
               <tbody
@@ -35,11 +35,13 @@
                 <% moxa_dtype_label = moxa_dtype_label.present? ? moxa_dtype_label[0].upcase + moxa_dtype_label[1..].to_s.downcase : "Unknown" %>
                 <% uticor_tip = "Datatype - #{dt_code_tip}: #{dt_tip}\nEncode - #{enc_code_tip}: #{enc_tip}\nData Length - #{data_length_tip}" %>
                 <% moxa_tip = "Datatype - #{moxa_dtype_label}\nData Length - #{moxa_data_length}" %>
-                <% data_type_tip = source_format == "moxa" ? moxa_tip : uticor_tip %>
+                <% ignition_tip = "Datatype - #{moxa_dtype_label}" %>
+                <% moxa_like = source_format == "moxa" || source_format == "ignition" %>
+                <% data_type_tip = source_format == "ignition" ? ignition_tip : (source_format == "moxa" ? moxa_tip : uticor_tip) %>
                 <% data_type_value = row["Data Type"].to_s %>
                 <% unique_data_type = data_type_value.casecmp?("unique") %>
-                <% pair_readonly = source_format == "moxa" && row["_address_pair"] && row["Read/Write"].to_s == "Read Only" %>
-                <% raw_tag_name = source_format == "moxa" ? (row["_moxa_tag_name"].to_s.presence || row["Tag Name"].to_s) : row["Tag Name"].to_s %>
+                <% pair_readonly = moxa_like && row["_address_pair"] && row["Read/Write"].to_s == "Read Only" %>
+                <% raw_tag_name = moxa_like ? (row["_moxa_tag_name"].to_s.presence || row["Tag Name"].to_s) : row["Tag Name"].to_s %>
                 <tr
                   class="<%= "row-address-conflict" if row["_address_conflict"] %> <%= "row-address-paired" if row["_address_pair"] %> <%= "row-address-paired-readonly" if pair_readonly %>"
                   data-tag-group="<%= row["Tag Group"].to_s %>"

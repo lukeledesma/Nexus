@@ -50,7 +50,7 @@ module Alchemy
       def parse_moxa_json(path, original)
         json = File.read(path)
         payload = JSON.parse(json)
-        rows = extract_moxa_rows(payload)
+        rows = extract_moxa_rows(payload, source_path: path)
         return Result.new(success?: false, error: "JSON file does not contain any Moxa tags.") if rows.empty?
 
         xml_content = build_xml_from_moxa_rows(rows)
@@ -71,7 +71,23 @@ module Alchemy
         ].join("\n")
       end
 
-      def extract_moxa_rows(payload)
+      def extract_moxa_rows(payload, source_path: nil)
+        if moxa_profile_payload?(payload)
+          return extract_moxa_profile_rows(payload)
+        end
+
+        template_index = load_template_tag_index(source_path)
+        extract_ignition_reference_rows(payload, template_index: template_index)
+      end
+
+      def moxa_profile_payload?(payload)
+        profiles = payload.is_a?(Array) ? payload : [ payload ]
+        profiles.any? do |profile|
+          profile.is_a?(Hash) && profile["tagList"].is_a?(Array)
+        end
+      end
+
+      def extract_moxa_profile_rows(payload)
         profiles = payload.is_a?(Array) ? payload : [ payload ]
         rows = []
 
@@ -92,6 +108,8 @@ module Alchemy
             rows << {
               tag_group: group_name,
               tag_name: name,
+              moxa_tag_name: name,
+              source_format: "moxa",
               address: tag["address"],
               function: tag["function"].to_s,
               data_type: tag["dataType"].to_s,
@@ -109,6 +127,203 @@ module Alchemy
         rows
       end
 
+      def extract_ignition_reference_rows(payload, template_index:)
+        nodes = payload.is_a?(Array) ? payload : [ payload ]
+        rows = []
+
+        nodes.each_with_index do |node, idx|
+          next unless node.is_a?(Hash)
+
+          root_name = node["name"].to_s.strip
+          current_group = root_name.presence || "Group #{idx + 1}"
+          rows.concat(extract_reference_rows_from_node(node, current_group: current_group, template_index: template_index))
+        end
+
+        rows
+      end
+
+      def extract_reference_rows_from_node(node, current_group:, template_index:)
+        return [] unless node.is_a?(Hash)
+
+        rows = []
+        node_name = node["name"].to_s.strip
+        tag_type = node["tagType"].to_s
+        next_group = if tag_type.casecmp("Folder").zero? && node_name.present?
+          node_name
+        else
+          current_group
+        end
+
+        if reference_atomic_tag?(node)
+          row = build_row_from_reference_tag(node, current_group: current_group, template_index: template_index)
+          rows << row if row
+        end
+
+        children = node["tags"]
+        if children.is_a?(Array)
+          children.each do |child|
+            rows.concat(extract_reference_rows_from_node(child, current_group: next_group, template_index: template_index))
+          end
+        end
+
+        rows
+      end
+
+      def reference_atomic_tag?(node)
+        return false unless node["tagType"].to_s.casecmp("AtomicTag").zero?
+        return false unless node["valueSource"].to_s.casecmp("reference").zero?
+
+        node["sourceTagPath"].to_s.strip.present?
+      end
+
+      def build_row_from_reference_tag(tag, current_group:, template_index:)
+        source_path = tag["sourceTagPath"].to_s.strip
+        raw_name = moxa_tag_name_from_source_path(source_path)
+        return nil if raw_name.blank?
+
+        template = template_index[raw_name.downcase] || {}
+        access = infer_access_from_moxa_tag_name(raw_name)
+        function = template["function"].presence || infer_function_from_reference(tag, access)
+        data_type = template["dataType"].presence || infer_data_type_from_reference(tag)
+        quantity = template["quantity"].presence || infer_quantity_from_data_type(data_type)
+        size = template["size"].presence || infer_size_from_data_type(data_type)
+
+        {
+          tag_group: current_group.to_s.presence || "Group 1",
+          tag_name: tag["name"].to_s.strip.presence || raw_name,
+          moxa_tag_name: raw_name,
+          source_format: "ignition",
+          address: template["address"].presence || infer_address_from_moxa_tag_name(raw_name, data_type: data_type, function: function),
+          function: function.to_s,
+          data_type: data_type.to_s,
+          access: access.to_s,
+          size: size,
+          quantity: quantity,
+          auto_scaling: {},
+          enable_auto_scaling: false,
+          enable_byte_order: template["enableByteOrder"],
+          byte_order: template["byteOrder"]
+        }
+      end
+
+      def moxa_tag_name_from_source_path(source_path)
+        return "" if source_path.blank?
+
+        path = source_path.to_s
+        value_match = path.match(%r{/([^/]+)/value\z})
+        return value_match[1].to_s.strip if value_match
+
+        path.split("/").last.to_s.strip
+      end
+
+      def infer_access_from_moxa_tag_name(raw_name)
+        raw_name.to_s.end_with?("_FB") ? "ro" : "rw"
+      end
+
+      def infer_function_from_reference(tag, access)
+        ignition_dtype = tag["dataType"].to_s.strip.downcase
+        if ["boolean", "bool"].include?(ignition_dtype)
+          return access.to_s == "ro" ? "read-coils" : "write-single-coil"
+        end
+
+        access.to_s == "ro" ? "read-holding-registers" : "write-single-register"
+      end
+
+      def infer_data_type_from_reference(tag)
+        ignition_dtype = tag["dataType"].to_s.strip.downcase
+        mapping = {
+          "boolean" => "boolean",
+          "bool" => "boolean",
+          "int2" => "int16",
+          "int4" => "int32",
+          "float4" => "float32"
+        }
+
+        mapping.fetch(ignition_dtype, "unknown")
+      end
+
+      def infer_quantity_from_data_type(data_type)
+        dtype = data_type.to_s.strip.downcase
+        return 1 if ["boolean", "bool", "int16", "uint16", "short", "ushort", "int2", "uint2"].include?(dtype)
+
+        1
+      end
+
+      def infer_size_from_data_type(data_type)
+        dtype = data_type.to_s.strip.downcase
+        return 1 if ["boolean", "bool", "int16", "uint16", "short", "ushort", "int2", "uint2", "byte", "uint8"].include?(dtype)
+        return 2 if ["int32", "uint32", "dint", "udint", "float32", "float", "real", "int4", "uint4", "float4"].include?(dtype)
+
+        1
+      end
+
+      def infer_address_from_moxa_tag_name(raw_name, data_type: nil, function: nil)
+        name = raw_name.to_s.strip
+        return 0 if name.empty?
+
+        suffix_trimmed = name.sub(/_FB\z/i, "")
+        numeric_parts = suffix_trimmed.scan(/\d+/).map(&:to_i)
+        return 0 if numeric_parts.length < 2
+
+        # Format: N11_<word>_<bit> is a packed coil offset (word * 16 + bit).
+        if numeric_parts.length >= 3 && coil_like_reference?(data_type, function)
+          return (numeric_parts[1] * 16) + numeric_parts[2]
+        end
+
+        numeric_parts[1]
+      end
+
+      def load_template_tag_index(source_path)
+        dir = source_path.present? ? File.dirname(source_path.to_s) : nil
+        candidates = [
+          (File.join(dir, "templates.json") if dir.present?),
+          (File.join(dir, "template.json") if dir.present?),
+          Rails.root.join("config", "alchemy_templates", "Carefree_AB_Generic", "templates.json").to_s,
+          Rails.root.join("config", "alchemy_templates", "Carefree_AB_Generic.json").to_s
+        ].compact.uniq
+
+        candidates.each do |candidate|
+          next unless File.exist?(candidate)
+
+          payload = JSON.parse(File.read(candidate))
+          return template_tag_index_from_payload(payload)
+        rescue StandardError
+          next
+        end
+
+        {}
+      end
+
+      def coil_like_reference?(data_type, function)
+        dtype = data_type.to_s.strip.downcase
+        return true if ["boolean", "bool"].include?(dtype)
+
+        function.to_s.downcase.include?("coil")
+      end
+
+      def template_tag_index_from_payload(payload)
+        profiles = payload.is_a?(Array) ? payload : [ payload ]
+        index = {}
+
+        profiles.each do |profile|
+          next unless profile.is_a?(Hash)
+
+          tag_list = profile["tagList"]
+          next unless tag_list.is_a?(Array)
+
+          tag_list.each do |tag|
+            next unless tag.is_a?(Hash)
+
+            name = tag["name"].to_s.strip
+            next if name.empty?
+
+            index[name.downcase] = tag
+          end
+        end
+
+        index
+      end
+
       def build_xml_from_moxa_rows(rows)
         body = +""
         body << %(<?xml version="1.0" encoding="UTF-8"?>\n)
@@ -122,6 +337,7 @@ module Alchemy
           scaling_expr = scaling_expr_from_moxa(row[:auto_scaling], row[:enable_auto_scaling])
           subscribe = subscribe_from_access(row[:access])
           node_id = row[:tag_group].to_s
+          source_format = row[:source_format].to_s.presence || "moxa"
 
           body << "  <#{tag_name}>\n"
           body << "    <FUNCCODE>\"#{funccode}\"</FUNCCODE>\n"
@@ -133,11 +349,11 @@ module Alchemy
           body << "    <SUBSCRIBE>\"#{subscribe}\"</SUBSCRIBE>\n"
           body << "    <DATALENGTH>\"#{data_length}\"</DATALENGTH>\n"
           body << "    <VERIFY>\"7\"</VERIFY>\n"
-          body << "    <SOURCEFORMAT>\"moxa\"</SOURCEFORMAT>\n"
+          body << "    <SOURCEFORMAT>\"#{escape_xml_text(source_format)}\"</SOURCEFORMAT>\n"
           body << "    <MOXAFUNCTION>\"#{escape_xml_text(row[:function].to_s)}\"</MOXAFUNCTION>\n"
           body << "    <MOXADATATYPE>\"#{escape_xml_text(row[:data_type].to_s)}\"</MOXADATATYPE>\n"
           body << "    <MOXAQUANTITY>\"#{numeric_or_default(row[:quantity], default: infer_data_length(row[:size]))}\"</MOXAQUANTITY>\n"
-          body << "    <MOXATAGNAME>\"#{escape_xml_text(row[:tag_name].to_s)}\"</MOXATAGNAME>\n"
+          body << "    <MOXATAGNAME>\"#{escape_xml_text(row[:moxa_tag_name].to_s.presence || row[:tag_name].to_s)}\"</MOXATAGNAME>\n"
           body << "  </#{tag_name}>\n"
         end
 
@@ -154,6 +370,7 @@ module Alchemy
         bool_function = function.include?("coil")
         bool_dtype = dtype == "boolean" || dtype == "bool"
         if bool_function || bool_dtype
+          return [ "107", "107", "03" ] if function.include?("holding")
           return [ "107", "255", "01" ]
         end
 
