@@ -72,6 +72,9 @@ module Apps
         key = raw.to_s.strip.downcase
         return DEFAULT_SECTION_KEY if key.blank?
 
+        # Allow pinned folder keys to pass through without normalization
+        return key if key.start_with?("pinned_")
+
         key = LEGACY_SECTION_KEY_ALIASES.fetch(key, key)
         workspace_section_definitions.find { |item| item[:key] == key }&.fetch(:key, DEFAULT_SECTION_KEY) || DEFAULT_SECTION_KEY
       end
@@ -244,14 +247,40 @@ module Apps
 
       persist_last_finder_section_key(@section_key) unless @finder_single_section_mode
 
-      @finder_sections = self.class.workspace_section_definitions.map do |definition|
+      # Build base sections
+      base_sections = self.class.workspace_section_definitions.map do |definition|
         definition.merge(folder: section_roots[definition[:key]])
+      end
+
+      # Get pinned folders and insert them as sidebar items between Storage and Favorites
+      storage_root = section_roots["storage"]
+      pinned_folders = storage_root ? storage_root.children.where(is_pinned: true, is_folder: true).sort_by { |f| f.title.to_s.downcase } : []
+      
+      @finder_sections = []
+      base_sections.each do |section|
+        @finder_sections << section
+        # Insert pinned folders after Storage section
+        if section[:key] == "storage" && pinned_folders.any?
+          pinned_folders.each do |folder|
+            @finder_sections << {
+              key: "pinned_#{folder.id}",
+              title: folder.title,
+              icon: "folder",
+              folder: folder,
+              is_pinned_folder: true
+            }
+          end
+        end
       end
 
       workspace_root = self.class.workspace_root_folder(current_user)
       @root_folder =
         if @section_key == "favorites"
           workspace_root
+        elsif @section_key.to_s.start_with?("pinned_")
+          # Extract folder ID from section key and use that folder as root
+          folder_id = @section_key.to_s.sub("pinned_", "").to_i
+          Document.find_by(id: folder_id)
         elsif @section_key == "trash"
           @trash_root || self.class.workspace_trash_root(current_user)
         else
@@ -288,6 +317,10 @@ module Apps
         @browse_folder = @root_folder
         @expanded_folder_ids = Set.new
         @tree_nodes = build_favorites_tree_nodes(@root_folder)
+      elsif @section_key == "pinned"
+        @browse_folder = @root_folder
+        @expanded_folder_ids = Set.new
+        @tree_nodes = build_pinned_tree_nodes(@root_folder)
       elsif @section_key == "trash"
         @browse_folder = @root_folder
         @expanded_folder_ids = Set.new
@@ -315,6 +348,25 @@ module Apps
         end
 
       render layout: finder_embed_layout?
+    end
+
+    def toggle_pin
+      document_id = params[:document_id]
+      unless document_id
+        return render json: { error: "Document ID required" }, status: :bad_request
+      end
+
+      document = Document.find_by(id: document_id)
+      unless document
+        return render json: { error: "Document not found" }, status: :not_found
+      end
+
+      begin
+        document.update!(is_pinned: !document.is_pinned)
+        render json: { success: true, is_pinned: document.is_pinned }
+      rescue StandardError => e
+        render json: { error: e.message }, status: :unprocessable_entity
+      end
     end
 
     private
@@ -419,6 +471,16 @@ module Apps
       end
       nodes
     end
+
+    def build_pinned_tree_nodes(storage_root)
+      nodes = []
+      # Find all pinned folders at the top level of storage
+      pinned_folders = storage_root.children.folders.where(is_pinned: true).order(:title)
+      nodes = pinned_folders.map { |doc| tree_node_for_folder(doc) }
+      nodes
+    end
+
+
 
     def build_global_search_rows(section_roots)
       nodes = []
@@ -533,10 +595,10 @@ module Apps
         list.sort_by! { |d| [ d.folder? ? 0 : 1, d.title.to_s.downcase ] }
       end
       direct = children_by_parent[root_folder.id] || []
-      direct.map { |d| tree_node_from_doc(d, children_by_parent) }
+      direct.map { |d| tree_node_from_doc(d, children_by_parent, root_folder.id) }
     end
 
-    def tree_node_from_doc(doc, children_by_parent)
+    def tree_node_from_doc(doc, children_by_parent, root_folder_id = nil)
       if doc.folder?
         kids = children_by_parent[doc.id] || []
         sf, fi = kids.partition(&:folder?)
@@ -545,8 +607,10 @@ module Apps
           id: doc.id,
           title: doc.title.to_s,
           writable: !doc.protected_workspace_structure?,
-          children: sf.map { |c| tree_node_from_doc(c, children_by_parent) } + fi.map { |f| tree_node_for_file(f) },
-          is_favorited: favorited_flag_for(doc)
+          children: sf.map { |c| tree_node_from_doc(c, children_by_parent, root_folder_id) } + fi.map { |f| tree_node_for_file(f) },
+          is_favorited: favorited_flag_for(doc),
+          is_pinned: doc.is_pinned,
+          is_top_level: root_folder_id.present? && doc.parent_id == root_folder_id
         }
       else
         tree_node_for_file(doc)
@@ -590,6 +654,20 @@ module Apps
         # The thumbnail action returns 404 if the file doesn't exist; the img onerror
         # handler in the template falls back to the file icon gracefully.
         thumbnail_url: file_kind == "image" ? helpers.thumbnail_document_path(doc.id) : nil
+      }
+    end
+
+    def tree_node_for_folder(doc)
+      # Helper method to build tree nodes for folders (used in pinned section)
+      {
+        kind: :folder,
+        id: doc.id,
+        title: helpers.finder_document_display_title(doc.title),
+        storage_name: doc.title.to_s,
+        writable: !doc.protected_workspace_structure?,
+        is_pinned: doc.is_pinned,
+        is_top_level: true,
+        children: []
       }
     end
 

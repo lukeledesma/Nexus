@@ -71,6 +71,16 @@
             data-parent-id="<%= node[:id] %>"
             data-action="click->finder-browser#createSubfolder"
           ><%= material_symbol_icon(:add, size: :xs) %></button>
+          <% if section_key == "storage" && node.fetch(:is_top_level, false) %>
+            <button
+              type="button"
+              class="item-action-btn item-action-pin<%= " is-pinned" if node[:is_pinned] %>"
+              title="<%= node[:is_pinned] ? "Unpin folder" : "Pin folder" %>"
+              aria-label="<%= node[:is_pinned] ? "Unpin" : "Pin" %> <%= node[:title] %>"
+              data-action="click->finder-browser#togglePin"
+              data-document-id="<%= node[:id] %>"
+            ><% if node[:is_pinned] %><%= render "shared/keep_off_icon" %><% else %><%= render "shared/keep_icon" %><% end %></button>
+          <% end %>
           <button
             type="button"
             class="item-action-btn item-action-rename"

@@ -17,9 +17,10 @@
       <% unless @finder_single_section_mode %>
         <aside class="finder-shell-pane finder-shell-pane--folders" aria-label="Finder sections">
           <ul class="finder-folder-list settings-sections-list">
-            <% @finder_sections.each do |section| %>
+            <% @finder_sections.each_with_index do |section, index| %>
               <% active = !@finder_search_mode && section[:key] == @section_key %>
-              <li class="finder-folder-item<%= " is-active" if active %><%= " finder-folder-item--separator" if ["favorites", "trash"].include?(section[:key]) %><%= " finder-folder-item--bottom" if section[:key] == "trash" %>" data-finder-section-key="<%= section[:key] %>"
+              <% next_is_separator = @finder_sections[index + 1] && ["favorites", "trash"].include?(@finder_sections[index + 1][:key]) %>
+              <li class="finder-folder-item<%= " is-active" if active %><%= " finder-folder-item--separator" if ["favorites", "trash"].include?(section[:key]) %><%= " finder-folder-item--bottom" if section[:key] == "trash" %><%= " finder-folder-item--pre-separator" if next_is_separator %>" data-finder-section-key="<%= section[:key] %>"
                 <% if section[:folder] %>data-finder-section-folder-id="<%= section[:folder].id %>"<% end %>
                 <% if !@finder_read_only && section[:key] == "favorites" %>data-action="dragover->finder-browser#favoritesSidebarDragOver dragleave->finder-browser#favoritesSidebarDragLeave drop->finder-browser#favoritesSidebarDrop"<% elsif !@finder_read_only && section[:key] == "trash" %>data-action="dragover->finder-browser#trashSidebarDragOver dragleave->finder-browser#trashSidebarDragLeave drop->finder-browser#trashSidebarDrop"<% elsif !@finder_read_only && section[:folder] %>data-action="dragover->finder-browser#sectionSidebarDragOver dragleave->finder-browser#sectionSidebarDragLeave drop->finder-browser#sectionSidebarDrop"<% end %>>
                 <%= link_to apps_finder_path({ section: section[:key], frame_id: frame_id }.merge(@finder_read_only ? { mode: "save_as" } : {})), class: "finder-folder-link", data: { turbo_frame: frame_id, turbo_prefetch: false }, aria: { label: "Open #{section[:title]}" } do %>
@@ -31,6 +32,16 @@
                     <% end %>
                   </span>
                   <span class="finder-folder-name"><%= section[:title] %></span>
+                <% end %>
+                <% if section[:is_pinned_folder] && !@finder_read_only %>
+                  <button
+                    type="button"
+                    class="item-action-btn finder-folder-unpin-btn"
+                    title="Unpin folder"
+                    aria-label="Unpin <%= section[:title] %>"
+                    data-action="click->finder-browser#togglePin"
+                    data-document-id="<%= section[:folder].id %>"
+                  ><%= render "shared/keep_off_icon" %></button>
                 <% end %>
               </li>
             <% end %>

@@ -6920,7 +6920,6 @@ input.app-save-dialog__btn {
 .theme-builder-view .theme-builder-studio-rows > li.theme-builder-studio-section:not(.is-collapsed) .theme-builder-section-body {
   margin-left: 0;
   margin-right: 0;
-  width: 100%;
   max-width: none;
   box-sizing: border-box;
   /* Extra horizontal inset so sliders / values aren’t flush with the rounded group edge */
@@ -7978,6 +7977,37 @@ a.finder-tree__row {
   background: rgba(248, 113, 113, 0.14);
 }
 
+.finder-tree__row-actions .item-action-pin {
+  color: var(--text-muted, #a0a0a0);
+}
+
+.finder-tree__row-actions .item-action-pin svg {
+  width: 14px;
+  height: 14px;
+}
+
+.finder-tree__row-actions .item-action-pin:hover,
+.finder-tree__row-actions .item-action-pin:focus-visible {
+  color: #60a5fa;
+  background: rgba(96, 165, 250, 0.16);
+}
+
+.finder-tree__row-actions .item-action-pin.is-pinned {
+  color: #60a5fa;
+  background: rgba(96, 165, 250, 0.1);
+}
+
+.finder-tree__row-actions .item-action-pin.is-pinned:hover,
+.finder-tree__row-actions .item-action-pin.is-pinned:focus-visible {
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.2);
+}
+
+.finder-folder-unpin-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
 .finder-folder-item--drag-over > .finder-folder-link {
   background: rgba(239, 68, 68, 0.24);
   color: #ef4444;
@@ -8349,8 +8379,16 @@ a.finder-tree__row--file:focus-visible {
 }
 
 .finder-folder-item--separator {
-  padding-top: 0.65rem;
+  padding-top: 10.4px;
   margin-top: 0;
+}
+
+.finder-folder-item--separator > .finder-folder-link {
+  padding-top: 7px;
+}
+
+.finder-folder-item--pre-separator {
+  padding-bottom: 5.2px;
 }
 
 .finder-folder-item--separator::before {
@@ -8424,6 +8462,28 @@ a.finder-tree__row--file:focus-visible {
 .finder-folder-item:focus-within .finder-folder-actions {
   opacity: 1;
   pointer-events: auto;
+}
+
+.finder-folder-unpin-btn {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease;
+}
+
+.finder-folder-item:hover .finder-folder-unpin-btn,
+.finder-folder-item:focus-within .finder-folder-unpin-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.finder-folder-unpin-btn:hover,
+.finder-folder-unpin-btn:focus-visible {
+  background: rgba(248, 113, 113, 0.14);
+  color: #f87171;
 }
 
 /* Inline rename: padded field + fixed outer height so rows stay one size in and out of edit */

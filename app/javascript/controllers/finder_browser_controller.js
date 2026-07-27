@@ -858,6 +858,49 @@ export default class extends Controller {
     }))
   }
 
+  async togglePin(event) {
+    if (this.readOnlyValue) return
+    event.preventDefault()
+    event.stopPropagation()
+    const btn = event.currentTarget
+    const documentId = btn.dataset.documentId
+    if (!documentId) return
+
+    const response = await fetch("/apps/finder/toggle_pin", {
+      method: "POST",
+      headers: finderApiHeaders({ jsonBody: true }),
+      body: JSON.stringify({ document_id: documentId })
+    })
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}))
+      window.alert(payload.error || "Could not pin/unpin folder.")
+      return
+    }
+
+    const data = await response.json()
+    
+    // Toggle the button's visual state
+    btn.classList.toggle("is-pinned", data.is_pinned)
+    btn.setAttribute("title", data.is_pinned ? "Unpin" : "Pin")
+    btn.setAttribute("aria-label", `${data.is_pinned ? "Unpin" : "Pin"} folder`)
+    
+    // Update the icon class for filled/outline appearance
+    const icon = btn.querySelector(".material-icon")
+    if (icon) {
+      if (data.is_pinned) {
+        icon.classList.add("is-filled")
+      } else {
+        icon.classList.remove("is-filled")
+      }
+    }
+
+    // Notify other listeners that the structure has changed
+    window.dispatchEvent(new CustomEvent("nexus:finder-structure-changed", {
+      detail: { type: data.is_pinned ? "folder_pinned" : "folder_unpinned", documentId, sectionKey: "storage" }
+    }))
+  }
+
   // ── Drag-to-Trash ──────────────────────────────────────────────────────────
   // File rows in any section can be dragged onto the Trash sidebar item.
   trashSidebarDragOver(event) {

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_14_220000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_27_213921) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -20,6 +20,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_14_220000) do
     t.datetime "created_at", null: false
     t.boolean "is_favorited", default: false, null: false
     t.boolean "is_folder", default: false, null: false
+    t.boolean "is_pinned", default: false, null: false
     t.datetime "last_reset_at"
     t.integer "parent_id"
     t.integer "reset_days", default: [], null: false, array: true
@@ -31,6 +32,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_14_220000) do
     t.index ["content_type"], name: "index_documents_on_content_type"
     t.index ["is_favorited"], name: "index_documents_on_is_favorited_true", where: "(is_favorited = true)"
     t.index ["is_folder"], name: "index_documents_on_is_folder"
+    t.index ["is_pinned"], name: "index_documents_on_is_pinned_true", where: "(is_pinned = true)"
     t.index ["parent_id", "is_folder"], name: "index_documents_on_parent_id_and_is_folder"
     t.index ["parent_id"], name: "index_documents_on_parent_id"
   end

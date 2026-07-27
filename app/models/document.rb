@@ -22,6 +22,8 @@ class Document < ApplicationRecord
 
   scope :folders, -> { where(is_folder: true) }
   scope :files, -> { where(is_folder: false) }
+  scope :pinned, -> { where(is_pinned: true) }
+  scope :unpinned, -> { where(is_pinned: false) }
 
   validate :parent_must_be_folder
   validate :title_cannot_start_with_dot
