@@ -29,7 +29,7 @@ module Documents
       return Support::OperationResult.new(status: :forbidden, error: "Can only move into folders in Finder.") unless Apps::FinderController.document_in_finder_subtree?(finder_root, target)
       target_policy = ::DocumentPolicy.new(user: @user, document: target)
       return Support::OperationResult.new(status: :forbidden, error: "Cannot move into that folder.") if target_policy.in_trash?
-      if target.protected_workspace_structure? && @kind == :folder
+      if target.protected_workspace_structure? && @kind == :folder && target.id != finder_root.id
         return Support::OperationResult.new(status: :forbidden, error: "Cannot move into that folder.")
       end
 

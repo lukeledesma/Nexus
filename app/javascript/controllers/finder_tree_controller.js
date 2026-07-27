@@ -355,7 +355,7 @@ export default class extends Controller {
     event.dataTransfer.setData("application/nexus-document-id", id)
     event.dataTransfer.setData("text/plain", id)
     line.classList.add("finder-tree__row-line--dragging")
-    this._setRootDropArmed(this._dragKind === DRAG_KIND.FILE)
+    this._setRootDropArmed(true)
   }
 
   _onDragEnd(event) {
@@ -481,7 +481,7 @@ export default class extends Controller {
       return
     }
 
-    this._setRootDropArmed(dragPayload.dragKind === DRAG_KIND.FILE)
+    this._setRootDropArmed(true)
 
     const target = this._dropTargetFromEvent(event, { allowRoot: dragPayload.dragKind === DRAG_KIND.FILE || dragPayload.dragKind === DRAG_KIND.FOLDER })
     if (!target) {
@@ -507,7 +507,7 @@ export default class extends Controller {
     const droppedFiles = finderDroppedFilesFromDataTransfer(dt)
     const hasDroppedFiles = dt?.files?.length > 0
     const dragPayload = this._activeDragPayload(event)
-    const target = this._dropTargetFromEvent(event, { allowRoot: hasDroppedFiles || dragPayload?.dragKind === DRAG_KIND.FILE })
+    const target = this._dropTargetFromEvent(event, { allowRoot: hasDroppedFiles || dragPayload?.dragKind === DRAG_KIND.FILE || dragPayload?.dragKind === DRAG_KIND.FOLDER })
 
     if (hasDroppedFiles) {
       if (!target) {

@@ -896,8 +896,9 @@ export default class extends Controller {
     }
 
     // Notify other listeners that the structure has changed
+    // Include current section so page reload preserves the current view instead of jumping to Storage
     window.dispatchEvent(new CustomEvent("nexus:finder-structure-changed", {
-      detail: { type: data.is_pinned ? "folder_pinned" : "folder_unpinned", documentId, sectionKey: "storage" }
+      detail: { type: data.is_pinned ? "folder_pinned" : "folder_unpinned", documentId, sectionKey: this.sectionKeyValue }
     }))
   }
 
@@ -1069,7 +1070,8 @@ export default class extends Controller {
         detail: {
           type: "favorite_toggled",
           documentId: String(id),
-          sectionKey: "favorites"
+          isFavorited
+          // No sectionKey - refresh in ALL views to keep favorites in sync
         }
       }))
     } catch (_error) {
@@ -1217,7 +1219,8 @@ export default class extends Controller {
         detail: {
           type: "favorite_toggled",
           documentId: String(documentId),
-          sectionKey: "favorites"
+          isFavorited
+          // No sectionKey - refresh in ALL views to keep favorites in sync
         }
       }))
     } catch (_error) {

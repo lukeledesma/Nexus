@@ -241,8 +241,15 @@ module Apps
         if @finder_single_section_mode
           self.class.normalized_section_key(read_only_config[:section_key])
         else
-          self.class.finder_section_key_for_document(current_user, browse_doc, section_roots: section_roots) ||
-            self.class.normalized_section_key(params[:section].presence || last_finder_section_key)
+          # If a specific section is requested (e.g., pinned folder), use it
+          requested_section = params[:section].presence
+          if requested_section
+            self.class.normalized_section_key(requested_section)
+          else
+            # Otherwise, determine section from the document being browsed or use last saved section
+            self.class.finder_section_key_for_document(current_user, browse_doc, section_roots: section_roots) ||
+              self.class.normalized_section_key(last_finder_section_key)
+          end
         end
 
       persist_last_finder_section_key(@section_key) unless @finder_single_section_mode
@@ -382,7 +389,14 @@ module Apps
     end
 
     def finder_embed_layout?
-      params[:embed].to_s == "iframe" ? "finder_embed" : false
+      # For Turbo Frame requests (which have parent page with JavaScript), use no layout
+      return false if turbo_frame_request?
+      
+      # For iframe embeds, use the embed layout
+      return "finder_embed" if params[:embed].to_s == "iframe"
+      
+      # For direct page loads, use full application layout
+      "application"
     end
 
     def last_finder_section_key
