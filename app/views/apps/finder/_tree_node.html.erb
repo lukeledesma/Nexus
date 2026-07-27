@@ -71,7 +71,7 @@
             data-parent-id="<%= node[:id] %>"
             data-action="click->finder-browser#createSubfolder"
           ><%= material_symbol_icon(:add, size: :xs) %></button>
-          <% if section_key == "storage" && node.fetch(:is_top_level, false) %>
+          <% if section_key == "storage" %>
             <button
               type="button"
               class="item-action-btn item-action-pin<%= " is-pinned" if node[:is_pinned] %>"

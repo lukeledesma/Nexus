@@ -252,9 +252,9 @@ module Apps
         definition.merge(folder: section_roots[definition[:key]])
       end
 
-      # Get pinned folders and insert them as sidebar items between Storage and Favorites
+      # Get all pinned folders (recursively) and insert them as sidebar items between Storage and Favorites
       storage_root = section_roots["storage"]
-      pinned_folders = storage_root ? storage_root.children.where(is_pinned: true, is_folder: true).sort_by { |f| f.title.to_s.downcase } : []
+      pinned_folders = storage_root ? gather_pinned_descendants(storage_root) : []
       
       @finder_sections = []
       base_sections.each do |section|
@@ -370,6 +370,16 @@ module Apps
     end
 
     private
+
+    # Recursively gather all pinned folders from a given parent (used for sidebar generation)
+    def gather_pinned_descendants(parent)
+      result = []
+      parent.children.where(is_folder: true).each do |child|
+        result << child if child.is_pinned
+        result.concat(gather_pinned_descendants(child))
+      end
+      result.sort_by { |f| f.title.to_s.downcase }
+    end
 
     def finder_embed_layout?
       params[:embed].to_s == "iframe" ? "finder_embed" : false

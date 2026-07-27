@@ -8376,6 +8376,9 @@ a.finder-tree__row--file:focus-visible {
 .finder-folder-item {
   position: relative;
   border-radius: 8px;
+  display: flex;
+  align-items: center;
+  width: 100%;
 }
 
 .finder-folder-item--separator {
@@ -8408,10 +8411,6 @@ a.finder-tree__row--file:focus-visible {
   margin-bottom: 0;
 }
 
-.finder-folder-item.is-active .finder-folder-link {
-  background: var(--nexus-row-selected-highlight);
-}
-
 .finder-folder-link {
   box-sizing: border-box;
   display: flex;
@@ -8419,7 +8418,7 @@ a.finder-tree__row--file:focus-visible {
   align-items: center;
   gap: var(--finder-row-gap);
   border-radius: 8px;
-  padding: var(--finder-row-padding-block) calc(var(--nexus-icon-btn-size) * 2 + 0.375rem) var(--finder-row-padding-block) var(--finder-row-padding-inline);
+  padding: var(--finder-row-padding-block) var(--finder-row-padding-inline) var(--finder-row-padding-block) var(--finder-row-padding-inline);
   min-height: calc(var(--finder-row-padding-block) * 2 + var(--finder-row-min-inner-height));
   color: var(--text);
   text-decoration: none;
@@ -8427,6 +8426,7 @@ a.finder-tree__row--file:focus-visible {
   line-height: 1.2;
   cursor: pointer;
   transition: background 140ms ease, color 140ms ease;
+  flex: 1;
 }
 
 .finder-folder-link > .finder-folder-icon {
@@ -8434,6 +8434,10 @@ a.finder-tree__row--file:focus-visible {
   width: 18px;
   height: 18px;
   line-height: 0;
+}
+
+.finder-folder-item.is-active .finder-folder-link {
+  background: var(--nexus-row-selected-highlight);
 }
 
 .finder-folder-item:hover .finder-folder-link {
@@ -8473,34 +8477,7 @@ a.finder-tree__row--file:focus-visible {
 }
 
 .finder-folder-unpin-btn {
-  position: absolute;
-  top: 50%;
-  right: 6px;
-  transform: translateY(-50%);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 24px;
-  min-height: 24px;
-  padding: 2px 4px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  color: var(--text-muted, #a0a0a0);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease;
-}
-
-.finder-folder-item:hover .finder-folder-unpin-btn,
-.finder-folder-item:focus-within .finder-folder-unpin-btn {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.finder-folder-unpin-btn:hover {
-  background: rgba(248, 113, 113, 0.14);
-  color: #f87171;
+  display: none;
 }
 
 .finder-folder-unpin-btn:hover,

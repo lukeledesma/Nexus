@@ -34,14 +34,7 @@
                   <span class="finder-folder-name"><%= section[:title] %></span>
                 <% end %>
                 <% if section[:is_pinned_folder] && !@finder_read_only %>
-                  <button
-                    type="button"
-                    class="item-action-btn finder-folder-unpin-btn"
-                    title="Unpin folder"
-                    aria-label="Unpin <%= section[:title] %>"
-                    data-action="click->finder-browser#togglePin"
-                    data-document-id="<%= section[:folder].id %>"
-                  ><%= render "shared/keep_off_icon" %></button>
+                  <%# Unpin button hidden - use tree view buttons for pin/unpin management %>
                 <% end %>
               </li>
             <% end %>
