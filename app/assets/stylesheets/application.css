@@ -8436,6 +8436,14 @@ a.finder-tree__row--file:focus-visible {
   line-height: 0;
 }
 
+.finder-folder-item:hover .finder-folder-link {
+  background: var(--nexus-row-hover-highlight);
+}
+
+.finder-folder-item:focus-within .finder-folder-link {
+  background: var(--nexus-row-hover-highlight);
+}
+
 .finder-folder-link:hover,
 .finder-folder-link:focus-visible {
   background: var(--nexus-row-hover-highlight);
@@ -8469,6 +8477,16 @@ a.finder-tree__row--file:focus-visible {
   top: 50%;
   right: 6px;
   transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 2px 4px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--text-muted, #a0a0a0);
   opacity: 0;
   pointer-events: none;
   transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease;
@@ -8478,6 +8496,11 @@ a.finder-tree__row--file:focus-visible {
 .finder-folder-item:focus-within .finder-folder-unpin-btn {
   opacity: 1;
   pointer-events: auto;
+}
+
+.finder-folder-unpin-btn:hover {
+  background: rgba(248, 113, 113, 0.14);
+  color: #f87171;
 }
 
 .finder-folder-unpin-btn:hover,
