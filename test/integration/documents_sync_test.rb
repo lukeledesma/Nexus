@@ -11,6 +11,7 @@ class DocumentsSyncTest < ActionDispatch::IntegrationTest
   end
 
   teardown do
+    UserAppState.delete_all
     Document.delete_all
     User.where(id: @user&.id).delete_all
   end
@@ -71,18 +72,18 @@ class DocumentsSyncTest < ActionDispatch::IntegrationTest
     text_path = folder_path.join("from_finder.txt")
     File.write(text_path, "Imported from disk")
 
-    assert_nil Document.files.find_by(storage_path: "finder-folder/from_finder.txt")
+    assert_nil Document.files.find_by(storage_path: "Storage/finder-folder/from_finder.txt")
 
     get root_path
 
-    created = Document.files.find_by(storage_path: "finder-folder/from_finder.txt")
+    created = Document.files.find_by(storage_path: "Storage/finder-folder/from_finder.txt")
     assert_not_nil created
     assert_equal "from_finder", created.title
     assert_equal "note", created.content_type
   ensure
     FileUtils.rm_rf(DocumentStorageSyncLite.storage_root.join("finder-folder"))
-    Document.files.where(storage_path: "finder-folder/from_finder.txt").delete_all
-    Document.folders.where(storage_path: "finder-folder").delete_all
+    Document.files.where(storage_path: "Storage/finder-folder/from_finder.txt").delete_all
+    Document.folders.where(storage_path: "Storage/finder-folder").delete_all
   end
 
   test "organizer ignores unsupported files without ingesting them" do

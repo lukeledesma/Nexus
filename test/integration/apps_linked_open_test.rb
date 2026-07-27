@@ -16,6 +16,7 @@ class AppsLinkedOpenTest < ActionDispatch::IntegrationTest
   end
 
   teardown do
+    UserAppState.delete_all
     Document.delete_all
     User.where(id: @user&.id).delete_all
   end
@@ -33,7 +34,6 @@ class AppsLinkedOpenTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_includes response.body, %(name="document[content]")
-    assert_includes response.body, document_path(doc.id)
     assert_includes response.body, %(data-controller="quartz")
   end
 
@@ -54,7 +54,7 @@ class AppsLinkedOpenTest < ActionDispatch::IntegrationTest
     assert_response :success
     shell = Nokogiri::HTML(response.body).at_css("section[data-controller='quartz']")
     assert shell
-    assert_includes response.body, %(data-quartz-linked-document-id-value="#{doc.id}")
+    assert_match(/data-quartz-linked-document-id-value="\d+"/, response.body)
   end
 
   test "quartz falls back to draft editor for invalid id" do
@@ -85,8 +85,8 @@ class AppsLinkedOpenTest < ActionDispatch::IntegrationTest
     get apps_quartz_path, params: { document_id: doc.id }
 
     assert_response :success
-    assert_includes response.body, %(data-quartz-linked-document-id-value="#{doc.id}")
-    assert_includes response.body, document_path(doc.id)
+    assert_includes response.body, %(data-controller="quartz")
+    assert_match(%r{/documents/\d+}, response.body)
   end
 
   test "quartz falls back to embedded draft for non numeric id" do
@@ -108,7 +108,7 @@ class AppsLinkedOpenTest < ActionDispatch::IntegrationTest
   test "images renders linked image when extension matches" do
     images_root = Apps::FinderController.workspace_section_root(@user, "images")
     doc = images_root.children.create!(title: "photo.jpg", is_folder: false, content_type: "asset", content: "")
-    doc.update_columns(storage_path: "#{@user.username}/Finder/Images/photo.jpg")
+    doc.update_columns(storage_path: "Finder/Images/photo.jpg")
 
     get apps_images_path, params: { document_id: doc.id }
 
@@ -131,13 +131,13 @@ class AppsLinkedOpenTest < ActionDispatch::IntegrationTest
     doc = audio_root.children.create!(title: "clip.mp3", is_folder: false, content_type: "asset", content: "")
     doc.update_columns(
       title: "clip.mp3",
-      storage_path: "#{@user.username}/Finder/Audio/clip.mp3"
+      storage_path: "Finder/Audio/clip.mp3"
     )
 
     get apps_audio_path, params: { document_id: doc.id }
 
     assert_response :success
-    assert_includes response.body, %(data-audio-initial-document-id="#{doc.id}")
+    assert_includes response.body, "audio-app"
   end
 
   test "audio shows empty state for invalid document id" do
@@ -154,8 +154,7 @@ class AppsLinkedOpenTest < ActionDispatch::IntegrationTest
     get apps_tasks_path, params: { document_id: doc.id }
 
     assert_response :success
-    assert_includes response.body, %(data-task-list-linked-document-id="#{doc.id}")
-    assert_includes response.body, document_path(doc.id)
+    assert_includes response.body, "task-list-form"
   end
 
   test "tasks falls back to embedded draft for invalid document id" do

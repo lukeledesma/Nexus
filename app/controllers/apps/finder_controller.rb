@@ -7,30 +7,58 @@ module Apps
     skip_before_action :sync_from_disk
     FINDER_LAST_SECTION_STATE_KEY = "finder.last_section"
 
-    DEFAULT_SECTION_KEY = "documents"
-    TASKS_SECTION_TITLE = "Tasks"
+    DEFAULT_SECTION_KEY = "storage"
+    STORAGE_SECTION_TITLE = "Storage"
+    DESKTOP_SECTION_TITLE = "Desktop"
+    DOCUMENTS_SECTION_TITLE = "Documents"
+    PICTURES_SECTION_TITLE = "Pictures"
+    MUSIC_SECTION_TITLE = "Music"
     FAVORITES_SECTION_TITLE = "Favorites"
-    QUARTZ_SECTION_TITLE = "Quartz"
     TRASH_SECTION_TITLE = "Trash"
+    TASKS_SECTION_TITLE = "Tasks"
+    QUARTZ_SECTION_TITLE = "Quartz"
+    IMAGES_SECTION_TITLE = "Images"
+    AUDIO_SECTION_TITLE = "Audio"
+    ALCHEMY_SECTION_TITLE = "Alchemy"
+    LEGACY_SECTION_KEY_ALIASES = {
+      "storage" => "storage",
+      "desktop" => "storage",
+      "documents" => "storage",
+      "pictures" => "storage",
+      "music" => "storage",
+      "tasks" => "storage",
+      "quartz" => "storage",
+      "images" => "storage",
+      "audio" => "storage",
+      "alchemy" => "storage"
+    }.freeze
+    LEGACY_SECTION_TITLE_ALIASES = {
+      STORAGE_SECTION_TITLE.downcase => "storage",
+      DESKTOP_SECTION_TITLE.downcase => "storage",
+      DOCUMENTS_SECTION_TITLE.downcase => "storage",
+      PICTURES_SECTION_TITLE.downcase => "storage",
+      MUSIC_SECTION_TITLE.downcase => "storage",
+      TASKS_SECTION_TITLE.downcase => "storage",
+      QUARTZ_SECTION_TITLE.downcase => "storage",
+      IMAGES_SECTION_TITLE.downcase => "storage",
+      AUDIO_SECTION_TITLE.downcase => "storage",
+      ALCHEMY_SECTION_TITLE.downcase => "storage"
+    }.freeze
     FINDER_SECTION_DEFINITIONS = [
-      { key: "documents", title: TASKS_SECTION_TITLE, icon: "task_checklist" },
-      { key: "quartz", title: QUARTZ_SECTION_TITLE, icon: "sticky_note", icon_svg: true, icon_partial: "quartz_icon" },
-      { key: "images", title: "Images", icon: "wallpaper" },
-      { key: "audio", title: "Audio", icon: "graphic_eq" },
-      { key: "alchemy", title: "Alchemy", icon: "apps", icon_svg: true, icon_partial: "alchemy_icon" },
+      { key: "storage", title: STORAGE_SECTION_TITLE, icon_svg: true, icon_partial: "hard_drive_icon" },
       { key: "favorites", title: FAVORITES_SECTION_TITLE, icon: "star_rounded" },
       { key: "trash", title: TRASH_SECTION_TITLE, icon: "delete" }
     ].freeze
     READ_ONLY_FRAME_CONFIG = {
-      "tasks-pane" => { section_key: "documents", content_type: "task_list", allow_save: true },
+      "tasks-pane" => { section_key: "storage", content_type: "task_list", allow_save: true },
       "quartz-pane" => {
-        section_key: "quartz",
+        section_key: "storage",
         content_type: "note",
         allow_save: true
       },
-      "audio-pane" => { section_key: "audio", content_type: "asset", allow_save: false },
-      "images-pane" => { section_key: "images", content_type: "asset", allow_save: false },
-      "alchemy-pane" => { section_key: "alchemy", content_type: "alchemy_tag_list", allow_save: true }
+      "audio-pane" => { section_key: "storage", content_type: "asset", allow_save: false },
+      "images-pane" => { section_key: "storage", content_type: "asset", allow_save: false },
+      "alchemy-pane" => { section_key: "storage", content_type: "alchemy_tag_list", allow_save: true }
     }.freeze
     # Matches file kinds with an opener app (see finder_browser_controller.js).
     LINKED_FILE_CONTENT_TYPES = %w[note task_list asset alchemy_tag_list].freeze
@@ -44,25 +72,45 @@ module Apps
         key = raw.to_s.strip.downcase
         return DEFAULT_SECTION_KEY if key.blank?
 
+        key = LEGACY_SECTION_KEY_ALIASES.fetch(key, key)
         workspace_section_definitions.find { |item| item[:key] == key }&.fetch(:key, DEFAULT_SECTION_KEY) || DEFAULT_SECTION_KEY
       end
 
       def finder_section_label(section_key)
         key = normalized_section_key(section_key)
-        workspace_section_definitions.find { |item| item[:key] == key }&.fetch(:title, TASKS_SECTION_TITLE) || TASKS_SECTION_TITLE
+        workspace_section_definitions.find { |item| item[:key] == key }&.fetch(:title, STORAGE_SECTION_TITLE) || STORAGE_SECTION_TITLE
       end
 
       # Derives the originating section key from a document's storage_path.
-      # Path format: "Username/Finder/SectionTitle/..."
+      # Path formats:
+      # - "Finder/SectionTitle/..." (current)
+      # - "Username/Finder/SectionTitle/..." (legacy)
       # Returns nil when the path doesn't match or the section is unknown.
       def origin_section_key_from_storage_path(storage_path)
-        parts = storage_path.to_s.split("/")
-        section_title = parts[2] # index 0=user, 1=Finder, 2=section title
-        return nil if section_title.blank?
+        parts = storage_path.to_s.split("/").reject(&:blank?)
+        return nil if parts.empty?
 
-        workspace_section_definitions
-          .reject { |d| ["favorites", "trash"].include?(d[:key]) }
-          .find { |d| d[:title].casecmp?(section_title) }&.fetch(:key, nil)
+        first = parts[0].to_s.strip
+        second = parts[1].to_s.strip
+        third = parts[2].to_s.strip
+
+        return "trash" if first.casecmp?(TRASH_SECTION_TITLE)
+        return nil if first.casecmp?("Embedded")
+        return "storage" if LEGACY_SECTION_TITLE_ALIASES.key?(first.downcase)
+
+        if FinderListedFolders.finder_title_match?(first, STORAGE_SECTION_TITLE)
+          return "trash" if second.casecmp?(TRASH_SECTION_TITLE)
+          return nil if second.casecmp?("Embedded")
+          return "storage" if second.blank? || LEGACY_SECTION_TITLE_ALIASES.key?(second.downcase)
+        end
+
+        if FinderListedFolders.finder_title_match?(second, STORAGE_SECTION_TITLE)
+          return "trash" if third.casecmp?(TRASH_SECTION_TITLE)
+          return nil if third.casecmp?("Embedded")
+          return "storage" if third.blank? || LEGACY_SECTION_TITLE_ALIASES.key?(third.downcase)
+        end
+
+        nil
       end
 
       def workspace_root_folder(user)
@@ -71,7 +119,8 @@ module Apps
 
       def workspace_section_roots(user)
         roots = FinderWorkspaceInitializer.section_roots_for(user)
-        return roots if roots.present?
+        meaningful_roots = roots.except("favorites")
+        return roots if meaningful_roots.present?
 
         FinderWorkspaceInitializer.ensure_for_user!(user)
       end
@@ -87,21 +136,17 @@ module Apps
 
       def workspace_trash_root(user)
         FinderWorkspaceInitializer.ensure_for_user!(user)
-        root = workspace_root_folder(user)
-        return nil unless root
+        finder_root = workspace_root_folder(user)
+        return nil unless finder_root
 
-        finder = root.children.folders.find { |d| d.title.to_s.strip.casecmp?("Finder") }
-        finder ||= root.children.create!(is_folder: true, title: "Finder")
-
-        folder = finder.children.folders.find { |d| d.title.to_s.strip.casecmp?(TRASH_SECTION_TITLE) } ||
-          finder.children.create!(is_folder: true, title: TRASH_SECTION_TITLE)
-        ensure_folder_storage_path!(finder, folder)
+        folder = finder_root.children.folders.find { |d| /\A#{Regexp.escape(TRASH_SECTION_TITLE)}(?:\s+\d+)?\z/i.match?(d.title.to_s.strip) } ||
+          finder_root.children.create!(is_folder: true, title: TRASH_SECTION_TITLE)
+        ensure_folder_storage_path!(finder_root, folder)
         folder
       rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique
-        root = workspace_root_folder(user)
-        finder = root&.children&.folders&.find { |d| d.title.to_s.strip.casecmp?("Finder") }
-        folder = finder&.children&.folders&.find { |d| d.title.to_s.strip.casecmp?(TRASH_SECTION_TITLE) }
-        ensure_folder_storage_path!(finder, folder) if finder && folder
+        finder_root = workspace_root_folder(user)
+        folder = finder_root&.children&.folders&.find { |d| /\A#{Regexp.escape(TRASH_SECTION_TITLE)}(?:\s+\d+)?\z/i.match?(d.title.to_s.strip) }
+        ensure_folder_storage_path!(finder_root, folder) if finder_root && folder
         folder
       end
 
@@ -110,9 +155,7 @@ module Apps
         return if folder.storage_path.to_s.strip.present?
 
         parent_path = finder_root.storage_path.to_s.strip
-        return if parent_path.blank?
-
-        relative = File.join(parent_path, folder.title.to_s)
+        relative = parent_path.present? ? File.join(parent_path, folder.title.to_s) : folder.title.to_s
         FileUtils.mkdir_p(DocumentStorageSyncLite.storage_root.join(relative))
         folder.update_column(:storage_path, relative)
       end
@@ -128,12 +171,16 @@ module Apps
         root&.children&.folders&.find { |d| d.title.to_s.strip.casecmp?(folder_title.to_s.strip) }
       end
 
-      def finder_section_key_for_document(user, doc)
+      def finder_section_key_for_document(user, doc, section_roots: nil)
         return nil unless doc
 
-        workspace_section_roots(user).each do |key, root|
-          return key if document_in_finder_subtree?(root, doc)
-        end
+        trash_root = section_roots&.[]("trash") || workspace_trash_root(user)
+        return "trash" if document_in_finder_subtree?(trash_root, doc)
+        return nil if DocumentPolicy.new(user: user, document: doc).in_embedded_subtree?
+
+        root = section_roots&.[]("storage") || workspace_section_root(user, "storage")
+        return "storage" if document_in_finder_subtree?(root, doc)
+
         nil
       end
 
@@ -162,7 +209,8 @@ module Apps
     end
 
     def show
-      FinderWorkspaceInitializer.ensure_for_user!(current_user)
+      section_roots = FinderWorkspaceInitializer.ensure_for_user!(current_user)
+      section_roots = self.class.workspace_section_roots(current_user) if section_roots.blank?
 
       @finder_read_only = params[:mode].to_s == "save_as"
       @finder_single_section_mode = false
@@ -176,15 +224,21 @@ module Apps
       read_only_content_type = read_only_config&.[](:content_type)
       @finder_read_only_can_save = @finder_read_only && read_only_config&.[](:allow_save)
       @finder_single_section_mode = @finder_read_only && read_only_config.present?
+      @open_in_app_content_types =
+        if @finder_read_only
+          read_only_content_type.present? ? [ read_only_content_type.to_s ] : []
+        else
+          %w[note task_list asset alchemy_tag_list]
+        end
 
-      section_roots = self.class.workspace_section_roots(current_user)
       browse_doc = params[:browse_id].present? ? Document.find_by(id: params[:browse_id]) : nil
+      @trash_root = section_roots["trash"]
 
       @section_key =
         if @finder_single_section_mode
           self.class.normalized_section_key(read_only_config[:section_key])
         else
-          self.class.finder_section_key_for_document(current_user, browse_doc) ||
+          self.class.finder_section_key_for_document(current_user, browse_doc, section_roots: section_roots) ||
             self.class.normalized_section_key(params[:section].presence || last_finder_section_key)
         end
 
@@ -199,7 +253,7 @@ module Apps
         if @section_key == "favorites"
           workspace_root
         elsif @section_key == "trash"
-          self.class.workspace_trash_root(current_user)
+          @trash_root || self.class.workspace_trash_root(current_user)
         else
           section_roots[@section_key]
         end
@@ -207,14 +261,15 @@ module Apps
       @finder_empty_message = nil
       @tree_nodes = []
       @browse_folder = nil
-      @finder_search_mode = !@finder_read_only && params[:search_mode].to_s == "1"
+      @finder_picker_search_mode = @finder_read_only && read_only_config.present?
+      @finder_search_mode = @finder_picker_search_mode || (!@finder_read_only && params[:search_mode].to_s == "1")
       @finder_search_query = @finder_search_mode ? params[:q].to_s.strip : ""
       @finder_search_active = @finder_search_mode
       @finder_search_seed_rows = []
 
       unless @root_folder
         @finder_empty_message =
-          "Your workspace folders could not be found. Set a username so Nexus can create your workspace, then open Finder again."
+          "Your workspace folders could not be found. Reopen Finder to rebuild the workspace layout."
         render layout: finder_embed_layout?
         return
       end
@@ -222,7 +277,12 @@ module Apps
       if @finder_search_mode
         @browse_folder = @root_folder
         @expanded_folder_ids = Set.new
-        @finder_search_seed_rows = build_global_search_rows(section_roots)
+        @finder_search_seed_rows =
+          if @finder_picker_search_mode
+            build_picker_search_rows(@root_folder, @open_in_app_content_types)
+          else
+            build_global_search_rows(section_roots)
+          end
         @tree_nodes = []
       elsif @section_key == "favorites"
         @browse_folder = @root_folder
@@ -234,10 +294,11 @@ module Apps
         @tree_nodes = build_trash_tree_nodes(@root_folder)
       else
         @browse_folder = resolve_browse_folder(@root_folder, params[:browse_id])
-        allowed_folder_ids = finder_folder_ids_in_subtree(@root_folder)
+        visible_rows = visible_descendant_documents_for_tree(@root_folder)
+        allowed_folder_ids = finder_folder_ids_in_subtree(@root_folder, visible_rows)
         extra_expanded = Set.new(parse_expanded_folder_ids_param) & allowed_folder_ids
         @expanded_folder_ids = expanded_folder_ids_on_path(@root_folder, @browse_folder) | extra_expanded
-        @tree_nodes = build_tree_nodes(@root_folder)
+        @tree_nodes = build_tree_nodes_from_rows(@root_folder, visible_rows)
       end
 
       @linked_app_save_icon =
@@ -251,13 +312,6 @@ module Apps
           else
             "file_document"
           end
-        end
-
-      @open_in_app_content_types =
-        if @finder_read_only
-          read_only_content_type.present? ? [ read_only_content_type.to_s ] : []
-        else
-          %w[note task_list asset alchemy_tag_list]
         end
 
       render layout: finder_embed_layout?
@@ -316,8 +370,9 @@ module Apps
       parts.filter_map { |s| Integer(s, 10) }
     end
 
-    def finder_folder_ids_in_subtree(root_folder)
-      Set.new(descendant_documents_for_finder_tree(root_folder).select(&:folder?).map(&:id))
+    def finder_folder_ids_in_subtree(root_folder, rows = nil)
+      source_rows = rows || visible_descendant_documents_for_tree(root_folder)
+      Set.new(source_rows.select(&:folder?).map(&:id))
     end
 
     def finder_folder_for(user)
@@ -330,12 +385,13 @@ module Apps
       doc = Document.find_by(id: browse_id)
       return root_folder unless doc&.folder?
       return root_folder unless self.class.document_in_finder_subtree?(root_folder, doc)
+      return root_folder if hidden_root_subtree_document?(root_folder, doc)
 
       doc
     end
 
     def build_tree_nodes(root_folder)
-      rows = descendant_documents_for_finder_tree(root_folder)
+      rows = visible_descendant_documents_for_tree(root_folder)
       build_tree_nodes_from_rows(root_folder, rows)
     end
 
@@ -366,17 +422,30 @@ module Apps
 
     def build_global_search_rows(section_roots)
       nodes = []
-      section_roots.each do |key, root|
-        next if root.blank?
-        next if [ "favorites", "trash" ].include?(key.to_s)
-
-        descendant_documents_for_finder_tree(root).each do |doc|
+      section_roots
+        .except("favorites", "trash")
+        .values
+        .compact
+        .uniq(&:id)
+        .each do |root|
+        visible_descendant_documents_for_tree(root).each do |doc|
           next unless doc.file?
 
           nodes << tree_node_for_file(doc)
         end
       end
       nodes.sort_by { |row| row[:title].to_s.downcase }
+    end
+
+    def build_picker_search_rows(root_folder, allowed_content_types)
+      allowed = Array(allowed_content_types).map(&:to_s).to_set
+      return [] if root_folder.blank? || allowed.empty?
+
+      visible_descendant_documents_for_tree(root_folder)
+        .select(&:file?)
+        .select { |doc| allowed.include?(doc.content_type.to_s) }
+        .sort_by { |doc| doc.title.to_s.downcase }
+        .map { |doc| tree_node_for_file(doc) }
     end
 
     def finder_search_row_payload(doc, origin_section_key:)
@@ -422,6 +491,39 @@ module Apps
         SELECT * FROM subtree
       SQL
       Document.find_by_sql(Document.sanitize_sql_array([ sql, root_folder.id ]))
+    end
+
+    def visible_descendant_documents_for_tree(root_folder)
+      rows = descendant_documents_for_finder_tree(root_folder)
+      hidden_root_ids = hidden_root_folder_ids_for_tree(root_folder)
+      return rows if hidden_root_ids.empty?
+
+      hidden_ids = Set.new(hidden_root_ids)
+      loop do
+        before = hidden_ids.size
+        rows.each do |doc|
+          hidden_ids.add(doc.id) if hidden_ids.include?(doc.parent_id)
+        end
+        break if hidden_ids.size == before
+      end
+
+      rows.reject { |doc| hidden_ids.include?(doc.id) }
+    end
+
+    def hidden_root_folder_ids_for_tree(root_folder)
+      ids = []
+      trash_root = @trash_root || self.class.workspace_trash_root(current_user)
+      ids << trash_root.id if trash_root&.parent_id == root_folder.id
+      embedded_root = root_folder.children.folders.find { |doc| doc.title.to_s.strip.casecmp?("Embedded") }
+      ids << embedded_root.id if embedded_root
+      ids.compact
+    end
+
+    def hidden_root_subtree_document?(root_folder, doc)
+      hidden_root_folder_ids_for_tree(root_folder).any? do |hidden_id|
+        hidden_root = Document.find_by(id: hidden_id)
+        self.class.document_in_finder_subtree?(hidden_root, doc)
+      end
     end
 
     def build_tree_nodes_from_rows(root_folder, rows)

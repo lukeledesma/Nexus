@@ -59,6 +59,35 @@ class DocumentDiskLoaderTest < ActiveSupport::TestCase
     assert_equal "Backlog", DocumentDiskLoader.send(:basename_without_supported_extension, "/tmp/Kanban/Backlog.md")
   end
 
+  test "nexus and rtf text files are supported and titles strip extension" do
+    assert DocumentDiskLoader.send(:supported_file_extension?, "/tmp/Notes/Legacy.nexus")
+    assert DocumentDiskLoader.send(:supported_file_extension?, "/tmp/Notes/Editor.rtf")
+    assert_equal "Legacy", DocumentDiskLoader.send(:basename_without_supported_extension, "/tmp/Notes/Legacy.nexus")
+    assert_equal "Editor", DocumentDiskLoader.send(:basename_without_supported_extension, "/tmp/Notes/Editor.rtf")
+  end
+
+  test "xml files are indexed only for unified alchemy format" do
+    Dir.mktmpdir do |dir|
+      raw_xml_path = File.join(dir, "raw.xml")
+      alchemy_xml_path = File.join(dir, "alchemy.xml")
+
+      File.write(raw_xml_path, "<xml/>")
+      File.write(
+        alchemy_xml_path,
+        [
+          "# NEXUS_FILE v1",
+          "# kind: alchemy",
+          "# title: PLC Tag List",
+          "",
+          "<XML><TAG /></XML>"
+        ].join("\n")
+      )
+
+      assert_not DocumentDiskLoader.send(:supported_file_extension?, raw_xml_path)
+      assert DocumentDiskLoader.send(:supported_file_extension?, alchemy_xml_path)
+    end
+  end
+
   test "unified quartz files preserve full nexus content" do
     lines = [
       "# NEXUS_FILE v1",
@@ -113,6 +142,40 @@ class DocumentDiskLoaderTest < ActiveSupport::TestCase
 
     assert Document.exists?(draft.id), "expected embedded draft row to remain after purge"
   ensure
+    UserAppState.delete_all
+    Document.delete_all
+    User.where(id: user&.id).delete_all
+  end
+
+  test "sync attaches top-level disk entries to the shared storage root" do
+    suffix = SecureRandom.hex(4)
+    user = User.create!(
+      email: "disk_loader_root_#{suffix}@example.com",
+      username: "disk_loader_root_#{suffix}",
+      password: "password123",
+      password_confirmation: "password123"
+    )
+    FinderWorkspaceInitializer.ensure_for_user!(user)
+    root = FinderListedFolders.workspace_root_for(user)
+    folder_name = "Loose Folder #{suffix}"
+    file_name = "Loose Note #{suffix}.txt"
+
+    FileUtils.mkdir_p(DocumentStorageSyncLite.storage_root.join(folder_name))
+    File.write(DocumentStorageSyncLite.storage_root.join(file_name), "hello from disk")
+
+    DocumentDiskLoader.sync!(purge_missing: false)
+
+    folder = Document.find_by(storage_path: folder_name)
+    file = Document.find_by(storage_path: file_name)
+
+    assert folder, "expected disk folder to be imported"
+    assert file, "expected disk file to be imported"
+    assert_equal root.id, folder.parent_id
+    assert_equal root.id, file.parent_id
+  ensure
+    FileUtils.rm_rf(DocumentStorageSyncLite.storage_root.join(folder_name.to_s))
+    FileUtils.rm_f(DocumentStorageSyncLite.storage_root.join(file_name.to_s))
+    UserAppState.delete_all
     Document.delete_all
     User.where(id: user&.id).delete_all
   end

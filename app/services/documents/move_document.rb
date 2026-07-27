@@ -27,7 +27,11 @@ module Documents
       return Support::OperationResult.new(status: :unprocessable_entity, error: "Choose a folder to move into.") if @parent_id <= 0
       return Support::OperationResult.new(status: :unprocessable_entity, error: "Invalid folder.") unless target&.folder?
       return Support::OperationResult.new(status: :forbidden, error: "Can only move into folders in Finder.") unless Apps::FinderController.document_in_finder_subtree?(finder_root, target)
-      return Support::OperationResult.new(status: :forbidden, error: "Cannot move into that folder.") if target.protected_workspace_structure?
+      target_policy = ::DocumentPolicy.new(user: @user, document: target)
+      return Support::OperationResult.new(status: :forbidden, error: "Cannot move into that folder.") if target_policy.in_trash?
+      if target.protected_workspace_structure? && @kind == :folder
+        return Support::OperationResult.new(status: :forbidden, error: "Cannot move into that folder.")
+      end
 
       if @kind == :folder && (target.id == @document.id || within_tree?(@document, target))
         return Support::OperationResult.new(status: :unprocessable_entity, error: "Cannot move a folder into itself or its subfolder.")

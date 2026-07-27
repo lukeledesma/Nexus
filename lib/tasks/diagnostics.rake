@@ -90,4 +90,24 @@ namespace :nexus do
     File.write(out_path, lines.join("\n") + "\n")
     puts "Diagnostics snapshot written: #{out_path}"
   end
+
+  desc "Generate a storage health report (DB vs disk) under docs/audit"
+  task storage_health: :environment do
+    require "fileutils"
+
+    timestamp = Time.current.strftime("%Y%m%d_%H%M%S")
+    out_path =
+      if ENV["NEXUS_STORAGE_HEALTH_OUTPUT"].to_s.strip.present?
+        Rails.root.join(ENV["NEXUS_STORAGE_HEALTH_OUTPUT"].to_s.strip)
+      else
+        out_dir = Rails.root.join("docs", "audit")
+        FileUtils.mkdir_p(out_dir)
+        out_dir.join("storage_health_#{timestamp}.md")
+      end
+    FileUtils.mkdir_p(out_path.dirname)
+
+    report = StorageHealthReport.call
+    File.write(out_path, StorageHealthReport.to_markdown(report))
+    puts "Storage health report written: #{out_path}"
+  end
 end

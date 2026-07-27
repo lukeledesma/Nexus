@@ -4,6 +4,15 @@ require "marcel"
 
 module Documents
   class UploadFiles
+    TEXT_LIKE_EXTENSIONS = %w[.txt .nexus .rtf].freeze
+    ALCHEMY_SOURCE_SUFFIXES = %w[.xml .json .xml.tar .xml.tar.gz .tgz].freeze
+
+    FILE_KIND_LABELS = {
+      ".png" => "PNG",
+      ".mp3" => "MP3",
+      ".wav" => "WAV"
+    }.freeze
+
     def self.call(user:, folder:, files:)
       new(user: user, folder: folder, files: files).call
     end
@@ -19,10 +28,7 @@ module Documents
       return Support::OperationResult.new(status: :unprocessable_entity, error: "Upload into a folder only.") unless @folder&.folder?
 
       iimage_folder = EmbeddedIimageFolder.document_for(@user)
-      return Support::OperationResult.new(status: :forbidden, error: "Cannot upload into that folder.") if @policy.protected_workspace_structure?
-      unless @policy.can_upload_to_folder?(iimage_folder_id: iimage_folder&.id)
-        return Support::OperationResult.new(status: :forbidden, error: "Can only upload into allowed folders.")
-      end
+      return Support::OperationResult.new(status: :forbidden, error: "Can only upload into allowed folders.") unless @policy.can_upload_to_folder?(iimage_folder_id: iimage_folder&.id)
 
       list = normalize_uploaded_file_list(@files)
       return Support::OperationResult.new(status: :unprocessable_entity, error: "No files received.") if list.empty?
@@ -42,6 +48,9 @@ module Documents
           end
         elsif in_alchemy
           build_uploaded_alchemy_document(uploaded)
+        elsif alchemy_source_upload?(uploaded.original_filename)
+          imported_doc, imported_error = build_uploaded_alchemy_document(uploaded)
+          imported_doc ? [ imported_doc, nil ] : build_uploaded_text_document(uploaded, fallback_error: imported_error)
         elsif text_like_finder_upload_extension?(ext)
           build_uploaded_text_document(uploaded)
         else
@@ -69,12 +78,7 @@ module Documents
             id: d.id,
             name: d.title.to_s,
             ext: ext,
-            kind_label: case ext
-                        when ".png" then "PNG"
-                        when ".mp3" then "MP3"
-                        when ".wav" then "WAV"
-                        else "JPEG"
-                        end
+            kind_label: FILE_KIND_LABELS.fetch(ext, "JPEG")
           }
         end
 
@@ -105,7 +109,12 @@ module Documents
     end
 
     def text_like_finder_upload_extension?(ext)
-      %w[.txt .nexus .rtf].include?(ext)
+      TEXT_LIKE_EXTENSIONS.include?(ext)
+    end
+
+    def alchemy_source_upload?(filename)
+      lower = filename.to_s.downcase
+      ALCHEMY_SOURCE_SUFFIXES.any? { |suffix| lower.end_with?(suffix) }
     end
 
     def folder_section_key
@@ -137,7 +146,7 @@ module Documents
       [ nil, "Could not read file bytes." ]
     end
 
-    def build_uploaded_text_document(uploaded)
+    def build_uploaded_text_document(uploaded, fallback_error: nil)
       parsed = DocumentDiskLoader.send(:parse_nexus_file, uploaded.tempfile.path)
       doc = Document.new(
         is_folder: false,
@@ -152,7 +161,7 @@ module Documents
       )
       [ doc, nil ]
     rescue StandardError
-      [ nil, "Could not import text file." ]
+      [ nil, fallback_error.presence || "Could not import text file." ]
     end
 
     def build_uploaded_alchemy_document(uploaded)

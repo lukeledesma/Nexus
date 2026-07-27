@@ -125,6 +125,26 @@ module Alchemy
 
       DEFAULT_DATA_LENGTH = "1"
       DEFAULT_VERIFY = "7 (Changed)"
+      MOXA_SOURCE_FORMATS = %w[moxa ignition].freeze
+      RAW_MOXA_DATATYPE_MAP = {
+        ["0", "255"] => "int16",
+        ["1", "255"] => "uint16",
+        ["0", "102"] => "int16",
+        ["1", "102"] => "uint16",
+        ["4", "255"] => "int32",
+        ["7", "4"] => "int32",
+        ["4", "32"] => "int32",
+        ["7", "32"] => "int32",
+        ["8", "255"] => "uint32",
+        ["17", "8"] => "uint32",
+        ["8", "32"] => "uint32",
+        ["17", "32"] => "uint32",
+        ["32", "255"] => "float32",
+        ["35", "32"] => "float32",
+        ["0032", "255"] => "float32",
+        ["0035", "32"] => "float32",
+        ["999", "255"] => "int64"
+      }.freeze
 
       class << self
         def parse_records_from_content(xml_content)
@@ -142,27 +162,11 @@ module Alchemy
         end
 
         def extract_xml_content(content)
-          text = content.to_s
-          return text unless text.include?(SOURCE_XML_START) && text.include?(SOURCE_XML_END)
-
-          start_at = text.index(SOURCE_XML_START)
-          end_at = text.index(SOURCE_XML_END)
-          return text if start_at.nil? || end_at.nil? || end_at <= start_at
-
-          body_start = start_at + SOURCE_XML_START.length
-          text[body_start...end_at].to_s.strip
+          extract_segment(content, start_marker: SOURCE_XML_START, end_marker: SOURCE_XML_END)
         end
 
         def extract_raw_content(content)
-          text = content.to_s
-          return text unless text.include?(SOURCE_JSON_START) && text.include?(SOURCE_JSON_END)
-
-          start_at = text.index(SOURCE_JSON_START)
-          end_at = text.index(SOURCE_JSON_END)
-          return text if start_at.nil? || end_at.nil? || end_at <= start_at
-
-          body_start = start_at + SOURCE_JSON_START.length
-          text[body_start...end_at].to_s.strip
+          extract_segment(content, start_marker: SOURCE_JSON_START, end_marker: SOURCE_JSON_END)
         end
 
         def parse_records(xml_path)
@@ -174,41 +178,7 @@ module Alchemy
 
           xml_node.elements.each do |child|
             next if child.name.to_s.start_with?("Preload_")
-
-            funccode = get_child_text(child, "FUNCCODE").delete('"')
-            addrstart = get_child_text(child, "ADDRSTART").delete('"')
-            datatype = get_child_text(child, "DATATYPE").delete('"')
-            encode = get_child_text(child, "ENCODE").delete('"')
-            expr = get_child_text(child, "EXPR").delete('"')
-            nodeid = get_child_text(child, "NODEID").delete('"')
-            subscribe = get_child_text(child, "SUBSCRIBE").delete('"')
-            dlength = get_child_text(child, "DATALENGTH").delete('"').presence || DEFAULT_DATA_LENGTH
-            verify_raw = get_child_text(child, "VERIFY").delete('"').presence || "7"
-            source_format = get_child_text(child, "SOURCEFORMAT").delete('"').downcase
-            moxa_function = get_child_text(child, "MOXAFUNCTION").delete('"')
-            moxa_data_type = get_child_text(child, "MOXADATATYPE").delete('"')
-            moxa_quantity = get_child_text(child, "MOXAQUANTITY").delete('"')
-            moxa_tag_name = get_child_text(child, "MOXATAGNAME").delete('"')
-
-            records << {
-              COLUMNS[:tag_group] => nodeid,
-              COLUMNS[:tag_name] => child.name.to_s,
-              COLUMNS[:data_type] => DataTypeMapper.map_datatype(datatype, encode),
-              COLUMNS[:address_start] => addrstart,
-              COLUMNS[:data_length] => dlength,
-              COLUMNS[:scaling] => ScalingMapper.expr_to_ui(expr),
-              COLUMNS[:read_write] => ReadWriteMapper.subscribe_to_ui(subscribe),
-              COLUMNS[:verify] => DEFAULT_VERIFY,
-              "_raw_datatype" => datatype,
-              "_raw_encode" => encode,
-              "_raw_funccode" => funccode,
-              "_raw_verify" => verify_raw,
-              "_source_format" => source_format,
-              "_moxa_function" => moxa_function,
-              "_moxa_data_type" => moxa_data_type,
-              "_moxa_quantity" => moxa_quantity,
-              "_moxa_tag_name" => moxa_tag_name
-            }
+            records << build_record_from_child(child)
           end
 
           infer_missing_source_formats!(records)
@@ -238,6 +208,59 @@ module Alchemy
           child&.text ? child.text.strip : ""
         end
 
+        def child_text(node, tag_name)
+          get_child_text(node, tag_name).delete('"')
+        end
+
+        def build_record_from_child(child)
+          funccode = child_text(child, "FUNCCODE")
+          addrstart = child_text(child, "ADDRSTART")
+          datatype = child_text(child, "DATATYPE")
+          encode = child_text(child, "ENCODE")
+          expr = child_text(child, "EXPR")
+          nodeid = child_text(child, "NODEID")
+          subscribe = child_text(child, "SUBSCRIBE")
+          dlength = child_text(child, "DATALENGTH").presence || DEFAULT_DATA_LENGTH
+          verify_raw = child_text(child, "VERIFY").presence || "7"
+          source_format = child_text(child, "SOURCEFORMAT").downcase
+          moxa_function = child_text(child, "MOXAFUNCTION")
+          moxa_data_type = child_text(child, "MOXADATATYPE")
+          moxa_quantity = child_text(child, "MOXAQUANTITY")
+          moxa_tag_name = child_text(child, "MOXATAGNAME")
+
+          {
+            COLUMNS[:tag_group] => nodeid,
+            COLUMNS[:tag_name] => child.name.to_s,
+            COLUMNS[:data_type] => DataTypeMapper.map_datatype(datatype, encode),
+            COLUMNS[:address_start] => addrstart,
+            COLUMNS[:data_length] => dlength,
+            COLUMNS[:scaling] => ScalingMapper.expr_to_ui(expr),
+            COLUMNS[:read_write] => ReadWriteMapper.subscribe_to_ui(subscribe),
+            COLUMNS[:verify] => DEFAULT_VERIFY,
+            "_raw_datatype" => datatype,
+            "_raw_encode" => encode,
+            "_raw_funccode" => funccode,
+            "_raw_verify" => verify_raw,
+            "_source_format" => source_format,
+            "_moxa_function" => moxa_function,
+            "_moxa_data_type" => moxa_data_type,
+            "_moxa_quantity" => moxa_quantity,
+            "_moxa_tag_name" => moxa_tag_name
+          }
+        end
+
+        def extract_segment(content, start_marker:, end_marker:)
+          text = content.to_s
+          return text unless text.include?(start_marker) && text.include?(end_marker)
+
+          start_at = text.index(start_marker)
+          end_at = text.index(end_marker)
+          return text if start_at.nil? || end_at.nil? || end_at <= start_at
+
+          body_start = start_at + start_marker.length
+          text[body_start...end_at].to_s.strip
+        end
+
         def annotate_duplicate_addresses!(records)
           grouped = Hash.new { |h, k| h[k] = [] }
 
@@ -245,24 +268,17 @@ module Alchemy
             address = row[COLUMNS[:address_start]].to_s.strip
             next if address.empty?
 
-            data_type = row[COLUMNS[:data_type]].to_s.strip
-            register_kind = data_type == "BOOL" ? "coil" : "holding"
-            key = "#{register_kind}:#{address}"
+            register_kind = register_kind_for_row_data_type(row[COLUMNS[:data_type]])
+            key = register_key(register_kind, address)
             grouped[key] << row
           end
 
-          records.each do |row|
-            row["_address_conflict"] = false
-            row["_address_pair"] = false
-          end
+          reset_address_flags!(records)
 
           grouped.each_value do |rows|
             next if rows.size <= 1
 
-            moxa_like_rows = rows.select do |r|
-              format = r["_source_format"].to_s.downcase
-              format == "moxa" || format == "ignition"
-            end
+            moxa_like_rows = rows.select { |r| moxa_like_source_format?(r["_source_format"]) }
 
             if moxa_like_rows.size == rows.size
               matched_pair_ids = Set.new
@@ -311,8 +327,7 @@ module Alchemy
           return if records.empty?
 
           explicit = records.filter_map do |row|
-            value = row["_source_format"].to_s.strip.downcase
-            value.presence
+            normalized_source_format(row).presence
           end.uniq
 
           if explicit.size == 1
@@ -321,18 +336,12 @@ module Alchemy
           end
 
           if explicit.include?("moxa")
-            records.each do |row|
-              value = row["_source_format"].to_s.strip.downcase
-              row["_source_format"] = value.presence || "moxa"
-            end
+            apply_source_format_default!(records, "moxa")
             return
           end
 
           if explicit.include?("uticor")
-            records.each do |row|
-              value = row["_source_format"].to_s.strip.downcase
-              row["_source_format"] = value.presence || "uticor"
-            end
+            apply_source_format_default!(records, "uticor")
             return
           end
 
@@ -348,9 +357,8 @@ module Alchemy
             address = row[COLUMNS[:address_start]].to_s.strip
             next if address.empty?
 
-            data_type = row[COLUMNS[:data_type]].to_s.strip
-            register_kind = data_type == "BOOL" ? "coil" : "holding"
-            grouped["#{register_kind}:#{address}"] << row[COLUMNS[:tag_name]].to_s
+            register_kind = register_kind_for_row_data_type(row[COLUMNS[:data_type]])
+            grouped[register_key(register_kind, address)] << row[COLUMNS[:tag_name]].to_s
           end
 
           has_moxa_signature = records.any? do |row|
@@ -360,16 +368,7 @@ module Alchemy
           pair_groups = grouped.values.count do |names|
             next false if names.size < 2
 
-            set = names.to_set
-            names.any? do |name|
-              next false if name.blank?
-
-              if name.end_with?("_FB")
-                set.include?(name.delete_suffix("_FB"))
-              else
-                set.include?("#{name}_FB")
-              end
-            end
+            paired_names_present?(names)
           end
 
           has_moxa_signature || pair_groups >= 1
@@ -397,33 +396,51 @@ module Alchemy
         def infer_moxa_datatype_from_raw(raw_dt:, raw_enc:, raw_fc:)
           return "boolean" if raw_fc == "01" || raw_dt == "107"
 
-          key = [raw_dt, raw_enc]
-          mapping = {
-            ["0", "255"] => "int16",
-            ["1", "255"] => "uint16",
-            ["0", "102"] => "int16",
-            ["1", "102"] => "uint16",
-            ["4", "255"] => "int32",
-            ["7", "4"] => "int32",
-            ["4", "32"] => "int32",
-            ["7", "32"] => "int32",
-            ["8", "255"] => "uint32",
-            ["17", "8"] => "uint32",
-            ["8", "32"] => "uint32",
-            ["17", "32"] => "uint32",
-            ["32", "255"] => "float32",
-            ["35", "32"] => "float32",
-            ["0032", "255"] => "float32",
-            ["0035", "32"] => "float32",
-            ["999", "255"] => "int64"
-          }
-
-          mapping.fetch(key, "unknown")
+          RAW_MOXA_DATATYPE_MAP.fetch([raw_dt, raw_enc], "unknown")
         end
 
         def pair_key_for_row(row)
           source_name = row["_moxa_tag_name"].to_s.presence || row[COLUMNS[:tag_name]].to_s
           source_name.strip.downcase
+        end
+
+        def moxa_like_source_format?(source_format)
+          MOXA_SOURCE_FORMATS.include?(source_format.to_s.downcase)
+        end
+
+        def register_kind_for_row_data_type(data_type)
+          data_type.to_s.strip == "BOOL" ? "coil" : "holding"
+        end
+
+        def reset_address_flags!(records)
+          records.each do |row|
+            row["_address_conflict"] = false
+            row["_address_pair"] = false
+          end
+        end
+
+        def register_key(register_kind, address)
+          "#{register_kind}:#{address}"
+        end
+
+        def apply_source_format_default!(records, default_format)
+          records.each do |row|
+            row["_source_format"] = normalized_source_format(row).presence || default_format
+          end
+        end
+
+        def paired_names_present?(names)
+          set = names.to_set
+          names.any? do |name|
+            next false if name.blank?
+
+            partner_name = name.end_with?("_FB") ? name.delete_suffix("_FB") : "#{name}_FB"
+            set.include?(partner_name)
+          end
+        end
+
+        def normalized_source_format(row)
+          row["_source_format"].to_s.strip.downcase
         end
       end
     end

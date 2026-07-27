@@ -157,6 +157,26 @@ What it does:
 - Includes row counts, columns, and max updated_at when present
 - Provides a repeatable before/after baseline for cleanup work
 
+Storage health report (DB vs disk drift + usage):
+
+```bash
+bin/rake nexus:storage_health
+```
+
+Optional output path:
+
+```bash
+NEXUS_STORAGE_HEALTH_OUTPUT=tmp/storage_health.md bin/rake nexus:storage_health
+```
+
+What it does:
+
+- Writes a timestamped markdown report to `docs/audit/`
+- Reports DB file rows missing on disk
+- Reports disk files not represented in DB
+- Reports duplicate DB `storage_path` rows
+- Reports storage usage by `content_type`, including Alchemy totals
+
 Workspace storage cleanup (legacy/test artifacts):
 
 ```bash

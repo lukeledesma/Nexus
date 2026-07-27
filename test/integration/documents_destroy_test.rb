@@ -36,7 +36,7 @@ class DocumentsDestroyTest < ActionDispatch::IntegrationTest
 
     assert_response :no_content
     assert Document.exists?(file.id)
-    assert_equal Apps::FinderController::TRASH_SECTION_TITLE, file.reload.parent.title
+    assert_match(/\A#{Regexp.escape(Apps::FinderController::TRASH_SECTION_TITLE)}(?:\s+\d+)?\z/i, file.reload.parent.title)
     assert DocumentStorageSyncLite.storage_root.join(file.storage_path).exist?
     assert root
   end
@@ -59,18 +59,18 @@ class DocumentsDestroyTest < ActionDispatch::IntegrationTest
     patch restore_from_trash_document_path(file), as: :json
 
     assert_response :success
-    assert_equal Apps::FinderController::TASKS_SECTION_TITLE, file.reload.parent.title
+    assert_match(/\AStorage(?:\s+\d+)?\z/i, file.reload.parent.title)
   end
 
-  test "rejects destroy for protected workspace structure" do
+  test "rejects destroy for storage root" do
     docs = Apps::FinderController.workspace_section_root(@user, "documents")
     assert docs
-    assert docs.protected_workspace_structure?
+    assert docs.user_workspace_root?
 
     delete document_path(docs), as: :json
 
     assert_response :forbidden
-    assert_match(/cannot be deleted/i, response.parsed_body.fetch("error"))
+    assert_match(/protected/i, response.parsed_body.fetch("error"))
     assert Document.exists?(docs.id)
   end
 

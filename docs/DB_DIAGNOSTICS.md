@@ -10,10 +10,20 @@ From project root:
 bin/rake nexus:diagnostics
 ```
 
+Storage/DB drift + usage snapshot:
+
+```bash
+bin/rake nexus:storage_health
+```
+
 To write the snapshot to a specific path (for example CI or a temp file), set **`NEXUS_DIAGNOSTICS_OUTPUT`** to a path relative to the Rails root or an absolute path. The parent directory is created if needed.
 
 ```bash
 NEXUS_DIAGNOSTICS_OUTPUT=tmp/my_snapshot.md bin/rake nexus:diagnostics
+```
+
+```bash
+NEXUS_STORAGE_HEALTH_OUTPUT=tmp/my_storage_health.md bin/rake nexus:storage_health
 ```
 
 Output:
@@ -22,6 +32,13 @@ Output:
   - **Document disk sync root** — resolved `DocumentStorageSyncLite.storage_root`, whether `NEXUS_STORAGE_ROOT` is set, and a short note on `workspace` vs `workspace_test` in test.
   - **Workspace directories on disk (both)** — presence of `storage/workspace` and `storage/workspace_test` plus top-level entry counts (quick sanity check without scanning the whole tree).
   - **Tables** — per-table row counts, columns, and max `updated_at` when present.
+
+`nexus:storage_health` writes a markdown report to `docs/audit` with:
+- **DB rows missing on disk** (first 200 listed)
+- **Disk files missing in DB** (first 200 listed)
+- **Duplicate DB storage paths**
+- **Usage by content type** (`db_rows`, `db_content_bytes`, `disk_bytes`, `missing_on_disk`)
+- **Alchemy totals** (`db_rows`, `db_content_bytes`, `disk_bytes`, `missing_on_disk`)
 
 ## See Which Databases Exist
 
@@ -97,5 +114,5 @@ RAILS_ENV=production bin/rails runner 'puts ActiveRecord::Base.connection.tables
 1. Run bin/rake nexus:diagnostics before cleanup work.
 2. Run tests.
 3. Apply one cleanup batch.
-4. Run bin/rake nexus:diagnostics again.
+4. Run bin/rake nexus:diagnostics and bin/rake nexus:storage_health again.
 5. Compare snapshots and update docs/NEXUS_FULL_REPO_AUDIT_2026-05-06.md.

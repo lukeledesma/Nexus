@@ -77,7 +77,6 @@ module Apps
           user: current_user,
           document_id: did,
           content_type: "task_list",
-          section_key: "documents",
           allow_embedded: true
         )
         return result.payload.fetch(:document) if result.success?

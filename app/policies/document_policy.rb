@@ -88,9 +88,9 @@ class DocumentPolicy
 
   def can_upload_to_folder?(iimage_folder_id: nil)
     return false unless folder?
-    return false if protected_workspace_structure?
+    return false if in_trash?
 
-    in_finder_section? || (iimage_folder_id.present? && document.id == iimage_folder_id)
+    in_finder_section? || finder_section_root_folder? || (iimage_folder_id.present? && document.id == iimage_folder_id)
   end
 
   def can_rename?
@@ -103,5 +103,16 @@ class DocumentPolicy
 
   def can_toggle_favorite?(favorites_available:)
     favorites_available && file? && !user_workspace_root?
+  end
+
+  private
+
+  def finder_section_root_folder?
+    return false unless user && folder?
+
+    section_roots = Apps::FinderController.workspace_section_roots(user)
+    section_roots.values.compact.any? { |root| root.id == document.id }
+  rescue StandardError
+    false
   end
 end

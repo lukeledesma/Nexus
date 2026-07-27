@@ -16,6 +16,7 @@ class WorkspacePreferencesManagerTest < ActiveSupport::TestCase
 
   teardown do
     Document.delete_all
+    UserAppState.delete_all
     User.where(id: @user&.id).delete_all
   end
 
@@ -37,7 +38,7 @@ class WorkspacePreferencesManagerTest < ActiveSupport::TestCase
   test "applies eligible wallpaper image" do
     images_root = Apps::FinderController.workspace_section_root(@user, "images")
     doc = images_root.children.create!(title: "wall.jpg", is_folder: false, content_type: "asset", content: "")
-    doc.update_columns(storage_path: "#{@user.username}/Finder/Images/wall.jpg")
+    doc.update_columns(storage_path: "Finder/Images/wall.jpg")
 
     result = @manager.apply_wallpaper_image(doc.id)
     assert result.success?

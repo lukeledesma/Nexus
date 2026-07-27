@@ -14,6 +14,26 @@ module Alchemy
     SOURCE_XML_START = "__ALCHEMY_SOURCE_XML_START__"
     SOURCE_XML_END = "__ALCHEMY_SOURCE_XML_END__"
 
+    BOOL_DTYPES = %w[boolean bool].freeze
+    INT16_DTYPES = %w[int16 int2 short int].freeze
+    UINT16_DTYPES = %w[uint16 uint2 ushort word byte uint8].freeze
+    INT32_DTYPES = %w[int32 int4 dint].freeze
+    UINT32_DTYPES = %w[uint32 uint4 udint dword].freeze
+    FLOAT32_DTYPES = %w[float32 float4 float real].freeze
+    INT64_DTYPES = %w[int64 long].freeze
+    UINT64_DTYPES = %w[uint64 ulong].freeze
+    FLOAT64_DTYPES = %w[float64 double].freeze
+    ONE_WORD_DTYPES = %w[boolean bool int16 uint16 short ushort int2 uint2].freeze
+    SINGLE_WORD_DTYPES = %w[boolean bool int16 uint16 short ushort int2 uint2 byte uint8].freeze
+    DOUBLE_WORD_DTYPES = %w[int32 uint32 dint udint float32 float real int4 uint4 float4].freeze
+    IGNITION_DTYPE_TO_MOXA_MAP = {
+      "boolean" => "boolean",
+      "bool" => "boolean",
+      "int2" => "int16",
+      "int4" => "int32",
+      "float4" => "float32"
+    }.freeze
+
     Result = Struct.new(:success?, :xml_content, :source_filename, :error, keyword_init: true)
 
     class << self
@@ -23,22 +43,10 @@ module Alchemy
         original = uploaded.original_filename.to_s
         ext = original.downcase
 
-        if ext.end_with?(".xml")
-          content = File.read(uploaded.tempfile.path)
-          return Result.new(success?: true, xml_content: content, source_filename: original)
-        end
-
-        if ext.end_with?(".json")
-          return parse_moxa_json(uploaded.tempfile.path, original)
-        end
-
-        if ext.end_with?(".xml.tar")
-          return read_first_xml_from_tar(uploaded.tempfile.path, original)
-        end
-
-        if ext.end_with?(".xml.tar.gz") || ext.end_with?(".tgz")
-          return read_first_xml_from_targz(uploaded.tempfile.path, original)
-        end
+        return Result.new(success?: true, xml_content: File.read(uploaded.tempfile.path), source_filename: original) if ext.end_with?(".xml")
+        return parse_moxa_json(uploaded.tempfile.path, original) if ext.end_with?(".json")
+        return read_first_xml_from_tar(uploaded.tempfile.path, original) if ext.end_with?(".xml.tar")
+        return read_first_xml_from_targz(uploaded.tempfile.path, original) if ext.end_with?(".xml.tar.gz", ".tgz")
 
         Result.new(success?: false, error: "Unsupported file type.")
       rescue StandardError => e
@@ -72,23 +80,21 @@ module Alchemy
       end
 
       def extract_moxa_rows(payload, source_path: nil)
-        if moxa_profile_payload?(payload)
-          return extract_moxa_profile_rows(payload)
-        end
+        return extract_moxa_profile_rows(payload) if moxa_profile_payload?(payload)
 
         template_index = load_template_tag_index(source_path)
         extract_ignition_reference_rows(payload, template_index: template_index)
       end
 
       def moxa_profile_payload?(payload)
-        profiles = payload.is_a?(Array) ? payload : [ payload ]
+        profiles = normalize_payload_nodes(payload)
         profiles.any? do |profile|
           profile.is_a?(Hash) && profile["tagList"].is_a?(Array)
         end
       end
 
       def extract_moxa_profile_rows(payload)
-        profiles = payload.is_a?(Array) ? payload : [ payload ]
+        profiles = normalize_payload_nodes(payload)
         rows = []
 
         profiles.each_with_index do |profile, idx|
@@ -128,7 +134,7 @@ module Alchemy
       end
 
       def extract_ignition_reference_rows(payload, template_index:)
-        nodes = payload.is_a?(Array) ? payload : [ payload ]
+        nodes = normalize_payload_nodes(payload)
         rows = []
 
         nodes.each_with_index do |node, idx|
@@ -222,7 +228,7 @@ module Alchemy
 
       def infer_function_from_reference(tag, access)
         ignition_dtype = tag["dataType"].to_s.strip.downcase
-        if ["boolean", "bool"].include?(ignition_dtype)
+        if BOOL_DTYPES.include?(ignition_dtype)
           return access.to_s == "ro" ? "read-coils" : "write-single-coil"
         end
 
@@ -230,29 +236,21 @@ module Alchemy
       end
 
       def infer_data_type_from_reference(tag)
-        ignition_dtype = tag["dataType"].to_s.strip.downcase
-        mapping = {
-          "boolean" => "boolean",
-          "bool" => "boolean",
-          "int2" => "int16",
-          "int4" => "int32",
-          "float4" => "float32"
-        }
-
-        mapping.fetch(ignition_dtype, "unknown")
+        ignition_dtype = normalized_data_type(tag["dataType"])
+        IGNITION_DTYPE_TO_MOXA_MAP.fetch(ignition_dtype, "unknown")
       end
 
       def infer_quantity_from_data_type(data_type)
         dtype = data_type.to_s.strip.downcase
-        return 1 if ["boolean", "bool", "int16", "uint16", "short", "ushort", "int2", "uint2"].include?(dtype)
+        return 1 if ONE_WORD_DTYPES.include?(dtype)
 
         1
       end
 
       def infer_size_from_data_type(data_type)
         dtype = data_type.to_s.strip.downcase
-        return 1 if ["boolean", "bool", "int16", "uint16", "short", "ushort", "int2", "uint2", "byte", "uint8"].include?(dtype)
-        return 2 if ["int32", "uint32", "dint", "udint", "float32", "float", "real", "int4", "uint4", "float4"].include?(dtype)
+        return 1 if SINGLE_WORD_DTYPES.include?(dtype)
+        return 2 if DOUBLE_WORD_DTYPES.include?(dtype)
 
         1
       end
@@ -274,21 +272,9 @@ module Alchemy
       end
 
       def load_template_tag_index(source_path)
-        dir = source_path.present? ? File.dirname(source_path.to_s) : nil
-        candidates = [
-          (File.join(dir, "templates.json") if dir.present?),
-          (File.join(dir, "template.json") if dir.present?),
-          Rails.root.join("config", "alchemy_templates", "Carefree_AB_Generic", "templates.json").to_s,
-          Rails.root.join("config", "alchemy_templates", "Carefree_AB_Generic.json").to_s
-        ].compact.uniq
-
-        candidates.each do |candidate|
-          next unless File.exist?(candidate)
-
-          payload = JSON.parse(File.read(candidate))
-          return template_tag_index_from_payload(payload)
-        rescue StandardError
-          next
+        template_candidate_paths(source_path).each do |candidate|
+          index = load_template_index_from_candidate(candidate)
+          return index if index.present?
         end
 
         {}
@@ -296,13 +282,13 @@ module Alchemy
 
       def coil_like_reference?(data_type, function)
         dtype = data_type.to_s.strip.downcase
-        return true if ["boolean", "bool"].include?(dtype)
+        return true if BOOL_DTYPES.include?(dtype)
 
         function.to_s.downcase.include?("coil")
       end
 
       def template_tag_index_from_payload(payload)
-        profiles = payload.is_a?(Array) ? payload : [ payload ]
+        profiles = normalize_payload_nodes(payload)
         index = {}
 
         profiles.each do |profile|
@@ -368,57 +354,43 @@ module Alchemy
         swapped = moxa_byte_swapped?(row)
 
         bool_function = function.include?("coil")
-        bool_dtype = dtype == "boolean" || dtype == "bool"
+        bool_dtype = BOOL_DTYPES.include?(dtype)
         if bool_function || bool_dtype
           return [ "107", "107", "03" ] if function.include?("holding")
           return [ "107", "255", "01" ]
         end
 
-        if ["int16", "int2", "short", "int"].include?(dtype)
+        if INT16_DTYPES.include?(dtype)
           return scaled ? [ "0", "102", "03" ] : [ "0", "255", "03" ]
         end
 
-        if ["uint16", "uint2", "ushort", "word", "byte", "uint8"].include?(dtype)
+        if UINT16_DTYPES.include?(dtype)
           return scaled ? [ "1", "102", "03" ] : [ "1", "255", "03" ]
         end
 
-        if ["int32", "int4", "dint"].include?(dtype)
-          return [ "7", "32", "03" ] if scaled && swapped
-          return [ "4", "32", "03" ] if scaled
-          return [ "7", "4", "03" ] if swapped
-          return [ "4", "255", "03" ]
+        if INT32_DTYPES.include?(dtype)
+          return codes_for_int32_family(signed: true, scaled: scaled, swapped: swapped)
         end
 
-        if ["uint32", "uint4", "udint", "dword"].include?(dtype)
-          return [ "17", "32", "03" ] if scaled && swapped
-          return [ "8", "32", "03" ] if scaled
-          return [ "17", "8", "03" ] if swapped
-          return [ "8", "255", "03" ]
+        if UINT32_DTYPES.include?(dtype)
+          return codes_for_int32_family(signed: false, scaled: scaled, swapped: swapped)
         end
 
-        if ["float32", "float4", "float", "real"].include?(dtype)
-          return [ "35", "32", "03" ] if swapped
-          return [ "32", "255", "03" ]
+        if FLOAT32_DTYPES.include?(dtype)
+          return codes_for_float32_family(swapped: swapped)
         end
 
         # Excel PLC Tag List has no direct 64-bit rows. Use closest supported 32-bit family.
-        if ["int64", "long"].include?(dtype)
-          return [ "7", "32", "03" ] if scaled && swapped
-          return [ "4", "32", "03" ] if scaled
-          return [ "7", "4", "03" ] if swapped
-          return [ "4", "255", "03" ]
+        if INT64_DTYPES.include?(dtype)
+          return codes_for_int32_family(signed: true, scaled: scaled, swapped: swapped)
         end
 
-        if ["uint64", "ulong"].include?(dtype)
-          return [ "17", "32", "03" ] if scaled && swapped
-          return [ "8", "32", "03" ] if scaled
-          return [ "17", "8", "03" ] if swapped
-          return [ "8", "255", "03" ]
+        if UINT64_DTYPES.include?(dtype)
+          return codes_for_int32_family(signed: false, scaled: scaled, swapped: swapped)
         end
 
-        if ["float64", "double"].include?(dtype)
-          return [ "35", "32", "03" ] if swapped
-          return [ "32", "255", "03" ]
+        if FLOAT64_DTYPES.include?(dtype)
+          return codes_for_float32_family(swapped: swapped)
         end
 
         return [ "999", "255", "03" ] if ["string"].include?(dtype)
@@ -427,11 +399,31 @@ module Alchemy
       end
 
       def moxa_scaled?(row)
-        row[:enable_auto_scaling] == true || row[:enable_auto_scaling].to_s == "true"
+        truthy?(row[:enable_auto_scaling])
+      end
+
+      def codes_for_int32_family(signed:, scaled:, swapped:)
+        if signed
+          return [ "7", "32", "03" ] if scaled && swapped
+          return [ "4", "32", "03" ] if scaled
+          return [ "7", "4", "03" ] if swapped
+          return [ "4", "255", "03" ]
+        end
+
+        return [ "17", "32", "03" ] if scaled && swapped
+        return [ "8", "32", "03" ] if scaled
+        return [ "17", "8", "03" ] if swapped
+        [ "8", "255", "03" ]
+      end
+
+      def codes_for_float32_family(swapped:)
+        return [ "35", "32", "03" ] if swapped
+
+        [ "32", "255", "03" ]
       end
 
       def moxa_byte_swapped?(row)
-        enabled = row[:enable_byte_order] == true || row[:enable_byte_order].to_s == "true"
+        enabled = truthy?(row[:enable_byte_order])
         return false unless enabled
 
         order = row[:byte_order].to_s.strip.upcase
@@ -452,7 +444,7 @@ module Alchemy
       end
 
       def scaling_expr_from_moxa(auto_scaling, enable_auto_scaling)
-        enabled = enable_auto_scaling == true || enable_auto_scaling.to_s == "true"
+        enabled = truthy?(enable_auto_scaling)
         return "1" unless enabled
         return "1" unless auto_scaling.is_a?(Hash)
 
@@ -488,6 +480,37 @@ module Alchemy
 
       def escape_xml_text(text)
         CGI.escapeHTML(text.to_s)
+      end
+
+      def normalized_data_type(value)
+        value.to_s.strip.downcase
+      end
+
+      def normalize_payload_nodes(payload)
+        payload.is_a?(Array) ? payload : [ payload ]
+      end
+
+      def truthy?(value)
+        value == true || value.to_s == "true"
+      end
+
+      def template_candidate_paths(source_path)
+        dir = source_path.present? ? File.dirname(source_path.to_s) : nil
+        [
+          (File.join(dir, "templates.json") if dir.present?),
+          (File.join(dir, "template.json") if dir.present?),
+          Rails.root.join("config", "alchemy_templates", "Carefree_AB_Generic", "templates.json").to_s,
+          Rails.root.join("config", "alchemy_templates", "Carefree_AB_Generic.json").to_s
+        ].compact.uniq
+      end
+
+      def load_template_index_from_candidate(candidate)
+        return {} unless File.exist?(candidate)
+
+        payload = JSON.parse(File.read(candidate))
+        template_tag_index_from_payload(payload)
+      rescue StandardError
+        {}
       end
 
       def read_first_xml_from_targz(gzip_path, fallback_name)

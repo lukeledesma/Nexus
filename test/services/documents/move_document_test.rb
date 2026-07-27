@@ -18,6 +18,7 @@ module Documents
     end
 
     teardown do
+      UserAppState.delete_all
       Document.delete_all
       User.where(id: @user&.id).delete_all
     end
@@ -28,6 +29,14 @@ module Documents
 
       assert result.success?
       assert_equal @b.id, file.reload.parent_id
+    end
+
+    test "moves file to section root folder" do
+      file = Document.create!(is_folder: false, parent: @a, title: "note", content_type: "note", content: "<p>x</p>")
+      result = Documents::MoveDocument.call(user: @user, document: file, parent_id: @root.id, kind: :file)
+
+      assert result.success?
+      assert_equal @root.id, file.reload.parent_id
     end
 
     test "prevents moving folder into its descendant" do

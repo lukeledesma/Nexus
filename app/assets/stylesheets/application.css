@@ -6209,6 +6209,7 @@ html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden)
   position: relative;
   padding: 0;
   overflow: hidden;
+  border-radius: 0 0 10px 10px;
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
@@ -6255,6 +6256,8 @@ html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden)
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
+  border-radius: inherit;
   background: hsl(var(--window-bg-h) var(--window-bg-saturation) var(--window-bg-brightness) / 1);
 }
 
@@ -6267,15 +6270,33 @@ html.nexus-side-panel-layout-animating .content-window.os-window:not(.is-hidden)
   width: 100%;
   min-height: 0;
   border: 0;
+  border-radius: inherit;
   display: block;
 }
 
 /* Minimal document for save-picker Finder iframe (full layout not loaded). */
 .nexus-finder-embed {
   margin: 0;
+  height: 100vh;
   min-height: 100vh;
   box-sizing: border-box;
+  overflow: hidden;
   background: hsl(var(--window-bg-h) var(--window-bg-saturation) var(--window-bg-brightness) / 1);
+}
+
+.nexus-finder-embed turbo-frame {
+  display: block;
+  height: 100%;
+}
+
+.nexus-finder-embed .app-surface--finder {
+  height: 100%;
+  min-height: 0;
+}
+
+.nexus-finder-embed .finder-shell {
+  height: 100%;
+  min-height: 0;
 }
 
 .content-window--auto-sized .window-content {
@@ -7826,7 +7847,44 @@ a.finder-tree__row {
 }
 
 .finder-browser-root-drop-zone.finder-tree__row-line--drop-target {
-  background: color-mix(in oklab, var(--surface-raised) 86%, var(--accent) 14%);
+  outline: none !important;
+  background: transparent !important;
+}
+
+.finder-tree__node--root-drop-target {
+  display: none;
+}
+
+.finder-tree__root-drop-spacer {
+  display: none;
+  opacity: 0;
+  visibility: hidden;
+  background: transparent !important;
+  outline: none !important;
+  pointer-events: none;
+}
+
+.finder-tree--root.finder-tree--root-drop-armed > .finder-tree__node--root-drop-target {
+  display: block;
+  min-height: 5rem;
+}
+
+.finder-tree--root.finder-tree--root-drop-armed > .finder-tree__node--root-drop-target > .finder-tree__root-drop-spacer {
+  display: flex;
+  flex: 1 0 5rem;
+  min-height: 5rem;
+  margin-top: 2px;
+  pointer-events: auto;
+}
+
+.finder-tree__root-drop-spacer.finder-tree__row-line--drop-target {
+  opacity: 1;
+  visibility: visible;
+}
+
+.finder-tree__root-drop-spacer:hover {
+  background: transparent !important;
+  outline: none !important;
 }
 
 .finder-tree__row-line[draggable="true"] {
@@ -8085,10 +8143,18 @@ a.finder-tree__row--file:focus-visible {
 
 .finder-shell.finder-shell--tree-only {
   grid-template-columns: 1fr;
+  background: color-mix(in oklab, var(--surface-raised) 92%, var(--text) 8%);
+  border-radius: 0 0 10px 10px;
+  overflow: hidden;
 }
 
 .finder-shell.finder-shell--tree-only .finder-shell-pane--folders {
   border-right: none;
+}
+
+.finder-shell.finder-shell--tree-only .finder-shell-pane--contents {
+  background: transparent;
+  border-radius: 0;
 }
 
 .finder-shell-pane--folders:has(ul.finder-tree--root:not(:empty)) .finder-tree-empty-hint {
@@ -8172,12 +8238,21 @@ a.finder-tree__row--file:focus-visible {
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
+  background: transparent;
+  border-radius: 0;
+  overflow: visible;
 }
 
 .finder-search-seed-list,
 .finder-search-results-list {
   flex: 1 1 auto;
   min-height: 0;
+}
+
+.finder-browser-search-mode .finder-search-seed-list,
+.finder-browser-search-mode .finder-search-results-list {
+  background: transparent;
+  border-radius: 0;
 }
 
 .finder-search-empty-state {
@@ -8192,9 +8267,18 @@ a.finder-tree__row--file:focus-visible {
   gap: 8px;
 }
 
+.finder-browser-search-mode .finder-browser-content-surface {
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  overflow: visible;
+}
+
 .finder-browser-content-tree {
   flex: 1 1 auto;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
   overflow: auto;
 }
 
@@ -8610,6 +8694,14 @@ a.finder-tree__row--file:focus-visible {
 
 :root[data-nexus-shell-mode="light"] .finder-shell-pane--contents {
   background: linear-gradient(180deg, rgba(15, 23, 42, 0.028), rgba(15, 23, 42, 0.01));
+}
+
+:root[data-nexus-shell-mode="light"] .finder-shell.finder-shell--tree-only {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.028), rgba(15, 23, 42, 0.01));
+}
+
+:root[data-nexus-shell-mode="light"] .finder-shell.finder-shell--tree-only .finder-shell-pane--contents {
+  background: transparent;
 }
 
 :root[data-nexus-shell-mode="light"] .finder-folder-item.is-active .finder-folder-link,
@@ -9339,4 +9431,3 @@ a.finder-tree__row--file:focus-visible {
 .quartz-hover-tip[hidden] {
   display: none !important;
 }
-

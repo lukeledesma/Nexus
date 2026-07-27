@@ -9,7 +9,6 @@ module Apps
         user: current_user,
         document_id: params[:document_id],
         content_type: "asset",
-        section_key: "audio",
         allow_embedded: true
       )
       if result.success?

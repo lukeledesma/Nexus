@@ -509,6 +509,10 @@ class DocumentsController < ApplicationController
   def panel_search_files_for_workspace
     section_roots = Apps::FinderController.workspace_section_roots(current_user).values.compact
     root_ids = section_roots.map(&:id).uniq
+    if root_ids.empty?
+      workspace_root = FinderListedFolders.workspace_root_for(current_user)
+      root_ids = workspace_root ? [ workspace_root.id ] : []
+    end
     return [] if root_ids.empty?
 
     placeholders = ([ "?" ] * root_ids.length).join(",")
@@ -743,17 +747,16 @@ end
 
   def x_accel_path_for(file_path)
     # Rails needs to map the disk path to an internal nginx path
-    # storage/workspace/{user}/path/to/file -> /assets-internal/workspace/{user}/path/to/file
+    # storage/path/to/file -> /assets-internal/path/to/file
     # nginx is configured to serve /assets-internal paths from the storage directory
     
     file_str = file_path.to_s
     
     # Handle both absolute and relative paths
-    # Extract the part after storage/workspace/
-    if file_str.include?("/storage/workspace/")
-      # /Users/.../storage/workspace/user123/Embedded/image.png -> workspace/user123/Embedded/image.png
-      relative = file_str.split("/storage/workspace/").last
-      "/assets-internal/workspace/#{relative}"
+    # Extract the part after storage/
+    if file_str.include?("/storage/")
+      relative = file_str.split("/storage/").last
+      "/assets-internal/#{relative}"
     else
       # Fallback - shouldn't happen in normal operation
       raise "Unable to map asset path: #{file_str}"

@@ -13,6 +13,7 @@ class AppsUserUpdateUsernameTest < ActiveSupport::TestCase
   end
 
   teardown do
+    UserAppState.delete_all
     Document.delete_all
     User.where(id: @user&.id).delete_all
   end
@@ -28,31 +29,14 @@ class AppsUserUpdateUsernameTest < ActiveSupport::TestCase
     assert_equal "current_password_incorrect", result.payload[:code]
   end
 
-  test "rolls username back when workspace rename fails" do
-    previous = @user.username
+  test "updates username without workspace folder migration side effects" do
+    result = Apps::User::UpdateUsername.call(
+      user: @user,
+      new_username: "new_name_ok",
+      current_password: "password123"
+    )
 
-    singleton = WorkspaceUserFolderRename.singleton_class
-    singleton.class_eval do
-      alias_method :__slice9_original_call, :call
-      define_method(:call) { |_args| raise "boom" }
-    end
-
-    begin
-      result = Apps::User::UpdateUsername.call(
-        user: @user,
-        new_username: "new_name_ok",
-        current_password: "password123"
-      )
-
-      assert_equal :unprocessable_entity, result.status
-      assert_equal "workspace_sync_failed", result.payload[:code]
-    ensure
-      singleton.class_eval do
-        alias_method :call, :__slice9_original_call
-        remove_method :__slice9_original_call
-      end
-    end
-
-    assert_equal previous, @user.reload.username
+    assert_equal :ok, result.status
+    assert_equal "new_name_ok", @user.reload.username
   end
 end

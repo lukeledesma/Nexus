@@ -112,7 +112,7 @@
     <% finder_open_doc_title = finder_document_display_title(node[:title].to_s) %>
     <% effective_section_key = node[:origin_section_key].presence || section_key %>
     <% thumb_url = node[:thumbnail_url].presence %>
-    <div class="finder-tree__row-line" draggable="<%= (writable && !read_only) ? "true" : "false" %>" data-action="click->finder-browser#activateRowLine<%= " dragstart->finder-browser#fileDragStart dragend->finder-browser#fileDragEnd" if writable && !read_only && !in_trash %>">
+    <div class="finder-tree__row-line" draggable="<%= (writable && !read_only) ? "true" : "false" %>" data-action="click->finder-browser#activateRowLine">
       <% if file_linked && !read_only %>
         <%= link_to "#",
               class: "finder-tree__row finder-tree__row--file",

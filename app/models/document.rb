@@ -66,30 +66,19 @@ class Document < ApplicationRecord
     return false unless folder? && parent_id.nil?
 
     value = title.to_s.strip.downcase
-    return false if value.blank?
-
-    # Fast path: exact match against any username or email (single EXISTS query).
-    return true if User.where("LOWER(username) = :v OR LOWER(email) = :v", v: value).exists?
-
-    # Handle "username 2", "username 3" style duplicate workspace roots.
-    stem = value.sub(/\s+\d+\z/, "")
-    return false if stem == value # no trailing number — already ruled out by exact match above
-
-    User.where("LOWER(username) = :v OR LOWER(email) = :v", v: stem).exists?
+    /\A(storage|finder|admin)(?:\s+\d+)?\z/.match?(value)
   end
 
-  # Embedded and fixed Finder section roots under the user workspace cannot be renamed/deleted from the UI.
+  # Fixed Finder section roots under the workspace root cannot be renamed/deleted from the UI.
   def protected_workspace_structure?
     return false unless folder?
     return false if user_workspace_root?
 
-    protected_titles = ["Embedded", "Documents", "Tasks", "Quartz", "Images", "Audio", "Alchemy", "Trash"]
-    return false unless protected_titles.any? { |name| title.to_s.casecmp?(name) }
+    protected_titles = ["Storage", "Trash"]
+    return false unless protected_titles.any? { |name| /\A#{Regexp.escape(name)}(?:\s+\d+)?\z/i.match?(title.to_s.strip) }
 
     p = parent
-    return true if p&.user_workspace_root?
-
-    p&.folder? && p.title.to_s.casecmp?("Finder") && p.parent&.user_workspace_root?
+    p&.user_workspace_root?
   end
 
   def sync_create_to_disk

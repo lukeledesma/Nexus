@@ -11,6 +11,7 @@ class DocumentsImportTest < ActionDispatch::IntegrationTest
   end
 
   teardown do
+    UserAppState.delete_all
     Document.delete_all
     User.where(id: @user&.id).delete_all
   end

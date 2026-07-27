@@ -18,8 +18,6 @@ module ApplicationHelper
       { window_key: "tasks", pin_key: "tasks", label: "Tasks", icon: :task_checklist },
       { window_key: "quartz", pin_key: "quartz", label: "Quartz", icon: :article, icon_svg: true, icon_partial: "quartz_icon" },
       { window_key: "calendar", pin_key: "calendar", label: "Calendar", icon: :calendar_month },
-      { window_key: "images", pin_key: "images", label: "Images", icon: :wallpaper },
-      { window_key: "audio", pin_key: "audio", label: "Audio", icon: :graphic_eq },
       { window_key: "alchemy", pin_key: "alchemy", label: "Alchemy", icon: :apps, icon_svg: true, icon_partial: "alchemy_icon" }
     ].freeze
   end

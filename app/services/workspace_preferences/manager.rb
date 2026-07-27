@@ -1,17 +1,13 @@
 # frozen_string_literal: true
 
-require "json"
-require "tempfile"
-
 module WorkspacePreferences
   class Manager
-    STORAGE_ROOT = Rails.root.join("storage", "workspace").freeze
-
     DEFAULT_THEME_ID = "default"
     DEFAULT_THEME_NAME = "Modern"
     CUSTOM_THEME_ID = "custom"
     CUSTOM_THEME_NAME = "CUSTOM"
     ALLOWED_THEME_IDS = [ DEFAULT_THEME_ID ].freeze
+    WORKSPACE_STATE_KEY = "workspace.preferences".freeze
 
     DEFAULT_APPEARANCE = {
       "hue" => 200,
@@ -64,7 +60,7 @@ module WorkspacePreferences
       @state["active_theme_id"] = active_theme_id
 
       state_dirty, themes_dirty = sync_state_wallpaper_from_theme!(@themes, @state, active_theme)
-      write_state_data(@state) if state_dirty
+      write_workspace_state(@state) if state_dirty
       write_themes_data(@themes) if themes_dirty
 
       Support::OperationResult.new(
@@ -121,7 +117,7 @@ module WorkspacePreferences
       ensure_loaded!
       active_theme = @themes.find { |theme| theme["id"] == @state["active_theme_id"] }
       sync_state_wallpaper_from_theme!(@themes, @state, active_theme)
-      write_state_data(@state)
+      write_workspace_state(@state)
       write_themes_data(@themes)
       ok
     end
@@ -139,7 +135,7 @@ module WorkspacePreferences
 
       if @user && active_theme
         wp_dirty, th_dirty = sync_state_wallpaper_from_theme!(@themes, @state, active_theme, user: @user)
-        write_state_data(@state) if wp_dirty
+        write_workspace_state(@state) if wp_dirty
         write_themes_data(@themes) if th_dirty
       end
 
@@ -216,28 +212,10 @@ module WorkspacePreferences
     def ensure_loaded!
       return if @state && @themes
 
-      ensure_storage_files
       @state = read_state_data
       state_dirty = reconcile_wallpaper_reference!(@state)
       @themes = ensure_default_theme(read_themes_data)
-      write_state_data(@state) if state_dirty
-    end
-
-    def workspace_storage_dir
-      username = @user&.username.to_s.strip
-      if username.present?
-        STORAGE_ROOT.join(username, "Embedded")
-      else
-        STORAGE_ROOT.join("Embedded")
-      end
-    end
-
-    def workspace_state_file
-      workspace_storage_dir.join("WorkspaceState.txt")
-    end
-
-    def layout_themes_file
-      workspace_storage_dir.join("LayoutThemes.txt")
+      write_workspace_state(@state) if state_dirty
     end
 
     def default_state
@@ -266,19 +244,11 @@ module WorkspacePreferences
       [ default_theme_snapshot ]
     end
 
-    def ensure_storage_files
-      FileUtils.mkdir_p(workspace_storage_dir)
-      return if File.exist?(workspace_state_file) && File.exist?(layout_themes_file)
-
-      write_state_data(default_state)
-      write_themes_data(ensure_default_theme(nil))
-    end
-
     def read_state_data
-      payload = parse_json_file(workspace_state_file)
-      return default_state.dup unless payload.respond_to?(:to_h)
+      payload = read_workspace_state
+      return default_state.dup unless payload.is_a?(Hash)
 
-      state = default_state.merge(payload.to_h.transform_keys(&:to_s))
+      state = default_state.merge(payload.transform_keys(&:to_s))
       state["active_theme_id"] = DEFAULT_THEME_ID unless ALLOWED_THEME_IDS.include?(state["active_theme_id"].to_s)
       state["gradient_source_theme_id"] = nil
       state["gradient_source_theme_name"] = nil
@@ -290,7 +260,9 @@ module WorkspacePreferences
       state
     end
 
-    def write_state_data(state)
+    def write_workspace_state(state)
+      return unless @user
+
       normalized_wallpaper_kind = state["wallpaper_background_kind"].to_s == "image" ? "image" : nil
       normalized_wallpaper_id = state["wallpaper_image_document_id"].presence&.to_i
       normalized_wallpaper_path = state["wallpaper_image_storage_path"].presence
@@ -307,39 +279,21 @@ module WorkspacePreferences
         "wallpaper_image_document_id" => normalized_wallpaper_id,
         "wallpaper_image_storage_path" => normalized_wallpaper_path
       )
-      write_json_atomically(workspace_state_file, output)
+      UserAppState.put(user: @user, key: WORKSPACE_STATE_KEY, value: output)
     end
 
     def read_themes_data
-      payload = parse_json_file(layout_themes_file)
-      themes = payload.respond_to?(:to_h) ? payload.to_h["themes"] : []
-      ensure_default_theme(themes)
+      ensure_default_theme(nil)
     end
 
-    def write_themes_data(themes)
-      output = { "themes" => ensure_default_theme(themes) }
-      write_json_atomically(layout_themes_file, output)
+    def write_themes_data(_themes)
+      nil
     end
 
-    def write_json_atomically(path, payload)
-      dir = File.dirname(path)
-      FileUtils.mkdir_p(dir)
+    def read_workspace_state
+      return {} unless @user
 
-      Tempfile.create([ File.basename(path), ".tmp" ], dir) do |tmp|
-        tmp.write(JSON.pretty_generate(payload))
-        tmp.write("\n")
-        tmp.flush
-        tmp.fsync
-        File.rename(tmp.path, path.to_s)
-      end
-    end
-
-    def parse_json_file(path)
-      return {} unless File.exist?(path)
-
-      JSON.parse(File.read(path))
-    rescue JSON::ParserError
-      {}
+      UserAppState.find_by(user_id: @user.id, key: WORKSPACE_STATE_KEY)&.data || {}
     end
 
     def theme_summaries(themes)

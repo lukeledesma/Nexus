@@ -16,6 +16,7 @@ module Documents
     end
 
     teardown do
+      UserAppState.delete_all
       Document.delete_all
       User.where(id: @user&.id).delete_all
     end
@@ -38,6 +39,39 @@ module Documents
       result = Documents::UploadFiles.call(user: @user, folder: @folder, files: [ uploaded ])
 
       assert result.success?
+      assert_equal 1, result.payload[:ids].length
+    ensure
+      tempfile&.close!
+    end
+
+    test "imports xml upload as alchemy file outside alchemy section" do
+      tempfile = Tempfile.new([ "upload", ".xml" ])
+      tempfile.binmode
+      tempfile.write("<?xml version=\"1.0\"?><XML><TagA><FUNCCODE>\"03\"</FUNCCODE></TagA></XML>")
+      tempfile.rewind
+      uploaded = Rack::Test::UploadedFile.new(tempfile.path, "application/xml", original_filename: "Tags.xml")
+
+      result = Documents::UploadFiles.call(user: @user, folder: @folder, files: [ uploaded ])
+
+      assert result.success?
+      created = Document.find(result.payload[:ids].first)
+      assert_equal "alchemy_tag_list", created.content_type
+    ensure
+      tempfile&.close!
+    end
+
+    test "allows upload into protected finder section root" do
+      section_root = Apps::FinderController.workspace_section_root(@user, "documents")
+      tempfile = Tempfile.new([ "upload", ".txt" ])
+      tempfile.binmode
+      tempfile.write("Root upload")
+      tempfile.rewind
+      uploaded = Rack::Test::UploadedFile.new(tempfile.path, "text/plain", original_filename: "Root.txt")
+
+      result = Documents::UploadFiles.call(user: @user, folder: section_root, files: [ uploaded ])
+
+      assert result.success?
+      assert_equal :ok, result.status
       assert_equal 1, result.payload[:ids].length
     ensure
       tempfile&.close!

@@ -82,9 +82,12 @@ class EmbeddedDraftDocument
       existing = root.children.folders.find { |d| d.title.to_s.strip.casecmp?("embedded") }
       return existing if existing
 
+      adopted = adopt_legacy_embedded_folder!(root)
+      return adopted if adopted
+
       root.with_lock do
         root.children.folders.find { |d| d.title.to_s.strip.casecmp?("embedded") } ||
-          root.children.create!(is_folder: true, title: "Embedded")
+          root.children.create!(embedded_folder_attributes)
       end
     rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid
       root.children.folders.find { |d| d.title.to_s.strip.casecmp?("embedded") }
@@ -96,6 +99,18 @@ class EmbeddedDraftDocument
         .where(content_type: config[:content_type])
         .order(:id)
         .first
+    end
+
+    def adopt_legacy_embedded_folder!(root)
+      legacy = Document.folders.where(parent_id: nil, storage_path: "Embedded").order(:id).find do |folder|
+        folder.id != root.id && folder.title.to_s.strip.casecmp?("Embedded")
+      end
+      return nil unless legacy
+
+      legacy.update!(parent: root, title: "Embedded")
+      legacy
+    rescue ActiveRecord::RecordInvalid
+      nil
     end
 
     def create_draft!(embedded, app_key, config)
@@ -118,7 +133,17 @@ class EmbeddedDraftDocument
         attrs[:content] = ""
       end
 
+      storage_path = preferred_draft_storage_path(embedded, config)
+      attrs[:storage_path] = storage_path if storage_path.present?
+
       Document.create!(attrs)
+    end
+
+    def embedded_folder_attributes
+      attrs = { is_folder: true, title: "Embedded" }
+      embedded_path = DocumentStorageSyncLite.storage_root.join("Embedded")
+      attrs[:storage_path] = "Embedded" if embedded_path.directory?
+      attrs
     end
 
     def ensure_synced_to_disk!(doc)
@@ -127,6 +152,25 @@ class EmbeddedDraftDocument
       DocumentStorageSyncLite.new(doc).update
     rescue StandardError
       nil
+    end
+
+    def preferred_draft_storage_path(embedded, config)
+      relative_dir = embedded.storage_path.to_s
+      return nil if relative_dir.blank?
+
+      extension = draft_extension_for(config[:content_type])
+      relative_path = File.join(relative_dir, "#{config[:title]}#{extension}")
+      absolute_path = DocumentStorageSyncLite.storage_root.join(relative_path)
+      absolute_path.file? ? relative_path : nil
+    end
+
+    def draft_extension_for(content_type)
+      case content_type.to_s
+      when "note"
+        ".rtf"
+      else
+        ".txt"
+      end
     end
   end
 end

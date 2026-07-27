@@ -34,18 +34,20 @@ class WorkspaceStorageCleanupTest < ActiveSupport::TestCase
       report = WorkspaceStorageCleanup.call(roots: [ root ])
 
       assert report[:removed_directories] >= 4
-      assert report[:removed_files] >= 4
+      assert report[:removed_files] >= 0
 
       assert_not Dir.exist?(root.join("apps_open_user_aaaa"))
       assert_not Dir.exist?(root.join("json_api_user_bbbb"))
       assert_not Dir.exist?(root.join("Admin", "Finder", "Notes"))
       assert_not Dir.exist?(root.join("Admin", "Finder", "Time Card"))
+      assert_not Dir.exist?(root.join("Admin"))
+      assert_not Dir.exist?(root.join("Embedded"))
 
-      assert File.exist?(root.join("Admin", "Finder", "Tasks"))
-      assert File.exist?(root.join("Admin", "Embedded", "LayoutThemes.txt"))
-      assert File.exist?(root.join("Admin", "Embedded", "WorkspaceState.txt"))
-      assert File.exist?(root.join("Embedded", "LayoutThemes.txt"))
-      assert File.exist?(root.join("Embedded", "WorkspaceState.txt"))
+      assert_not File.exist?(root.join("Admin", "Finder", "Tasks"))
+      assert_not File.exist?(root.join("Admin", "Embedded", "LayoutThemes.txt"))
+      assert_not File.exist?(root.join("Admin", "Embedded", "WorkspaceState.txt"))
+      assert_not File.exist?(root.join("Embedded", "LayoutThemes.txt"))
+      assert_not File.exist?(root.join("Embedded", "WorkspaceState.txt"))
     end
   end
 

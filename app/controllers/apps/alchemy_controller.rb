@@ -11,19 +11,18 @@ module Apps
       @raw_source_content = ""
       @linked_document_id = nil
       @source_kind = nil
-      @status_message = "Drop XML or Moxa JSON files into Finder > Alchemy, then open one here."
+      @status_message = "Drop XML or Moxa JSON files into Finder, then open one here."
 
       if params[:document_id].present?
         result = Apps::OpenLinkedDocument.call(
           user: current_user,
           document_id: params[:document_id],
           content_type: "alchemy_tag_list",
-          section_key: "alchemy",
           allow_embedded: false
         )
 
         unless result.success?
-          @status_message = "Selected file is not available in the Alchemy section."
+          @status_message = "Selected file is not available."
           return render_with_turbo_support layout: false
         end
 

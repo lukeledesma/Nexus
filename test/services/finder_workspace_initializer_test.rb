@@ -11,6 +11,7 @@ class FinderWorkspaceInitializerTest < ActiveSupport::TestCase
   end
 
   teardown do
+    UserAppState.delete_all
     Document.delete_all
     User.where(id: @user&.id).delete_all
   end
@@ -20,36 +21,28 @@ class FinderWorkspaceInitializerTest < ActiveSupport::TestCase
     FinderWorkspaceInitializer.ensure_for_user!(@user)
 
     root = FinderListedFolders.workspace_root_for(@user)
-    finder = root.children.folders.find { |d| d.title.to_s.casecmp?("Finder") }
-
-    assert finder
-    assert_equal 1, root.children.folders.select { |d| d.title.to_s.casecmp?("Finder") }.size
-
-    section_titles = Apps::FinderController.workspace_section_definitions
-      .reject { |definition| definition[:key] == "favorites" }
-      .map { |definition| definition[:title] }
-
-    section_titles.each do |title|
-      matching = finder.children.folders.select { |folder| folder.title.to_s.casecmp?(title) }
-      assert_equal 1, matching.size, "expected one section folder named #{title}"
-    end
+    assert root
+    assert_match(/\AStorage(?:\s+\d+)?\z/i, root.title)
+    assert_equal "", root.storage_path.to_s
 
     roots = FinderWorkspaceInitializer.section_roots_for(@user)
-    assert_equal Apps::FinderController::TASKS_SECTION_TITLE, roots["documents"]&.title
-    assert_equal Apps::FinderController::QUARTZ_SECTION_TITLE, roots["quartz"]&.title
+    assert_equal root.id, roots["storage"]&.parent_id
+    assert_match(/\AStorage(?:\s+\d+)?\z/i, roots["storage"]&.title.to_s)
+    assert_equal roots["storage"]&.id, roots["documents"]&.id
+    assert_equal roots["storage"]&.id, roots["desktop"]&.id
     assert_nil roots["favorites"]
   end
 
-  test "migrates legacy documents notes and favorites layout" do
+  test "migrates legacy sections into standard roots" do
     FinderWorkspaceInitializer.ensure_for_user!(@user)
 
     root = FinderListedFolders.workspace_root_for(@user)
-    finder = root.children.folders.find { |d| d.title.to_s.casecmp?("Finder") }
-    tasks = finder.children.folders.find { |d| d.title.to_s.casecmp?(Apps::FinderController::TASKS_SECTION_TITLE) }
+    tasks = root.children.create!(is_folder: true, title: Apps::FinderController::TASKS_SECTION_TITLE)
+    nested_pictures = tasks.children.create!(is_folder: true, title: Apps::FinderController::PICTURES_SECTION_TITLE)
+    legacy_quartz = root.children.create!(is_folder: true, title: Apps::FinderController::QUARTZ_SECTION_TITLE)
+    quartz_note = legacy_quartz.children.create!(is_folder: false, title: "Daily Note", content_type: "note", content: "<p>Hello</p>")
 
-    tasks.update!(title: "Documents")
-
-    legacy_favorites = finder.children.create!(is_folder: true, title: Apps::FinderController::FAVORITES_SECTION_TITLE)
+    legacy_favorites = root.children.create!(is_folder: true, title: Apps::FinderController::FAVORITES_SECTION_TITLE)
     favorite_file = legacy_favorites.children.create!(
       is_folder: false,
       title: "Favorite Candidate",
@@ -59,14 +52,15 @@ class FinderWorkspaceInitializerTest < ActiveSupport::TestCase
 
     roots = FinderWorkspaceInitializer.ensure_for_user!(@user)
 
-    assert roots["documents"]
-    assert_equal Apps::FinderController::TASKS_SECTION_TITLE, roots["documents"].title
-  assert roots["quartz"]
-  assert_equal finder.id, roots["quartz"].parent_id
+    assert_equal root.id, roots["storage"]&.parent_id
+    assert_equal roots["storage"]&.id, nested_pictures.reload.parent_id
 
     assert_not Document.exists?(legacy_favorites.id)
-    assert_equal roots["documents"].id, favorite_file.reload.parent_id
+    assert_equal roots["storage"]&.id, favorite_file.reload.parent_id
     assert_equal true, favorite_file.is_favorited?
+    assert_equal roots["storage"]&.id, legacy_quartz.reload.parent_id
+    assert_equal legacy_quartz.id, quartz_note.reload.parent_id
+    assert_not Document.exists?(tasks.id)
   end
 
   test "ensure_for_user handles missing root folder gracefully" do
@@ -85,17 +79,31 @@ class FinderWorkspaceInitializerTest < ActiveSupport::TestCase
     FinderWorkspaceInitializer.ensure_for_user!(@user)
 
     root = FinderListedFolders.workspace_root_for(@user)
-    finder = root.children.folders.find { |d| d.title.to_s.casecmp?("Finder") }
+    assert root, "Finder root folder should exist"
+    assert_match(/\AStorage(?:\s+\d+)?\z/i, root.title)
+    assert_equal "", root.storage_path.to_s
+    assert FinderWorkspaceInitializer.section_roots_for(@user)["trash"]
+  end
 
-    assert finder, "Finder root folder should exist"
+  test "ensure_for_user migrates legacy nested storage root to disk root" do
+    FinderWorkspaceInitializer.ensure_for_user!(@user)
 
-    section_titles = Apps::FinderController.workspace_section_definitions
-      .reject { |definition| definition[:key] == "favorites" }
-      .map { |definition| definition[:title] }
+    root = FinderListedFolders.workspace_root_for(@user)
+    note = root.children.create!(is_folder: false, title: "Legacy Root Note", content_type: "note", content: "hello")
+    legacy_root = DocumentStorageSyncLite.storage_root.join("Storage")
+    migrated_path = DocumentStorageSyncLite.storage_root.join("Storage", "Legacy Root Note.rtf")
 
-    section_titles.each do |title|
-      matching = finder.children.folders.select { |folder| folder.title.to_s.casecmp?(title) }
-      assert_equal 1, matching.size, "expected one section folder named #{title}"
-    end
+    FileUtils.mkdir_p(legacy_root)
+    FileUtils.mv(DocumentStorageSyncLite.storage_root.join(note.storage_path), legacy_root.join("Legacy Root Note.txt"))
+    root.update_column(:storage_path, "Storage")
+    note.update_column(:storage_path, "Storage/Legacy Root Note.txt")
+
+    FinderWorkspaceInitializer.ensure_for_user!(@user)
+
+    assert_equal "", root.reload.storage_path.to_s
+    assert_equal "Storage/Legacy Root Note.rtf", note.reload.storage_path
+    assert_equal FinderWorkspaceInitializer.section_roots_for(@user)["storage"]&.id, note.reload.parent_id
+    assert migrated_path.file?
+    assert legacy_root.directory?
   end
 end

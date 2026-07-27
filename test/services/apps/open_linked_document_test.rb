@@ -20,14 +20,14 @@ class AppsOpenLinkedDocumentTest < ActiveSupport::TestCase
   end
 
   test "returns ok for a note in requested section" do
-    quartz_root = Apps::FinderController.workspace_section_root(@user, "quartz")
-    doc = quartz_root.children.create!(title: "Daily Note", is_folder: false, content_type: "note", content: "Hello")
+    docs_root = Apps::FinderController.workspace_section_root(@user, "documents")
+    doc = docs_root.children.create!(title: "Daily Note", is_folder: false, content_type: "note", content: "Hello")
 
     result = Apps::OpenLinkedDocument.call(
       user: @user,
       document_id: doc.id,
       content_type: "note",
-      section_key: "quartz",
+      section_key: "documents",
       allow_embedded: true
     )
 
@@ -41,7 +41,7 @@ class AppsOpenLinkedDocumentTest < ActiveSupport::TestCase
       user: @user,
       document_id: "abc",
       content_type: "note",
-      section_key: "quartz",
+      section_key: "documents",
       allow_embedded: true
     )
 
@@ -54,7 +54,7 @@ class AppsOpenLinkedDocumentTest < ActiveSupport::TestCase
       user: @user,
       document_id: 999_999,
       content_type: "note",
-      section_key: "quartz",
+      section_key: "documents",
       allow_embedded: true
     )
 
@@ -62,20 +62,20 @@ class AppsOpenLinkedDocumentTest < ActiveSupport::TestCase
     assert_not result.success?
   end
 
-  test "returns unauthorized for section mismatch" do
-    docs_root = Apps::FinderController.workspace_section_root(@user, "documents")
-    doc = docs_root.children.create!(title: "Task Note", is_folder: false, content_type: "note", content: "x")
+  test "returns ok for section mismatch when document is still in storage" do
+    desktop_root = Apps::FinderController.workspace_section_root(@user, "desktop")
+    doc = desktop_root.children.create!(title: "Task Note", is_folder: false, content_type: "note", content: "x")
 
     result = Apps::OpenLinkedDocument.call(
       user: @user,
       document_id: doc.id,
       content_type: "note",
-      section_key: "quartz",
+      section_key: "documents",
       allow_embedded: true
     )
 
-    assert_equal :unauthorized, result.status
-    assert_not result.success?
+    assert_equal :ok, result.status
+    assert result.success?
   end
 
   test "returns ok for task list in documents section" do
@@ -94,7 +94,7 @@ class AppsOpenLinkedDocumentTest < ActiveSupport::TestCase
     assert_equal doc.id, result.payload.fetch(:document).id
   end
 
-  test "returns unauthorized for audio section mismatch" do
+  test "returns ok for audio section mismatch when asset is still in storage" do
     images_root = Apps::FinderController.workspace_section_root(@user, "images")
     doc = images_root.children.create!(title: "clip.mp3", is_folder: false, content_type: "asset", content: "")
 
@@ -106,13 +106,13 @@ class AppsOpenLinkedDocumentTest < ActiveSupport::TestCase
       allow_embedded: true
     )
 
-    assert_equal :unauthorized, result.status
-    assert_not result.success?
+    assert_equal :ok, result.status
+    assert result.success?
   end
 
   test "returns unauthorized for document in trash" do
-    quartz_root = Apps::FinderController.workspace_section_root(@user, "quartz")
-    doc = quartz_root.children.create!(title: "Trashed Note", is_folder: false, content_type: "note", content: "Hello")
+    docs_root = Apps::FinderController.workspace_section_root(@user, "documents")
+    doc = docs_root.children.create!(title: "Trashed Note", is_folder: false, content_type: "note", content: "Hello")
 
     trash_result = Documents::TrashDocument.call(user: @user, document: doc)
     assert_equal true, trash_result.success?
@@ -121,7 +121,7 @@ class AppsOpenLinkedDocumentTest < ActiveSupport::TestCase
       user: @user,
       document_id: doc.id,
       content_type: "note",
-      section_key: "quartz",
+      section_key: "documents",
       allow_embedded: true
     )
 

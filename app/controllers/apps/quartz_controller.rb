@@ -20,7 +20,6 @@ module Apps
           user: current_user,
           document_id: params[:document_id],
           content_type: "note",
-          section_key: "quartz",
           allow_embedded: true
         )
 

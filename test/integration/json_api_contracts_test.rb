@@ -18,6 +18,7 @@ class JsonApiContractsTest < ActionDispatch::IntegrationTest
 
   teardown do
     Document.delete_all
+    UserAppState.delete_all
     User.where(id: @user&.id).delete_all
   end
 

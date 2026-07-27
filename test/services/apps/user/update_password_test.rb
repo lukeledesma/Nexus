@@ -13,6 +13,7 @@ class AppsUserUpdatePasswordTest < ActiveSupport::TestCase
   end
 
   teardown do
+    UserAppState.delete_all
     User.where(id: @user&.id).delete_all
   end
 

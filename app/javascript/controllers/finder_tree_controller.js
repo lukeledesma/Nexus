@@ -17,6 +17,7 @@ const SEL = {
   rowLine: ".finder-tree__row-line",
   folderLi: "li.finder-tree__node--folder",
   fileLi: "li.finder-tree__node--file",
+  rootDropZone: ".finder-browser-root-drop-zone",
   ignoreClick: ".finder-tree__row-actions, .finder-folder-name-input, .finder-tree__row--pending",
   focusableRow: "a.finder-tree__row--folder, a.finder-tree__row--file, span.finder-tree__row--file"
 }
@@ -45,7 +46,9 @@ export default class extends Controller {
     this.boundDragStart = this._onDragStart.bind(this)
     this.boundDragEnd = this._onDragEnd.bind(this)
     this.boundDragOver = this._onDragOver.bind(this)
+    this.boundDragLeave = this._onDragLeave.bind(this)
     this.boundDrop = this._onDrop.bind(this)
+    this.boundWindowDragTerminate = this._onWindowDragTerminate.bind(this)
 
     this.element.addEventListener("pointerdown", this.boundPointerDownCapture, true)
     this.element.addEventListener("click", this.boundSuppressClickAfterDrag, true)
@@ -54,8 +57,13 @@ export default class extends Controller {
     this.element.addEventListener("dragstart", this.boundDragStart)
     this.element.addEventListener("dragend", this.boundDragEnd)
     this.element.addEventListener("dragover", this.boundDragOver)
+    this.element.addEventListener("dragleave", this.boundDragLeave)
     this.element.addEventListener("drop", this.boundDrop)
+    window.addEventListener("drop", this.boundWindowDragTerminate, true)
+    window.addEventListener("dragend", this.boundWindowDragTerminate, true)
 
+    this._clearDropTargetLine()
+    this._setRootDropArmed(false)
     requestAnimationFrame(() => this._hydrateExpandedFromStorage())
   }
 
@@ -67,7 +75,10 @@ export default class extends Controller {
     this.element.removeEventListener("dragstart", this.boundDragStart)
     this.element.removeEventListener("dragend", this.boundDragEnd)
     this.element.removeEventListener("dragover", this.boundDragOver)
+    this.element.removeEventListener("dragleave", this.boundDragLeave)
     this.element.removeEventListener("drop", this.boundDrop)
+    window.removeEventListener("drop", this.boundWindowDragTerminate, true)
+    window.removeEventListener("dragend", this.boundWindowDragTerminate, true)
   }
 
   _browserController() {
@@ -341,8 +352,10 @@ export default class extends Controller {
     this._dragDocumentId = id
     this._dragKind = isFolder ? DRAG_KIND.FOLDER : DRAG_KIND.FILE
     event.dataTransfer.effectAllowed = "move"
+    event.dataTransfer.setData("application/nexus-document-id", id)
     event.dataTransfer.setData("text/plain", id)
     line.classList.add("finder-tree__row-line--dragging")
+    this._setRootDropArmed(this._dragKind === DRAG_KIND.FILE)
   }
 
   _onDragEnd(event) {
@@ -351,6 +364,7 @@ export default class extends Controller {
     this._dragDocumentId = null
     this._dragKind = null
     this.element.querySelectorAll(".finder-tree__row-line--dragging").forEach((l) => l.classList.remove("finder-tree__row-line--dragging"))
+    this._setRootDropArmed(false)
 
     const effect = event.dataTransfer?.dropEffect
     if (effect === "move" || effect === "copy") {
@@ -370,7 +384,41 @@ export default class extends Controller {
       return { li, line, targetId }
     }
 
-    return null
+    const target = event.target
+    if (!(target instanceof Element)) return null
+    const li = target.closest(SEL.folderLi)
+    if (!li || !this.element.contains(li) || li.dataset.pendingNewFolder === "true") return null
+    const targetId = li.dataset.finderTreeNodeId
+    if (!targetId) return null
+    if (li.dataset.finderFolderWritable === "false") return null
+    const fallbackLine = li.querySelector(":scope > .finder-tree__row-line")
+    return fallbackLine ? { li, line: fallbackLine, targetId } : null
+  }
+
+  _rootDropTarget() {
+    const li = this.element.querySelector(".finder-tree__node--root-drop-target")
+    const line = li?.querySelector(":scope > .finder-tree__root-drop-spacer")
+    const targetId = li?.dataset?.finderTreeNodeId
+    if (!line || !targetId) return null
+    return { li, line, targetId: String(targetId) }
+  }
+
+  _rootDropTargetFromEvent(event) {
+    const zone = this.element.querySelector(SEL.rootDropZone)
+    if (!zone) return null
+
+    const x = event.clientX
+    const y = event.clientY
+    const rect = zone.getBoundingClientRect()
+    const inBounds = x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
+    if (!inBounds) return null
+
+    return this._rootDropTarget()
+  }
+
+  _dropTargetFromEvent(event, { allowRoot = false } = {}) {
+    const folderTarget = this._folderDropTargetFromEvent(event)
+    return folderTarget || (allowRoot ? this._rootDropTargetFromEvent(event) : null)
   }
 
   _dropWouldReparent(dragKind, dragId, targetId, draggedLi, targetLi) {
@@ -384,6 +432,29 @@ export default class extends Controller {
     return true
   }
 
+  _activeDragPayload(event) {
+    const currentId = this._dragDocumentId
+    const currentKind = this._dragKind
+    if (currentId && currentKind) {
+      return { dragDocumentId: String(currentId), dragKind: currentKind }
+    }
+
+    const dt = event?.dataTransfer
+    const fallbackId = dt?.getData("application/nexus-document-id") || dt?.getData("text/plain")
+    if (!fallbackId) return null
+
+    const draggedLi = finderQueryLiByNodeId(this.element, fallbackId)
+    if (!draggedLi) return null
+
+    const dragKind =
+      draggedLi.matches(SEL.folderLi) ? DRAG_KIND.FOLDER :
+      draggedLi.matches(SEL.fileLi) ? DRAG_KIND.FILE :
+      null
+    if (!dragKind) return null
+
+    return { dragDocumentId: String(fallbackId), dragKind }
+  }
+
   _onDragOver(event) {
     if (this._readOnly()) return
 
@@ -392,7 +463,8 @@ export default class extends Controller {
     const hasExternalFiles = types.includes("Files")
 
     if (hasExternalFiles) {
-      const target = this._folderDropTargetFromEvent(event)
+      this._setRootDropArmed(true)
+      const target = this._dropTargetFromEvent(event, { allowRoot: true })
       if (!target) {
         this._clearDropTargetLine()
         return
@@ -403,16 +475,22 @@ export default class extends Controller {
       return
     }
 
-    if (!this._dragDocumentId || !this._dragKind) return
+    const dragPayload = this._activeDragPayload(event)
+    if (!dragPayload) {
+      this._setRootDropArmed(false)
+      return
+    }
 
-    const target = this._folderDropTargetFromEvent(event)
+    this._setRootDropArmed(dragPayload.dragKind === DRAG_KIND.FILE)
+
+    const target = this._dropTargetFromEvent(event, { allowRoot: dragPayload.dragKind === DRAG_KIND.FILE })
     if (!target) {
       this._clearDropTargetLine()
       return
     }
 
-    const draggedLi = finderQueryLiByNodeId(this.element, this._dragDocumentId)
-    if (!this._dropWouldReparent(this._dragKind, this._dragDocumentId, target.targetId, draggedLi, target.li)) {
+    const draggedLi = finderQueryLiByNodeId(this.element, dragPayload.dragDocumentId)
+    if (!this._dropWouldReparent(dragPayload.dragKind, dragPayload.dragDocumentId, target.targetId, draggedLi, target.li)) {
       this._clearDropTargetLine()
       return
     }
@@ -426,18 +504,21 @@ export default class extends Controller {
     if (this._readOnly()) return
 
     const dt = event.dataTransfer
-    const target = this._folderDropTargetFromEvent(event)
     const droppedFiles = finderDroppedFilesFromDataTransfer(dt)
     const hasDroppedFiles = dt?.files?.length > 0
+    const dragPayload = this._activeDragPayload(event)
+    const target = this._dropTargetFromEvent(event, { allowRoot: hasDroppedFiles || dragPayload?.dragKind === DRAG_KIND.FILE })
 
     if (hasDroppedFiles) {
       if (!target) {
         this._clearDropTargetLine()
+        this._setRootDropArmed(false)
         return
       }
       event.preventDefault()
       event.stopPropagation()
       this._clearDropTargetLine()
+      this._setRootDropArmed(false)
 
       if (droppedFiles.length === 0) {
         return
@@ -465,19 +546,29 @@ export default class extends Controller {
       return
     }
 
-    if (!this._dragDocumentId || !this._dragKind) return
+    if (!dragPayload) {
+      this._setRootDropArmed(false)
+      return
+    }
 
-    if (!target) return
+    if (!target) {
+      this._setRootDropArmed(false)
+      return
+    }
 
-    const draggedLi = finderQueryLiByNodeId(this.element, this._dragDocumentId)
-    if (!this._dropWouldReparent(this._dragKind, this._dragDocumentId, target.targetId, draggedLi, target.li)) return
+    const draggedLi = finderQueryLiByNodeId(this.element, dragPayload.dragDocumentId)
+    if (!this._dropWouldReparent(dragPayload.dragKind, dragPayload.dragDocumentId, target.targetId, draggedLi, target.li)) {
+      this._setRootDropArmed(false)
+      return
+    }
 
     event.preventDefault()
     event.stopPropagation()
 
-    const draggedId = this._dragDocumentId
-    const kind = this._dragKind
+    const draggedId = dragPayload.dragDocumentId
+    const kind = dragPayload.dragKind
     this._clearDropTargetLine()
+    this._setRootDropArmed(false)
 
     const action = kind === DRAG_KIND.FOLDER ? "move_folder" : "move_file"
     const response = await fetch(`/documents/${encodeURIComponent(draggedId)}/${action}`, {
@@ -507,6 +598,32 @@ export default class extends Controller {
       this._dropTargetLine.classList.remove("finder-tree__row-line--drop-target")
       this._dropTargetLine = null
     }
+  }
+
+  _onDragLeave(event) {
+    const rect = this.element.getBoundingClientRect()
+    const outside =
+      event.clientX < rect.left ||
+      event.clientX > rect.right ||
+      event.clientY < rect.top ||
+      event.clientY > rect.bottom
+
+    if (!outside) return
+
+    this._clearDropTargetLine()
+    this._setRootDropArmed(false)
+  }
+
+  _onWindowDragTerminate() {
+    this._clearDropTargetLine()
+    this._setRootDropArmed(false)
+  }
+
+  _setRootDropArmed(active) {
+    const rootTree = this.element.querySelector(".finder-tree--root")
+    if (!rootTree) return
+
+    rootTree.classList.toggle("finder-tree--root-drop-armed", active)
   }
 
   /** Parent folder document id for a tree `li`, or Finder 2 root id when the row is under the root `<ul>`. */

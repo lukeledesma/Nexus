@@ -20,8 +20,8 @@
             <% @finder_sections.each do |section| %>
               <% active = !@finder_search_mode && section[:key] == @section_key %>
               <li class="finder-folder-item<%= " is-active" if active %><%= " finder-folder-item--separator" if ["favorites", "trash"].include?(section[:key]) %><%= " finder-folder-item--bottom" if section[:key] == "trash" %>" data-finder-section-key="<%= section[:key] %>"
-                <% if section[:key] == "favorites" && !@finder_read_only %>data-action="dragover->finder-browser#favoritesSidebarDragOver dragleave->finder-browser#favoritesSidebarDragLeave drop->finder-browser#favoritesSidebarDrop"<% end %>
-                <% if section[:key] == "trash" && !@finder_read_only %>data-action="dragover->finder-browser#trashSidebarDragOver dragleave->finder-browser#trashSidebarDragLeave drop->finder-browser#trashSidebarDrop"<% end %>>
+                <% if section[:folder] %>data-finder-section-folder-id="<%= section[:folder].id %>"<% end %>
+                <% if !@finder_read_only && section[:key] == "favorites" %>data-action="dragover->finder-browser#favoritesSidebarDragOver dragleave->finder-browser#favoritesSidebarDragLeave drop->finder-browser#favoritesSidebarDrop"<% elsif !@finder_read_only && section[:key] == "trash" %>data-action="dragover->finder-browser#trashSidebarDragOver dragleave->finder-browser#trashSidebarDragLeave drop->finder-browser#trashSidebarDrop"<% elsif !@finder_read_only && section[:folder] %>data-action="dragover->finder-browser#sectionSidebarDragOver dragleave->finder-browser#sectionSidebarDragLeave drop->finder-browser#sectionSidebarDrop"<% end %>>
                 <%= link_to apps_finder_path({ section: section[:key], frame_id: frame_id }.merge(@finder_read_only ? { mode: "save_as" } : {})), class: "finder-folder-link", data: { turbo_frame: frame_id, turbo_prefetch: false }, aria: { label: "Open #{section[:title]}" } do %>
                   <span class="finder-folder-icon" aria-hidden="true">
                     <% if section[:icon_svg] %>
@@ -100,6 +100,16 @@
                         read_only: @finder_read_only,
                         read_only_can_save: @finder_read_only_can_save,
                         open_in_app_content_types: @open_in_app_content_types %>
+                <% end %>
+                <% unless @finder_read_only %>
+                  <li
+                    class="finder-tree__node finder-tree__node--folder finder-tree__node--root-drop-target"
+                    data-finder-tree-node-id="<%= @root_folder.id %>"
+                    data-finder-folder-writable="true"
+                    aria-hidden="true"
+                  >
+                    <div class="finder-tree__row-line finder-tree__root-drop-spacer"></div>
+                  </li>
                 <% end %>
               </ul>
             </div>

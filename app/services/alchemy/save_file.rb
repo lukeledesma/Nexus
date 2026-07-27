@@ -98,7 +98,6 @@ module Alchemy
         user: @user,
         document_id: doc.id,
         content_type: "alchemy_tag_list",
-        section_key: "alchemy",
         allow_embedded: false
       )
       return nil unless open_result.success?

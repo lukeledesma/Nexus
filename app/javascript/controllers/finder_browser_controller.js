@@ -5,6 +5,7 @@ import {
   finderApiHeaders,
   finderCollectExpandedFolderIdsFromDom,
   finderCsrfToken,
+  finderMultipartHeaders,
   finderReadExpandedFolderIds,
   finderSanitizeDocumentId,
   finderWriteExpandedFolderIds
@@ -859,23 +860,9 @@ export default class extends Controller {
 
   // ── Drag-to-Trash ──────────────────────────────────────────────────────────
   // File rows in any section can be dragged onto the Trash sidebar item.
-
-  fileDragStart(event) {
-    const li = event.currentTarget.closest("li.finder-tree__node--file")
-    if (!li) return
-    const id = li.dataset.finderTreeNodeId
-    if (!id) return
-    event.dataTransfer.effectAllowed = "move"
-    event.dataTransfer.setData("application/nexus-document-id", id)
-    event.currentTarget.classList.add("finder-tree__row-line--dragging")
-  }
-
-  fileDragEnd(event) {
-    event.currentTarget.classList.remove("finder-tree__row-line--dragging")
-  }
-
   trashSidebarDragOver(event) {
-    if (!event.dataTransfer.types.includes("application/nexus-document-id")) return
+    const types = Array.from(event.dataTransfer?.types || [])
+    if (!types.includes("application/nexus-document-id") && !types.includes("text/plain")) return
     event.preventDefault()
     event.dataTransfer.dropEffect = "move"
     event.currentTarget.classList.add("finder-folder-item--drag-over")
@@ -885,9 +872,81 @@ export default class extends Controller {
     event.currentTarget.classList.remove("finder-folder-item--drag-over")
   }
 
+  sectionSidebarDragOver(event) {
+    const folderId = event.currentTarget?.dataset?.finderSectionFolderId
+    if (!folderId) return
+
+    const types = Array.from(event.dataTransfer?.types || [])
+    const hasInternalFile = types.includes("application/nexus-document-id") || types.includes("text/plain")
+    const hasExternalFiles = types.includes("Files")
+    if (!hasInternalFile && !hasExternalFiles) return
+
+    event.preventDefault()
+    event.dataTransfer.dropEffect = hasExternalFiles ? "copy" : "move"
+    event.currentTarget.classList.add("finder-folder-item--drag-over")
+  }
+
+  sectionSidebarDragLeave(event) {
+    event.currentTarget.classList.remove("finder-folder-item--drag-over")
+  }
+
+  async sectionSidebarDrop(event) {
+    const sectionItem = event.currentTarget
+    sectionItem.classList.remove("finder-folder-item--drag-over")
+
+    const folderId = sectionItem?.dataset?.finderSectionFolderId
+    if (!folderId) return
+
+    const types = Array.from(event.dataTransfer?.types || [])
+    const hasExternalFiles = types.includes("Files")
+    const documentId = event.dataTransfer?.getData("application/nexus-document-id") || event.dataTransfer?.getData("text/plain")
+    if (!hasExternalFiles && !documentId) return
+
+    event.preventDefault()
+
+    if (hasExternalFiles && event.dataTransfer?.files?.length > 0) {
+      const formData = new FormData()
+      Array.from(event.dataTransfer.files).forEach((file) => formData.append("files[]", file))
+
+      const uploadResponse = await fetch(`/documents/${encodeURIComponent(folderId)}/upload_images`, {
+        method: "POST",
+        headers: finderMultipartHeaders(),
+        body: formData
+      })
+      const uploadPayload = await uploadResponse.json().catch(() => ({}))
+      if (!uploadResponse.ok) {
+        window.alert(uploadPayload.error || "Could not upload files.")
+        return
+      }
+      if (Array.isArray(uploadPayload.errors) && uploadPayload.errors.length > 0) {
+        window.alert(uploadPayload.errors.join("\n"))
+      }
+
+      this.reloadFrameWithBrowseId(folderId)
+      return
+    }
+
+    const li = this.element.querySelector(`li[data-finder-tree-node-id="${documentId}"]`)
+    const currentParentFolderId = li?.parentElement?.closest("li.finder-tree__node--folder")?.dataset?.finderTreeNodeId || String(this.rootFolderIdValue || "")
+    if (String(currentParentFolderId) === String(folderId)) return
+
+    const response = await fetch(`/documents/${encodeURIComponent(documentId)}/move_file`, {
+      method: "POST",
+      headers: finderApiHeaders({ jsonBody: true }),
+      body: JSON.stringify({ parent_id: Number(folderId) })
+    })
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      window.alert(payload.error || "Could not move file.")
+      return
+    }
+
+    this.reloadFrameWithBrowseId(folderId)
+  }
+
   async trashSidebarDrop(event) {
     event.currentTarget.classList.remove("finder-folder-item--drag-over")
-    const id = event.dataTransfer.getData("application/nexus-document-id")
+    const id = event.dataTransfer.getData("application/nexus-document-id") || event.dataTransfer.getData("text/plain")
     if (!id) return
     event.preventDefault()
 
@@ -915,7 +974,8 @@ export default class extends Controller {
   // File rows can be dragged onto Favorites to add them without opening row actions.
 
   favoritesSidebarDragOver(event) {
-    if (!event.dataTransfer.types.includes("application/nexus-document-id")) return
+    const types = Array.from(event.dataTransfer?.types || [])
+    if (!types.includes("application/nexus-document-id") && !types.includes("text/plain")) return
     event.preventDefault()
     event.dataTransfer.dropEffect = "copy"
     event.currentTarget.classList.add("finder-folder-item--drag-over")
@@ -927,7 +987,7 @@ export default class extends Controller {
 
   async favoritesSidebarDrop(event) {
     event.currentTarget.classList.remove("finder-folder-item--drag-over")
-    const id = event.dataTransfer.getData("application/nexus-document-id")
+    const id = event.dataTransfer.getData("application/nexus-document-id") || event.dataTransfer.getData("text/plain")
     if (!id) return
     event.preventDefault()
 

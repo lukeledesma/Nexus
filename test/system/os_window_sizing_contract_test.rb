@@ -20,6 +20,7 @@ class OsWindowSizingContractTest < ApplicationSystemTestCase
 
   teardown do
     Capybara.reset_sessions!
+    UserAppState.delete_all
     User.where(id: @user&.id).delete_all
   end
 

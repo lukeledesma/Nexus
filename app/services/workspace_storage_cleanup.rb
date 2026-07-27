@@ -3,27 +3,30 @@
 require "fileutils"
 
 class WorkspaceStorageCleanup
-  ARTIFACT_DIR_PATTERNS = %w[
-    apps_open_user_*
-    json_api_user_*
-    prefs_flow_user_*
-    prefs_user_*
-    open_doc_user_*
-    embedded_draft_user_*
-    time_card_index_*
-    create_file_user_*
-    create_subfolder_user_*
-    move_document_user_*
-    panel_search_user_*
-    policy_user_*
-    pwd_user_*
-    rename_user_*
-    upload_files_user_*
-    tasks_save_file_user_*
-    task_payload_strip_*
-    task_payload_workspace_*
-    disk_loader_user_*
-    drafts_user_*
+  ARTIFACT_DIR_PATTERNS = [
+    "Admin",
+    "Embedded",
+    "Finder *",
+    "apps_open_user_*",
+    "json_api_user_*",
+    "prefs_flow_user_*",
+    "prefs_user_*",
+    "open_doc_user_*",
+    "embedded_draft_user_*",
+    "time_card_index_*",
+    "create_file_user_*",
+    "create_subfolder_user_*",
+    "move_document_user_*",
+    "panel_search_user_*",
+    "policy_user_*",
+    "pwd_user_*",
+    "rename_user_*",
+    "upload_files_user_*",
+    "tasks_save_file_user_*",
+    "task_payload_strip_*",
+    "task_payload_workspace_*",
+    "disk_loader_user_*",
+    "drafts_user_*"
   ].freeze
 
   LEGACY_PATH_GLOBS = [

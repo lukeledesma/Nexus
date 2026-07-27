@@ -4,7 +4,15 @@ import { createOsWindowSizer } from "lib/os_window_sizing"
 import { syncOrganizerAboveVisibleContentWindows } from "lib/nexus_desktop_layers"
 import { clearLinkedAppPickerDraft, LINKED_APP_BEFORE_SAVE_PICKER } from "lib/linked_app_picker_draft"
 import { syncNexusDesktopWallpaper } from "lib/nexus_workspace_chrome"
-import { NexusUserState } from "lib/nexus_user_state"
+import {
+  getTitleSnapGhostEl,
+  hideTitleSnapGhostEl,
+  readRegistry,
+  readSessionThenLocalStorage,
+  removeSessionAndLocalStorage,
+  writeSessionAndLocalStorage,
+  writeRegistry,
+} from "lib/content_window_shared"
 
 /** Kept in sync with inline boot script in `shared/_content_windows_boot.html.erb`. */
 const DESKTOP_WINDOW_LAYERS_KEY = "nexus.desktop.windowLayers"
@@ -13,25 +21,6 @@ const TASK_WINDOW_REGISTRY_KEY = "windows.tasks"
 /** Legacy device-local localStorage keys; consulted once at first read for migration. */
 const LEGACY_TASK_REGISTRY_KEY = "nexus.taskWindowRegistry"
 
-function readRegistry(key, legacyKey) {
-  const synced = NexusUserState.get(key)
-  if (Array.isArray(synced)) return synced
-  if (NexusUserState.has(key)) return []
-  try {
-    const raw = window.localStorage.getItem(legacyKey)
-    if (!raw) return []
-    const parsed = JSON.parse(raw)
-    if (Array.isArray(parsed)) {
-      NexusUserState.set(key, parsed)
-      return parsed
-    }
-  } catch (_e) { /* ignore */ }
-  return []
-}
-
-function writeRegistry(key, entries) {
-  NexusUserState.set(key, entries)
-}
 /** Treat as “at least operational min” within this many px (subpixel + border rounding). */
 const MIN_SIZE_SLACK_PX = 2
 /** Desktop canvas minimum app area (px): when viewport is smaller, shell scrolls instead of shrinking windows further. */
@@ -47,23 +36,6 @@ const TITLE_SNAP_TITLE_ALIGN_TOLERANCE_PX = 28
 const RESIZE_HEIGHT_SNAP_DELTA_PX = 34
 const RESIZE_WIDTH_SNAP_DELTA_PX = 34
 const RESIZE_NEIGHBOR_MAX_GAP_PX = 360
-
-function getTitleSnapGhostEl() {
-  if (!window.__nexusTitleSnapGhostEl?.isConnected) {
-    const ghost = document.createElement("div")
-    ghost.className = "content-window-title-snap-ghost"
-    ghost.setAttribute("aria-hidden", "true")
-    const container = document.getElementById("desktop-shell-canvas") || document.getElementById("desktop-shell") || document.body
-    container.appendChild(ghost)
-    window.__nexusTitleSnapGhostEl = ghost
-  }
-  return window.__nexusTitleSnapGhostEl
-}
-
-function hideTitleSnapGhostEl() {
-  const ghost = window.__nexusTitleSnapGhostEl
-  if (ghost) ghost.style.display = "none"
-}
 
 export default class extends Controller {
   static targets = [
@@ -663,35 +635,16 @@ export default class extends Controller {
     if (this.hasChromePickerToolsTarget) this.chromePickerToolsTarget.hidden = true
     this.#dismissLinkedAppSavePickerLayer()
 
-    const url = new URL(this.appUrlValue, window.location.origin)
-    url.searchParams.set("frame_id", this.frameIdValue)
-    url.searchParams.set("document_id", String(documentId))
-    url.searchParams.delete("blank")
-    this.currentUrl = `${url.pathname}${url.search}`
+    this.currentUrl = this.buildLinkedDocumentUrl(documentId)
 
-    try {
-      window.sessionStorage.setItem(`nexus.linkedAppDocument.${this.frameIdValue}`, String(documentId))
-    } catch (_err) {
-      /* ignore */
-    }
-      try {
-        window.localStorage.setItem(`nexus.linkedAppDocument.${this.frameIdValue}`, String(documentId))
-      } catch (_) {}
+    this.persistLinkedAppDocumentForFrame(this.frameIdValue, String(documentId))
     this.syncSpawnedLinkedDocumentRegistration(String(documentId))
 
-    const t = (documentTitle || "").trim()
-    if (t) {
-      this.syncOpenFileBadge(t)
-      this.persistLinkedAppOpenTitle(t)
-    } else {
+    if (!this.syncLinkedAppOpenTitleAndBadge(documentTitle)) {
       this.clearOpenFileBadge()
     }
 
-    if (this.element.classList.contains("is-hidden")) {
-      this.open()
-    } else {
-      this.bringToFront()
-    }
+    this.openOrBringToFrontCurrentWindow()
 
     if (this.hasFrameTarget) {
       this.hardReloadFrame(this.currentUrl)
@@ -760,27 +713,14 @@ export default class extends Controller {
       }
 
     if (documentId) {
-      const url = new URL(this.appUrlValue, window.location.origin)
-      url.searchParams.set("frame_id", this.frameIdValue)
-      url.searchParams.set("document_id", String(documentId))
-      url.searchParams.delete("blank")
-      this.currentUrl = `${url.pathname}${url.search}`
-      this.syncOpenFileBadge(documentTitle)
-      const titled = (documentTitle || "").trim()
-      if (titled) this.persistLinkedAppOpenTitle(titled)
-      else this.clearLinkedAppOpenTitleStorage()
-        // Persist linked doc to both storages so it survives logout/login
-        try {
-          window.sessionStorage.setItem(`nexus.linkedAppDocument.${this.frameIdValue}`, String(documentId))
-          window.localStorage.setItem(`nexus.linkedAppDocument.${this.frameIdValue}`, String(documentId))
-        } catch (_) {}
+      this.currentUrl = this.buildLinkedDocumentUrl(documentId)
+      if (!this.syncLinkedAppOpenTitleAndBadge(documentTitle)) this.clearLinkedAppOpenTitleStorage()
+      // Persist linked doc to both storages so it survives logout/login
+      this.persistLinkedAppDocumentForFrame(this.frameIdValue, String(documentId))
       this.syncSpawnedLinkedDocumentRegistration(String(documentId))
     } else {
       if (forceBlank && this.hasFrameIdValue) {
-        try {
-          window.sessionStorage.removeItem(`nexus.linkedAppDocument.${this.frameIdValue}`)
-          window.localStorage.removeItem(`nexus.linkedAppDocument.${this.frameIdValue}`)
-        } catch (_) {}
+        this.clearLinkedAppDocumentForFrame(this.frameIdValue)
       }
       this.currentUrl = this.buildAppUrl({ blank: this.isLinkedApp() })
       this.clearOpenFileBadge()
@@ -797,11 +737,7 @@ export default class extends Controller {
       this.frameTarget.src = this.currentUrl
     }
 
-    if (this.element.classList.contains("is-hidden")) {
-      this.open()
-    } else {
-      this.bringToFront()
-    }
+    this.openOrBringToFrontCurrentWindow()
   }
 
   focusAndFlashWindow(windowEl) {
@@ -829,6 +765,14 @@ export default class extends Controller {
     this.focusAndFlashWindow(windowEl)
   }
 
+  openOrBringToFrontCurrentWindow() {
+    if (this.element.classList.contains("is-hidden")) {
+      this.open()
+      return
+    }
+    this.bringToFront()
+  }
+
   shouldSpawnDraftWindow(requestedDocumentId) {
     const requested = String(requestedDocumentId || "")
     if (!requested) return false
@@ -844,14 +788,8 @@ export default class extends Controller {
 
   readLinkedDocumentIdForFrame(frameId) {
     if (!frameId) return null
-    try {
-      const v = window.sessionStorage.getItem(`nexus.linkedAppDocument.${frameId}`)
-        if (v) return String(v)
-        const lv = window.localStorage.getItem(`nexus.linkedAppDocument.${frameId}`)
-        return lv ? String(lv) : null
-    } catch (_error) {
-      return null
-    }
+    const value = readSessionThenLocalStorage(`nexus.linkedAppDocument.${frameId}`)
+    return value ? String(value) : null
   }
 
   windowMatchesLinkedDocumentId(windowEl, docId) {
@@ -876,17 +814,11 @@ export default class extends Controller {
   }
 
   findTaskWindowByDocumentId(documentId, options = {}) {
-    const includeHidden = Boolean(options.includeHidden)
-    const docId = String(documentId || "")
-    if (!docId) return null
-    const taskWindows = document.querySelectorAll(
+    return this.findWindowByDocumentIdWithSelector(documentId, {
+      includeHidden: options.includeHidden,
+      selector:
       'section.content-window[data-content-window-app-key-value="tasks"], section.content-window[data-content-window-app-key-value^="task-spawn-"]'
-    )
-    for (const windowEl of taskWindows) {
-      if (!includeHidden && windowEl.classList.contains("is-hidden")) continue
-      if (this.windowMatchesLinkedDocumentId(windowEl, docId)) return windowEl
-    }
-    return null
+    })
   }
 
   findVisibleTaskWindowByDocumentId(documentId) {
@@ -894,17 +826,11 @@ export default class extends Controller {
   }
 
   findImageWindowByDocumentId(documentId, options = {}) {
-    const includeHidden = Boolean(options.includeHidden)
-    const docId = String(documentId || "")
-    if (!docId) return null
-    const imageWindows = document.querySelectorAll(
+    return this.findWindowByDocumentIdWithSelector(documentId, {
+      includeHidden: options.includeHidden,
+      selector:
       'section.content-window[data-content-window-app-key-value="images"], section.content-window[data-content-window-app-key-value^="image-spawn-"]'
-    )
-    for (const windowEl of imageWindows) {
-      if (!includeHidden && windowEl.classList.contains("is-hidden")) continue
-      if (this.windowMatchesLinkedDocumentId(windowEl, docId)) return windowEl
-    }
-    return null
+    })
   }
 
   findVisibleImageWindowByDocumentId(documentId) {
@@ -912,12 +838,18 @@ export default class extends Controller {
   }
 
   findQuartzWindowByDocumentId(documentId, { includeHidden = true } = {}) {
-    const docId = String(documentId || "")
-    if (!docId) return null
-    const quartzWindows = document.querySelectorAll(
+    return this.findWindowByDocumentIdWithSelector(documentId, {
+      includeHidden,
+      selector:
       'section.content-window[data-content-window-app-key-value="quartz"], section.content-window[data-content-window-app-key-value^="quartz-spawn-"]'
-    )
-    for (const windowEl of quartzWindows) {
+    })
+  }
+
+  findWindowByDocumentIdWithSelector(documentId, { selector, includeHidden = false } = {}) {
+    const docId = String(documentId || "")
+    if (!docId || !selector) return null
+    const windows = document.querySelectorAll(selector)
+    for (const windowEl of windows) {
       if (!includeHidden && windowEl.classList.contains("is-hidden")) continue
       if (this.windowMatchesLinkedDocumentId(windowEl, docId)) return windowEl
     }
@@ -935,41 +867,29 @@ export default class extends Controller {
     const uid = `task-spawn-${Date.now()}`
     const title = (documentTitle || "").trim()
 
-    try {
-      window.sessionStorage.setItem(`nexus.linkedAppDocument.${uid}`, String(documentId))
-      if (title) window.sessionStorage.setItem(`nexus.linkedAppOpenTitle.${uid}`, title)
-    } catch (_) {}
-      try {
-        window.localStorage.setItem(`nexus.linkedAppDocument.${uid}`, String(documentId))
-        if (title) window.localStorage.setItem(`nexus.linkedAppOpenTitle.${uid}`, title)
-      } catch (_) {}
+    this.persistLinkedDocumentContextForFrame(uid, String(documentId), title)
 
     // Register documentId → spawned appKey so we can detect duplicates
-    window.__nexusSpawnedTasksByDocumentId[String(documentId)] = uid
+    this.registerSpawnedWindowDocument(uid, documentId)
 
     const clone = this.element.cloneNode(true)
 
     // Give the clone a unique identity so it doesn't respond to toggle/open events
     // meant for the primary Tasks window.
-    clone.dataset.contentWindowAppKeyValue = uid
-    clone.dataset.contentWindowFrameIdValue = uid
-    clone.dataset.contentWindowStorageKeyValue = uid
-    clone.dataset.contentWindowHasLinkedAppSavePickerValue = "true"
-    // Signal connect() to open the window immediately.
-    clone.dataset.openOnConnect = "true"
-    // Mark as spawned so it emits Tasks state
-    clone.dataset.isSpawnedTaskWindow = "true"
-    // Store documentId for cleanup
-    clone.dataset.spawnedFromDocumentId = String(documentId)
+    this.configureSpawnedCloneIdentity(clone, {
+      appKey: uid,
+      frameId: uid,
+      storageKey: uid,
+      spawnedFlag: "isSpawnedTaskWindow",
+      documentId: String(documentId),
+      hasLinkedAppSavePicker: true,
+      openOnConnect: true
+    })
 
     this.prepareClonedWindowShell(clone, { frameId: uid, title, openOnConnect: true })
 
     // Offset position so the new window doesn't land exactly on top of the original.
-    const rect = this.element.getBoundingClientRect()
-    clone.style.left = `${Math.round(rect.left) + 24}px`
-    clone.style.top = `${Math.round(rect.top) + 24}px`
-    clone.style.width = `${Math.round(rect.width)}px`
-    clone.style.height = `${Math.round(rect.height)}px`
+    this.applySpawnedCloneBounds(clone)
 
     this.persistSpawnedTaskWindow({
       appKey: uid,
@@ -986,32 +906,23 @@ export default class extends Controller {
     const uid = `image-spawn-${Date.now()}`
     const title = (documentTitle || "").trim()
 
-    try {
-      window.sessionStorage.setItem(`nexus.linkedAppDocument.${uid}`, String(documentId))
-      if (title) window.sessionStorage.setItem(`nexus.linkedAppOpenTitle.${uid}`, title)
-    } catch (_) {}
-    try {
-      window.localStorage.setItem(`nexus.linkedAppDocument.${uid}`, String(documentId))
-      if (title) window.localStorage.setItem(`nexus.linkedAppOpenTitle.${uid}`, title)
-    } catch (_) {}
+    this.persistLinkedDocumentContextForFrame(uid, String(documentId), title)
 
-    window.__nexusSpawnedImagesByDocumentId[String(documentId)] = uid
+    this.registerSpawnedWindowDocument(uid, documentId)
 
     const clone = this.element.cloneNode(true)
-    clone.dataset.contentWindowAppKeyValue = uid
-    clone.dataset.contentWindowFrameIdValue = uid
-    clone.dataset.contentWindowStorageKeyValue = uid
-    clone.dataset.openOnConnect = "true"
-    clone.dataset.isSpawnedImageWindow = "true"
-    clone.dataset.spawnedFromDocumentId = String(documentId)
+    this.configureSpawnedCloneIdentity(clone, {
+      appKey: uid,
+      frameId: uid,
+      storageKey: uid,
+      spawnedFlag: "isSpawnedImageWindow",
+      documentId: String(documentId),
+      openOnConnect: true
+    })
 
     this.prepareClonedWindowShell(clone, { frameId: uid, title, openOnConnect: true })
 
-    const rect = this.element.getBoundingClientRect()
-    clone.style.left = `${Math.round(rect.left) + 24}px`
-    clone.style.top = `${Math.round(rect.top) + 24}px`
-    clone.style.width = `${Math.round(rect.width)}px`
-    clone.style.height = `${Math.round(rect.height)}px`
+    this.applySpawnedCloneBounds(clone)
 
     this.element.parentElement.appendChild(clone)
   }
@@ -1026,33 +937,24 @@ export default class extends Controller {
     const uid = `quartz-spawn-${Date.now()}`
     const title = (documentTitle || "").trim()
 
-    try {
-      window.sessionStorage.setItem(`nexus.linkedAppDocument.${uid}`, String(documentId))
-      if (title) window.sessionStorage.setItem(`nexus.linkedAppOpenTitle.${uid}`, title)
-    } catch (_) {}
-    try {
-      window.localStorage.setItem(`nexus.linkedAppDocument.${uid}`, String(documentId))
-      if (title) window.localStorage.setItem(`nexus.linkedAppOpenTitle.${uid}`, title)
-    } catch (_) {}
+    this.persistLinkedDocumentContextForFrame(uid, String(documentId), title)
 
-    window.__nexusSpawnedQuartzByDocumentId[String(documentId)] = uid
+    this.registerSpawnedWindowDocument(uid, documentId)
 
     const clone = this.element.cloneNode(true)
-    clone.dataset.contentWindowAppKeyValue = uid
-    clone.dataset.contentWindowFrameIdValue = uid
-    clone.dataset.contentWindowStorageKeyValue = uid
-    clone.dataset.contentWindowHasLinkedAppSavePickerValue = "true"
-    clone.dataset.openOnConnect = "true"
-    clone.dataset.isSpawnedQuartzWindow = "true"
-    clone.dataset.spawnedFromDocumentId = String(documentId)
+    this.configureSpawnedCloneIdentity(clone, {
+      appKey: uid,
+      frameId: uid,
+      storageKey: uid,
+      spawnedFlag: "isSpawnedQuartzWindow",
+      documentId: String(documentId),
+      hasLinkedAppSavePicker: true,
+      openOnConnect: true
+    })
 
     this.prepareClonedWindowShell(clone, { frameId: uid, title, openOnConnect: true })
 
-    const rect = this.element.getBoundingClientRect()
-    clone.style.left = `${Math.round(rect.left) + 24}px`
-    clone.style.top = `${Math.round(rect.top) + 24}px`
-    clone.style.width = `${Math.round(rect.width)}px`
-    clone.style.height = `${Math.round(rect.height)}px`
+    this.applySpawnedCloneBounds(clone)
 
     this.element.parentElement.appendChild(clone)
   }
@@ -1089,27 +991,23 @@ export default class extends Controller {
       const restoredTitle = (entry.documentTitle || "").trim()
       // Always restore sessionStorage from registry so restoreLinkedAppUrlAndBadge
       // works even after a logout where sessionStorage is cleared.
-      try {
-        window.sessionStorage.setItem(`nexus.linkedAppDocument.${restoredFrameId}`, String(entry.documentId))
-        if (restoredTitle) window.sessionStorage.setItem(`nexus.linkedAppOpenTitle.${restoredFrameId}`, restoredTitle)
-      } catch (_) {}
-      try {
-        window.localStorage.setItem(`nexus.linkedAppDocument.${restoredFrameId}`, String(entry.documentId))
-        if (restoredTitle) window.localStorage.setItem(`nexus.linkedAppOpenTitle.${restoredFrameId}`, restoredTitle)
-      } catch (_) {}
+      this.persistLinkedDocumentContextForFrame(restoredFrameId, String(entry.documentId), restoredTitle)
 
       if (document.querySelector(`[data-content-window-app-key-value="${entry.appKey}"]`)) {
-        window.__nexusSpawnedTasksByDocumentId[String(entry.documentId)] = entry.appKey
+        this.registerSpawnedWindowDocument(entry.appKey, entry.documentId)
         return
       }
 
       const clone = this.element.cloneNode(true)
-      clone.dataset.contentWindowAppKeyValue = String(entry.appKey)
-      clone.dataset.contentWindowFrameIdValue = String(entry.frameId || entry.appKey)
-      clone.dataset.contentWindowStorageKeyValue = String(entry.storageKey || entry.appKey)
-      clone.dataset.contentWindowHasLinkedAppSavePickerValue = "true"
-      clone.dataset.isSpawnedTaskWindow = "true"
-      clone.dataset.spawnedFromDocumentId = String(entry.documentId)
+      this.configureSpawnedCloneIdentity(clone, {
+        appKey: String(entry.appKey),
+        frameId: String(entry.frameId || entry.appKey),
+        storageKey: String(entry.storageKey || entry.appKey),
+        spawnedFlag: "isSpawnedTaskWindow",
+        documentId: String(entry.documentId),
+        hasLinkedAppSavePicker: true,
+        openOnConnect: false
+      })
 
       this.prepareClonedWindowShell(clone, {
         frameId: String(entry.frameId || entry.appKey),
@@ -1117,7 +1015,7 @@ export default class extends Controller {
         openOnConnect: false
       })
 
-      window.__nexusSpawnedTasksByDocumentId[String(entry.documentId)] = String(entry.appKey)
+      this.registerSpawnedWindowDocument(String(entry.appKey), entry.documentId)
       this.element.parentElement.appendChild(clone)
     })
   }
@@ -1148,6 +1046,14 @@ export default class extends Controller {
 
   syncOpenFileBadge(title) {
     this.syncOpenFileBadgeFor(this.element, title)
+  }
+
+  syncLinkedAppOpenTitleAndBadge(title) {
+    const t = (title || "").trim()
+    if (!t) return false
+    this.persistLinkedAppOpenTitle(t)
+    this.syncOpenFileBadge(t)
+    return true
   }
 
   syncOpenFileBadgeFor(windowEl, title) {
@@ -1195,19 +1101,8 @@ export default class extends Controller {
   readOpenTitleForFrame(frameId) {
     if (!frameId) return ""
     const key = `nexus.linkedAppOpenTitle.${frameId}`
-    let title = ""
-    try {
-      title = window.sessionStorage.getItem(key) || ""
-    } catch (_error) {
-      // non-blocking
-    }
-    if (title.trim().length > 0) return title.trim()
-    try {
-      title = window.localStorage.getItem(key) || ""
-    } catch (_error) {
-      // non-blocking
-    }
-    return (title || "").trim()
+    const title = readSessionThenLocalStorage(key) || ""
+    return String(title).trim()
   }
 
   syncOpenTitleStorageForFrame(frameId, title) {
@@ -1215,16 +1110,7 @@ export default class extends Controller {
     const key = `nexus.linkedAppOpenTitle.${frameId}`
     const t = (title || "").trim()
     if (!t) return
-    try {
-      window.sessionStorage.setItem(key, t)
-    } catch (_error) {
-      // non-blocking
-    }
-    try {
-      window.localStorage.setItem(key, t)
-    } catch (_error) {
-      // non-blocking
-    }
+    writeSessionAndLocalStorage(key, t)
   }
 
   syncPersistedSpawnedTaskTitle(documentTitle) {
@@ -1238,23 +1124,8 @@ export default class extends Controller {
   }
 
   syncSpawnedTaskDocumentRegistration(documentId) {
-    if (!this.appKeyValue.startsWith("task-spawn-")) return
-    if (!window.__nexusSpawnedTasksByDocumentId) window.__nexusSpawnedTasksByDocumentId = {}
-
-    const map = window.__nexusSpawnedTasksByDocumentId
-    const nextDocId = String(documentId || "")
-
-    Object.keys(map).forEach((docId) => {
-      if (map[docId] === this.appKeyValue && docId !== nextDocId) delete map[docId]
-    })
-
-    if (!nextDocId) {
-      delete this.element.dataset.spawnedFromDocumentId
-      return
-    }
-
-    map[nextDocId] = this.appKeyValue
-    this.element.dataset.spawnedFromDocumentId = nextDocId
+    const nextDocId = this.syncSpawnedDocumentRegistrationByPrefix("task-spawn-", documentId)
+    if (!nextDocId) return
     this.persistSpawnedTaskWindow({
       appKey: this.appKeyValue,
       frameId: this.frameIdValue,
@@ -1265,10 +1136,13 @@ export default class extends Controller {
   }
 
   syncSpawnedQuartzDocumentRegistration(documentId) {
-    if (!this.appKeyValue.startsWith("quartz-spawn-")) return
-    if (!window.__nexusSpawnedQuartzByDocumentId) window.__nexusSpawnedQuartzByDocumentId = {}
+    this.syncSpawnedDocumentRegistrationByPrefix("quartz-spawn-", documentId)
+  }
 
-    const map = window.__nexusSpawnedQuartzByDocumentId
+  syncSpawnedDocumentRegistrationByPrefix(prefix, documentId) {
+    if (!this.appKeyValue.startsWith(prefix)) return null
+    const map = this.spawnedWindowRegistryMapForAppKey(this.appKeyValue)
+    if (!map) return null
     const nextDocId = String(documentId || "")
 
     Object.keys(map).forEach((docId) => {
@@ -1282,6 +1156,7 @@ export default class extends Controller {
 
     map[nextDocId] = this.appKeyValue
     this.element.dataset.spawnedFromDocumentId = nextDocId
+    return nextDocId
   }
 
   syncSpawnedLinkedDocumentRegistration(documentId) {
@@ -1298,8 +1173,62 @@ export default class extends Controller {
     return this.hasFrameIdValue ? `nexus.linkedAppDocument.${this.frameIdValue}` : null
   }
 
+  linkedAppDocumentStorageKeyForFrame(frameId) {
+    if (!frameId) return null
+    return `nexus.linkedAppDocument.${frameId}`
+  }
+
   linkedAppOpenTitleStorageKey() {
     return this.hasFrameIdValue ? `nexus.linkedAppOpenTitle.${this.frameIdValue}` : null
+  }
+
+  persistLinkedAppDocumentForFrame(frameId, documentId) {
+    const key = this.linkedAppDocumentStorageKeyForFrame(frameId)
+    if (!key) return
+    writeSessionAndLocalStorage(key, String(documentId || ""))
+  }
+
+  persistLinkedDocumentContextForFrame(frameId, documentId, title) {
+    this.persistLinkedAppDocumentForFrame(frameId, documentId)
+    this.syncOpenTitleStorageForFrame(frameId, title)
+  }
+
+  registerSpawnedWindowDocument(appKey, documentId) {
+    const map = this.spawnedWindowRegistryMapForAppKey(appKey)
+    const docId = String(documentId || "")
+    if (!map || !docId) return
+    map[docId] = String(appKey)
+  }
+
+  unregisterSpawnedWindowDocument(appKey, documentId) {
+    const map = this.spawnedWindowRegistryMapForAppKey(appKey)
+    const docId = String(documentId || "")
+    if (!map || !docId) return
+    delete map[docId]
+  }
+
+  spawnedWindowRegistryMapForAppKey(appKey) {
+    const key = String(appKey || "")
+    if (key === "tasks" || key.startsWith("task-spawn-")) {
+      if (!window.__nexusSpawnedTasksByDocumentId) window.__nexusSpawnedTasksByDocumentId = {}
+      return window.__nexusSpawnedTasksByDocumentId
+    }
+    if (key === "images" || key.startsWith("image-spawn-")) {
+      if (!window.__nexusSpawnedImagesByDocumentId) window.__nexusSpawnedImagesByDocumentId = {}
+      return window.__nexusSpawnedImagesByDocumentId
+    }
+    if (key === "quartz" || key.startsWith("quartz-spawn-")) {
+      if (!window.__nexusSpawnedQuartzByDocumentId) window.__nexusSpawnedQuartzByDocumentId = {}
+      return window.__nexusSpawnedQuartzByDocumentId
+    }
+
+    return null
+  }
+
+  clearLinkedAppDocumentForFrame(frameId) {
+    const key = this.linkedAppDocumentStorageKeyForFrame(frameId)
+    if (!key) return
+    removeSessionAndLocalStorage(key)
   }
 
   clearLinkedAppPickerDraftSnapshot() {
@@ -1312,32 +1241,14 @@ export default class extends Controller {
     if (!key) return
     const t = (title || "").trim()
     if (!t) return
-    try {
-      window.sessionStorage.setItem(key, t)
-    } catch (_error) {
-      // non-blocking
-    }
-    try {
-      window.localStorage.setItem(key, t)
-    } catch (_error) {
-      // non-blocking
-    }
+    writeSessionAndLocalStorage(key, t)
     this.syncPersistedSpawnedTaskTitle(t)
   }
 
   clearLinkedAppOpenTitleStorage() {
     const key = this.linkedAppOpenTitleStorageKey()
     if (!key) return
-    try {
-      window.sessionStorage.removeItem(key)
-    } catch (_error) {
-      // non-blocking
-    }
-    try {
-      window.localStorage.removeItem(key)
-    } catch (_error) {
-      // non-blocking
-    }
+    removeSessionAndLocalStorage(key)
     this.syncPersistedSpawnedTaskTitle("")
   }
 
@@ -1347,54 +1258,20 @@ export default class extends Controller {
     if (!this.hasFrameIdValue) return
     const docKey = this.linkedAppDocumentStorageKey()
     if (!docKey) return
-    let linkedId = null
-    try {
-      linkedId = window.sessionStorage.getItem(docKey)
-    } catch (_error) {
-      return
-    }
-      // Fall back to localStorage so state survives logout/login
-      if (!linkedId) {
-        try {
-          linkedId = window.localStorage.getItem(`nexus.linkedAppDocument.${this.frameIdValue}`)
-        } catch (_) {}
-      }
-      if (!linkedId) return
+    const linkedId = readSessionThenLocalStorage(docKey)
+    if (!linkedId) return
 
-    const url = new URL(this.appUrlValue, window.location.origin)
-    url.searchParams.set("frame_id", this.frameIdValue)
-    url.searchParams.set("document_id", String(linkedId))
-    url.searchParams.delete("blank")
-    this.currentUrl = `${url.pathname}${url.search}`
+    this.currentUrl = this.buildLinkedDocumentUrl(linkedId)
 
     const titleKey = this.linkedAppOpenTitleStorageKey()
-    let openTitle = ""
-    if (titleKey) {
-      try {
-        openTitle = window.sessionStorage.getItem(titleKey) || ""
-      } catch (_error) {
-        // ignore
-      }
-      if (!openTitle) {
-        try {
-          openTitle = window.localStorage.getItem(titleKey) || ""
-        } catch (_error) {
-          // ignore
-        }
-      }
-    }
-    const t = openTitle.trim()
-    if (t) this.syncOpenFileBadge(t)
-    else this.syncOpenFileBadge("")
+    const openTitle = titleKey ? (readSessionThenLocalStorage(titleKey) || "") : ""
+    this.syncOpenFileBadge(openTitle)
   }
 
   onLinkedAppDocumentSaved(event) {
     const { frameId, title } = event.detail || {}
     if (frameId !== this.frameIdValue) return
-    const t = (title || "").trim()
-    if (!t) return
-    this.persistLinkedAppOpenTitle(t)
-    this.syncOpenFileBadge(t)
+    this.syncLinkedAppOpenTitleAndBadge(title)
   }
 
   onFinderItemRenamed(event) {
@@ -1404,11 +1281,7 @@ export default class extends Controller {
     const linkedDocId = this.readLinkedDocumentIdForCurrentFrame()
     if (!linkedDocId || String(linkedDocId) !== String(itemId)) return
     
-    const newTitle = (newName || "").trim()
-    if (!newTitle) return
-    
-    this.persistLinkedAppOpenTitle(newTitle)
-    this.syncOpenFileBadge(newTitle)
+    this.syncLinkedAppOpenTitleAndBadge(newName)
   }
 
   onLinkedDocumentUnavailable(event) {
@@ -1445,11 +1318,9 @@ export default class extends Controller {
   }
 
   startAlchemySplitResize(event) {
-    if (this.appKeyValue !== "alchemy" || !this.hasFrameTarget) return
-    const results = this.frameTarget.querySelector(".alchemy-app__results")
-    const tableView = this.frameTarget.querySelector("[data-alchemy-table-view]")
-    const rawView = this.frameTarget.querySelector("[data-alchemy-raw-view]")
-    if (!results || !tableView || !rawView) return
+    const layout = this.alchemySplitLayoutElements()
+    if (!layout) return
+    const { results } = layout
 
     if (event) event.preventDefault()
     const onMove = (moveEvent) => {
@@ -1509,16 +1380,23 @@ export default class extends Controller {
     return `nexus.alchemy.${name}`
   }
 
+  alchemySourceKind() {
+    if (!this.hasFrameTarget) return null
+    return this.frameTarget.querySelector("[data-alchemy-source-kind]")?.dataset?.alchemySourceKind || null
+  }
+
+  alchemyTableRows() {
+    if (!this.hasFrameTarget) return []
+    return Array.from(this.frameTarget.querySelectorAll("tbody[data-alchemy-table-target='tbody'] tr"))
+  }
+
   syncAlchemyChromeMeta() {
     if (this.appKeyValue !== "alchemy" || !this.hasFrameTarget) return
 
     const countEl = this.element.querySelector("[data-nexus-alchemy-tag-count]")
-    const rows = Array.from(this.frameTarget.querySelectorAll("tbody[data-alchemy-table-target='tbody'] tr"))
+    const rows = this.alchemyTableRows()
     const conflictCount = rows.filter((row) => row.classList.contains("row-address-conflict")).length
-    const sourceKind = this.frameTarget
-      .querySelector("[data-alchemy-source-kind]")
-      ?.dataset
-      ?.alchemySourceKind
+    const sourceKind = this.alchemySourceKind()
     const enabled = this.element.dataset.alchemyConflictsOnly === "true"
 
     if (countEl) {
@@ -1537,7 +1415,7 @@ export default class extends Controller {
   applyAlchemyConflictFilter(enabled) {
     if (this.appKeyValue !== "alchemy" || !this.hasFrameTarget) return
 
-    const rows = Array.from(this.frameTarget.querySelectorAll("tbody[data-alchemy-table-target='tbody'] tr"))
+    const rows = this.alchemyTableRows()
     rows.forEach((row) => {
       const conflict = row.classList.contains("row-address-conflict")
       row.hidden = enabled && !conflict
@@ -1548,13 +1426,9 @@ export default class extends Controller {
   }
 
   applyAlchemyRawView(enabled) {
-    if (this.appKeyValue !== "alchemy" || !this.hasFrameTarget) return
-
-    const results = this.frameTarget.querySelector(".alchemy-app__results")
-    const tableView = this.frameTarget.querySelector("[data-alchemy-table-view]")
-    const rawView = this.frameTarget.querySelector("[data-alchemy-raw-view]")
-    const splitter = this.frameTarget.querySelector("[data-alchemy-splitter]")
-    if (!results || !tableView || !rawView || !splitter) return
+    const layout = this.alchemySplitLayoutElements({ includeSplitter: true })
+    if (!layout) return
+    const { results, tableView, rawView, splitter } = layout
 
     tableView.hidden = false
     rawView.hidden = !enabled
@@ -1592,11 +1466,9 @@ export default class extends Controller {
   }
 
   applyAlchemySplitSize(topPx) {
-    if (this.appKeyValue !== "alchemy" || !this.hasFrameTarget) return
-    const results = this.frameTarget.querySelector(".alchemy-app__results")
-    const tableView = this.frameTarget.querySelector("[data-alchemy-table-view]")
-    const rawView = this.frameTarget.querySelector("[data-alchemy-raw-view]")
-    if (!results || !tableView || !rawView) return
+    const layout = this.alchemySplitLayoutElements()
+    if (!layout) return
+    const { results, tableView, rawView } = layout
 
     const rect = results.getBoundingClientRect()
     const minPane = this.alchemySplitMinPanePx(rect.height)
@@ -1632,13 +1504,28 @@ export default class extends Controller {
     if (this.appKeyValue !== "alchemy" || !this.hasFrameTarget) return
     if (this.element.dataset.alchemyRawView !== "true") return
 
-    const results = this.frameTarget.querySelector(".alchemy-app__results")
-    if (!results) return
+    const layout = this.alchemySplitLayoutElements()
+    if (!layout) return
+    const { results } = layout
     const rect = results.getBoundingClientRect()
     const savedBottomPx = Number(this.element.dataset.alchemySplitBottomPx || 0)
     if (!Number.isFinite(savedBottomPx) || savedBottomPx <= 0) return
 
     this.applyAlchemySplitSize(rect.height - savedBottomPx)
+  }
+
+  alchemySplitLayoutElements(options = {}) {
+    if (this.appKeyValue !== "alchemy" || !this.hasFrameTarget) return null
+    const results = this.frameTarget.querySelector(".alchemy-app__results")
+    const tableView = this.frameTarget.querySelector("[data-alchemy-table-view]")
+    const rawView = this.frameTarget.querySelector("[data-alchemy-raw-view]")
+    if (!results || !tableView || !rawView) return null
+    if (options.includeSplitter) {
+      const splitter = this.frameTarget.querySelector("[data-alchemy-splitter]")
+      if (!splitter) return null
+      return { results, tableView, rawView, splitter }
+    }
+    return { results, tableView, rawView }
   }
 
   bindAlchemySelectionSync() {
@@ -1710,7 +1597,7 @@ export default class extends Controller {
 
     this._alchemyActiveRawTagName = tagName
 
-    const sourceKind = this.frameTarget.querySelector("[data-alchemy-source-kind]")?.dataset?.alchemySourceKind
+    const sourceKind = this.alchemySourceKind()
     const text = rawText.value || ""
     const span = this.findTagSpanInRaw(text, tagName, sourceKind)
     if (!span) {
@@ -1719,7 +1606,7 @@ export default class extends Controller {
       return
     }
 
-    const rows = Array.from(this.frameTarget.querySelectorAll("tbody[data-alchemy-table-target='tbody'] tr"))
+    const rows = this.alchemyTableRows()
     const rowMatch = rows.find((row) => String(row.dataset.rawTagName || row.dataset.tagName || "") === tagName)
     if (rowMatch) this.ensureAlchemyRowVisible(rowMatch)
 
@@ -1742,8 +1629,8 @@ export default class extends Controller {
   syncRowsToRawCursor(rawText) {
     const text = rawText.value || ""
     const cursor = Number(rawText.selectionStart || 0)
-    const sourceKind = this.frameTarget.querySelector("[data-alchemy-source-kind]")?.dataset?.alchemySourceKind
-    const rows = Array.from(this.frameTarget.querySelectorAll("tbody[data-alchemy-table-target='tbody'] tr"))
+    const sourceKind = this.alchemySourceKind()
+    const rows = this.alchemyTableRows()
     const matchAtCursor = this.findNearestTagNameAtCursor(text, cursor, sourceKind, rows)
     const tagName = String(matchAtCursor?.rawTagName || "")
     if (!tagName) {
@@ -1782,7 +1669,7 @@ export default class extends Controller {
     const overlay = this.frameTarget.querySelector("[data-alchemy-raw-overlay]")
     if (!rawText || !overlay) return
 
-    const sourceKind = this.frameTarget.querySelector("[data-alchemy-source-kind]")?.dataset?.alchemySourceKind
+    const sourceKind = this.alchemySourceKind()
     const text = rawText.value || ""
     const states = this.collectAlchemyRowStates(details)
     const spans = []
@@ -1824,7 +1711,7 @@ export default class extends Controller {
   collectAlchemyRowStates(details = null) {
     const selectedRows = Array.isArray(details?.selectedRows) ? details.selectedRows : []
     const selectedRawFromDetails = new Set(selectedRows.map((row) => String(row.rawTagName || row.tagName || "")))
-    const rows = Array.from(this.frameTarget.querySelectorAll("tbody[data-alchemy-table-target='tbody'] tr"))
+    const rows = this.alchemyTableRows()
     return rows.map((row) => ({
       tagName: String(row.dataset.tagName || ""),
       rawTagName: String(row.dataset.rawTagName || row.dataset.tagName || ""),
@@ -2172,7 +2059,7 @@ export default class extends Controller {
   }
 
   findNearestTagNameAtCursor(text, cursor, sourceKind, rowsArg = null) {
-    const rows = Array.from(rowsArg || this.frameTarget.querySelectorAll("tbody[data-alchemy-table-target='tbody'] tr"))
+    const rows = Array.from(rowsArg || this.alchemyTableRows())
     const matches = []
 
     rows.forEach((row) => {
@@ -2294,10 +2181,7 @@ export default class extends Controller {
 
     // If the server rendered linked mode, synchronize local identity and stop.
     if (linkedMode && linkedDocumentId) {
-      try {
-        window.sessionStorage.setItem(`nexus.linkedAppDocument.${this.frameIdValue}`, linkedDocumentId)
-        window.localStorage.setItem(`nexus.linkedAppDocument.${this.frameIdValue}`, linkedDocumentId)
-      } catch (_) {}
+      this.persistLinkedAppDocumentForFrame(this.frameIdValue, linkedDocumentId)
       if (linkedDocumentTitle) {
         this.syncOpenFileBadge(linkedDocumentTitle)
         this.persistLinkedAppOpenTitle(linkedDocumentTitle)
@@ -2330,10 +2214,7 @@ export default class extends Controller {
         return
       }
 
-      try {
-        window.sessionStorage.setItem(`nexus.linkedAppDocument.${this.frameIdValue}`, canonicalId)
-        window.localStorage.setItem(`nexus.linkedAppDocument.${this.frameIdValue}`, canonicalId)
-      } catch (_) {}
+      this.persistLinkedAppDocumentForFrame(this.frameIdValue, canonicalId)
       if (canonicalTitle) {
         this.syncOpenFileBadge(canonicalTitle)
         this.persistLinkedAppOpenTitle(canonicalTitle)
@@ -2450,10 +2331,7 @@ export default class extends Controller {
     if (saved && documentId != null) {
       const docIdStr = String(documentId)
       // Persist linked doc to both storages so it survives logout/login
-      try {
-        window.sessionStorage.setItem(`nexus.linkedAppDocument.${this.frameIdValue}`, docIdStr)
-        window.localStorage.setItem(`nexus.linkedAppDocument.${this.frameIdValue}`, docIdStr)
-      } catch (_) {}
+      this.persistLinkedAppDocumentForFrame(this.frameIdValue, docIdStr)
       this.syncSpawnedLinkedDocumentRegistration(docIdStr)
     }
 
@@ -2606,15 +2484,10 @@ export default class extends Controller {
     // Clean up the global registry
     const docId = this.element.dataset.spawnedFromDocumentId
     if (docId) {
-      if (this.appKeyValue.startsWith("task-spawn-")) delete window.__nexusSpawnedTasksByDocumentId[docId]
-      if (this.appKeyValue.startsWith("image-spawn-")) delete window.__nexusSpawnedImagesByDocumentId[docId]
-      if (this.appKeyValue.startsWith("quartz-spawn-")) delete window.__nexusSpawnedQuartzByDocumentId[docId]
+      this.unregisterSpawnedWindowDocument(this.appKeyValue, docId)
     }
     if (this.appKeyValue.startsWith("task-spawn-")) this.removePersistedSpawnedTaskWindow(this.appKeyValue)
-    try {
-      window.localStorage.removeItem(`nexus.linkedAppDocument.${this.frameIdValue}`)
-      window.sessionStorage.removeItem(`nexus.linkedAppDocument.${this.frameIdValue}`)
-    } catch (_) {}
+    this.clearLinkedAppDocumentForFrame(this.frameIdValue)
     this.element.remove()
 
     const hasOtherSpawned = this.appKeyValue.startsWith("task-spawn-")
@@ -2708,10 +2581,7 @@ export default class extends Controller {
   resetLinkedDocumentSessionState() {
     this.stopFrameMediaPlayback()
     if (this.hasFrameIdValue) {
-      try {
-        window.sessionStorage.removeItem(`nexus.linkedAppDocument.${this.frameIdValue}`)
-        window.localStorage.removeItem(`nexus.linkedAppDocument.${this.frameIdValue}`)
-      } catch (_) {}
+      this.clearLinkedAppDocumentForFrame(this.frameIdValue)
     }
     this.currentUrl = this.buildAppUrl({ blank: false })
     this.clearOpenFileBadge()
@@ -2762,6 +2632,14 @@ export default class extends Controller {
     } else {
       url.searchParams.delete("blank")
     }
+    return `${url.pathname}${url.search}`
+  }
+
+  buildLinkedDocumentUrl(documentId) {
+    const url = new URL(this.appUrlValue, window.location.origin)
+    if (this.hasFrameIdValue) url.searchParams.set("frame_id", this.frameIdValue)
+    url.searchParams.set("document_id", String(documentId))
+    url.searchParams.delete("blank")
     return `${url.pathname}${url.search}`
   }
 
@@ -3852,22 +3730,52 @@ export default class extends Controller {
     if (pickerIframe) pickerIframe.removeAttribute("src")
   }
 
+  applySpawnedCloneBounds(clone, offsetPx = 24) {
+    if (!clone) return
+    const rect = this.element.getBoundingClientRect()
+    clone.style.left = `${Math.round(rect.left) + offsetPx}px`
+    clone.style.top = `${Math.round(rect.top) + offsetPx}px`
+    clone.style.width = `${Math.round(rect.width)}px`
+    clone.style.height = `${Math.round(rect.height)}px`
+  }
+
+  configureSpawnedCloneIdentity(clone, {
+    appKey,
+    frameId,
+    storageKey,
+    spawnedFlag,
+    documentId = "",
+    hasLinkedAppSavePicker = false,
+    openOnConnect = false
+  } = {}) {
+    if (!clone) return
+    const resolvedAppKey = String(appKey || "")
+    const resolvedFrameId = String(frameId || resolvedAppKey)
+    const resolvedStorageKey = String(storageKey || resolvedAppKey)
+    clone.dataset.contentWindowAppKeyValue = resolvedAppKey
+    clone.dataset.contentWindowFrameIdValue = resolvedFrameId
+    clone.dataset.contentWindowStorageKeyValue = resolvedStorageKey
+    if (hasLinkedAppSavePicker) clone.dataset.contentWindowHasLinkedAppSavePickerValue = "true"
+    if (openOnConnect) clone.dataset.openOnConnect = "true"
+    if (spawnedFlag) clone.dataset[spawnedFlag] = "true"
+    if (documentId) clone.dataset.spawnedFromDocumentId = String(documentId)
+  }
+
   /** Clone the primary window shell into a new blank (unsaved) task window and open it. */
   spawnBlankTaskWindow() {
     const uid = `task-spawn-${Date.now()}`
     const clone = this.element.cloneNode(true)
-    clone.dataset.contentWindowAppKeyValue = uid
-    clone.dataset.contentWindowFrameIdValue = uid
-    clone.dataset.contentWindowStorageKeyValue = uid
-    clone.dataset.contentWindowHasLinkedAppSavePickerValue = "true"
-    clone.dataset.isSpawnedTaskWindow = "true"
+    this.configureSpawnedCloneIdentity(clone, {
+      appKey: uid,
+      frameId: uid,
+      storageKey: uid,
+      spawnedFlag: "isSpawnedTaskWindow",
+      hasLinkedAppSavePicker: true,
+      openOnConnect: false
+    })
     // No spawnedFromDocumentId — blank window hasn't been saved yet
     this.prepareClonedWindowShell(clone, { frameId: uid, title: "", openOnConnect: true })
-    const rect = this.element.getBoundingClientRect()
-    clone.style.left = `${Math.round(rect.left) + 24}px`
-    clone.style.top  = `${Math.round(rect.top)  + 24}px`
-    clone.style.width  = `${Math.round(rect.width)}px`
-    clone.style.height = `${Math.round(rect.height)}px`
+    this.applySpawnedCloneBounds(clone)
     this.element.parentElement.appendChild(clone)
     return uid
   }

@@ -8,8 +8,11 @@ class DocumentStorageSyncLite
       env_override = ENV["NEXUS_STORAGE_ROOT"].to_s.strip
       return Pathname.new(env_override) unless env_override.empty?
 
-      root_name = Rails.env.test? ? "workspace_test" : "workspace"
-      Rails.root.join("storage", root_name)
+      if Rails.env.test?
+        Rails.root.join("storage", "storage_test", Process.pid.to_s)
+      else
+        Rails.root.join("storage")
+      end
     end
 
     def next_available_filename(base_path, title, extension: ".txt", exclude_path: nil)
@@ -109,6 +112,11 @@ class DocumentStorageSyncLite
   end
 
   def create_folder
+    if @document.user_workspace_root?
+      persist_storage_path("")
+      return
+    end
+
     parent_relative = folder_parent_relative_path
     base_path = absolute_path_for(parent_relative)
     FileUtils.mkdir_p(base_path)
@@ -128,8 +136,9 @@ class DocumentStorageSyncLite
     parent_path = absolute_path_for(parent_relative)
     FileUtils.mkdir_p(parent_path)
 
-    filename = self.class.next_available_filename(parent_path, @document.title, extension: disk_extension_for_file)
-    target_relative = File.join(parent_relative, filename)
+    filename = File.basename(@document.storage_path.to_s) if @document.storage_path.present?
+    filename = self.class.next_available_filename(parent_path, @document.title, extension: disk_extension_for_file) if filename.blank?
+    target_relative = parent_relative.present? ? File.join(parent_relative, filename) : filename
     target_path = absolute_path_for(target_relative)
 
     File.binwrite(target_path, item_file_contents)
@@ -138,6 +147,11 @@ class DocumentStorageSyncLite
   end
 
   def sync_folder_update
+    if @document.user_workspace_root?
+      persist_storage_path("")
+      return
+    end
+
     old_relative = @document.previous_changes.dig("storage_path", 0).to_s.presence || @document.storage_path.to_s
     old_path = absolute_path_for(old_relative)
     parent_relative = folder_parent_relative_path
@@ -176,7 +190,7 @@ class DocumentStorageSyncLite
       extension: disk_extension_for_file,
       exclude_path: previous_path
     )
-    target_relative = File.join(parent_relative, target_filename)
+    target_relative = parent_relative.present? ? File.join(parent_relative, target_filename) : target_filename
     target_path = absolute_path_for(target_relative)
 
     if previous_relative.present? && previous_path.exist? && previous_path != target_path

@@ -16,6 +16,7 @@ class WorkspacePreferencesAndUserFlowTest < ActionDispatch::IntegrationTest
 
   teardown do
     Document.delete_all
+    UserAppState.delete_all
     User.where(id: @user&.id).delete_all
   end
 
@@ -39,7 +40,7 @@ class WorkspacePreferencesAndUserFlowTest < ActionDispatch::IntegrationTest
   test "workspace preferences update without wallpaper params preserves wallpaper" do
     images_root = Apps::FinderController.workspace_section_root(@user, "images")
     doc = images_root.children.create!(title: "preserve-wall.jpg", is_folder: false, content_type: "asset", content: "")
-    doc.update_columns(storage_path: "#{@user.username}/Finder/Images/preserve-wall.jpg")
+    doc.update_columns(storage_path: "Finder/Images/preserve-wall.jpg")
 
     manager = WorkspacePreferences::Manager.new(user: @user)
     result = manager.apply_wallpaper_image(doc.id)
@@ -61,15 +62,11 @@ class WorkspacePreferencesAndUserFlowTest < ActionDispatch::IntegrationTest
   end
 
   test "workspace preferences show does not clear wallpaper when referenced doc is missing" do
-    manager = WorkspacePreferences::Manager.new(user: @user)
-    manager.payload
-    state_file = manager.send(:workspace_state_file)
-
-    File.write(state_file, JSON.pretty_generate({
+    UserAppState.put(user: @user, key: WorkspacePreferences::Manager::WORKSPACE_STATE_KEY, value: {
       active_theme_id: "default",
       wallpaper_background_kind: "image",
       wallpaper_image_document_id: 999_999
-    }) + "\n")
+    })
 
     get workspace_preferences_path, as: :json
 
@@ -78,16 +75,12 @@ class WorkspacePreferencesAndUserFlowTest < ActionDispatch::IntegrationTest
     assert_equal "image", body.fetch("wallpaper_background_kind")
     assert_equal 999_999, body.fetch("wallpaper_image_document_id")
 
-    stored = JSON.parse(File.read(state_file))
+    stored = UserAppState.find_by(user: @user, key: WorkspacePreferences::Manager::WORKSPACE_STATE_KEY)&.data
     assert_equal "image", stored.fetch("wallpaper_background_kind")
     assert_equal 999_999, stored.fetch("wallpaper_image_document_id")
   end
 
   test "workspace preferences show does not clear wallpaper when referenced doc is ineligible" do
-    manager = WorkspacePreferences::Manager.new(user: @user)
-    manager.payload
-    state_file = manager.send(:workspace_state_file)
-
     workspace_root = Apps::FinderController.workspace_root_folder(@user)
     ineligible = Document.create!(
       parent: workspace_root,
@@ -97,11 +90,11 @@ class WorkspacePreferencesAndUserFlowTest < ActionDispatch::IntegrationTest
       content: "x"
     )
 
-    File.write(state_file, JSON.pretty_generate({
+    UserAppState.put(user: @user, key: WorkspacePreferences::Manager::WORKSPACE_STATE_KEY, value: {
       active_theme_id: "default",
       wallpaper_background_kind: "image",
       wallpaper_image_document_id: ineligible.id
-    }) + "\n")
+    })
 
     get workspace_preferences_path, as: :json
 
@@ -110,26 +103,22 @@ class WorkspacePreferencesAndUserFlowTest < ActionDispatch::IntegrationTest
     assert_equal "image", body.fetch("wallpaper_background_kind")
     assert_equal ineligible.id, body.fetch("wallpaper_image_document_id")
 
-    stored = JSON.parse(File.read(state_file))
+    stored = UserAppState.find_by(user: @user, key: WorkspacePreferences::Manager::WORKSPACE_STATE_KEY)&.data
     assert_equal "image", stored.fetch("wallpaper_background_kind")
     assert_equal ineligible.id, stored.fetch("wallpaper_image_document_id")
   end
 
   test "workspace preferences show heals stale wallpaper id from storage path" do
-    manager = WorkspacePreferences::Manager.new(user: @user)
-    manager.payload
-    state_file = manager.send(:workspace_state_file)
-
     images_root = Apps::FinderController.workspace_section_root(@user, "images")
     doc = images_root.children.create!(title: "heal-wall.jpg", is_folder: false, content_type: "asset", content: "")
-    doc.update_columns(storage_path: "#{@user.username}/Finder/Images/heal-wall.jpg")
+    doc.update_columns(storage_path: "Finder/Images/heal-wall.jpg")
 
-    File.write(state_file, JSON.pretty_generate({
+    UserAppState.put(user: @user, key: WorkspacePreferences::Manager::WORKSPACE_STATE_KEY, value: {
       active_theme_id: "default",
       wallpaper_background_kind: "image",
       wallpaper_image_document_id: 999_999,
       wallpaper_image_storage_path: doc.storage_path
-    }) + "\n")
+    })
 
     get workspace_preferences_path, as: :json
 
@@ -138,7 +127,7 @@ class WorkspacePreferencesAndUserFlowTest < ActionDispatch::IntegrationTest
     assert_equal "image", body.fetch("wallpaper_background_kind")
     assert_equal doc.id, body.fetch("wallpaper_image_document_id")
 
-    stored = JSON.parse(File.read(state_file))
+    stored = UserAppState.find_by(user: @user, key: WorkspacePreferences::Manager::WORKSPACE_STATE_KEY)&.data
     assert_equal "image", stored.fetch("wallpaper_background_kind")
     assert_equal doc.id, stored.fetch("wallpaper_image_document_id")
     assert_equal doc.storage_path, stored.fetch("wallpaper_image_storage_path")
