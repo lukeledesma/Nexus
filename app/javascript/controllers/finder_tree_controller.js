@@ -483,7 +483,7 @@ export default class extends Controller {
 
     this._setRootDropArmed(dragPayload.dragKind === DRAG_KIND.FILE)
 
-    const target = this._dropTargetFromEvent(event, { allowRoot: dragPayload.dragKind === DRAG_KIND.FILE })
+    const target = this._dropTargetFromEvent(event, { allowRoot: dragPayload.dragKind === DRAG_KIND.FILE || dragPayload.dragKind === DRAG_KIND.FOLDER })
     if (!target) {
       this._clearDropTargetLine()
       return
